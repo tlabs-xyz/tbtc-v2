@@ -18,9 +18,9 @@ pragma solidity 0.8.17;
 import "@keep-network/random-beacon/contracts/Reimbursable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import "./wormhole/Wormhole.sol";
+import "./Wormhole.sol";
 import "../integrator/AbstractBTCRedeemer.sol";
-import "./utils/Crosschain.sol";
+import "../utils/Crosschain.sol";
 
 /// @title L1BTCRedeemerWormhole
 /// @notice This contract is part of the direct bridging mechanism allowing
@@ -46,7 +46,12 @@ import "./utils/Crosschain.sol";
 ///         5. Relayers (or other authorized entities) might be involved in facilitating
 ///            the cross-chain communication and L1 transaction submissions, potentially
 ///            eligible for gas reimbursement.
-contract L1BTCRedeemerWormhole is AbstractBTCRedeemer, OwnableUpgradeable, Reimbursable {
+contract L1BTCRedeemerWormhole is
+    AbstractBTCRedeemer,
+    OwnableUpgradeable,
+    Reimbursable,
+    ReentrancyGuardUpgradeable
+{
     /// @notice Holds information about a deferred gas reimbursement.
     struct GasReimbursement {
         /// @notice Receiver that is supposed to receive the reimbursement.
