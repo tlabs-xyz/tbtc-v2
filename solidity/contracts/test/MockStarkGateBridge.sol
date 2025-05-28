@@ -95,8 +95,20 @@ contract MockStarkGateBridge is IStarkGateBridge {
         return messageNonce++;
     }
     
-    function estimateMessageFee() external pure override returns (uint256) {
-        return 0.01 ether;
+    uint256 public dynamicFee = 0.01 ether;
+    bool public shouldFailEstimation = false;
+    
+    function estimateMessageFee() external view override returns (uint256) {
+        require(!shouldFailEstimation, "Estimation failed");
+        return dynamicFee;
+    }
+    
+    function setDynamicFee(uint256 _fee) external {
+        dynamicFee = _fee;
+    }
+    
+    function setShouldFailEstimation(bool _shouldFail) external {
+        shouldFailEstimation = _shouldFail;
     }
     
     function depositWithMessageCancelRequest(
