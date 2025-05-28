@@ -27,6 +27,12 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     /// @notice The L1→L2 message fee required for StarkGate bridge
     uint256 public l1ToL2MessageFee;
 
+    /// @notice Maximum allowed fee buffer percentage (50%)
+    uint256 public constant MAX_FEE_BUFFER = 50;
+    
+    /// @notice Fee buffer percentage to apply on top of dynamic fees
+    uint256 public feeBuffer;
+
     // ========== Events ==========
 
     /// @notice Emitted when tBTC is successfully bridged to StarkNet
@@ -44,6 +50,10 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     /// @notice Emitted when the L1→L2 message fee is updated
     /// @param newFee The new fee amount in wei
     event L1ToL2MessageFeeUpdated(uint256 newFee);
+    
+    /// @notice Emitted when the fee buffer is updated
+    /// @param newBuffer The new fee buffer percentage
+    event FeeBufferUpdated(uint256 newBuffer);
 
     /// @notice Emitted when the depositor is initialized
     /// @param starkGateBridge The address of the StarkGate bridge
@@ -90,6 +100,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         starkGateBridge = IStarkGateBridge(_starkGateBridge);
         starkNetTBTCToken = _starkNetTBTCToken;
         l1ToL2MessageFee = _l1ToL2MessageFee;
+        feeBuffer = 10; // Default 10% buffer
 
         emit StarkNetBitcoinDepositorInitialized(_starkGateBridge, _starkNetTBTCToken);
     }
@@ -108,6 +119,30 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         require(newFee > 0, "Fee must be greater than 0");
         l1ToL2MessageFee = newFee;
         emit L1ToL2MessageFeeUpdated(newFee);
+    }
+    
+    /// @notice Returns the dynamic fee quote from StarkGate with fee buffer
+    /// @dev Falls back to static fee if StarkGate is unavailable or fails
+    /// @return The current L1→L2 message fee with buffer applied
+    function quoteFinalizeDepositDynamic() public view returns (uint256) {
+        if (address(starkGateBridge) == address(0)) {
+            return l1ToL2MessageFee;
+        }
+        
+        try starkGateBridge.estimateMessageFee() returns (uint256 baseFee) {
+            uint256 bufferedFee = baseFee + ((baseFee * feeBuffer) / 100);
+            return bufferedFee;
+        } catch {
+            return l1ToL2MessageFee;
+        }
+    }
+    
+    /// @notice Updates the fee buffer percentage
+    /// @param newBuffer The new fee buffer percentage (0-50)
+    function updateFeeBuffer(uint256 newBuffer) external onlyOwner {
+        require(newBuffer <= MAX_FEE_BUFFER, "Fee buffer too high");
+        feeBuffer = newBuffer;
+        emit FeeBufferUpdated(newBuffer);
     }
 
     // ========== Internal Functions ==========
@@ -149,5 +184,5 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     
     /// @dev Gap for future storage variables to maintain upgrade compatibility
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable state-variable-assignment
-    uint256[50] private __gap;
+    uint256[49] private __gap; // Reduced by 1 due to feeBuffer
 }
