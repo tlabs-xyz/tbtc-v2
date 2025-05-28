@@ -63,11 +63,6 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     const MockTBTCToken = await ethers.getContractFactory("MockTBTCToken")
     tbtcToken = await MockTBTCToken.deploy()
     await tbtcVault.setTbtcToken(tbtcToken.address)
-    
-    // Verify token is set correctly
-    const vaultToken = await tbtcVault.tbtcToken()
-    console.log("Vault tbtcToken:", vaultToken)
-    console.log("Actual token:", tbtcToken.address)
 
     const MockStarkGateBridge = await ethers.getContractFactory("MockStarkGateBridge")
     starkGateBridge = await MockStarkGateBridge.deploy()
@@ -88,17 +83,6 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     const proxy = await ProxyFactory.deploy(depositorImpl.address, initData)
     
     depositor = StarkNetBitcoinDepositor.attach(proxy.address)
-    
-    // Debug: Check depositor's tbtcToken
-    const depositorToken = await depositor.tbtcToken()
-    console.log("Depositor tbtcToken:", depositorToken)
-    console.log("Expected tbtcToken:", tbtcToken.address)
-    console.log("Vault's tbtcToken:", await tbtcVault.tbtcToken())
-    
-    // Verify tbtcToken is properly initialized
-    if (depositorToken !== tbtcToken.address) {
-      console.error("WARNING: tbtcToken mismatch!")
-    }
   })
 
   beforeEach(async () => {
@@ -182,10 +166,6 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       const lastCall = await starkGateBridge.getLastSimpleDepositCall()
       expect(lastCall.token).to.equal(tbtcToken.address)
       
-      // Debug amount differences
-      console.log("Expected depositAmount:", depositAmount.toString())
-      console.log("Actual lastCall.amount:", lastCall.amount.toString())
-      
       // Verify the actual bridged amount (there's an optimistic minting fee)
       // The actual amount will be slightly less than expected
       expect(lastCall.amount).to.be.gt(0)
@@ -225,8 +205,6 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       const tx = await depositor.finalizeDeposit(depositKey, { value: INITIAL_MESSAGE_FEE })
       const receipt = await tx.wait()
       const gasUsed = receipt.gasUsed
-
-      console.log(`Gas used with deposit(): ${gasUsed}`)
       
       // This is the gas used with the new deposit() function
       // We can't directly compare without the old implementation
