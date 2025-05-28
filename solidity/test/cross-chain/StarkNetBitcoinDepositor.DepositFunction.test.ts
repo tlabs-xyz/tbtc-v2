@@ -135,16 +135,16 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       // Mark deposit as swept by the bridge (required for finalization)
       await bridge.sweepDeposit(depositKey)
 
-      // Setup for finalization
-      await tbtcToken.mint(depositor.address, depositAmount)
+      // Setup for finalization - mint tBTC to the vault (not the depositor)
+      // The depositor will transfer from the vault
+      await tbtcToken.mint(tbtcVault.address, depositAmount)
 
       // Finalize deposit - this should call deposit(), not depositWithMessage()
       await depositor.finalizeDeposit(depositKey, { value: INITIAL_MESSAGE_FEE })
 
-      // Verify deposit() was called (this will fail initially)
-      // @ts-ignore - deposit() doesn't exist yet
-      expect(await starkGateBridge.wasDepositCalled()).to.be.true
-      expect(await starkGateBridge.wasDepositWithMessageCalled()).to.be.false
+      // Verify deposit() was called
+      expect(await starkGateBridge.depositCalled()).to.be.true
+      expect(await starkGateBridge.depositWithMessageCalled()).to.be.false
     })
 
     it("should not create empty message array", async () => {
@@ -168,7 +168,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       )
 
       await bridge.sweepDeposit(depositKey)
-      await tbtcToken.mint(depositor.address, depositAmount)
+      await tbtcToken.mint(tbtcVault.address, depositAmount)
       await depositor.finalizeDeposit(depositKey, { value: INITIAL_MESSAGE_FEE })
 
       // Verify deposit() was called with correct parameters
@@ -186,8 +186,8 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       
       // Verify no message array exists (deposit() doesn't have message parameter)
       // This confirms we're using the simpler function
-      expect(await starkGateBridge.wasDepositCalled()).to.be.true
-      expect(await starkGateBridge.wasDepositWithMessageCalled()).to.be.false
+      expect(await starkGateBridge.depositCalled()).to.be.true
+      expect(await starkGateBridge.depositWithMessageCalled()).to.be.false
     })
   })
 
@@ -212,7 +212,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       )
 
       await bridge.sweepDeposit(depositKey)
-      await tbtcToken.mint(depositor.address, depositAmount)
+      await tbtcToken.mint(tbtcVault.address, depositAmount)
       
       // Measure gas for new implementation
       const tx = await depositor.finalizeDeposit(depositKey, { value: INITIAL_MESSAGE_FEE })
@@ -250,7 +250,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       )
 
       await bridge.sweepDeposit(depositKey)
-      await tbtcToken.mint(depositor.address, depositAmount)
+      await tbtcToken.mint(tbtcVault.address, depositAmount)
 
       // Finalize deposit
       await depositor.finalizeDeposit(depositKey, { value: INITIAL_MESSAGE_FEE })
