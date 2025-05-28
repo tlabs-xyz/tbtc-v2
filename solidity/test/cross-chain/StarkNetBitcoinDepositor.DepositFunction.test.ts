@@ -92,6 +92,13 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     // Debug: Check depositor's tbtcToken
     const depositorToken = await depositor.tbtcToken()
     console.log("Depositor tbtcToken:", depositorToken)
+    console.log("Expected tbtcToken:", tbtcToken.address)
+    console.log("Vault's tbtcToken:", await tbtcVault.tbtcToken())
+    
+    // Verify tbtcToken is properly initialized
+    if (depositorToken !== tbtcToken.address) {
+      console.error("WARNING: tbtcToken mismatch!")
+    }
   })
 
   beforeEach(async () => {
@@ -135,9 +142,9 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       // Mark deposit as swept by the bridge (required for finalization)
       await bridge.sweepDeposit(depositKey)
 
-      // Setup for finalization - mint tBTC to the vault (not the depositor)
-      // The depositor will transfer from the vault
-      await tbtcToken.mint(tbtcVault.address, depositAmount)
+      // Setup for finalization - mint tBTC to the depositor
+      // In real scenario, vault would mint to depositor after sweep
+      await tbtcToken.mint(depositor.address, depositAmount)
 
       // Finalize deposit - this should call deposit(), not depositWithMessage()
       await depositor.finalizeDeposit(depositKey, { value: INITIAL_MESSAGE_FEE })
@@ -168,7 +175,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       )
 
       await bridge.sweepDeposit(depositKey)
-      await tbtcToken.mint(tbtcVault.address, depositAmount)
+      await tbtcToken.mint(depositor.address, depositAmount)
       await depositor.finalizeDeposit(depositKey, { value: INITIAL_MESSAGE_FEE })
 
       // Verify deposit() was called with correct parameters
@@ -212,7 +219,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       )
 
       await bridge.sweepDeposit(depositKey)
-      await tbtcToken.mint(tbtcVault.address, depositAmount)
+      await tbtcToken.mint(depositor.address, depositAmount)
       
       // Measure gas for new implementation
       const tx = await depositor.finalizeDeposit(depositKey, { value: INITIAL_MESSAGE_FEE })
@@ -250,7 +257,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       )
 
       await bridge.sweepDeposit(depositKey)
-      await tbtcToken.mint(tbtcVault.address, depositAmount)
+      await tbtcToken.mint(depositor.address, depositAmount)
 
       // Finalize deposit
       await depositor.finalizeDeposit(depositKey, { value: INITIAL_MESSAGE_FEE })
