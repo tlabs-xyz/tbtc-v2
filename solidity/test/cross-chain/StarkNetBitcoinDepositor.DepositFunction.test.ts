@@ -57,12 +57,12 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     const MockBridge = await ethers.getContractFactory("MockBridgeForStarkNet")
     bridge = await MockBridge.deploy()
 
-    const MockTBTCVault = await ethers.getContractFactory("contracts/test/MockTBTCVault.sol:MockTBTCVault")
-    tbtcVault = await MockTBTCVault.deploy()
-
     const MockTBTCToken = await ethers.getContractFactory("MockTBTCToken")
     tbtcToken = await MockTBTCToken.deploy()
-    await tbtcVault.setTbtcToken(tbtcToken.address)
+
+    const MockTBTCVault = await ethers.getContractFactory("contracts/test/MockTBTCVault.sol:MockTBTCVault")
+    tbtcVault = await MockTBTCVault.deploy()
+    await tbtcVault.setTbtcToken(tbtcToken.address) // Must set token before initializing depositor
 
     const MockStarkGateBridge = await ethers.getContractFactory("MockStarkGateBridge")
     starkGateBridge = await MockStarkGateBridge.deploy()
@@ -129,6 +129,14 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       // Setup for finalization - mint tBTC to the depositor
       // In real scenario, vault would mint to depositor after sweep
       await tbtcToken.mint(depositor.address, depositAmount)
+
+      // Debug logging
+      console.log("=== Debug Info ===")
+      console.log("tbtcToken address from depositor:", await depositor.tbtcToken())
+      console.log("Expected tbtcToken address:", tbtcToken.address)
+      console.log("Depositor address:", depositor.address)
+      console.log("Depositor tBTC balance:", await tbtcToken.balanceOf(depositor.address))
+      console.log("==================")
 
       // Finalize deposit - this should call deposit(), not depositWithMessage()
       await depositor.finalizeDeposit(depositKey, { value: INITIAL_MESSAGE_FEE })
