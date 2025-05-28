@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.17;
 
-import "../../../../../contracts/cross-chain/starknet/interfaces/IStarkGateBridge.sol";
+import "../cross-chain/starknet/interfaces/IStarkGateBridge.sol";
 
 contract MockStarkGateBridge is IStarkGateBridge {
     uint256 public messageNonce = 1;

@@ -4,9 +4,9 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../integrator/AbstractBTCDepositor.sol";
-import "../integrator/IBridge.sol";
-import "../integrator/ITBTCVault.sol";
+import "../../integrator/AbstractBTCDepositor.sol";
+import "../../integrator/IBridge.sol";
+import "../../integrator/ITBTCVault.sol";
 import "./interfaces/IStarkGateBridge.sol";
 
 /// @title StarkNet L1 Bitcoin Depositor
@@ -52,6 +52,14 @@ contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
         address tbtcToken
     );
 
+    /// @notice Emitted when a deposit is initialized for StarkNet
+    /// @param depositKey The unique identifier for the deposit
+    /// @param starkNetRecipient The recipient address on StarkNet L2
+    event DepositInitializedForStarkNet(
+        bytes32 indexed depositKey,
+        uint256 indexed starkNetRecipient
+    );
+
     // ========== Constructor ==========
 
     /// @notice Initializes the StarkNet Bitcoin Depositor contract
@@ -70,8 +78,9 @@ contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
         require(_starkGateBridge != address(0), "Invalid StarkGate bridge");
         require(_l1ToL2MessageFee > 0, "Invalid L1->L2 message fee");
 
-        bridge = IBridge(_tbtcBridge);
-        tbtcVault = ITBTCVault(_tbtcVault);
+        // Initialize the AbstractBTCDepositor
+        __AbstractBTCDepositor_initialize(_tbtcBridge, _tbtcVault);
+        
         starkGateBridge = IStarkGateBridge(_starkGateBridge);
         tbtcToken = IERC20(ITBTCVault(_tbtcVault).tbtcToken());
         l1ToL2MessageFee = _l1ToL2MessageFee;
@@ -93,7 +102,13 @@ contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
         require(l2DepositOwner != bytes32(0), "Invalid L2 deposit owner");
         
         // Call parent's _initializeDeposit which handles the reveal to tBTC Bridge
-        _initializeDeposit(fundingTx, reveal, l2DepositOwner);
+        (uint256 depositKey, ) = _initializeDeposit(fundingTx, reveal, l2DepositOwner);
+        
+        // Emit event for StarkNet-specific initialization
+        emit DepositInitializedForStarkNet(
+            bytes32(depositKey),
+            uint256(l2DepositOwner)
+        );
     }
 
     /// @notice Finalizes a deposit by bridging minted tBTC to StarkNet
@@ -102,10 +117,10 @@ contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
         require(msg.value >= l1ToL2MessageFee, "Insufficient L1->L2 message fee");
         
         // Call parent's _finalizeDeposit to get the minted tBTC
-        (uint256 initialAmount, uint256 tbtcAmount, bytes32 l2DepositOwner) = _finalizeDeposit(depositKey);
+        (uint256 initialAmount, uint256 tbtcAmount, bytes32 l2DepositOwner) = _finalizeDeposit(uint256(depositKey));
         
         // Bridge the tBTC to StarkNet
-        _transferTbtc(tbtcAmount, l2DepositOwner);
+        _transferTbtc(depositKey, tbtcAmount, l2DepositOwner);
     }
 
     /// @notice Returns the required fee to finalize a deposit
@@ -117,7 +132,7 @@ contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
     /// @notice Updates the L1→L2 message fee
     /// @param newFee The new fee amount in wei
     function updateL1ToL2MessageFee(uint256 newFee) external onlyOwner {
-        require(newFee > 0, "Invalid fee");
+        require(newFee > 0, "Fee must be greater than 0");
         l1ToL2MessageFee = newFee;
         emit L1ToL2MessageFeeUpdated(newFee);
     }
@@ -126,9 +141,11 @@ contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
 
     /// @notice Transfers tBTC to StarkNet L2 using StarkGate bridge
     /// @dev This is the key integration point with StarkGate
+    /// @param depositKey The unique identifier for the deposit
     /// @param amount The amount of tBTC to bridge
     /// @param l2Receiver The recipient address on StarkNet (as bytes32)
     function _transferTbtc(
+        bytes32 depositKey,
         uint256 amount,
         bytes32 l2Receiver
     ) internal {
@@ -150,7 +167,7 @@ contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
 
         // Emit event for tracking
         emit TBTCBridgedToStarkNet(
-            keccak256(abi.encode(block.timestamp, amount, starkNetRecipient)),
+            depositKey,
             starkNetRecipient,
             amount,
             messageNonce

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.17;
 
-import "../../../../contracts/integrator/ITBTCVault.sol";
+import "../integrator/ITBTCVault.sol";
 
 contract MockTBTCVault is ITBTCVault {
     address public override tbtcToken;
