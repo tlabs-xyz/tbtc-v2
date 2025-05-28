@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.17;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../cross-chain/starknet/interfaces/IStarkGateBridge.sol";
 
 contract MockStarkGateBridge is IStarkGateBridge {
@@ -29,6 +30,18 @@ contract MockStarkGateBridge is IStarkGateBridge {
     bool public depositWithMessageCalled;
     bool public depositCalled;
     uint256 public depositCallCount;
+    
+    // Storage for deposits
+    struct DepositInfo {
+        address token;
+        uint256 amount;
+        uint256 l2Recipient;
+        uint256[] message;
+        address depositor;
+    }
+    
+    mapping(uint256 => DepositInfo) public deposits;
+    uint256 public nextNonce = 1;
     
     function deposit(
         address token,
