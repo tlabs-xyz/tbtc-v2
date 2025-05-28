@@ -129,13 +129,11 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         // Approve StarkGate bridge to spend tBTC
         tbtcToken.safeIncreaseAllowance(address(starkGateBridge), amount);
 
-        // Bridge tBTC to StarkNet with empty message for direct transfer
-        uint256[] memory emptyMessage = new uint256[](0);
-        uint256 messageNonce = starkGateBridge.depositWithMessage{value: msg.value}(
+        // Bridge tBTC to StarkNet using the more efficient deposit function
+        uint256 messageNonce = starkGateBridge.deposit{value: msg.value}(
             address(tbtcToken),
             amount,
-            starkNetRecipient,
-            emptyMessage
+            starkNetRecipient
         );
 
         // Emit event for tracking

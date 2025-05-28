@@ -17,10 +17,62 @@ contract MockStarkGateBridge is IStarkGateBridge {
         uint256 value;
     }
     
+    struct SimpleDepositCall {
+        address token;
+        uint256 amount;
+        uint256 l2Recipient;
+        uint256 value;
+    }
+    
     DepositCall public lastDepositCall;
+    SimpleDepositCall public lastSimpleDepositCall;
     bool public depositWithMessageCalled;
+    bool public depositCalled;
     uint256 public depositCallCount;
     
+    function deposit(
+        address token,
+        uint256 amount,
+        uint256 l2Recipient
+    ) external payable override returns (uint256) {
+        depositCalled = true;
+        depositCallCount++;
+        lastSimpleDepositCall = SimpleDepositCall({
+            token: token,
+            amount: amount,
+            l2Recipient: l2Recipient,
+            value: msg.value
+        });
+        
+        if (_useCustomReturnValue) {
+            return _customReturnValue;
+        }
+        return messageNonce++;
+    }
+    
+    function deposit(
+        address token,
+        uint256 amount,
+        uint256 l2Recipient
+    ) external payable override returns (uint256) {
+        require(msg.value == 0.1 ether, "Incorrect L1->L2 message fee");
+        
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        
+        deposits[nextNonce] = DepositInfo({
+            token: token,
+            amount: amount,
+            l2Recipient: l2Recipient,
+            message: new uint256[](0),
+            depositor: msg.sender
+        });
+        
+        uint256 nonce = nextNonce;
+        nextNonce++;
+        
+        return nonce;
+    }
+
     function depositWithMessage(
         address token,
         uint256 amount,
@@ -92,8 +144,18 @@ contract MockStarkGateBridge is IStarkGateBridge {
         _useCustomReturnValue = true;
     }
     
+    // Helper functions for deposit() testing
+    function wasDepositCalled() external view returns (bool) {
+        return depositCalled;
+    }
+    
+    function getLastSimpleDepositCall() external view returns (SimpleDepositCall memory) {
+        return lastSimpleDepositCall;
+    }
+    
     function resetMock() external {
         depositWithMessageCalled = false;
+        depositCalled = false;
         depositCallCount = 0;
         _useCustomReturnValue = false;
         messageNonce = 1;
