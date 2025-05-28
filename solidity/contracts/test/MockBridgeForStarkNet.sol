@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.17;
 
+import {BTCUtils} from "@keep-network/bitcoin-spv-sol/contracts/BTCUtils.sol";
 import "../integrator/IBridge.sol";
 
 contract MockBridgeForStarkNet is IBridge {
     mapping(uint256 => IBridgeTypes.DepositRequest) private _deposits;
     mapping(uint256 => bool) private _swept;
+    mapping(uint256 => bool) private _finalized; // Track finalized deposits to prevent double finalization
     
     // Events to match real Bridge
     event DepositRevealed(uint256 indexed depositKey);
@@ -21,19 +23,25 @@ contract MockBridgeForStarkNet is IBridge {
     ) external {
         initializeDepositCalled = true;
         
-        // Calculate deposit key using extraData as the key component
-        // This simulates how AbstractBTCDepositor creates unique deposit keys
-        uint256 depositKey = uint256(extraData);
+        // Calculate deposit key exactly like AbstractBTCDepositor
+        bytes memory txData = abi.encodePacked(
+            fundingTx.version,
+            fundingTx.inputVector,
+            fundingTx.outputVector,
+            fundingTx.locktime
+        );
+        bytes32 fundingTxHash = BTCUtils.hash256View(txData);
+        uint256 depositKey = uint256(keccak256(abi.encodePacked(fundingTxHash, reveal.fundingOutputIndex)));
         
         lastDepositKey = depositKey;
         
         // Create mock deposit
         _deposits[depositKey] = IBridgeTypes.DepositRequest({
             depositor: msg.sender,
-            amount: 1000000000000000, // Example amount
+            amount: 100000000, // 1 BTC in satoshis (8-decimal precision)
             revealedAt: uint32(block.timestamp),
             vault: reveal.vault,
-            treasuryFee: 12098000000000, // Example treasury fee
+            treasuryFee: 12098, // Treasury fee in satoshis (should match the ratio)
             sweptAt: 0,
             extraData: extraData
         });
@@ -68,6 +76,11 @@ contract MockBridgeForStarkNet is IBridge {
         uint256[] memory keys = new uint256[](1);
         keys[0] = lastDepositKey;
         return keys;
+    }
+    
+    // Debug helper to check if deposit exists
+    function depositExists(uint256 depositKey) external view returns (bool) {
+        return _deposits[depositKey].depositor != address(0);
     }
     
     // Test helper functions

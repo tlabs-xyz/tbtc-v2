@@ -1,27 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.17;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../../integrator/AbstractBTCDepositor.sol";
-import "../../integrator/IBridge.sol";
-import "../../integrator/ITBTCVault.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+
+import "../AbstractL1BTCDepositor.sol";
 import "./interfaces/IStarkGateBridge.sol";
 
 /// @title StarkNet L1 Bitcoin Depositor
 /// @notice This contract facilitates Bitcoin deposits that are bridged to StarkNet L2
-/// @dev Inherits from AbstractBTCDepositor and integrates with StarkGate bridge
-contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
-    using SafeERC20 for IERC20;
+/// @dev Inherits from AbstractL1BTCDepositor and integrates with StarkGate bridge
+///      Implements OpenZeppelin upgradeable pattern for future improvements
+contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     // ========== State Variables ==========
+    // Note: All state variables must be declared without initialization
+    // for upgradeable contracts
 
     /// @notice The StarkGate bridge contract interface
-    IStarkGateBridge public immutable starkGateBridge;
+    IStarkGateBridge public starkGateBridge;
 
-    /// @notice The L1 tBTC token contract
-    IERC20 public immutable tbtcToken;
+    /// @notice The StarkNet L2 tBTC token address
+    uint256 public starkNetTBTCToken;
 
     /// @notice The L1→L2 message fee required for StarkGate bridge
     uint256 public l1ToL2MessageFee;
@@ -46,86 +47,58 @@ contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
 
     /// @notice Emitted when the depositor is initialized
     /// @param starkGateBridge The address of the StarkGate bridge
-    /// @param tbtcToken The address of the tBTC token
+    /// @param starkNetTBTCToken The L2 tBTC token address on StarkNet
     event StarkNetBitcoinDepositorInitialized(
         address starkGateBridge,
-        address tbtcToken
-    );
-
-    /// @notice Emitted when a deposit is initialized for StarkNet
-    /// @param depositKey The unique identifier for the deposit
-    /// @param starkNetRecipient The recipient address on StarkNet L2
-    event DepositInitializedForStarkNet(
-        bytes32 indexed depositKey,
-        uint256 indexed starkNetRecipient
+        uint256 starkNetTBTCToken
     );
 
     // ========== Constructor ==========
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    // ========== Initializer ==========
 
     /// @notice Initializes the StarkNet Bitcoin Depositor contract
     /// @param _tbtcBridge Address of the tBTC Bridge contract
     /// @param _tbtcVault Address of the tBTC Vault contract
     /// @param _starkGateBridge Address of the StarkGate bridge contract
+    /// @param _starkNetTBTCToken The L2 tBTC token address on StarkNet
     /// @param _l1ToL2MessageFee Initial L1→L2 message fee for StarkGate
-    constructor(
+    function initialize(
         address _tbtcBridge,
         address _tbtcVault,
         address _starkGateBridge,
+        uint256 _starkNetTBTCToken,
         uint256 _l1ToL2MessageFee
-    ) {
+    ) external initializer {
         require(_tbtcBridge != address(0), "Invalid tBTC Bridge");
         require(_tbtcVault != address(0), "Invalid tBTC Vault");
-        require(_starkGateBridge != address(0), "Invalid StarkGate bridge");
-        require(_l1ToL2MessageFee > 0, "Invalid L1->L2 message fee");
+        require(_starkGateBridge != address(0), "StarkGate bridge address cannot be zero");
+        require(_starkNetTBTCToken != 0, "StarkNet tBTC token address cannot be zero");
+        require(_l1ToL2MessageFee > 0, "L1->L2 message fee must be greater than zero");
 
         // Initialize the AbstractBTCDepositor
         __AbstractBTCDepositor_initialize(_tbtcBridge, _tbtcVault);
         
+        // Initialize OwnableUpgradeable
+        __Ownable_init();
+        
         starkGateBridge = IStarkGateBridge(_starkGateBridge);
-        tbtcToken = IERC20(ITBTCVault(_tbtcVault).tbtcToken());
+        starkNetTBTCToken = _starkNetTBTCToken;
         l1ToL2MessageFee = _l1ToL2MessageFee;
 
-        emit StarkNetBitcoinDepositorInitialized(_starkGateBridge, address(tbtcToken));
+        emit StarkNetBitcoinDepositorInitialized(_starkGateBridge, _starkNetTBTCToken);
     }
 
     // ========== External Functions ==========
 
-    /// @notice Initializes a deposit by revealing it to the tBTC Bridge
-    /// @param fundingTx Bitcoin funding transaction data
-    /// @param reveal Deposit reveal data  
-    /// @param l2DepositOwner The L2 address that will own the deposit (as bytes32)
-    function initializeDeposit(
-        IBridgeTypes.BitcoinTxInfo calldata fundingTx,
-        IBridgeTypes.DepositRevealInfo calldata reveal,
-        bytes32 l2DepositOwner
-    ) external {
-        require(l2DepositOwner != bytes32(0), "Invalid L2 deposit owner");
-        
-        // Call parent's _initializeDeposit which handles the reveal to tBTC Bridge
-        (uint256 depositKey, ) = _initializeDeposit(fundingTx, reveal, l2DepositOwner);
-        
-        // Emit event for StarkNet-specific initialization
-        emit DepositInitializedForStarkNet(
-            bytes32(depositKey),
-            uint256(l2DepositOwner)
-        );
-    }
-
-    /// @notice Finalizes a deposit by bridging minted tBTC to StarkNet
-    /// @param depositKey The deposit key from initialization
-    function finalizeDeposit(bytes32 depositKey) external payable {
-        require(msg.value >= l1ToL2MessageFee, "Insufficient L1->L2 message fee");
-        
-        // Call parent's _finalizeDeposit to get the minted tBTC
-        (uint256 initialAmount, uint256 tbtcAmount, bytes32 l2DepositOwner) = _finalizeDeposit(uint256(depositKey));
-        
-        // Bridge the tBTC to StarkNet
-        _transferTbtc(depositKey, tbtcAmount, l2DepositOwner);
-    }
-
     /// @notice Returns the required fee to finalize a deposit
     /// @return The current L1→L2 message fee in wei
-    function quoteFinalizeDeposit() public view returns (uint256) {
+    function quoteFinalizeDeposit(uint256 /* depositKey */) public view override returns (uint256) {
         return l1ToL2MessageFee;
     }
 
@@ -140,17 +113,17 @@ contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
     // ========== Internal Functions ==========
 
     /// @notice Transfers tBTC to StarkNet L2 using StarkGate bridge
-    /// @dev This is the key integration point with StarkGate
-    /// @param depositKey The unique identifier for the deposit
-    /// @param amount The amount of tBTC to bridge
-    /// @param l2Receiver The recipient address on StarkNet (as bytes32)
+    /// @dev This function overrides the abstract function in AbstractL1BTCDepositor
+    /// @param amount The amount of tBTC to bridge (in 1e18 precision)
+    /// @param destinationChainReceiver The recipient address on StarkNet (as bytes32)
     function _transferTbtc(
-        bytes32 depositKey,
         uint256 amount,
-        bytes32 l2Receiver
-    ) internal {
+        bytes32 destinationChainReceiver
+    ) internal override {
+        require(msg.value >= l1ToL2MessageFee, "Insufficient L1->L2 message fee");
+        
         // Convert bytes32 to uint256 for StarkNet address format
-        uint256 starkNetRecipient = uint256(l2Receiver);
+        uint256 starkNetRecipient = uint256(destinationChainReceiver);
         require(starkNetRecipient != 0, "Invalid StarkNet address");
 
         // Approve StarkGate bridge to spend tBTC
@@ -167,10 +140,16 @@ contract StarkNetBitcoinDepositor is AbstractBTCDepositor, Ownable {
 
         // Emit event for tracking
         emit TBTCBridgedToStarkNet(
-            depositKey,
+            bytes32(0), // depositKey is not available in this context
             starkNetRecipient,
             amount,
             messageNonce
         );
     }
+
+    // ========== Gap for Future Storage Variables ==========
+    
+    /// @dev Gap for future storage variables to maintain upgrade compatibility
+    /// @custom:oz-upgrades-unsafe-allow state-variable-immutable state-variable-assignment
+    uint256[50] private __gap;
 }
