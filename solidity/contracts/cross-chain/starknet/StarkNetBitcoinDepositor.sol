@@ -109,7 +109,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
 
     /// @notice Returns the required fee to finalize a deposit
     /// @return The current L1→L2 message fee in wei
-    function quoteFinalizeDeposit(uint256 /* depositKey */) public view override returns (uint256) {
+    function quoteFinalizeDeposit(uint256 /* depositKey */) public view returns (uint256) {
         return l1ToL2MessageFee;
     }
 

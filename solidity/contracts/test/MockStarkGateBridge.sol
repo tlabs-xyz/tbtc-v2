@@ -48,6 +48,9 @@ contract MockStarkGateBridge is IStarkGateBridge {
         uint256 amount,
         uint256 l2Recipient
     ) external payable override returns (uint256) {
+        require(msg.value == 0.1 ether, "Incorrect L1->L2 message fee");
+        
+        // Track the call
         depositCalled = true;
         depositCallCount++;
         lastSimpleDepositCall = SimpleDepositCall({
@@ -57,21 +60,10 @@ contract MockStarkGateBridge is IStarkGateBridge {
             value: msg.value
         });
         
-        if (_useCustomReturnValue) {
-            return _customReturnValue;
-        }
-        return messageNonce++;
-    }
-    
-    function deposit(
-        address token,
-        uint256 amount,
-        uint256 l2Recipient
-    ) external payable override returns (uint256) {
-        require(msg.value == 0.1 ether, "Incorrect L1->L2 message fee");
-        
+        // Transfer tokens
         IERC20(token).transferFrom(msg.sender, address(this), amount);
         
+        // Store deposit info
         deposits[nextNonce] = DepositInfo({
             token: token,
             amount: amount,
@@ -82,6 +74,11 @@ contract MockStarkGateBridge is IStarkGateBridge {
         
         uint256 nonce = nextNonce;
         nextNonce++;
+        
+        // Handle custom return value if set
+        if (_useCustomReturnValue) {
+            return _customReturnValue;
+        }
         
         return nonce;
     }
