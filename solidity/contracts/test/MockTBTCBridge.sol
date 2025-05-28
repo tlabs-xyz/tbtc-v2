@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.17;
 
-import "../../../../contracts/integrator/IBridge.sol";
+import "../integrator/IBridge.sol";
 
 contract MockTBTCBridge is IBridge {
     mapping(uint256 => IBridgeTypes.DepositRequest) private _deposits;
