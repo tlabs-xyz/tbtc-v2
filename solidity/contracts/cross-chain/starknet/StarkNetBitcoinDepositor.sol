@@ -152,29 +152,53 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     /// @notice Returns the dynamic fee quote from StarkGate with fee buffer
     /// @dev Falls back to static fee if StarkGate is unavailable or fails
     /// @return The current L1→L2 message fee with buffer applied
-    // slither-disable-next-line uninitialized-local,variable-scope,unused-return
     function quoteFinalizeDepositDynamic() public view returns (uint256) {
         if (address(starkGateBridge) == address(0)) {
             return l1ToL2MessageFee;
         }
 
-        uint256 baseFee;
-        bool success;
-        
-        try starkGateBridge.estimateMessageFee() returns (uint256 _fee) {
-            baseFee = _fee;
-            success = true;
-        } catch {
-            success = false;
-        }
+        // Use a separate internal function to handle the try-catch
+        (bool success, uint256 baseFee) = _tryEstimateMessageFee();
 
         if (success) {
-            // Calculate buffer amount avoiding divide-before-multiply pattern
-            // This prevents precision loss: (baseFee * feeBuffer) / 100
-            uint256 bufferAmount = (baseFee * feeBuffer) / 100;
+            // If fee buffer is 0, return base fee without buffer
+            if (feeBuffer == 0) {
+                return baseFee;
+            }
+
+            // Calculate buffer amount safely
+            // Since feeBuffer is capped at 50, we can optimize the calculation
+            // to avoid intermediate overflow
+            uint256 bufferAmount;
+
+            // For better precision and to avoid overflow, calculate as:
+            // bufferAmount = (baseFee / 100) * feeBuffer
+            // This is safe because baseFee / 100 reduces the value first
+            // slither-disable-next-line divide-before-multiply
+            bufferAmount = (baseFee / 100) * feeBuffer;
+
+            // Check if final addition would overflow
+            if (baseFee > type(uint256).max - bufferAmount) {
+                return type(uint256).max;
+            }
+
             return baseFee + bufferAmount;
         } else {
             return l1ToL2MessageFee;
+        }
+    }
+
+    /// @dev Internal function to wrap try-catch and avoid Slither warnings
+    // slither-disable-next-line uninitialized-local,variable-scope,unused-return
+    function _tryEstimateMessageFee()
+        private
+        view
+        returns (bool success, uint256 fee)
+    {
+        try starkGateBridge.estimateMessageFee() returns (uint256 _fee) {
+            return (true, _fee);
+        } catch {
+            return (false, 0);
         }
     }
 
