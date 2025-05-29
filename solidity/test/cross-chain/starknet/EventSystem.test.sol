@@ -15,30 +15,30 @@ contract EventSystemTest is Test {
     MockTBTCVault public mockVault;
     MockTBTCToken public mockToken;
     MockStarkGateBridge public mockStarkGateBridge;
-    
+
     uint256 public constant INITIAL_FEE = 0.01 ether;
     uint256 public constant TEST_AMOUNT = 1 ether;
-    
+
     // Events to test
     event StarkNetBitcoinDepositorInitialized(
         address starkGateBridge,
         address tbtcToken
     );
-    
+
     event DepositInitializedForStarkNet(
         bytes32 indexed depositKey,
         uint256 indexed starkNetRecipient
     );
-    
+
     event TBTCBridgedToStarkNet(
         bytes32 indexed depositKey,
         uint256 indexed starkNetRecipient,
         uint256 amount,
         uint256 messageNonce
     );
-    
+
     event L1ToL2MessageFeeUpdated(uint256 newFee);
-    
+
     function setUp() public {
         // Deploy mocks
         mockToken = new MockTBTCToken();
@@ -46,7 +46,7 @@ contract EventSystemTest is Test {
         mockVault = new MockTBTCVault(address(mockToken));
         mockStarkGateBridge = new MockStarkGateBridge();
     }
-    
+
     function testConstructorInitializationEvent() public {
         // Expect event emission
         vm.expectEmit(true, true, true, true);
@@ -54,7 +54,7 @@ contract EventSystemTest is Test {
             address(mockStarkGateBridge),
             address(mockToken)
         );
-        
+
         // Deploy depositor
         depositor = new StarkNetBitcoinDepositor(
             address(mockBridge),
@@ -63,7 +63,7 @@ contract EventSystemTest is Test {
             INITIAL_FEE
         );
     }
-    
+
     function testDepositInitializedForStarkNetEvent() public {
         // Deploy depositor
         depositor = new StarkNetBitcoinDepositor(
@@ -72,42 +72,42 @@ contract EventSystemTest is Test {
             address(mockStarkGateBridge),
             INITIAL_FEE
         );
-        
+
         // Create test data
-        IBridgeTypes.BitcoinTxInfo memory fundingTx = IBridgeTypes.BitcoinTxInfo({
-            version: "0x01000000",
-            inputVector: "",
-            outputVector: "",
-            locktime: ""
-        });
-        
-        IBridgeTypes.DepositRevealInfo memory reveal = IBridgeTypes.DepositRevealInfo({
-            fundingOutputIndex: 0,
-            blindingFactor: bytes8(0),
-            walletPubKeyHash: bytes20(address(this)),
-            refundPubKeyHash: bytes20(address(this)),
-            refundLocktime: bytes4(0),
-            vault: address(mockVault)
-        });
-        
+        IBridgeTypes.BitcoinTxInfo memory fundingTx = IBridgeTypes
+            .BitcoinTxInfo({
+                version: "0x01000000",
+                inputVector: "",
+                outputVector: "",
+                locktime: ""
+            });
+
+        IBridgeTypes.DepositRevealInfo memory reveal = IBridgeTypes
+            .DepositRevealInfo({
+                fundingOutputIndex: 0,
+                blindingFactor: bytes8(0),
+                walletPubKeyHash: bytes20(address(this)),
+                refundPubKeyHash: bytes20(address(this)),
+                refundLocktime: bytes4(0),
+                vault: address(mockVault)
+            });
+
         bytes32 l2DepositOwner = bytes32(uint256(0x0123456789abcdef));
-        
+
         // Calculate expected deposit key (this would need to match the actual calculation)
-        bytes32 expectedDepositKey = keccak256(
-            abi.encode(fundingTx, reveal)
-        );
-        
+        bytes32 expectedDepositKey = keccak256(abi.encode(fundingTx, reveal));
+
         // Expect event
         vm.expectEmit(true, true, true, true);
         emit DepositInitializedForStarkNet(
             expectedDepositKey,
             uint256(l2DepositOwner)
         );
-        
+
         // Initialize deposit
         depositor.initializeDeposit(fundingTx, reveal, l2DepositOwner);
     }
-    
+
     function testTBTCBridgedToStarkNetEvent() public {
         // Deploy depositor
         depositor = new StarkNetBitcoinDepositor(
@@ -116,39 +116,41 @@ contract EventSystemTest is Test {
             address(mockStarkGateBridge),
             INITIAL_FEE
         );
-        
+
         // Setup mock to return a message nonce
         uint256 expectedNonce = 12345;
         mockStarkGateBridge.setDepositWithMessageReturn(expectedNonce);
-        
+
         // First initialize a deposit
-        IBridgeTypes.BitcoinTxInfo memory fundingTx = IBridgeTypes.BitcoinTxInfo({
-            version: "0x01000000",
-            inputVector: "",
-            outputVector: "",
-            locktime: ""
-        });
-        
-        IBridgeTypes.DepositRevealInfo memory reveal = IBridgeTypes.DepositRevealInfo({
-            fundingOutputIndex: 0,
-            blindingFactor: bytes8(0),
-            walletPubKeyHash: bytes20(address(this)),
-            refundPubKeyHash: bytes20(address(this)),
-            refundLocktime: bytes4(0),
-            vault: address(mockVault)
-        });
-        
+        IBridgeTypes.BitcoinTxInfo memory fundingTx = IBridgeTypes
+            .BitcoinTxInfo({
+                version: "0x01000000",
+                inputVector: "",
+                outputVector: "",
+                locktime: ""
+            });
+
+        IBridgeTypes.DepositRevealInfo memory reveal = IBridgeTypes
+            .DepositRevealInfo({
+                fundingOutputIndex: 0,
+                blindingFactor: bytes8(0),
+                walletPubKeyHash: bytes20(address(this)),
+                refundPubKeyHash: bytes20(address(this)),
+                refundLocktime: bytes4(0),
+                vault: address(mockVault)
+            });
+
         bytes32 l2DepositOwner = bytes32(uint256(0x0123456789abcdef));
-        
+
         // Initialize deposit
         depositor.initializeDeposit(fundingTx, reveal, l2DepositOwner);
-        
+
         // Calculate deposit key
         bytes32 depositKey = keccak256(abi.encode(fundingTx, reveal));
-        
+
         // Mock the bridge to simulate minting tBTC
         mockToken.mint(address(depositor), TEST_AMOUNT);
-        
+
         // Expect bridging event
         vm.expectEmit(true, true, true, true);
         emit TBTCBridgedToStarkNet(
@@ -157,11 +159,11 @@ contract EventSystemTest is Test {
             TEST_AMOUNT,
             expectedNonce
         );
-        
+
         // Finalize deposit
         depositor.finalizeDeposit{value: INITIAL_FEE}(depositKey);
     }
-    
+
     function testL1ToL2MessageFeeUpdatedEvent() public {
         // Deploy depositor
         depositor = new StarkNetBitcoinDepositor(
@@ -170,17 +172,17 @@ contract EventSystemTest is Test {
             address(mockStarkGateBridge),
             INITIAL_FEE
         );
-        
+
         uint256 newFee = 0.03 ether;
-        
+
         // Expect event
         vm.expectEmit(true, true, true, true);
         emit L1ToL2MessageFeeUpdated(newFee);
-        
+
         // Update fee
         depositor.updateL1ToL2MessageFee(newFee);
     }
-    
+
     function testAllEventsInCompleteFlow() public {
         // Test constructor event
         vm.expectEmit(true, true, true, true);
@@ -188,7 +190,7 @@ contract EventSystemTest is Test {
             address(mockStarkGateBridge),
             address(mockToken)
         );
-        
+
         // Deploy depositor
         depositor = new StarkNetBitcoinDepositor(
             address(mockBridge),
@@ -196,42 +198,44 @@ contract EventSystemTest is Test {
             address(mockStarkGateBridge),
             INITIAL_FEE
         );
-        
+
         // Test fee update event
         uint256 newFee = 0.02 ether;
         vm.expectEmit(true, true, true, true);
         emit L1ToL2MessageFeeUpdated(newFee);
         depositor.updateL1ToL2MessageFee(newFee);
-        
+
         // Test deposit initialization event
-        IBridgeTypes.BitcoinTxInfo memory fundingTx = IBridgeTypes.BitcoinTxInfo({
-            version: "0x01000000",
-            inputVector: "",
-            outputVector: "",
-            locktime: ""
-        });
-        
-        IBridgeTypes.DepositRevealInfo memory reveal = IBridgeTypes.DepositRevealInfo({
-            fundingOutputIndex: 0,
-            blindingFactor: bytes8(0),
-            walletPubKeyHash: bytes20(address(this)),
-            refundPubKeyHash: bytes20(address(this)),
-            refundLocktime: bytes4(0),
-            vault: address(mockVault)
-        });
-        
+        IBridgeTypes.BitcoinTxInfo memory fundingTx = IBridgeTypes
+            .BitcoinTxInfo({
+                version: "0x01000000",
+                inputVector: "",
+                outputVector: "",
+                locktime: ""
+            });
+
+        IBridgeTypes.DepositRevealInfo memory reveal = IBridgeTypes
+            .DepositRevealInfo({
+                fundingOutputIndex: 0,
+                blindingFactor: bytes8(0),
+                walletPubKeyHash: bytes20(address(this)),
+                refundPubKeyHash: bytes20(address(this)),
+                refundLocktime: bytes4(0),
+                vault: address(mockVault)
+            });
+
         bytes32 l2DepositOwner = bytes32(uint256(0x0123456789abcdef));
         bytes32 depositKey = keccak256(abi.encode(fundingTx, reveal));
-        
+
         vm.expectEmit(true, true, true, true);
         emit DepositInitializedForStarkNet(depositKey, uint256(l2DepositOwner));
         depositor.initializeDeposit(fundingTx, reveal, l2DepositOwner);
-        
+
         // Test bridging event
         mockToken.mint(address(depositor), TEST_AMOUNT);
         uint256 expectedNonce = 54321;
         mockStarkGateBridge.setDepositWithMessageReturn(expectedNonce);
-        
+
         vm.expectEmit(true, true, true, true);
         emit TBTCBridgedToStarkNet(
             depositKey,

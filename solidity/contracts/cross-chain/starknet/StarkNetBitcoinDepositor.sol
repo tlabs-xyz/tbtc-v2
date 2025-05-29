@@ -43,7 +43,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
 
     /// @notice Maximum allowed fee buffer percentage (50%)
     uint256 public constant MAX_FEE_BUFFER = 50;
-    
+
     /// @notice Fee buffer percentage to apply on top of dynamic fees
     uint256 public feeBuffer;
 
@@ -64,7 +64,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     /// @notice Emitted when the L1→L2 message fee is updated
     /// @param newFee The new fee amount in wei
     event L1ToL2MessageFeeUpdated(uint256 newFee);
-    
+
     /// @notice Emitted when the fee buffer is updated
     /// @param newBuffer The new fee buffer percentage
     event FeeBufferUpdated(uint256 newBuffer);
@@ -101,29 +101,43 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     ) external initializer {
         require(_tbtcBridge != address(0), "Invalid tBTC Bridge");
         require(_tbtcVault != address(0), "Invalid tBTC Vault");
-        require(_starkGateBridge != address(0), "StarkGate bridge address cannot be zero");
-        require(_starkNetTBTCToken != 0, "StarkNet tBTC token address cannot be zero");
-        require(_l1ToL2MessageFee > 0, "L1->L2 message fee must be greater than zero");
+        require(
+            _starkGateBridge != address(0),
+            "StarkGate bridge address cannot be zero"
+        );
+        require(
+            _starkNetTBTCToken != 0,
+            "StarkNet tBTC token address cannot be zero"
+        );
+        require(
+            _l1ToL2MessageFee > 0,
+            "L1->L2 message fee must be greater than zero"
+        );
 
         // Initialize the parent AbstractL1BTCDepositor (this sets tbtcToken)
         __AbstractL1BTCDepositor_initialize(_tbtcBridge, _tbtcVault);
-        
+
         // Initialize OwnableUpgradeable
         __Ownable_init();
-        
+
         starkGateBridge = IStarkGateBridge(_starkGateBridge);
         starkNetTBTCToken = _starkNetTBTCToken;
         l1ToL2MessageFee = _l1ToL2MessageFee;
         feeBuffer = 10; // Default 10% buffer
 
-        emit StarkNetBitcoinDepositorInitialized(_starkGateBridge, _starkNetTBTCToken);
+        emit StarkNetBitcoinDepositorInitialized(
+            _starkGateBridge,
+            _starkNetTBTCToken
+        );
     }
 
     // ========== External Functions ==========
 
     /// @notice Returns the required fee to finalize a deposit
     /// @return The current L1→L2 message fee in wei
-    function quoteFinalizeDeposit(uint256 /* depositKey */) public view returns (uint256) {
+    function quoteFinalizeDeposit(
+        uint256 /* depositKey */
+    ) public view returns (uint256) {
         return l1ToL2MessageFee;
     }
 
@@ -134,7 +148,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         l1ToL2MessageFee = newFee;
         emit L1ToL2MessageFeeUpdated(newFee);
     }
-    
+
     /// @notice Returns the dynamic fee quote from StarkGate with fee buffer
     /// @dev Falls back to static fee if StarkGate is unavailable or fails
     /// @return The current L1→L2 message fee with buffer applied
@@ -142,7 +156,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         if (address(starkGateBridge) == address(0)) {
             return l1ToL2MessageFee;
         }
-        
+
         try starkGateBridge.estimateMessageFee() returns (uint256 baseFee) {
             // Calculate buffer amount safely to avoid overflow
             // If baseFee is very large, this prevents overflow
@@ -152,7 +166,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
             return l1ToL2MessageFee;
         }
     }
-    
+
     /// @notice Updates the fee buffer percentage
     /// @param newBuffer The new fee buffer percentage (0-50)
     function updateFeeBuffer(uint256 newBuffer) external onlyOwner {
@@ -167,13 +181,16 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     /// @dev This function overrides the abstract function in AbstractL1BTCDepositor
     /// @param amount The amount of tBTC to bridge (in 1e18 precision)
     /// @param destinationChainReceiver The recipient address on StarkNet (as bytes32)
-    function _transferTbtc(
-        uint256 amount,
-        bytes32 destinationChainReceiver
-    ) internal override {
-        require(msg.value >= l1ToL2MessageFee, "Insufficient L1->L2 message fee");
+    function _transferTbtc(uint256 amount, bytes32 destinationChainReceiver)
+        internal
+        override
+    {
+        require(
+            msg.value >= l1ToL2MessageFee,
+            "Insufficient L1->L2 message fee"
+        );
         require(address(tbtcToken) != address(0), "tBTC token not initialized");
-        
+
         // Convert bytes32 to uint256 for StarkNet address format
         uint256 starkNetRecipient = uint256(destinationChainReceiver);
         require(starkNetRecipient != 0, "Invalid StarkNet address");
@@ -190,7 +207,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     }
 
     // ========== Gap for Future Storage Variables ==========
-    
+
     /// @dev Gap for future storage variables to maintain upgrade compatibility
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable state-variable-assignment
     uint256[49] private __gap; // Reduced by 1 due to feeBuffer

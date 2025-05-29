@@ -24,14 +24,17 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
     address public owner = address(0x1);
     address public user = address(0x2);
     address public unauthorized = address(0x3);
-    uint256 public starkNetRecipient = uint256(0x04e3bc49f130f9d0379082c24efd397a0eddfccdc6023a2f02a74d8527140276);
-    
+    uint256 public starkNetRecipient =
+        uint256(
+            0x04e3bc49f130f9d0379082c24efd397a0eddfccdc6023a2f02a74d8527140276
+        );
+
     // Test constants
     uint256 public constant INITIAL_MESSAGE_FEE = 0.01 ether;
     uint256 public constant DEPOSIT_AMOUNT = 1 ether;
     uint256 public constant DEFAULT_DEPOSIT_KEY = 12345;
     bytes32 public constant DEPOSIT_KEY_BYTES32 = bytes32(DEFAULT_DEPOSIT_KEY);
-    
+
     // Gas limits for performance validation
     uint256 public constant GAS_LIMIT_CONSTRUCTOR = 2_000_000;
     uint256 public constant GAS_LIMIT_FINALIZE_DEPOSIT = 500_000;
@@ -72,7 +75,7 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
 
     function test_Constructor_Success() public {
         uint256 gasStart = gasleft();
-        
+
         vm.prank(owner);
         StarkNetBitcoinDepositor newDepositor = new StarkNetBitcoinDepositor(
             address(mockTBTCBridge),
@@ -80,12 +83,15 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
             address(mockStarkGateBridge),
             INITIAL_MESSAGE_FEE
         );
-        
+
         uint256 gasUsed = gasStart - gasleft();
         recordGasUsage("constructor", gasUsed);
-        
+
         // Validate state initialization
-        assertEq(address(newDepositor.starkGateBridge()), address(mockStarkGateBridge));
+        assertEq(
+            address(newDepositor.starkGateBridge()),
+            address(mockStarkGateBridge)
+        );
         assertEq(address(newDepositor.tbtcToken()), address(mockTBTCToken));
         assertEq(newDepositor.l1ToL2MessageFee(), INITIAL_MESSAGE_FEE);
         assertEq(newDepositor.owner(), owner);
@@ -141,7 +147,7 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
             address(mockStarkGateBridge),
             address(mockTBTCToken)
         );
-        
+
         vm.prank(owner);
         new StarkNetBitcoinDepositor(
             address(mockTBTCBridge),
@@ -168,7 +174,7 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
         );
 
         depositor.initializeDeposit(fundingTx, reveal, l2DepositOwner);
-        
+
         // Verify state changes
         assertTrue(mockTBTCBridge.wasInitializeDepositCalled());
     }
@@ -176,7 +182,7 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
     function test_InitializeDeposit_RevertZeroL2DepositOwner() public {
         IBridgeTypes.BitcoinTxInfo memory fundingTx = _createValidFundingTx();
         IBridgeTypes.DepositRevealInfo memory reveal = _createValidReveal();
-        
+
         vm.expectRevert("Invalid L2 deposit owner");
         depositor.initializeDeposit(fundingTx, reveal, bytes32(0));
     }
@@ -203,16 +209,18 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
     function test_FinalizeDeposit_Success() public {
         // Setup: Prepare valid deposit state
         _setupValidDepositForFinalization();
-        
+
         vm.deal(address(this), INITIAL_MESSAGE_FEE);
         mockStarkGateBridge.setDepositWithMessageReturn(12345);
 
         uint256 gasStart = gasleft();
-        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(DEPOSIT_KEY_BYTES32);
+        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
+            DEPOSIT_KEY_BYTES32
+        );
         uint256 gasUsed = gasStart - gasleft();
-        
+
         recordGasUsage("finalizeDeposit", gasUsed);
-        
+
         // Verify bridge interaction
         assertTrue(mockStarkGateBridge.wasDepositWithMessageCalled());
         assertEq(mockStarkGateBridge.getDepositCount(), 1);
@@ -220,17 +228,17 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
 
     function test_FinalizeDeposit_RevertInsufficientFee() public {
         _setupValidDepositForFinalization();
-        
+
         uint256 insufficientFee = INITIAL_MESSAGE_FEE - 1;
         vm.deal(address(this), insufficientFee);
-        
+
         vm.expectRevert("Insufficient L1->L2 message fee");
         depositor.finalizeDeposit{value: insufficientFee}(DEPOSIT_KEY_BYTES32);
     }
 
     function test_FinalizeDeposit_EmitsTBTCBridgedEvent() public {
         _setupValidDepositForFinalization();
-        
+
         vm.deal(address(this), INITIAL_MESSAGE_FEE);
         uint256 expectedMessageNonce = 12345;
         mockStarkGateBridge.setDepositWithMessageReturn(expectedMessageNonce);
@@ -243,7 +251,9 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
             expectedMessageNonce
         );
 
-        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(DEPOSIT_KEY_BYTES32);
+        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
+            DEPOSIT_KEY_BYTES32
+        );
     }
 
     function test_FinalizeDeposit_InvalidStarkNetAddress() public {
@@ -254,39 +264,52 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
             DEPOSIT_AMOUNT,
             bytes32(0) // Invalid StarkNet address
         );
-        
+
         vm.deal(address(this), INITIAL_MESSAGE_FEE);
-        
+
         vm.expectRevert("Invalid StarkNet address");
-        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(DEPOSIT_KEY_BYTES32);
+        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
+            DEPOSIT_KEY_BYTES32
+        );
     }
 
     function test_FinalizeDeposit_CorrectTokenApproval() public {
         _setupValidDepositForFinalization();
-        
+
         vm.deal(address(this), INITIAL_MESSAGE_FEE);
         mockStarkGateBridge.setDepositWithMessageReturn(12345);
 
-        uint256 initialAllowance = mockTBTCToken.allowance(address(depositor), address(mockStarkGateBridge));
-        
-        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(DEPOSIT_KEY_BYTES32);
-        
-        uint256 finalAllowance = mockTBTCToken.allowance(address(depositor), address(mockStarkGateBridge));
-        
+        uint256 initialAllowance = mockTBTCToken.allowance(
+            address(depositor),
+            address(mockStarkGateBridge)
+        );
+
+        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
+            DEPOSIT_KEY_BYTES32
+        );
+
+        uint256 finalAllowance = mockTBTCToken.allowance(
+            address(depositor),
+            address(mockStarkGateBridge)
+        );
+
         // Verify allowance was increased by the deposit amount
         assertEq(finalAllowance, initialAllowance + DEPOSIT_AMOUNT);
     }
 
     function test_FinalizeDeposit_CorrectBridgeParameters() public {
         _setupValidDepositForFinalization();
-        
+
         vm.deal(address(this), INITIAL_MESSAGE_FEE);
         mockStarkGateBridge.setDepositWithMessageReturn(12345);
 
-        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(DEPOSIT_KEY_BYTES32);
+        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
+            DEPOSIT_KEY_BYTES32
+        );
 
         // Verify bridge was called with correct parameters
-        MockStarkGateBridge.DepositCall memory lastCall = mockStarkGateBridge.getLastDepositCall();
+        MockStarkGateBridge.DepositCall memory lastCall = mockStarkGateBridge
+            .getLastDepositCall();
         assertEq(lastCall.token, address(mockTBTCToken));
         assertEq(lastCall.amount, DEPOSIT_AMOUNT);
         assertEq(lastCall.l2Recipient, starkNetRecipient);
@@ -300,17 +323,17 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
         uint256 gasStart = gasleft();
         uint256 quotedFee = depositor.quoteFinalizeDeposit();
         uint256 gasUsed = gasStart - gasleft();
-        
+
         recordGasUsage("quoteFinalizeDeposit", gasUsed);
         assertEq(quotedFee, INITIAL_MESSAGE_FEE);
     }
 
     function test_QuoteFinalizeDeposit_ReflectsUpdatedFee() public {
         uint256 newFee = 0.02 ether;
-        
+
         vm.prank(owner);
         depositor.updateL1ToL2MessageFee(newFee);
-        
+
         uint256 quotedFee = depositor.quoteFinalizeDeposit();
         assertEq(quotedFee, newFee);
     }
@@ -325,15 +348,15 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
 
     function test_UpdateL1ToL2MessageFee_Success() public {
         uint256 newFee = 0.02 ether;
-        
+
         vm.expectEmit(false, false, false, true);
         emit StarkNetBitcoinDepositor.L1ToL2MessageFeeUpdated(newFee);
-        
+
         uint256 gasStart = gasleft();
         vm.prank(owner);
         depositor.updateL1ToL2MessageFee(newFee);
         uint256 gasUsed = gasStart - gasleft();
-        
+
         recordGasUsage("updateFee", gasUsed);
         assertEq(depositor.l1ToL2MessageFee(), newFee);
     }
@@ -365,7 +388,7 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
 
     function test_UpdateL1ToL2MessageFee_MaxUint256() public {
         uint256 maxFee = type(uint256).max;
-        
+
         vm.prank(owner);
         depositor.updateL1ToL2MessageFee(maxFee);
         assertEq(depositor.l1ToL2MessageFee(), maxFee);
@@ -389,12 +412,14 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
                 DEPOSIT_AMOUNT,
                 bytes32(testAddresses[i])
             );
-            
+
             vm.deal(address(this), INITIAL_MESSAGE_FEE);
             mockStarkGateBridge.setDepositWithMessageReturn(12345);
-            
+
             // Should not revert for valid addresses
-            depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(bytes32(testDepositKey));
+            depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
+                bytes32(testDepositKey)
+            );
         }
     }
 
@@ -406,11 +431,13 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
             0,
             bytes32(starkNetRecipient)
         );
-        
+
         vm.deal(address(this), INITIAL_MESSAGE_FEE);
         mockStarkGateBridge.setDepositWithMessageReturn(12345);
 
-        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(DEPOSIT_KEY_BYTES32);
+        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
+            DEPOSIT_KEY_BYTES32
+        );
 
         // Verify bridge was called even with zero amount
         assertTrue(mockStarkGateBridge.wasDepositWithMessageCalled());
@@ -418,14 +445,17 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
 
     function test_TransferTbtc_CorrectMessageFormat() public {
         _setupValidDepositForFinalization();
-        
+
         vm.deal(address(this), INITIAL_MESSAGE_FEE);
         mockStarkGateBridge.setDepositWithMessageReturn(12345);
 
-        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(DEPOSIT_KEY_BYTES32);
+        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
+            DEPOSIT_KEY_BYTES32
+        );
 
         // Verify empty message array is passed to bridge
-        MockStarkGateBridge.DepositCall memory lastCall = mockStarkGateBridge.getLastDepositCall();
+        MockStarkGateBridge.DepositCall memory lastCall = mockStarkGateBridge
+            .getLastDepositCall();
         assertEq(lastCall.message.length, 0);
     }
 
@@ -433,68 +463,92 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
 
     function test_GasUsage_WithinLimits() public {
         generateGasReport();
-        
+
         // Verify all operations are within gas limits
-        assertTrue(_isWithinGasLimit("constructor"), "Constructor exceeds gas limit");
-        assertTrue(_isWithinGasLimit("finalizeDeposit"), "FinalizeDeposit exceeds gas limit");
-        assertTrue(_isWithinGasLimit("updateFee"), "UpdateFee exceeds gas limit");
-        assertTrue(_isWithinGasLimit("quoteFinalizeDeposit"), "QuoteFinalizeDeposit exceeds gas limit");
+        assertTrue(
+            _isWithinGasLimit("constructor"),
+            "Constructor exceeds gas limit"
+        );
+        assertTrue(
+            _isWithinGasLimit("finalizeDeposit"),
+            "FinalizeDeposit exceeds gas limit"
+        );
+        assertTrue(
+            _isWithinGasLimit("updateFee"),
+            "UpdateFee exceeds gas limit"
+        );
+        assertTrue(
+            _isWithinGasLimit("quoteFinalizeDeposit"),
+            "QuoteFinalizeDeposit exceeds gas limit"
+        );
     }
 
     function test_GasUsage_TransferTbtcOptimization() public {
         _setupValidDepositForFinalization();
-        
+
         vm.deal(address(this), INITIAL_MESSAGE_FEE);
         mockStarkGateBridge.setDepositWithMessageReturn(12345);
 
         // Measure gas specifically for the internal transfer logic
         uint256 gasStart = gasleft();
-        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(DEPOSIT_KEY_BYTES32);
+        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
+            DEPOSIT_KEY_BYTES32
+        );
         uint256 gasUsed = gasStart - gasleft();
-        
+
         recordGasUsage("transferTbtc", gasUsed);
-        assertTrue(gasUsed < GAS_LIMIT_TRANSFER_TBTC, "TransferTbtc exceeds gas limit");
+        assertTrue(
+            gasUsed < GAS_LIMIT_TRANSFER_TBTC,
+            "TransferTbtc exceeds gas limit"
+        );
     }
 
     // ========== Edge Case Tests ==========
 
     function test_EdgeCase_LargeAmountDeposit() public {
         uint256 largeAmount = type(uint256).max / 2; // Avoid overflow
-        
+
         mockTBTCVault.setDepositInfo(
             DEFAULT_DEPOSIT_KEY,
             largeAmount,
             largeAmount,
             bytes32(starkNetRecipient)
         );
-        
+
         vm.deal(address(this), INITIAL_MESSAGE_FEE);
         mockStarkGateBridge.setDepositWithMessageReturn(12345);
 
-        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(DEPOSIT_KEY_BYTES32);
+        depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
+            DEPOSIT_KEY_BYTES32
+        );
 
-        MockStarkGateBridge.DepositCall memory lastCall = mockStarkGateBridge.getLastDepositCall();
+        MockStarkGateBridge.DepositCall memory lastCall = mockStarkGateBridge
+            .getLastDepositCall();
         assertEq(lastCall.amount, largeAmount);
     }
 
     function test_EdgeCase_MaxMessageFee() public {
         _setupValidDepositForFinalization();
-        
+
         uint256 maxFee = type(uint256).max;
         vm.prank(owner);
         depositor.updateL1ToL2MessageFee(maxFee);
-        
+
         vm.deal(address(this), maxFee);
         mockStarkGateBridge.setDepositWithMessageReturn(12345);
 
         depositor.finalizeDeposit{value: maxFee}(DEPOSIT_KEY_BYTES32);
-        
+
         assertTrue(mockStarkGateBridge.wasDepositWithMessageCalled());
     }
 
     // ========== Helper Functions ==========
 
-    function _setupMockDeposit(uint256 depositKey, uint256 amount, address depositor_) internal {
+    function _setupMockDeposit(
+        uint256 depositKey,
+        uint256 amount,
+        address depositor_
+    ) internal {
         setupMockDeposit(
             mockTBTCBridge,
             mockTBTCVault,
@@ -513,27 +567,45 @@ contract CoreLogicTests is Test, TestSetup, GasReporter {
         );
     }
 
-    function _createValidFundingTx() internal pure returns (IBridgeTypes.BitcoinTxInfo memory) {
-        return IBridgeTypes.BitcoinTxInfo({
-            version: bytes4(0x01000000),
-            inputVector: abi.encodePacked(bytes32(0x123)),
-            outputVector: abi.encodePacked(bytes32(0x456)),
-            locktime: bytes4(0x00000000)
-        });
+    function _createValidFundingTx()
+        internal
+        pure
+        returns (IBridgeTypes.BitcoinTxInfo memory)
+    {
+        return
+            IBridgeTypes.BitcoinTxInfo({
+                version: bytes4(0x01000000),
+                inputVector: abi.encodePacked(bytes32(0x123)),
+                outputVector: abi.encodePacked(bytes32(0x456)),
+                locktime: bytes4(0x00000000)
+            });
     }
 
-    function _createValidReveal() internal pure returns (IBridgeTypes.DepositRevealInfo memory) {
-        return IBridgeTypes.DepositRevealInfo({
-            fundingOutputIndex: 0,
-            blindingFactor: bytes8(0x1234567890abcdef),
-            walletPubKeyHash: bytes20(0x1234567890123456789012345678901234567890),
-            refundPubKeyHash: bytes20(0x0987654321098765432109876543210987654321),
-            refundLocktime: bytes4(0x12345678),
-            vault: address(0x1234567890123456789012345678901234567890)
-        });
+    function _createValidReveal()
+        internal
+        pure
+        returns (IBridgeTypes.DepositRevealInfo memory)
+    {
+        return
+            IBridgeTypes.DepositRevealInfo({
+                fundingOutputIndex: 0,
+                blindingFactor: bytes8(0x1234567890abcdef),
+                walletPubKeyHash: bytes20(
+                    0x1234567890123456789012345678901234567890
+                ),
+                refundPubKeyHash: bytes20(
+                    0x0987654321098765432109876543210987654321
+                ),
+                refundLocktime: bytes4(0x12345678),
+                vault: address(0x1234567890123456789012345678901234567890)
+            });
     }
 
-    function _isWithinGasLimit(string memory operation) internal view returns (bool) {
+    function _isWithinGasLimit(string memory operation)
+        internal
+        view
+        returns (bool)
+    {
         return isWithinGasLimit(operation);
     }
 }

@@ -21,7 +21,7 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
     address public owner = address(0x1);
     address public user = address(0x2);
     uint256 public starkNetRecipient = uint256(0x3);
-    
+
     // Test values
     uint256 public constant INITIAL_MESSAGE_FEE = 0.01 ether;
     uint256 public constant DEPOSIT_AMOUNT = 1 ether;
@@ -66,7 +66,7 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
 
     function test_Constructor_Success() public {
         uint256 gasStart = gasleft();
-        
+
         vm.prank(owner);
         StarkNetBitcoinDepositor newDepositor = new StarkNetBitcoinDepositor(
             address(mockTBTCBridge),
@@ -78,11 +78,14 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
             address(mockStarkGateBridge),
             INITIAL_MESSAGE_FEE
         );
-        
+
         uint256 gasUsed = gasStart - gasleft();
         recordGasUsage("constructor", gasUsed);
-        
-        assertEq(address(newDepositor.starkGateBridge()), address(mockStarkGateBridge));
+
+        assertEq(
+            address(newDepositor.starkGateBridge()),
+            address(mockStarkGateBridge)
+        );
         assertEq(newDepositor.l1ToL2MessageFee(), INITIAL_MESSAGE_FEE);
         assertEq(newDepositor.owner(), owner);
     }
@@ -136,14 +139,14 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
 
     function test_UpdateL1ToL2MessageFee_Success() public {
         uint256 newFee = 0.02 ether;
-        
+
         _expectEvent_L1ToL2MessageFeeUpdated(newFee);
-        
+
         uint256 gasStart = gasleft();
         vm.prank(owner);
         depositor.updateL1ToL2MessageFee(newFee);
         uint256 gasUsed = gasStart - gasleft();
-        
+
         recordGasUsage("updateFee", gasUsed);
         assertEq(depositor.l1ToL2MessageFee(), newFee);
     }
@@ -178,39 +181,42 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
     function test_FinalizeDeposit_EmitsDepositInitialized() public {
         uint256 depositKey = DEFAULT_DEPOSIT_KEY;
         bytes32 expectedDepositKey = _generateDepositKey(depositKey);
-        
+
         // Setup: Add sufficient balance to contract for fee
         vm.deal(address(depositor), INITIAL_MESSAGE_FEE);
-        
+
         // Setup: Mock successful StarkGate interaction
         mockStarkGateBridge.setDepositWithMessageReturn(1);
-        
-        _expectEvent_DepositInitializedForStarkNet(expectedDepositKey, starkNetRecipient);
-        
+
+        _expectEvent_DepositInitializedForStarkNet(
+            expectedDepositKey,
+            starkNetRecipient
+        );
+
         uint256 gasStart = gasleft();
         depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
             depositKey,
             starkNetRecipient
         );
         uint256 gasUsed = gasStart - gasleft();
-        
+
         recordGasUsage("finalizeDeposit", gasUsed);
     }
 
     function test_FinalizeDeposit_WithCorrectParameters() public {
         uint256 depositKey = DEFAULT_DEPOSIT_KEY;
         bytes32 expectedDepositKey = _generateDepositKey(depositKey);
-        
+
         vm.deal(address(depositor), INITIAL_MESSAGE_FEE);
         mockStarkGateBridge.setDepositWithMessageReturn(1);
-        
+
         // Verify event contains correct indexed parameters
         vm.expectEmit(true, true, false, true);
         emit StarkNetBitcoinDepositor.DepositInitializedForStarkNet(
             expectedDepositKey,
             starkNetRecipient
         );
-        
+
         depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
             depositKey,
             starkNetRecipient
@@ -222,23 +228,25 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
     function test_FullDepositFlow_Success() public {
         uint256 depositKey = DEFAULT_DEPOSIT_KEY;
         bytes32 expectedDepositKey = _generateDepositKey(depositKey);
-        
+
         // Setup: Fund contract and configure mocks
         vm.deal(address(depositor), INITIAL_MESSAGE_FEE);
         mockStarkGateBridge.setDepositWithMessageReturn(1);
-        
+
         // Verify initial state
         assertEq(mockStarkGateBridge.getDepositCount(), 0);
-        
+
         // Execute deposit finalization
         depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
             depositKey,
             starkNetRecipient
         );
-        
+
         // Verify final state
         assertEq(mockStarkGateBridge.getDepositCount(), 1);
-        assertTrue(mockTBTCVault.isOptimisticMintingFinalized(expectedDepositKey));
+        assertTrue(
+            mockTBTCVault.isOptimisticMintingFinalized(expectedDepositKey)
+        );
     }
 
     function test_MultipleDeposits_IndependentProcessing() public {
@@ -246,15 +254,15 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
         depositKeys[0] = 1001;
         depositKeys[1] = 1002;
         depositKeys[2] = 1003;
-        
+
         // Setup multiple deposits
         for (uint256 i = 0; i < depositKeys.length; i++) {
             _setupMockDeposit(depositKeys[i], DEPOSIT_AMOUNT, user);
         }
-        
+
         vm.deal(address(depositor), INITIAL_MESSAGE_FEE * 3);
         mockStarkGateBridge.setDepositWithMessageReturn(1);
-        
+
         // Process each deposit
         for (uint256 i = 0; i < depositKeys.length; i++) {
             depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
@@ -262,7 +270,7 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
                 starkNetRecipient + i
             );
         }
-        
+
         assertEq(mockStarkGateBridge.getDepositCount(), 3);
     }
 
@@ -271,7 +279,7 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
     function test_FinalizeDeposit_RevertInsufficientFee() public {
         uint256 depositKey = DEFAULT_DEPOSIT_KEY;
         uint256 insufficientFee = INITIAL_MESSAGE_FEE - 1;
-        
+
         vm.expectRevert();
         depositor.finalizeDeposit{value: insufficientFee}(
             depositKey,
@@ -281,7 +289,7 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
 
     function test_FinalizeDeposit_RevertZeroRecipient() public {
         uint256 depositKey = DEFAULT_DEPOSIT_KEY;
-        
+
         vm.deal(address(depositor), INITIAL_MESSAGE_FEE);
         vm.expectRevert("Invalid StarkNet recipient");
         depositor.finalizeDeposit{value: INITIAL_MESSAGE_FEE}(
@@ -294,16 +302,29 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
 
     function test_GasUsage_WithinLimits() public {
         generateGasReport();
-        
+
         // Verify all operations are within gas limits
-        assertTrue(_isWithinGasLimit("constructor"), "Constructor exceeds gas limit");
-        assertTrue(_isWithinGasLimit("finalizeDeposit"), "FinalizeDeposit exceeds gas limit");
-        assertTrue(_isWithinGasLimit("updateFee"), "UpdateFee exceeds gas limit");
+        assertTrue(
+            _isWithinGasLimit("constructor"),
+            "Constructor exceeds gas limit"
+        );
+        assertTrue(
+            _isWithinGasLimit("finalizeDeposit"),
+            "FinalizeDeposit exceeds gas limit"
+        );
+        assertTrue(
+            _isWithinGasLimit("updateFee"),
+            "UpdateFee exceeds gas limit"
+        );
     }
 
     // ========== Helper Functions ==========
 
-    function _setupMockDeposit(uint256 depositKey, uint256 amount, address depositor_) internal {
+    function _setupMockDeposit(
+        uint256 depositKey,
+        uint256 amount,
+        address depositor_
+    ) internal {
         setupMockDeposit(
             mockTBTCBridge,
             mockTBTCVault,
@@ -313,7 +334,11 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
         );
     }
 
-    function _generateDepositKey(uint256 depositKey) internal pure returns (bytes32) {
+    function _generateDepositKey(uint256 depositKey)
+        internal
+        pure
+        returns (bytes32)
+    {
         return bytes32(depositKey);
     }
 
@@ -321,11 +346,22 @@ contract StarkNetBitcoinDepositorTest is Test, TestSetup, GasReporter {
         expectEvent_L1ToL2MessageFeeUpdated(address(depositor), newFee);
     }
 
-    function _expectEvent_DepositInitializedForStarkNet(bytes32 depositKey, uint256 recipient) internal {
-        expectEvent_DepositInitializedForStarkNet(address(depositor), depositKey, recipient);
+    function _expectEvent_DepositInitializedForStarkNet(
+        bytes32 depositKey,
+        uint256 recipient
+    ) internal {
+        expectEvent_DepositInitializedForStarkNet(
+            address(depositor),
+            depositKey,
+            recipient
+        );
     }
 
-    function _isWithinGasLimit(string memory operation) internal view returns (bool) {
+    function _isWithinGasLimit(string memory operation)
+        internal
+        view
+        returns (bool)
+    {
         return isWithinGasLimit(operation);
     }
 }
