@@ -158,9 +158,9 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         }
 
         try starkGateBridge.estimateMessageFee() returns (uint256 baseFee) {
-            // Calculate buffer amount safely to avoid overflow
-            // If baseFee is very large, this prevents overflow
-            uint256 bufferAmount = (baseFee / 100) * feeBuffer;
+            // Calculate buffer amount avoiding divide-before-multiply pattern
+            // This prevents precision loss: (baseFee * feeBuffer) / 100
+            uint256 bufferAmount = (baseFee * feeBuffer) / 100;
             return baseFee + bufferAmount;
         } catch {
             return l1ToL2MessageFee;
@@ -199,6 +199,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         tbtcToken.safeIncreaseAllowance(address(starkGateBridge), amount);
 
         // Bridge tBTC to StarkNet using the more efficient deposit function
+        // slither-disable-next-line unused-return
         starkGateBridge.deposit{value: msg.value}(
             address(tbtcToken),
             amount,
@@ -210,5 +211,6 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
 
     /// @dev Gap for future storage variables to maintain upgrade compatibility
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable state-variable-assignment
+    // slither-disable-next-line unused-state
     uint256[49] private __gap; // Reduced by 1 due to feeBuffer
 }
