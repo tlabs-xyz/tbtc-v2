@@ -152,17 +152,28 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     /// @notice Returns the dynamic fee quote from StarkGate with fee buffer
     /// @dev Falls back to static fee if StarkGate is unavailable or fails
     /// @return The current L1→L2 message fee with buffer applied
+    // slither-disable-next-line uninitialized-local,variable-scope,unused-return
     function quoteFinalizeDepositDynamic() public view returns (uint256) {
         if (address(starkGateBridge) == address(0)) {
             return l1ToL2MessageFee;
         }
 
-        try starkGateBridge.estimateMessageFee() returns (uint256 baseFee) {
+        uint256 baseFee;
+        bool success;
+        
+        try starkGateBridge.estimateMessageFee() returns (uint256 _fee) {
+            baseFee = _fee;
+            success = true;
+        } catch {
+            success = false;
+        }
+
+        if (success) {
             // Calculate buffer amount avoiding divide-before-multiply pattern
             // This prevents precision loss: (baseFee * feeBuffer) / 100
             uint256 bufferAmount = (baseFee * feeBuffer) / 100;
             return baseFee + bufferAmount;
-        } catch {
+        } else {
             return l1ToL2MessageFee;
         }
     }
