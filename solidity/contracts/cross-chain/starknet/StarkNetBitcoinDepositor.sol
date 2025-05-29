@@ -195,6 +195,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         view
         returns (bool success, uint256 fee)
     {
+        // slither-disable-next-line uninitialized-local
         try starkGateBridge.estimateMessageFee() returns (uint256 _fee) {
             return (true, _fee);
         } catch {
