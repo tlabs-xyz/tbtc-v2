@@ -11,12 +11,12 @@ contract GasReporter is Test {
         bool withinLimit;
         uint256 gasLimit;
     }
-    
+
     GasReport[] public reports;
     uint256 public constant GAS_PRICE = 20 gwei;
-    
+
     mapping(string => uint256) public gasLimits;
-    
+
     constructor() {
         // Set gas limits for different operations
         gasLimits["constructor"] = 1_000_000;
@@ -26,23 +26,23 @@ contract GasReporter is Test {
         gasLimits["updateL1ToL2MessageFee"] = 50_000;
         gasLimits["quoteFinalizeDeposit"] = 30_000;
     }
-    
+
     function measureGas(
         string memory functionName,
         address target,
         bytes memory callData
     ) external returns (uint256 gasUsed) {
         uint256 gasStart = gasleft();
-        
-        (bool success,) = target.call(callData);
+
+        (bool success, ) = target.call(callData);
         require(success, "Function call failed");
-        
+
         gasUsed = gasStart - gasleft();
-        
+
         _recordGasUsage(functionName, gasUsed);
         return gasUsed;
     }
-    
+
     function measureGasWithValue(
         string memory functionName,
         address target,
@@ -50,42 +50,46 @@ contract GasReporter is Test {
         uint256 value
     ) external payable returns (uint256 gasUsed) {
         uint256 gasStart = gasleft();
-        
-        (bool success,) = target.call{value: value}(callData);
+
+        (bool success, ) = target.call{value: value}(callData);
         require(success, "Function call failed");
-        
+
         gasUsed = gasStart - gasleft();
-        
+
         _recordGasUsage(functionName, gasUsed);
         return gasUsed;
     }
-    
+
     function startMeasurement() external view returns (uint256) {
         return gasleft();
     }
-    
-    function endMeasurement(
-        string memory functionName,
-        uint256 gasStart
-    ) external returns (uint256 gasUsed) {
+
+    function endMeasurement(string memory functionName, uint256 gasStart)
+        external
+        returns (uint256 gasUsed)
+    {
         gasUsed = gasStart - gasleft();
         _recordGasUsage(functionName, gasUsed);
         return gasUsed;
     }
-    
-    function _recordGasUsage(string memory functionName, uint256 gasUsed) internal {
+
+    function _recordGasUsage(string memory functionName, uint256 gasUsed)
+        internal
+    {
         uint256 gasCost = gasUsed * GAS_PRICE;
         uint256 limit = gasLimits[functionName];
         bool withinLimit = limit == 0 || gasUsed <= limit;
-        
-        reports.push(GasReport({
-            functionName: functionName,
-            gasUsed: gasUsed,
-            gasCost: gasCost,
-            withinLimit: withinLimit,
-            gasLimit: limit
-        }));
-        
+
+        reports.push(
+            GasReport({
+                functionName: functionName,
+                gasUsed: gasUsed,
+                gasCost: gasCost,
+                withinLimit: withinLimit,
+                gasLimit: limit
+            })
+        );
+
         // Log the measurement
         console.log("Gas Report:");
         console.log("  Function: %s", functionName);
@@ -97,35 +101,42 @@ contract GasReporter is Test {
         }
         console.log("");
     }
-    
+
     function setGasLimit(string memory functionName, uint256 limit) external {
         gasLimits[functionName] = limit;
     }
-    
+
     function getReport(uint256 index) external view returns (GasReport memory) {
         require(index < reports.length, "Report index out of bounds");
         return reports[index];
     }
-    
+
     function getReportCount() external view returns (uint256) {
         return reports.length;
     }
-    
+
     function getAllReports() external view returns (GasReport[] memory) {
         return reports;
     }
-    
+
     function clearReports() external {
         delete reports;
     }
-    
-    function assertGasWithinLimit(string memory functionName, uint256 gasUsed) external view {
+
+    function assertGasWithinLimit(string memory functionName, uint256 gasUsed)
+        external
+        view
+    {
         uint256 limit = gasLimits[functionName];
         if (limit > 0) {
-            assertLe(gasUsed, limit, string(abi.encodePacked(functionName, " exceeds gas limit")));
+            assertLe(
+                gasUsed,
+                limit,
+                string(abi.encodePacked(functionName, " exceeds gas limit"))
+            );
         }
     }
-    
+
     function printSummary() external view {
         console.log("=== GAS USAGE SUMMARY ===");
         for (uint256 i = 0; i < reports.length; i++) {
