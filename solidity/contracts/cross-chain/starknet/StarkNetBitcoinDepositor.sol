@@ -1,4 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
+
+// ██████████████     ▐████▌     ██████████████
+// ██████████████     ▐████▌     ██████████████
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+// ██████████████     ▐████▌     ██████████████
+// ██████████████     ▐████▌     ██████████████
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -91,8 +105,8 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         require(_starkNetTBTCToken != 0, "StarkNet tBTC token address cannot be zero");
         require(_l1ToL2MessageFee > 0, "L1->L2 message fee must be greater than zero");
 
-        // Initialize the AbstractBTCDepositor
-        __AbstractBTCDepositor_initialize(_tbtcBridge, _tbtcVault);
+        // Initialize the parent AbstractL1BTCDepositor (this sets tbtcToken)
+        __AbstractL1BTCDepositor_initialize(_tbtcBridge, _tbtcVault);
         
         // Initialize OwnableUpgradeable
         __Ownable_init();
@@ -130,8 +144,10 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         }
         
         try starkGateBridge.estimateMessageFee() returns (uint256 baseFee) {
-            uint256 bufferedFee = baseFee + ((baseFee * feeBuffer) / 100);
-            return bufferedFee;
+            // Calculate buffer amount safely to avoid overflow
+            // If baseFee is very large, this prevents overflow
+            uint256 bufferAmount = (baseFee / 100) * feeBuffer;
+            return baseFee + bufferAmount;
         } catch {
             return l1ToL2MessageFee;
         }
@@ -156,6 +172,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         bytes32 destinationChainReceiver
     ) internal override {
         require(msg.value >= l1ToL2MessageFee, "Insufficient L1->L2 message fee");
+        require(address(tbtcToken) != address(0), "tBTC token not initialized");
         
         // Convert bytes32 to uint256 for StarkNet address format
         uint256 starkNetRecipient = uint256(destinationChainReceiver);
@@ -165,18 +182,10 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         tbtcToken.safeIncreaseAllowance(address(starkGateBridge), amount);
 
         // Bridge tBTC to StarkNet using the more efficient deposit function
-        uint256 messageNonce = starkGateBridge.deposit{value: msg.value}(
+        starkGateBridge.deposit{value: msg.value}(
             address(tbtcToken),
             amount,
             starkNetRecipient
-        );
-
-        // Emit event for tracking
-        emit TBTCBridgedToStarkNet(
-            bytes32(0), // depositKey is not available in this context
-            starkNetRecipient,
-            amount,
-            messageNonce
         );
     }
 

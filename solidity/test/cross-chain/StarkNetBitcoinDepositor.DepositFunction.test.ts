@@ -118,6 +118,11 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       // Direct test of the mock to verify deposit() works
       const testAmount = ethers.utils.parseEther("1")
       const testRecipient = ethers.BigNumber.from("0x12345")
+      const [signer] = await ethers.getSigners()
+      
+      // Setup: mint tokens to the signer and approve the bridge
+      await tbtcToken.mint(signer.address, testAmount)
+      await tbtcToken.approve(starkGateBridge.address, testAmount)
       
       // Call deposit directly on the mock
       await starkGateBridge.deposit(
@@ -303,11 +308,17 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     it("should demonstrate deposit() function is used in implementation", async () => {
       // This test verifies that the implementation uses deposit() not depositWithMessage()
       // by checking the contract code directly
+      const [signer] = await ethers.getSigners()
+      const testAmount = ethers.utils.parseEther("1")
+      
+      // Setup: mint tokens to the signer and approve the bridge
+      await tbtcToken.mint(signer.address, testAmount)
+      await tbtcToken.approve(starkGateBridge.address, testAmount)
       
       // The fact that our mock's deposit() function works proves the interface is correct
       const mockTx = await starkGateBridge.deposit(
         tbtcToken.address,
-        ethers.utils.parseEther("1"),
+        testAmount,
         123,
         { value: ethers.utils.parseEther("0.1") }
       )

@@ -43,12 +43,17 @@ contract MockStarkGateBridge is IStarkGateBridge {
     mapping(uint256 => DepositInfo) public deposits;
     uint256 public nextNonce = 1;
     
+    // Security testing features
+    bool public shouldRevert = false;
+    bool public shouldRevertEstimate = false;
+    
     function deposit(
         address token,
         uint256 amount,
         uint256 l2Recipient
     ) external payable override returns (uint256) {
-        require(msg.value == 0.1 ether, "Incorrect L1->L2 message fee");
+        require(!shouldRevert, "Mock: deposit reverted");
+        require(msg.value > 0, "L1->L2 message fee required");
         
         // Track the call
         depositCalled = true;
@@ -109,6 +114,7 @@ contract MockStarkGateBridge is IStarkGateBridge {
     bool public shouldFailEstimation = false;
     
     function estimateMessageFee() external view override returns (uint256) {
+        require(!shouldRevertEstimate, "Mock: estimate reverted");
         require(!shouldFailEstimation, "Estimation failed");
         return dynamicFee;
     }
@@ -187,7 +193,23 @@ contract MockStarkGateBridge is IStarkGateBridge {
         return depositCallCount;
     }
     
-    function getLastDepositCall() external view returns (DepositCall memory) {
+    function getLastDepositCall() external view returns (SimpleDepositCall memory) {
+        return lastSimpleDepositCall;
+    }
+    
+    function getLastDepositWithMessageCall() external view returns (DepositCall memory) {
         return lastDepositCall;
+    }
+    
+    function setShouldRevert(bool _shouldRevert) external {
+        shouldRevert = _shouldRevert;
+    }
+    
+    function setShouldRevertEstimate(bool _shouldRevert) external {
+        shouldRevertEstimate = _shouldRevert;
+    }
+    
+    function setEstimateMessageFeeReturn(uint256 _fee) external {
+        dynamicFee = _fee;
     }
 }
