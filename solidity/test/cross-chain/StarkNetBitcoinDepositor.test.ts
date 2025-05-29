@@ -221,8 +221,8 @@ describe("StarkNetBitcoinDepositor", () => {
       )
 
       await expect(tx)
-        .to.emit(depositor, "DepositInitializedForStarkNet")
-        .withArgs(fixture.expectedDepositKey, STARKNET_RECIPIENT)
+        .to.emit(depositor, "DepositInitialized")
+        .withArgs(fixture.expectedDepositKey, l2DepositOwner, await ethers.provider.getSigner(0).getAddress())
       
       await expect(tx)
         .to.emit(bridge, "DepositRevealed")
@@ -236,7 +236,7 @@ describe("StarkNetBitcoinDepositor", () => {
           fixture.reveal,
           ethers.constants.HashZero
         )
-      ).to.be.revertedWith("Invalid L2 deposit owner")
+      ).to.be.revertedWith("L2 deposit owner must not be 0x0")
     })
 
     it("should revert when vault address mismatch", async () => {
@@ -286,17 +286,15 @@ describe("StarkNetBitcoinDepositor", () => {
     })
 
     it("should finalize deposit successfully", async () => {
-      const expectedMessageNonce = 1
-      
       const tx = await depositor.finalizeDeposit(depositKey, {
         value: INITIAL_MESSAGE_FEE
       })
 
+      // The parent contract emits DepositFinalized, not the child contract
       await expect(tx)
-        .to.emit(depositor, "TBTCBridgedToStarkNet")
-        .withArgs(depositKey, STARKNET_RECIPIENT, expectedTbtcAmount, expectedMessageNonce)
+        .to.emit(depositor, "DepositFinalized")
       
-      expect(await starkGateBridge.depositWithMessageCalled()).to.be.true
+      expect(await starkGateBridge.depositCalled()).to.be.true
     })
 
     it("should revert with insufficient fee", async () => {
@@ -327,10 +325,9 @@ describe("StarkNetBitcoinDepositor", () => {
         value: INITIAL_MESSAGE_FEE
       })
       
-      // After depositWithMessage call, allowance should be back to 0 (if the mock consumed it)
-      // or should equal the approved amount (if the mock doesn't consume it)
+      // After deposit call, allowance should be back to 0 (the mock consumed it via transferFrom)
       const finalAllowance = await tbtcToken.allowance(depositor.address, starkGateBridge.address)
-      expect(finalAllowance).to.equal(expectedTbtcAmount) // Mock doesn't consume the allowance
+      expect(finalAllowance).to.equal(0) // Mock consumed the allowance
     })
   })
 

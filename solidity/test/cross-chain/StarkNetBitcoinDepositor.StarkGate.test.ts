@@ -7,7 +7,7 @@ import type {
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
-describe("P-002: StarkGate Deposit Function Research", () => {
+describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
   let starkGateBridge: MockStarkGateBridge
   let tbtcToken: MockTBTCToken
   let snapshot: number
@@ -34,7 +34,7 @@ describe("P-002: StarkGate Deposit Function Research", () => {
     await restoreSnapshot(snapshot)
   })
 
-  describe("StarkGate Function Analysis", () => {
+  describe("StarkGate Bridge Function Analysis", () => {
     it("should measure gas usage for depositWithMessage with empty array", async () => {
       // GREEN: Measure gas for current implementation
       const emptyMessage: any[] = []
@@ -91,7 +91,7 @@ describe("P-002: StarkGate Deposit Function Research", () => {
       )
       
       // Verify empty array is handled correctly
-      const lastCall = await starkGateBridge.getLastDepositCall()
+      const lastCall = await starkGateBridge.getLastDepositWithMessageCall()
       expect(lastCall.message.length).to.equal(0)
       expect(lastCall.l2Recipient).to.equal(TEST_RECIPIENT)
       expect(lastCall.amount).to.equal(TEST_AMOUNT)
@@ -100,7 +100,7 @@ describe("P-002: StarkGate Deposit Function Research", () => {
     })
   })
 
-  describe("Fee Implications Analysis", () => {
+  describe("StarkGate Fee Analysis", () => {
     it("should analyze L1->L2 fee structure", async () => {
       // GREEN: Document fee analysis
       const feeEstimate = await starkGateBridge.estimateMessageFee()

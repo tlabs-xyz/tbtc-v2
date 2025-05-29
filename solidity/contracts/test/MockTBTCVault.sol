@@ -69,4 +69,15 @@ contract MockTBTCVault is ITBTCVault {
     function isOptimisticMintingFinalized(bytes32 depositKey) external view returns (bool) {
         return _finalizedAt[uint256(depositKey)] > 0;
     }
+    
+    // Security testing features
+    mapping(uint256 => uint256) private _depositAmounts;
+    
+    function setDepositAmount(uint256 depositKey, uint256 amount) external {
+        _depositAmounts[depositKey] = amount;
+    }
+    
+    function getDepositAmount(uint256 depositKey) external view returns (uint256) {
+        return _depositAmounts[depositKey];
+    }
 }
