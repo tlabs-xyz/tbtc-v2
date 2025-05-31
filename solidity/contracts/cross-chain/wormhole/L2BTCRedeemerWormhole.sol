@@ -19,9 +19,10 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
+import {BTCUtils} from "@keep-network/bitcoin-spv-sol/contracts/BTCUtils.sol";
 import "./Wormhole.sol";
-import "../L2TBTC.sol";
 import "../../integrator/IL2WormholeGateway.sol";
 
 /// @title L2BTCRedeemerWormhole
@@ -65,12 +66,13 @@ contract L2BTCRedeemerWormhole is
     ReentrancyGuardUpgradeable
 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
+    using BTCUtils for bytes;
 
     /// @notice Reference to the Wormhole Gateway contract.
     IL2WormholeGateway public gateway;
 
     /// @notice Canonical L2 tBTC token.
-    L2TBTC public tbtc;
+    IERC20Upgradeable public tbtc;
 
     /// @notice Minimum amount of tBTC that can be redeemed.
     uint256 public minimumRedemptionAmount;
@@ -91,8 +93,8 @@ contract L2BTCRedeemerWormhole is
     event MinimumRedemptionAmountUpdated(uint256 newMinimumAmount);
 
     function initialize(
-        L2TBTC _tbtc,
-        IL2WormholeGateway _gateway,
+        address _tbtc,
+        address _gateway,
         bytes32 _l1BtcRedeemerWormholeAddress
     ) external initializer {
         __Ownable_init();
@@ -111,8 +113,8 @@ contract L2BTCRedeemerWormhole is
             "L1 BTC redeemer Wormhole address must not be 0x0"
         );
 
-        tbtc = _tbtc;
-        gateway = _gateway;
+        tbtc = IERC20Upgradeable(_tbtc);
+        gateway = IL2WormholeGateway(_gateway);
         l1BtcRedeemerWormholeAddress = _l1BtcRedeemerWormholeAddress;
         minimumRedemptionAmount = 1e16; // 0.01 tBTC
     }
@@ -144,8 +146,9 @@ contract L2BTCRedeemerWormhole is
         // properly only from standard outputs so if it succeeds, we have a
         // guarantee the redeemer output script is proper. The underlying way
         // of validation is the same as in tBTC v1.
-        bytes memory redeemerOutputScriptPayload = redeemerOutputScript
-            .extractHashAt(0, redeemerOutputScript.length);
+        bytes memory redeemerOutputScriptMem = redeemerOutputScript;
+        bytes memory redeemerOutputScriptPayload = redeemerOutputScriptMem
+            .extractHashAt(0, redeemerOutputScriptMem.length);
 
         require(
             redeemerOutputScriptPayload.length > 0,
