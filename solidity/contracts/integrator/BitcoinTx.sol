@@ -20,6 +20,7 @@ import {ValidateSPV} from "@keep-network/bitcoin-spv-sol/contracts/ValidateSPV.s
 /// @title Bitcoin transaction
 /// @notice Allows to reference Bitcoin raw transaction in Solidity.
 /// @dev See https://developer.bitcoin.org/reference/transactions.html#raw-transaction-format
+// slither-disable-next-line name-reused
 library BitcoinTx {
     using ValidateSPV for bytes32;
 
