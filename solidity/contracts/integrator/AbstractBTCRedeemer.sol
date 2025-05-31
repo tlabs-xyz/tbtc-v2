@@ -22,6 +22,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import "./IBridge.sol";
 import "./IBank.sol";
+import "./BitcoinTx.sol";
 
 
 /// @title Abstract AbstractBTCRedeemer contract.
@@ -130,12 +131,12 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
     function _requestRedemption(
         bytes20 walletPubKeyHash,
         BitcoinTx.UTXO memory mainUtxo,
-        bytes calldata redemptionOutputScript,
+        bytes memory redemptionOutputScript,
         uint64 amount
     )   internal
         returns (
             uint256 redemptionKey,
-            uint256 tbtcAmount,
+            uint256 tbtcAmount
         )
     {
         // This contract (as balanceOwner) approves the Bridge to spend its Bank balance.
@@ -183,7 +184,7 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
         uint256 amountSubTreasury = (redemptionAmountSat - redemptionTreasuryFeeSat) *
             SATOSHI_MULTIPLIER;
 
-        (, , uint64 redemptionTxMaxFee, ) = thresholdBridge
+        (, , uint64 redemptionTxMaxFee, , , , ) = thresholdBridge
             .redemptionParameters();
 
         uint256 txMaxFee = redemptionTxMaxFee * SATOSHI_MULTIPLIER;
