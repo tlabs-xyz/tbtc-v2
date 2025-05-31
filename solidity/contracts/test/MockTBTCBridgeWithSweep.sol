@@ -48,12 +48,10 @@ contract MockTBTCBridgeWithSweep is IBridge {
         _deposits[depositKey] = IBridgeTypes.DepositRequest({
             depositor: msg.sender,
             amount: 88800000, // Amount in satoshi that results in expectedTbtcAmount after fees
-            // solhint-disable-next-line not-rely-on-time
-            revealedAt: uint32(block.timestamp),
+            revealedAt: uint32(block.timestamp), // solhint-disable-line not-rely-on-time
             vault: reveal.vault,
             treasuryFee: 898000, // Treasury fee in satoshi
-            // solhint-disable-next-line not-rely-on-time
-            sweptAt: uint32(block.timestamp + 1),
+            sweptAt: uint32(block.timestamp + 1), // solhint-disable-line not-rely-on-time
             extraData: extraData
         });
 
@@ -102,16 +100,14 @@ contract MockTBTCBridgeWithSweep is IBridge {
             _deposits[depositKey] = IBridgeTypes.DepositRequest({
                 depositor: msg.sender,
                 amount: 88800000, // Amount in satoshi that results in expectedTbtcAmount after fees
-                // solhint-disable-next-line not-rely-on-time
-                revealedAt: uint32(block.timestamp - 1), // Set to past to allow sweep
+                revealedAt: uint32(block.timestamp - 1), // Set to past to allow sweep, solhint-disable-line not-rely-on-time
                 vault: address(0),
                 treasuryFee: 898000, // Treasury fee in satoshi
                 sweptAt: 0,
                 extraData: bytes32(0)
             });
         }
-        // solhint-disable-next-line not-rely-on-time
-        _deposits[depositKey].sweptAt = uint32(block.timestamp);
+        _deposits[depositKey].sweptAt = uint32(block.timestamp); // solhint-disable-line not-rely-on-time
     }
 
     // --- Redemption related mock functions ---
