@@ -46,12 +46,10 @@ contract MockTBTCBridge is IBridge {
         _deposits[depositKey] = IBridgeTypes.DepositRequest({
             depositor: msg.sender,
             amount: 100000000, // 1 BTC in satoshi
-            // solhint-disable-next-line not-rely-on-time
-            revealedAt: uint32(block.timestamp),
+            revealedAt: uint32(block.timestamp), // solhint-disable-line not-rely-on-time
             vault: reveal.vault,
             treasuryFee: 1000000, // 0.01 BTC in satoshi
-            // solhint-disable-next-line not-rely-on-time
-            sweptAt: uint32(block.timestamp + 1),
+            sweptAt: uint32(block.timestamp + 1), // solhint-disable-line not-rely-on-time
             extraData: extraData
         });
     }
@@ -91,7 +89,7 @@ contract MockTBTCBridge is IBridge {
         initializeDepositCalled = false;
         nextDepositKey = 12345;
     }
-
+    
     // --- Redemption related mock functions ---
     function requestRedemption(
         bytes20 walletPubKeyHash,
