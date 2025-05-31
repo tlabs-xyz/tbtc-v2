@@ -48,10 +48,12 @@ contract MockTBTCBridgeWithSweep is IBridge {
         _deposits[depositKey] = IBridgeTypes.DepositRequest({
             depositor: msg.sender,
             amount: 88800000, // Amount in satoshi that results in expectedTbtcAmount after fees
-            revealedAt: uint32(block.timestamp), // solhint-disable-line not-rely-on-time
+            // solhint-disable-next-line not-rely-on-time
+            revealedAt: uint32(block.timestamp),
             vault: reveal.vault,
             treasuryFee: 898000, // Treasury fee in satoshi
-            sweptAt: uint32(block.timestamp + 1), // solhint-disable-line not-rely-on-time
+            // solhint-disable-next-line not-rely-on-time
+            sweptAt: uint32(block.timestamp + 1),
             extraData: extraData
         });
 
@@ -100,14 +102,16 @@ contract MockTBTCBridgeWithSweep is IBridge {
             _deposits[depositKey] = IBridgeTypes.DepositRequest({
                 depositor: msg.sender,
                 amount: 88800000, // Amount in satoshi that results in expectedTbtcAmount after fees
-                revealedAt: uint32(block.timestamp - 1), // Set to past to allow sweep, solhint-disable-line not-rely-on-time
+                // solhint-disable-next-line not-rely-on-time
+                revealedAt: uint32(block.timestamp - 1), // Set to past to allow sweep
                 vault: address(0),
                 treasuryFee: 898000, // Treasury fee in satoshi
                 sweptAt: 0,
                 extraData: bytes32(0)
             });
         }
-        _deposits[depositKey].sweptAt = uint32(block.timestamp); // solhint-disable-line not-rely-on-time
+        // solhint-disable-next-line not-rely-on-time
+        _deposits[depositKey].sweptAt = uint32(block.timestamp);
     }
 
     // --- Redemption related mock functions ---
@@ -136,7 +140,7 @@ contract MockTBTCBridgeWithSweep is IBridge {
             requestedAmount: amount,
             treasuryFee: _redemptionTreasuryFeeDivisor > 0 ? amount / _redemptionTreasuryFeeDivisor : 0,
             txMaxFee: _redemptionTxMaxFee,
-            /* solhint-disable-next-line not-rely-on-time */
+            // solhint-disable-next-line not-rely-on-time
             requestedAt: uint32(block.timestamp)
         });
 
