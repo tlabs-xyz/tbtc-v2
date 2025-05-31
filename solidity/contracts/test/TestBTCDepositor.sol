@@ -208,7 +208,7 @@ contract MockBridge is IBridge {
             requestedAmount: amount,
             treasuryFee: amount / _redemptionTreasuryFeeDivisor,
             txMaxFee: _redemptionTxMaxFee,
-            // solhint-disable-next-line not-rely-on-time
+            /* solhint-disable-next-line not-rely-on-time */
             requestedAt: uint32(block.timestamp)
         });
 

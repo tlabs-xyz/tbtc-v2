@@ -169,14 +169,11 @@ contract L2BTCRedeemerWormhole is
         // successfully call tbtc.burnFrom(address(this), amount).
         tbtc.safeIncreaseAllowance(address(gateway), amount);
 
-        // slither-disable-next-line reentrancy-events
-        emit RedemptionRequestedOnL2(
-            amount,
-            redeemerOutputScript,
-            nonce
-        );
-
         redeemedAmount += amount;
+
+        // slither-disable-next-line reentrancy-events
+        emit RedemptionRequestedOnL2(amount, redeemerOutputScript, nonce);
+
         return
             gateway.sendTbtcWithPayloadToEthereum{value: msg.value}(
                 amount,
@@ -188,10 +185,9 @@ contract L2BTCRedeemerWormhole is
 
     /// @notice Lets the governance update the minimum redemption amount.
     /// @param _newMinimumRedemptionAmount The new minimum redemption amount.
-    function updateMinimumRedemptionAmount(uint256 _newMinimumRedemptionAmount)
-        external
-        onlyOwner
-    {
+    function updateMinimumRedemptionAmount(
+        uint256 _newMinimumRedemptionAmount
+    ) external onlyOwner {
         require(
             _newMinimumRedemptionAmount != 0,
             "Minimum redemption amount must not be 0"
