@@ -125,8 +125,7 @@ contract MockBridge is IBridge {
 
         request.depositor = msg.sender;
         request.amount = fundingOutputAmount;
-        /* solhint-disable-next-line not-rely-on-time */
-        request.revealedAt = uint32(block.timestamp);
+        request.revealedAt = uint32(block.timestamp);  // solhint-disable-line not-rely-on-time
         request.vault = reveal.vault;
         request.treasuryFee = _depositTreasuryFeeDivisor > 0
             ? fundingOutputAmount / _depositTreasuryFeeDivisor
@@ -142,8 +141,7 @@ contract MockBridge is IBridge {
     function sweepDeposit(uint256 depositKey) public {
         require(_deposits[depositKey].revealedAt != 0, "Deposit not revealed");
         require(_deposits[depositKey].sweptAt == 0, "Deposit already swept");
-        /* solhint-disable-next-line not-rely-on-time */
-        _deposits[depositKey].sweptAt = uint32(block.timestamp);
+        _deposits[depositKey].sweptAt = uint32(block.timestamp);  // solhint-disable-line not-rely-on-time
     }
 
     function deposits(uint256 depositKey)
@@ -208,8 +206,7 @@ contract MockBridge is IBridge {
             requestedAmount: amount,
             treasuryFee: amount / _redemptionTreasuryFeeDivisor,
             txMaxFee: _redemptionTxMaxFee,
-            /* solhint-disable-next-line not-rely-on-time */
-            requestedAt: uint32(block.timestamp)
+            requestedAt: uint32(block.timestamp)  // solhint-disable-line not-rely-on-time
         });
 
         emit RedemptionRequestedMock(
@@ -277,8 +274,7 @@ contract MockTBTCVault is ITBTCVault {
             _requests[depositKey].requestedAt == 0,
             "Request already exists"
         );
-        /* solhint-disable-next-line not-rely-on-time */
-        _requests[depositKey].requestedAt = uint64(block.timestamp);
+        _requests[depositKey].requestedAt = uint64(block.timestamp);  // solhint-disable-line not-rely-on-time
     }
 
     /// @dev The function is virtual to allow other projects using this mock
@@ -296,8 +292,7 @@ contract MockTBTCVault is ITBTCVault {
             _requests[depositKey].finalizedAt == 0,
             "Request already finalized"
         );
-        /* solhint-disable-next-line not-rely-on-time */
-        _requests[depositKey].finalizedAt = uint64(block.timestamp);
+        _requests[depositKey].finalizedAt = uint64(block.timestamp);  // solhint-disable-line not-rely-on-time
     }
 
     function setOptimisticMintingFeeDivisor(uint32 value) external {
