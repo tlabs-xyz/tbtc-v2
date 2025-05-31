@@ -5,10 +5,28 @@ import "../integrator/IBridge.sol";
 
 contract MockTBTCBridge is IBridge {
     mapping(uint256 => IBridgeTypes.DepositRequest) private _deposits;
+    // Added for redemption mocks
+    mapping(uint256 => IBridgeTypes.RedemptionRequest) internal _pendingRedemptions;
+
+    uint64 internal _redemptionDustThreshold = 50000;
+    uint64 internal _redemptionTreasuryFeeDivisor = 200;
+    uint64 internal _redemptionTxMaxFee = 10000;
+    uint64 internal _redemptionTxMaxTotalFee = 50000;
+    uint32 internal _redemptionTimeout = 6 * 3600;
+    uint96 internal _redemptionTimeoutSlashingAmount = 10**18;
+    uint32 internal _redemptionTimeoutNotifierRewardMultiplier = 5;
 
     // Track calls for testing
     bool public initializeDepositCalled;
     uint256 public nextDepositKey;
+
+    // Added for redemption mocks
+    event RedemptionRequestedMock(
+        bytes20 walletPubKeyHash,
+        uint64 amount,
+        bytes redeemerOutputScript,
+        uint256 redemptionKey
+    );
 
     constructor() {
         nextDepositKey = 12345; // Default test value
@@ -70,5 +88,75 @@ contract MockTBTCBridge is IBridge {
     function resetMock() external {
         initializeDepositCalled = false;
         nextDepositKey = 12345;
+    }
+
+    // --- Redemption related mock functions ---
+    function requestRedemption(
+        bytes20 walletPubKeyHash,
+        BitcoinTx.UTXO calldata /*mainUtxo*/, // Marked unused
+        bytes calldata redeemerOutputScript,
+        uint64 amount
+    ) external override { // Added override
+        bytes32 scriptHash = keccak256(redeemerOutputScript);
+        uint256 redemptionKey;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(0, scriptHash)
+            mstore(32, walletPubKeyHash)
+            redemptionKey := keccak256(0, 52)
+        }
+
+        require(
+            _pendingRedemptions[redemptionKey].requestedAt == 0,
+            "Redemption already requested"
+        );
+
+        _pendingRedemptions[redemptionKey] = IBridgeTypes.RedemptionRequest({
+            redeemer: msg.sender,
+            requestedAmount: amount,
+            treasuryFee: _redemptionTreasuryFeeDivisor > 0 ? amount / _redemptionTreasuryFeeDivisor : 0,
+            txMaxFee: _redemptionTxMaxFee,
+            /* solhint-disable-next-line not-rely-on-time */
+            requestedAt: uint32(block.timestamp)
+        });
+
+        emit RedemptionRequestedMock(
+            walletPubKeyHash,
+            amount,
+            redeemerOutputScript,
+            redemptionKey
+        );
+    }
+
+    function pendingRedemptions(uint256 redemptionKey)
+        external
+        view
+        override // Added override
+        returns (IBridgeTypes.RedemptionRequest memory)
+    {
+        return _pendingRedemptions[redemptionKey];
+    }
+
+    function redemptionParameters()
+        external
+        view
+        override // Added override
+        returns (
+            uint64 redemptionDustThreshold,
+            uint64 redemptionTreasuryFeeDivisor,
+            uint64 redemptionTxMaxFee,
+            uint64 redemptionTxMaxTotalFee,
+            uint32 redemptionTimeout,
+            uint96 redemptionTimeoutSlashingAmount,
+            uint32 redemptionTimeoutNotifierRewardMultiplier
+        )
+    {
+        redemptionDustThreshold = _redemptionDustThreshold;
+        redemptionTreasuryFeeDivisor = _redemptionTreasuryFeeDivisor;
+        redemptionTxMaxFee = _redemptionTxMaxFee;
+        redemptionTxMaxTotalFee = _redemptionTxMaxTotalFee;
+        redemptionTimeout = _redemptionTimeout;
+        redemptionTimeoutSlashingAmount = _redemptionTimeoutSlashingAmount;
+        redemptionTimeoutNotifierRewardMultiplier = _redemptionTimeoutNotifierRewardMultiplier;
     }
 }

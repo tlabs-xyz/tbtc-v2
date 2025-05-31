@@ -9,8 +9,26 @@ contract MockBridgeForStarkNet is IBridge {
     mapping(uint256 => bool) private _swept;
     mapping(uint256 => bool) private _finalized; // Track finalized deposits to prevent double finalization
 
+    // Added for redemption mocks
+    mapping(uint256 => IBridgeTypes.RedemptionRequest) internal _pendingRedemptions;
+
+    uint64 internal _redemptionDustThreshold = 50000; // 0.0005 BTC
+    uint64 internal _redemptionTreasuryFeeDivisor = 200; // 0.5%
+    uint64 internal _redemptionTxMaxFee = 10000; // 0.0001 BTC
+    uint64 internal _redemptionTxMaxTotalFee = 50000; // 0.0005 BTC
+    uint32 internal _redemptionTimeout = 6 * 3600; // 6 hours in seconds
+    uint96 internal _redemptionTimeoutSlashingAmount = 10**18; // 1 TBTC with 18 decimals
+    uint32 internal _redemptionTimeoutNotifierRewardMultiplier = 5; // 5%
+
     // Events to match real Bridge
     event DepositRevealed(uint256 indexed depositKey);
+    // Added for redemption mocks
+    event RedemptionRequestedMock(
+        bytes20 walletPubKeyHash,
+        uint64 amount,
+        bytes redeemerOutputScript,
+        uint256 redemptionKey
+    );
 
     // Track calls for testing
     bool public initializeDepositCalled;
@@ -20,7 +38,7 @@ contract MockBridgeForStarkNet is IBridge {
         IBridgeTypes.BitcoinTxInfo calldata fundingTx,
         IBridgeTypes.DepositRevealInfo calldata reveal,
         bytes32 extraData
-    ) external {
+    ) external override {
         initializeDepositCalled = true;
 
         // Calculate deposit key exactly like AbstractBTCDepositor
@@ -111,5 +129,75 @@ contract MockBridgeForStarkNet is IBridge {
     function resetMock() external {
         initializeDepositCalled = false;
         lastDepositKey = 0;
+    }
+
+    // --- Redemption related mock functions ---
+    function requestRedemption(
+        bytes20 walletPubKeyHash,
+        BitcoinTx.UTXO calldata /*mainUtxo*/, // Marked unused
+        bytes calldata redeemerOutputScript,
+        uint64 amount
+    ) external override {
+        bytes32 scriptHash = keccak256(redeemerOutputScript);
+        uint256 redemptionKey;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(0, scriptHash)
+            mstore(32, walletPubKeyHash)
+            redemptionKey := keccak256(0, 52)
+        }
+
+        require(
+            _pendingRedemptions[redemptionKey].requestedAt == 0,
+            "Redemption already requested"
+        );
+
+        _pendingRedemptions[redemptionKey] = IBridgeTypes.RedemptionRequest({
+            redeemer: msg.sender,
+            requestedAmount: amount,
+            treasuryFee: _redemptionTreasuryFeeDivisor > 0 ? amount / _redemptionTreasuryFeeDivisor : 0,
+            txMaxFee: _redemptionTxMaxFee,
+            /* solhint-disable-next-line not-rely-on-time */
+            requestedAt: uint32(block.timestamp)
+        });
+
+        emit RedemptionRequestedMock(
+            walletPubKeyHash,
+            amount,
+            redeemerOutputScript,
+            redemptionKey
+        );
+    }
+
+    function pendingRedemptions(uint256 redemptionKey)
+        external
+        view
+        override
+        returns (IBridgeTypes.RedemptionRequest memory)
+    {
+        return _pendingRedemptions[redemptionKey];
+    }
+
+    function redemptionParameters()
+        external
+        view
+        override
+        returns (
+            uint64 redemptionDustThreshold,
+            uint64 redemptionTreasuryFeeDivisor,
+            uint64 redemptionTxMaxFee,
+            uint64 redemptionTxMaxTotalFee,
+            uint32 redemptionTimeout,
+            uint96 redemptionTimeoutSlashingAmount,
+            uint32 redemptionTimeoutNotifierRewardMultiplier
+        )
+    {
+        redemptionDustThreshold = _redemptionDustThreshold;
+        redemptionTreasuryFeeDivisor = _redemptionTreasuryFeeDivisor;
+        redemptionTxMaxFee = _redemptionTxMaxFee;
+        redemptionTxMaxTotalFee = _redemptionTxMaxTotalFee;
+        redemptionTimeout = _redemptionTimeout;
+        redemptionTimeoutSlashingAmount = _redemptionTimeoutSlashingAmount;
+        redemptionTimeoutNotifierRewardMultiplier = _redemptionTimeoutNotifierRewardMultiplier;
     }
 }
