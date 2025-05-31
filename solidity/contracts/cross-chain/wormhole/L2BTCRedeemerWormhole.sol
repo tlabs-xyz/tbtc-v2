@@ -160,6 +160,8 @@ contract L2BTCRedeemerWormhole is
         amount = WormholeUtils.normalize(amount);
         require(amount >= minimumRedemptionAmount, "Amount too low to redeem");
 
+        redeemedAmount += amount;
+
         // Transfer user's tBTC to this contract.
         // The user must have previously approved this contract to spend this amount.
         tbtc.safeTransferFrom(msg.sender, address(this), amount);
@@ -168,8 +170,6 @@ contract L2BTCRedeemerWormhole is
         // This allows the gateway's sendTbtcWithPayloadToEthereum function to
         // successfully call tbtc.burnFrom(address(this), amount).
         tbtc.safeIncreaseAllowance(address(gateway), amount);
-
-        redeemedAmount += amount;
 
         // slither-disable-next-line reentrancy-events
         emit RedemptionRequestedOnL2(amount, redeemerOutputScript, nonce);
