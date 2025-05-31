@@ -61,7 +61,8 @@ contract MockBridgeForStarkNet is IBridge {
         _deposits[depositKey] = IBridgeTypes.DepositRequest({
             depositor: msg.sender,
             amount: 100000000, // 1 BTC in satoshis (8-decimal precision)
-            revealedAt: uint32(block.timestamp), // solhint-disable-line not-rely-on-time
+            // solhint-disable-next-line not-rely-on-time
+            revealedAt: uint32(block.timestamp),
             vault: reveal.vault,
             treasuryFee: 12098, // Treasury fee in satoshis (should match the ratio)
             sweptAt: 0,
@@ -101,7 +102,8 @@ contract MockBridgeForStarkNet is IBridge {
         );
         require(!_swept[depositKey], "Already swept");
         _swept[depositKey] = true;
-        _deposits[depositKey].sweptAt = uint32(block.timestamp); // solhint-disable-line not-rely-on-time
+        // solhint-disable-next-line not-rely-on-time
+        _deposits[depositKey].sweptAt = uint32(block.timestamp);
     }
 
     // Debug helper
@@ -157,7 +159,7 @@ contract MockBridgeForStarkNet is IBridge {
             requestedAmount: amount,
             treasuryFee: _redemptionTreasuryFeeDivisor > 0 ? amount / _redemptionTreasuryFeeDivisor : 0,
             txMaxFee: _redemptionTxMaxFee,
-            /* solhint-disable-next-line not-rely-on-time */
+            // solhint-disable-next-line not-rely-on-time
             requestedAt: uint32(block.timestamp)
         });
 
