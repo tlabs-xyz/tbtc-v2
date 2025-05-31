@@ -19,7 +19,7 @@ import "@keep-network/random-beacon/contracts/Reimbursable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import "./Wormhole.sol";
-import "../integrator/AbstractBTCRedeemer.sol";
+import "../../integrator/AbstractBTCRedeemer.sol";
 import "../utils/Crosschain.sol";
 
 /// @title L1BTCRedeemerWormhole
