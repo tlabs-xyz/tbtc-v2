@@ -16,6 +16,7 @@
 pragma solidity 0.8.17;
 
 import "@keep-network/random-beacon/contracts/Reimbursable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import "./Wormhole.sol";
@@ -48,7 +49,6 @@ import "../utils/Crosschain.sol";
 ///            eligible for gas reimbursement.
 contract L1BTCRedeemerWormhole is
     AbstractBTCRedeemer,
-    OwnableUpgradeable,
     Reimbursable,
     ReentrancyGuardUpgradeable
 {
