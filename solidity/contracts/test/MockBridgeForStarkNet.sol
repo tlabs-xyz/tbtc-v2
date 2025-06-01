@@ -10,7 +10,8 @@ contract MockBridgeForStarkNet is IBridge {
     mapping(uint256 => bool) private _finalized; // Track finalized deposits to prevent double finalization
 
     // Added for redemption mocks
-    mapping(uint256 => IBridgeTypes.RedemptionRequest) internal _pendingRedemptions;
+    mapping(uint256 => IBridgeTypes.RedemptionRequest)
+        internal _pendingRedemptions;
 
     uint64 internal _redemptionDustThreshold = 50000; // 0.0005 BTC
     uint64 internal _redemptionTreasuryFeeDivisor = 200; // 0.5%
@@ -134,7 +135,7 @@ contract MockBridgeForStarkNet is IBridge {
     // --- Redemption related mock functions ---
     function requestRedemption(
         bytes20 walletPubKeyHash,
-        BitcoinTx.UTXO calldata /*mainUtxo*/, // Marked unused
+        BitcoinTx.UTXO calldata, /*mainUtxo*/ // Marked unused
         bytes calldata redeemerOutputScript,
         uint64 amount
     ) external override {
@@ -155,9 +156,11 @@ contract MockBridgeForStarkNet is IBridge {
         _pendingRedemptions[redemptionKey] = IBridgeTypes.RedemptionRequest({
             redeemer: msg.sender,
             requestedAmount: amount,
-            treasuryFee: _redemptionTreasuryFeeDivisor > 0 ? amount / _redemptionTreasuryFeeDivisor : 0,
+            treasuryFee: _redemptionTreasuryFeeDivisor > 0
+                ? amount / _redemptionTreasuryFeeDivisor
+                : 0,
             txMaxFee: _redemptionTxMaxFee,
-            requestedAt: uint32(block.timestamp)  // solhint-disable-line not-rely-on-time
+            requestedAt: uint32(block.timestamp) // solhint-disable-line not-rely-on-time
         });
 
         emit RedemptionRequestedMock(

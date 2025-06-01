@@ -24,7 +24,6 @@ import "./IBridge.sol";
 import "./IBank.sol";
 import "./BitcoinTx.sol";
 
-
 /// @title Abstract AbstractBTCRedeemer contract.
 /// @notice This abstract contract is meant to facilitate integration of protocols
 ///         aiming to use tBTC as an underlying Bitcoin bridge for redemptions.
@@ -100,11 +99,16 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
         address _bank
     ) internal {
         require(
-            address(thresholdBridge) == address(0) && address(tbtcToken) == address(0) && address(bank) == address(0),
+            address(thresholdBridge) == address(0) &&
+                address(tbtcToken) == address(0) &&
+                address(bank) == address(0),
             "AbstractBTCRedeemer already initialized"
         );
 
-        require(_thresholdBridge != address(0), "Threshold Bridge address cannot be zero");
+        require(
+            _thresholdBridge != address(0),
+            "Threshold Bridge address cannot be zero"
+        );
         require(_tbtcToken != address(0), "TBTC token address cannot be zero");
         require(_bank != address(0), "Bank address cannot be zero");
 
@@ -133,32 +137,34 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
         BitcoinTx.UTXO memory mainUtxo,
         bytes memory redemptionOutputScript,
         uint64 amount
-    )   internal
-        returns (
-            uint256 redemptionKey,
-            uint256 tbtcAmount
-        )
-    {
+    ) internal returns (uint256 redemptionKey, uint256 tbtcAmount) {
         // This contract (as balanceOwner) approves the Bridge to spend its Bank balance.
         // The amount for Bank allowance is in satoshi units (which is what `amount` already is).
         bank.increaseBalanceAllowance(address(thresholdBridge), amount);
-        
+
         // This contract calls the Bridge. The Bridge will see `msg.sender` (this contract) as the `balanceOwner`.
         // The Bridge's internal Redemption logic will then call `bank.transferBalanceFrom(address(this), address(bridge_or_redemption_contract), amount)`.
         // The actual `balanceOwner` parameter for Bridge.requestRedemption might be `address(this)` if the Bridge function signature supports it,
         // or it might be implicitly msg.sender for the Bridge. Assuming msg.sender is balanceOwner for the Bridge call.
-        thresholdBridge.requestRedemption(walletPubKeyHash, mainUtxo, redemptionOutputScript, amount);
+        thresholdBridge.requestRedemption(
+            walletPubKeyHash,
+            mainUtxo,
+            redemptionOutputScript,
+            amount
+        );
 
         redemptionKey = _getRedemptionKey(
             walletPubKeyHash,
             redemptionOutputScript
         );
 
-        IBridgeTypes.RedemptionRequest memory redemption = thresholdBridge.pendingRedemptions(
-            redemptionKey
-        );
+        IBridgeTypes.RedemptionRequest memory redemption = thresholdBridge
+            .pendingRedemptions(redemptionKey);
 
-        tbtcAmount = _calculateTbtcAmount(redemption.requestedAmount, redemption.treasuryFee);
+        tbtcAmount = _calculateTbtcAmount(
+            redemption.requestedAmount,
+            redemption.treasuryFee
+        );
     }
 
     /// @notice Calculates the net amount of Bitcoin the redeemer will receive.
@@ -181,8 +187,8 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
     ) internal view virtual returns (uint256) {
         // Both redemption amount and treasury fee are in the 1e8 satoshi precision.
         // We need to convert them to the 1e18 TBTC precision.
-        uint256 amountSubTreasury = (redemptionAmountSat - redemptionTreasuryFeeSat) *
-            SATOSHI_MULTIPLIER;
+        uint256 amountSubTreasury = (redemptionAmountSat -
+            redemptionTreasuryFeeSat) * SATOSHI_MULTIPLIER;
 
         (, , uint64 redemptionTxMaxFee, , , , ) = thresholdBridge
             .redemptionParameters();
@@ -218,7 +224,10 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
     /// @param amount The amount of tBTC (in 18 decimal precision) to transfer.
     function rescueTbtc(address recipient, uint256 amount) external onlyOwner {
         require(recipient != address(0), "Cannot rescue to zero address");
-        require(tbtcToken.balanceOf(address(this)) >= amount, "Insufficient tBTC token balance in contract");
+        require(
+            tbtcToken.balanceOf(address(this)) >= amount,
+            "Insufficient tBTC token balance in contract"
+        );
 
         tbtcToken.safeTransfer(recipient, amount);
     }

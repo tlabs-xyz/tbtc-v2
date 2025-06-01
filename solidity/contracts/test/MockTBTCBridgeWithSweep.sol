@@ -6,7 +6,8 @@ import "../integrator/IBridge.sol";
 contract MockTBTCBridgeWithSweep is IBridge {
     mapping(uint256 => IBridgeTypes.DepositRequest) private _deposits;
     // Added for redemption mocks
-    mapping(uint256 => IBridgeTypes.RedemptionRequest) internal _pendingRedemptions;
+    mapping(uint256 => IBridgeTypes.RedemptionRequest)
+        internal _pendingRedemptions;
 
     uint64 internal _redemptionDustThreshold = 50000;
     uint64 internal _redemptionTreasuryFeeDivisor = 200;
@@ -66,6 +67,7 @@ contract MockTBTCBridgeWithSweep is IBridge {
     {
         return _deposits[depositKey];
     }
+
     function depositParameters()
         external
         pure
@@ -113,7 +115,7 @@ contract MockTBTCBridgeWithSweep is IBridge {
     // --- Redemption related mock functions ---
     function requestRedemption(
         bytes20 walletPubKeyHash,
-        BitcoinTx.UTXO calldata /*mainUtxo*/, // Marked unused
+        BitcoinTx.UTXO calldata, /*mainUtxo*/ // Marked unused
         bytes calldata redeemerOutputScript,
         uint64 amount
     ) external override {
@@ -134,7 +136,9 @@ contract MockTBTCBridgeWithSweep is IBridge {
         _pendingRedemptions[redemptionKey] = IBridgeTypes.RedemptionRequest({
             redeemer: msg.sender,
             requestedAmount: amount,
-            treasuryFee: _redemptionTreasuryFeeDivisor > 0 ? amount / _redemptionTreasuryFeeDivisor : 0,
+            treasuryFee: _redemptionTreasuryFeeDivisor > 0
+                ? amount / _redemptionTreasuryFeeDivisor
+                : 0,
             txMaxFee: _redemptionTxMaxFee,
             requestedAt: uint32(block.timestamp) // solhint-disable-line not-rely-on-time
         });
