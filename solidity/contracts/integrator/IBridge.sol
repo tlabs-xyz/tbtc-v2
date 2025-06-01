@@ -16,6 +16,7 @@
 pragma solidity ^0.8.0;
 
 import "./BitcoinTx.sol";
+
 /// @notice Namespace which groups all types relevant to the IBridge interface.
 /// @dev This is a mirror of the real types used in the Bridge contract.
 ///      This way, the `integrator` subpackage does not need to import

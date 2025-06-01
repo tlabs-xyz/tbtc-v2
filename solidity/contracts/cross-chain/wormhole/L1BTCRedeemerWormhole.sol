@@ -37,7 +37,7 @@ import "../utils/Crosschain.sol";
 ///         The outline of the direct redemption mechanism is as follows:
 ///         1. An L2 user initiates a redemption request on the L2 chain, specifying
 ///            the amount of tBTC to redeem and their Bitcoin destination address.
-///         2. The L2 contract sends this request (via a cross-chain message via Wormhole VAA) 
+///         2. The L2 contract sends this request (via a cross-chain message via Wormhole VAA)
 ///            to the `L1BTCRedeemerWormhole` on L1.
 ///         3. The `L1BTCRedeemerWormhole` receives the tBTC from the L2 (via the token bridge)
 ///            and then calls the tBTC `Bridge` contract on L1 to request the redemption,
@@ -116,7 +116,10 @@ contract L1BTCRedeemerWormhole is
             "L1BTCRedeemerWormhole already initialized"
         );
 
-        require(_wormholeTokenBridge != address(0), "Wormhole Token Bridge address cannot be zero");
+        require(
+            _wormholeTokenBridge != address(0),
+            "Wormhole Token Bridge address cannot be zero"
+        );
 
         wormholeTokenBridge = IWormholeTokenBridge(_wormholeTokenBridge);
         requestRedemptionGasOffset = 60_000;
@@ -126,7 +129,10 @@ contract L1BTCRedeemerWormhole is
     /// @dev Can be called only by the contract owner. The caller is responsible
     ///      for validating parameters.
     /// @param _requestRedemptionGasOffset New initialize redemption gas offset.
-    function updateGasOffsetParameters(uint256 _requestRedemptionGasOffset) external onlyOwner {
+    function updateGasOffsetParameters(uint256 _requestRedemptionGasOffset)
+        external
+        onlyOwner
+    {
         requestRedemptionGasOffset = _requestRedemptionGasOffset;
 
         emit GasOffsetParametersUpdated(_requestRedemptionGasOffset);
@@ -163,7 +169,7 @@ contract L1BTCRedeemerWormhole is
     ///      - All requirements of tBTC `Bridge.requestRedemption` must be met.
     ///      - Callers (typically relayers) might be eligible for gas reimbursement if authorized
     ///        and the reimbursement pool is funded.
-    /// 
+    ///
     ///        The Wormhole Token Bridge contract has protection against redeeming
     ///        the same VAA again. When a Token Bridge VAA is redeemed, its
     ///        message body hash is stored in a map. This map is used to check
@@ -188,13 +194,16 @@ contract L1BTCRedeemerWormhole is
         // all potential upgrades of ITokenBridge implementation and no other
         // validations are needed.
         uint256 balanceBefore = tbtcToken.balanceOf(address(this));
-        bytes memory encoded = wormholeTokenBridge.completeTransferWithPayload(encodedVm);
+        bytes memory encoded = wormholeTokenBridge.completeTransferWithPayload(
+            encodedVm
+        );
         uint256 balanceAfter = tbtcToken.balanceOf(address(this));
 
         uint256 amount = balanceAfter - balanceBefore;
 
-        bytes memory redemptionOutputScript = 
-            wormholeTokenBridge.parseTransferWithPayload(encoded).payload;
+        bytes memory redemptionOutputScript = wormholeTokenBridge
+            .parseTransferWithPayload(encoded)
+            .payload;
 
         // Convert the received ERC20 amount (1e18) to satoshi equivalent (1e8) for Bridge operations.
         uint64 amountInSatoshis = uint64(amount / SATOSHI_MULTIPLIER);

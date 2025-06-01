@@ -6,7 +6,8 @@ import "../integrator/IBridge.sol";
 contract MockTBTCBridge is IBridge {
     mapping(uint256 => IBridgeTypes.DepositRequest) private _deposits;
     // Added for redemption mocks
-    mapping(uint256 => IBridgeTypes.RedemptionRequest) internal _pendingRedemptions;
+    mapping(uint256 => IBridgeTypes.RedemptionRequest)
+        internal _pendingRedemptions;
 
     uint64 internal _redemptionDustThreshold = 50000;
     uint64 internal _redemptionTreasuryFeeDivisor = 200;
@@ -89,14 +90,15 @@ contract MockTBTCBridge is IBridge {
         initializeDepositCalled = false;
         nextDepositKey = 12345;
     }
-    
+
     // --- Redemption related mock functions ---
     function requestRedemption(
         bytes20 walletPubKeyHash,
-        BitcoinTx.UTXO calldata /*mainUtxo*/, // Marked unused
+        BitcoinTx.UTXO calldata, /*mainUtxo*/ // Marked unused
         bytes calldata redeemerOutputScript,
         uint64 amount
-    ) external override { // Added override
+    ) external override {
+        // Added override
         bytes32 scriptHash = keccak256(redeemerOutputScript);
         uint256 redemptionKey;
         // solhint-disable-next-line no-inline-assembly
@@ -114,7 +116,9 @@ contract MockTBTCBridge is IBridge {
         _pendingRedemptions[redemptionKey] = IBridgeTypes.RedemptionRequest({
             redeemer: msg.sender,
             requestedAmount: amount,
-            treasuryFee: _redemptionTreasuryFeeDivisor > 0 ? amount / _redemptionTreasuryFeeDivisor : 0,
+            treasuryFee: _redemptionTreasuryFeeDivisor > 0
+                ? amount / _redemptionTreasuryFeeDivisor
+                : 0,
             txMaxFee: _redemptionTxMaxFee,
             requestedAt: uint32(block.timestamp) // solhint-disable-line not-rely-on-time
         });
@@ -127,20 +131,18 @@ contract MockTBTCBridge is IBridge {
         );
     }
 
-    function pendingRedemptions(uint256 redemptionKey)
-        external
-        view
-        override // Added override
-        returns (IBridgeTypes.RedemptionRequest memory)
-    {
+    function pendingRedemptions(
+        uint256 redemptionKey // Added override
+    ) external view override returns (IBridgeTypes.RedemptionRequest memory) {
         return _pendingRedemptions[redemptionKey];
     }
 
     function redemptionParameters()
         external
         view
-        override // Added override
+        override
         returns (
+            // Added override
             uint64 redemptionDustThreshold,
             uint64 redemptionTreasuryFeeDivisor,
             uint64 redemptionTxMaxFee,
