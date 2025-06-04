@@ -91,6 +91,11 @@ contract MockTBTCBridge is IBridge {
         nextDepositKey = 12345;
     }
 
+    // Function to allow tests to modify the redemptionTxMaxFee
+    function setRedemptionTxMaxFeeInternal(uint64 newFee) external {
+        _redemptionTxMaxFee = newFee;
+    }
+
     // --- Redemption related mock functions ---
     function requestRedemption(
         bytes20 walletPubKeyHash,
