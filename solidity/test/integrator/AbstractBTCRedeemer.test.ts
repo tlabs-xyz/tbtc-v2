@@ -2,7 +2,7 @@ import { ethers, helpers } from "hardhat"
 import { expect } from "chai"
 import { BigNumber, ContractTransaction } from "ethers"
 import type {
-  MockBridge,
+  MockTBTCBridge,
   MockTBTCToken,
   TestBTCRedeemer,
 } from "../../typechain"
@@ -26,7 +26,7 @@ const loadFixture = (walletPubKeyHash: string) => ({
 })
 
 describe("AbstractBTCRedeemer", () => {
-  let bridge: MockBridge
+  let bridge: MockTBTCBridge
   let tbtcToken: MockTBTCToken
   let bank: MockBank
   let redeemer: TestBTCRedeemer
@@ -37,7 +37,7 @@ describe("AbstractBTCRedeemer", () => {
     const signers = await ethers.getSigners()
     deployer = signers[0]
 
-    const MockBridgeFactory = await ethers.getContractFactory("MockBridge")
+    const MockBridgeFactory = await ethers.getContractFactory("MockTBTCBridge")
     bridge = await MockBridgeFactory.deploy()
 
     const MockTBTCTokenFactory = await ethers.getContractFactory(
@@ -76,6 +76,71 @@ describe("AbstractBTCRedeemer", () => {
     await expect(
       redeemer.initialize(bridge.address, tbtcToken.address, bank.address)
     ).to.be.revertedWith("AbstractBTCRedeemer already initialized")
+  })
+
+  describe("initialize", () => {
+    let testRedeemer: TestBTCRedeemer
+    const TestBTCRedeemerFactory = ethers.getContractFactory("TestBTCRedeemer")
+
+    beforeEach(async () => {
+      await createSnapshot()
+      // Deploy a new instance for each initialization test
+      testRedeemer = await (await TestBTCRedeemerFactory).deploy()
+    })
+
+    afterEach(async () => {
+      await restoreSnapshot()
+    })
+
+    it("should initialize with valid parameters", async () => {
+      await expect(
+        testRedeemer.initialize(bridge.address, tbtcToken.address, bank.address)
+      ).to.not.be.reverted
+      expect(await testRedeemer.thresholdBridge()).to.equal(bridge.address)
+      expect(await testRedeemer.tbtcToken()).to.equal(tbtcToken.address)
+      expect(await testRedeemer.bank()).to.equal(bank.address)
+    })
+
+    it("should revert if _thresholdBridge is zero address", async () => {
+      await expect(
+        testRedeemer.initialize(
+          ethers.constants.AddressZero,
+          tbtcToken.address,
+          bank.address
+        )
+      ).to.be.revertedWith("Threshold Bridge address cannot be zero")
+    })
+
+    it("should revert if _tbtcToken is zero address", async () => {
+      await expect(
+        testRedeemer.initialize(
+          bridge.address,
+          ethers.constants.AddressZero,
+          bank.address
+        )
+      ).to.be.revertedWith("TBTC token address cannot be zero")
+    })
+
+    it("should revert if _bank is zero address", async () => {
+      await expect(
+        testRedeemer.initialize(
+          bridge.address,
+          tbtcToken.address,
+          ethers.constants.AddressZero
+        )
+      ).to.be.revertedWith("Bank address cannot be zero")
+    })
+
+    it("should revert on re-initialization", async () => {
+      await testRedeemer.initialize(
+        bridge.address,
+        tbtcToken.address,
+        bank.address
+      )
+      await expect(
+        testRedeemer.initialize(bridge.address, tbtcToken.address, bank.address)
+      ).to.be.revertedWith("AbstractBTCRedeemer already initialized")
+    })
   })
 
   describe("_getRedemptionKey", () => {
@@ -219,8 +284,8 @@ describe("AbstractBTCRedeemer", () => {
     context("when transaction max fee is zero", () => {
       before(async () => {
         await createSnapshot()
-        const mockBridge = await ethers.getContractAt("MockBridge", bridge.address)
-        await mockBridge.setRedemptionTxMaxFee(0)
+        const mockBridge = await ethers.getContractAt("MockTBTCBridge", bridge.address) as MockTBTCBridge
+        await mockBridge.setRedemptionTxMaxFeeInternal(0)
       })
 
       after(async () => {
@@ -243,8 +308,8 @@ describe("AbstractBTCRedeemer", () => {
     context("when all fees are zero", () => {
       before(async () => {
         await createSnapshot()
-        const mockBridge = await ethers.getContractAt("MockBridge", bridge.address)
-        await mockBridge.setRedemptionTxMaxFee(0)
+        const mockBridge = await ethers.getContractAt("MockTBTCBridge", bridge.address) as MockTBTCBridge
+        await mockBridge.setRedemptionTxMaxFeeInternal(0)
       })
 
       after(async () => {
@@ -387,6 +452,14 @@ describe("AbstractBTCRedeemer", () => {
     })
 
     context("when rescuing zero tokens", () => {
+      beforeEach(async () => {
+        await createSnapshot()
+      })
+
+      afterEach(async () => {
+        await restoreSnapshot()
+      })
+
       it("should succeed and transfer zero tokens", async () => {
         const zeroAmount = BigNumber.from(0)
         const initialOwnerBalance = await tbtcToken.balanceOf(deployer.address)
