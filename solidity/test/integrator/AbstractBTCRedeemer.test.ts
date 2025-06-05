@@ -35,8 +35,7 @@ describe("AbstractBTCRedeemer", () => {
   let deployer: any
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
+    [deployer] = await ethers.getSigners();
 
     const MockBridgeFactory = await ethers.getContractFactory("MockTBTCBridge")
     bridge = await MockBridgeFactory.deploy()
@@ -392,8 +391,7 @@ describe("AbstractBTCRedeemer", () => {
     let randomAccount: any
 
     before(async () => {
-      const signers = await ethers.getSigners()
-      randomAccount = signers[1] // Use a different account than the deployer/owner
+      [, randomAccount] = await ethers.getSigners(); // Use a different account than the deployer/owner
 
       // Mint some tBTC to the redeemer contract for rescue testing
       await tbtcToken.mint(redeemer.address, amountToRescue.mul(2)) // Mint 2 TBTC
