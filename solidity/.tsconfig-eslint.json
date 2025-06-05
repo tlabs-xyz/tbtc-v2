@@ -1,14 +1,1 @@
-{
-  "extends": "./tsconfig.json",
-  "include": [
-    "**/*.ts",
-    "**/*.js"
-  ],
-  "exclude": [
-    "node_modules",
-    "build",
-    "cache",
-    "coverage",
-    "typechain"
-  ]
-}
+node_modules/@thesis-co/eslint-config/.tsconfig-eslint.json
