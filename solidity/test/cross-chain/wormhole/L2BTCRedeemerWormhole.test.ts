@@ -17,9 +17,8 @@ chai.use(smock.matchers)
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
 // Returns hexString padded on the left with zeros to 32 bytes.
-const toWormholeFormat = (address: string): string => {
-  return ethers.utils.hexlify(ethers.utils.zeroPad(address, 32))
-}
+const toWormholeFormat = (address: string): string =>
+  ethers.utils.hexlify(ethers.utils.zeroPad(address, 32))
 
 describe("L2BTCRedeemerWormhole", () => {
   let deployer: SignerWithAddress
@@ -38,13 +37,17 @@ describe("L2BTCRedeemerWormhole", () => {
   const exampleAmount = ethers.utils.parseUnits("1", 18)
   // Use a raw 25-byte P2PKH script structure, consistent with how L2BTCRedeemerWormhole uses BTCUtils.extractHashAt
   // prefix with 0x19 (25 bytes length)
-  const exampleRedeemerOutputScript = "0x1976a9140102030405060708090a0b0c0d0e0f101112131488ac";
+  const exampleRedeemerOutputScript =
+    "0x1976a9140102030405060708090a0b0c0d0e0f101112131488ac"
   const exampleNonce = 123
 
   // New example scripts
-  const exampleP2WPKHOutputScript = "0x1600140102030405060708090a0b0c0d0e0f1011121314" // 22 bytes: OP_0 <20-byte-hash>
-  const exampleP2SHOutputScript = "0x17a9140102030405060708090a0b0c0d0e0f101112131487"    // 23 bytes: OP_HASH160 <20-byte-hash> OP_EQUAL
-  const exampleP2WSHOutputScript = "0x2200200102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20" // 34 bytes: OP_0 <32-byte-hash>
+  const exampleP2WPKHOutputScript =
+    "0x1600140102030405060708090a0b0c0d0e0f1011121314" // 22 bytes: OP_0 <20-byte-hash>
+  const exampleP2SHOutputScript =
+    "0x17a9140102030405060708090a0b0c0d0e0f101112131487" // 23 bytes: OP_HASH160 <20-byte-hash> OP_EQUAL
+  const exampleP2WSHOutputScript =
+    "0x2200200102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20" // 34 bytes: OP_0 <32-byte-hash>
 
   const contractsFixture = async () => {
     const _signers = await ethers.getSigners()
@@ -96,10 +99,14 @@ describe("L2BTCRedeemerWormhole", () => {
     const _l2BtcRedeemer = l2RedeemerDeployment[0] as L2BTCRedeemerWormhole
 
     const currentOwner = await _l2BtcRedeemer.owner()
-    console.log(`L2BTCRedeemerWormhole owner after deploy: ${currentOwner}, deployer: ${_deployer.address}`)
+    console.log(
+      `L2BTCRedeemerWormhole owner after deploy: ${currentOwner}, deployer: ${_deployer.address}`
+    )
 
     // Transfer ownership from the deployer (initial owner) to governance
-    await _l2BtcRedeemer.connect(_deployer).transferOwnership(_governance.address)
+    await _l2BtcRedeemer
+      .connect(_deployer)
+      .transferOwnership(_governance.address)
 
     return {
       deployer: _deployer,
@@ -116,15 +123,15 @@ describe("L2BTCRedeemerWormhole", () => {
 
   before(async () => {
     await createSnapshot()
-      ; ({
-        deployer,
-        governance,
-        user,
-        l2BtcRedeemer,
-        tbtc,
-        gateway,
-        testBTCUtilsHelper,
-      } = await waffle.loadFixture(contractsFixture))
+    ;({
+      deployer,
+      governance,
+      user,
+      l2BtcRedeemer,
+      tbtc,
+      gateway,
+      testBTCUtilsHelper,
+    } = await waffle.loadFixture(contractsFixture))
 
     // Debug BTCUtils.extractHashAt
     const payload = await testBTCUtilsHelper.getScriptPayload(
@@ -159,20 +166,22 @@ describe("L2BTCRedeemerWormhole", () => {
 
     context("when user has insufficient tBTC balance", () => {
       beforeEach(async () => {
-        await createSnapshot();
+        await createSnapshot()
         // Explicitly set user balance for this test to avoid state leakage
-        const currentBalance = await tbtc.balanceOf(user.address);
+        const currentBalance = await tbtc.balanceOf(user.address)
         if (currentBalance.gt(0)) {
-           await tbtc.connect(user).burn(currentBalance);
+          await tbtc.connect(user).burn(currentBalance)
         }
-        await tbtc.connect(deployer).mint(user.address, exampleAmount.mul(2));
+        await tbtc.connect(deployer).mint(user.address, exampleAmount.mul(2))
         // Ensure approval, though parent beforeEach should handle it if snapshots are perfect
-        await tbtc.connect(user).approve(l2BtcRedeemer.address, ethers.constants.MaxUint256);
-      });
+        await tbtc
+          .connect(user)
+          .approve(l2BtcRedeemer.address, ethers.constants.MaxUint256)
+      })
 
       afterEach(async () => {
-        await restoreSnapshot();
-      });
+        await restoreSnapshot()
+      })
 
       it("should revert", async () => {
         const largeAmount = exampleAmount.mul(10)
@@ -196,7 +205,9 @@ describe("L2BTCRedeemerWormhole", () => {
     context("when the caller is not the owner", () => {
       it("should revert", async () => {
         await expect(
-          l2BtcRedeemer.connect(user).updateMinimumRedemptionAmount(newMinAmount)
+          l2BtcRedeemer
+            .connect(user)
+            .updateMinimumRedemptionAmount(newMinAmount)
         ).to.be.revertedWith("Ownable: caller is not the owner")
       })
     })
@@ -239,27 +250,33 @@ describe("L2BTCRedeemerWormhole", () => {
   })
 
   describe("requestRedemption", () => {
-    const SATOSHI_MULTIPLIER_PRECISION = 10;
-    const normalizedExampleAmount = exampleAmount.div(BigNumber.from(10).pow(18 - SATOSHI_MULTIPLIER_PRECISION))
+    const SATOSHI_MULTIPLIER_PRECISION = 10
+    const normalizedExampleAmount = exampleAmount.div(
+      BigNumber.from(10).pow(18 - SATOSHI_MULTIPLIER_PRECISION)
+    )
 
     beforeEach(async () => {
-      await createSnapshot();
+      await createSnapshot()
       gateway.sendTbtcWithPayloadToEthereum.reset()
-      await tbtc.connect(user).approve(l2BtcRedeemer.address, ethers.constants.MaxUint256)
+      await tbtc
+        .connect(user)
+        .approve(l2BtcRedeemer.address, ethers.constants.MaxUint256)
 
       // Reset user's balance to 0 before minting to ensure consistent test state
-      const currentUserBalance = await tbtc.balanceOf(user.address);
+      const currentUserBalance = await tbtc.balanceOf(user.address)
       if (currentUserBalance.gt(0)) {
-        await tbtc.connect(user).burn(currentUserBalance); // User burns their own tokens
+        await tbtc.connect(user).burn(currentUserBalance) // User burns their own tokens
       }
       await tbtc.connect(deployer).mint(user.address, exampleAmount.mul(2)) // Mint initial balance for tests
 
-      await l2BtcRedeemer.connect(governance).updateMinimumRedemptionAmount(ethers.utils.parseUnits("0.001", 18))
+      await l2BtcRedeemer
+        .connect(governance)
+        .updateMinimumRedemptionAmount(ethers.utils.parseUnits("0.001", 18))
     })
 
     afterEach(async () => {
-      await restoreSnapshot();
-    });
+      await restoreSnapshot()
+    })
 
     context("when redemption is successful", () => {
       let tx: ContractTransaction
@@ -301,7 +318,9 @@ describe("L2BTCRedeemerWormhole", () => {
       })
 
       it("should call gateway.sendTbtcWithPayloadToEthereum with correct parameters", async () => {
-        expect(gateway.sendTbtcWithPayloadToEthereum).to.have.been.calledOnceWith(
+        expect(
+          gateway.sendTbtcWithPayloadToEthereum
+        ).to.have.been.calledOnceWith(
           exampleAmount,
           toWormholeFormat(l1BtcRedeemerWormholeAddress),
           exampleNonce,
@@ -312,11 +331,7 @@ describe("L2BTCRedeemerWormhole", () => {
       it("should emit RedemptionRequestedOnL2 event", async () => {
         await expect(tx)
           .to.emit(l2BtcRedeemer, "RedemptionRequestedOnL2")
-          .withArgs(
-            exampleAmount,
-            exampleRedeemerOutputScript,
-            exampleNonce
-          )
+          .withArgs(exampleAmount, exampleRedeemerOutputScript, exampleNonce)
       })
 
       it("should return the sequence number from the gateway", async () => {
@@ -360,13 +375,11 @@ describe("L2BTCRedeemerWormhole", () => {
           )
           .returns(expectedGatewaySequence)
 
-        tx = await l2BtcRedeemer
-          .connect(user)
-          .requestRedemption(
-            exampleAmount,
-            exampleP2WPKHOutputScript, // Use P2WPKH script
-            exampleNonce
-          )
+        tx = await l2BtcRedeemer.connect(user).requestRedemption(
+          exampleAmount,
+          exampleP2WPKHOutputScript, // Use P2WPKH script
+          exampleNonce
+        )
       })
 
       it("should transfer tBTC from user to L2BTCRedeemerWormhole contract", async () => {
@@ -377,7 +390,9 @@ describe("L2BTCRedeemerWormhole", () => {
       })
 
       it("should call gateway.sendTbtcWithPayloadToEthereum with P2WPKH script", async () => {
-        expect(gateway.sendTbtcWithPayloadToEthereum).to.have.been.calledOnceWith(
+        expect(
+          gateway.sendTbtcWithPayloadToEthereum
+        ).to.have.been.calledOnceWith(
           exampleAmount,
           toWormholeFormat(l1BtcRedeemerWormholeAddress),
           exampleNonce,
@@ -411,13 +426,11 @@ describe("L2BTCRedeemerWormhole", () => {
           )
           .returns(expectedGatewaySequence)
 
-        tx = await l2BtcRedeemer
-          .connect(user)
-          .requestRedemption(
-            exampleAmount,
-            exampleP2SHOutputScript, // Use P2SH script
-            exampleNonce
-          )
+        tx = await l2BtcRedeemer.connect(user).requestRedemption(
+          exampleAmount,
+          exampleP2SHOutputScript, // Use P2SH script
+          exampleNonce
+        )
       })
 
       it("should transfer tBTC from user to L2BTCRedeemerWormhole contract", async () => {
@@ -428,7 +441,9 @@ describe("L2BTCRedeemerWormhole", () => {
       })
 
       it("should call gateway.sendTbtcWithPayloadToEthereum with P2SH script", async () => {
-        expect(gateway.sendTbtcWithPayloadToEthereum).to.have.been.calledOnceWith(
+        expect(
+          gateway.sendTbtcWithPayloadToEthereum
+        ).to.have.been.calledOnceWith(
           exampleAmount,
           toWormholeFormat(l1BtcRedeemerWormholeAddress),
           exampleNonce,
@@ -447,56 +462,59 @@ describe("L2BTCRedeemerWormhole", () => {
       })
     })
 
-    context("when redeemerOutputScript is P2WSH (should be successful if BTCUtils truncates/handles 32-byte hash)", () => {
-      let tx: ContractTransaction
-      const expectedGatewaySequence = BigNumber.from(792) // Use a different sequence
+    context(
+      "when redeemerOutputScript is P2WSH (should be successful if BTCUtils truncates/handles 32-byte hash)",
+      () => {
+        let tx: ContractTransaction
+        const expectedGatewaySequence = BigNumber.from(792) // Use a different sequence
 
-      beforeEach(async () => {
-        await createSnapshot()
-        gateway.sendTbtcWithPayloadToEthereum
-          .whenCalledWith(
+        beforeEach(async () => {
+          await createSnapshot()
+          gateway.sendTbtcWithPayloadToEthereum
+            .whenCalledWith(
+              exampleAmount,
+              toWormholeFormat(l1BtcRedeemerWormholeAddress),
+              exampleNonce,
+              exampleP2WSHOutputScript // Use P2WSH script
+            )
+            .returns(expectedGatewaySequence)
+
+          tx = await l2BtcRedeemer.connect(user).requestRedemption(
+            exampleAmount,
+            exampleP2WSHOutputScript, // Use P2WSH script
+            exampleNonce
+          )
+        })
+
+        it("should transfer tBTC from user to L2BTCRedeemerWormhole contract", async () => {
+          expect(await tbtc.balanceOf(user.address)).to.equal(exampleAmount)
+          expect(await tbtc.balanceOf(l2BtcRedeemer.address)).to.equal(
+            exampleAmount
+          )
+        })
+
+        it("should call gateway.sendTbtcWithPayloadToEthereum with P2WSH script", async () => {
+          expect(
+            gateway.sendTbtcWithPayloadToEthereum
+          ).to.have.been.calledOnceWith(
             exampleAmount,
             toWormholeFormat(l1BtcRedeemerWormholeAddress),
             exampleNonce,
             exampleP2WSHOutputScript // Use P2WSH script
           )
-          .returns(expectedGatewaySequence)
+        })
 
-        tx = await l2BtcRedeemer
-          .connect(user)
-          .requestRedemption(
-            exampleAmount,
-            exampleP2WSHOutputScript, // Use P2WSH script
-            exampleNonce
-          )
-      })
-
-      it("should transfer tBTC from user to L2BTCRedeemerWormhole contract", async () => {
-        expect(await tbtc.balanceOf(user.address)).to.equal(exampleAmount)
-        expect(await tbtc.balanceOf(l2BtcRedeemer.address)).to.equal(
-          exampleAmount
-        )
-      })
-
-      it("should call gateway.sendTbtcWithPayloadToEthereum with P2WSH script", async () => {
-        expect(gateway.sendTbtcWithPayloadToEthereum).to.have.been.calledOnceWith(
-          exampleAmount,
-          toWormholeFormat(l1BtcRedeemerWormholeAddress),
-          exampleNonce,
-          exampleP2WSHOutputScript // Use P2WSH script
-        )
-      })
-
-      it("should emit RedemptionRequestedOnL2 event with P2WSH script", async () => {
-        await expect(tx)
-          .to.emit(l2BtcRedeemer, "RedemptionRequestedOnL2")
-          .withArgs(
-            exampleAmount,
-            exampleP2WSHOutputScript, // Use P2WSH script
-            exampleNonce
-          )
-      })
-    })
+        it("should emit RedemptionRequestedOnL2 event with P2WSH script", async () => {
+          await expect(tx)
+            .to.emit(l2BtcRedeemer, "RedemptionRequestedOnL2")
+            .withArgs(
+              exampleAmount,
+              exampleP2WSHOutputScript, // Use P2WSH script
+              exampleNonce
+            )
+        })
+      }
+    )
 
     context("when redeemerOutputScript is invalid (non-standard)", () => {
       it("should revert", async () => {
