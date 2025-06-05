@@ -88,10 +88,10 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
     // Stub contract is used instead of a smock because of the token transfer
     // that needs to happen in completeTransferWithPayload function.
     //
-    const WormholeBridgeStub = await ethers.getContractFactory(
+    const WormholeBridgeStubFactory = await ethers.getContractFactory(
       "WormholeBridgeStub"
     )
-    const _wormholeBridgeStub = await WormholeBridgeStub.deploy(
+    const _wormholeBridgeStub = await WormholeBridgeStubFactory.deploy(
       _wormholeTbtc.address
     )
     await _wormholeBridgeStub.deployed()
