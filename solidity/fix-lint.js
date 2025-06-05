@@ -1,6 +1,6 @@
-import fs from "fs";
-import path from "path";
-import * as glob from "glob";
+import fs from "fs"
+import path from "path"
+import * as glob from "glob"
 
 // Fix unnamed async functions in deploy files
 const deployFiles = glob.sync("deploy/*.ts")
@@ -29,5 +29,5 @@ testFiles.forEach((file) => {
 })
 
 console.log(
-  "Basic lint fixes applied. Run \"npm run lint\" to see remaining issues."
+  'Basic lint fixes applied. Run "npm·run·lint" to see remaining issues.'
 )
