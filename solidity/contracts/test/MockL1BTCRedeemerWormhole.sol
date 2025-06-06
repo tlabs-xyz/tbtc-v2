@@ -16,7 +16,7 @@ contract MockL1BTCRedeemerWormhole is
     IWormholeTokenBridge public wormholeTokenBridge;
     uint256 public requestRedemptionGasOffset;
     mapping(address => bool) public reimbursementAuthorizations;
-    
+
     // Mock-specific state
     uint256 public mockRedemptionAmountTBTC;
 
@@ -97,14 +97,13 @@ contract MockL1BTCRedeemerWormhole is
 
         // In tests, wormholeTokenBridge.completeTransferWithPayload is mocked
         // to return the redemption output script directly
-        bytes memory redemptionOutputScriptToUse = wormholeTokenBridge.completeTransferWithPayload(
-            encodedVm
-        );
+        bytes memory redemptionOutputScriptToUse = wormholeTokenBridge
+            .completeTransferWithPayload(encodedVm);
 
         // Use the mock-specific redemption amount
         uint256 amountToUse = mockRedemptionAmountTBTC;
         if (amountToUse == 0) {
-            amountToUse = 2 * (10**18); 
+            amountToUse = 2 * (10**18);
         }
 
         // Convert to satoshis
@@ -124,7 +123,7 @@ contract MockL1BTCRedeemerWormhole is
             walletPubKeyHash,
             mainUtxo,
             redemptionOutputScriptToUse,
-            amountToUse 
+            amountToUse
         );
 
         // Reimbursement logic
@@ -147,6 +146,8 @@ contract MockL1BTCRedeemerWormhole is
             return 0;
         }
         // Simplified calculation for the mock
-        return (redemptionAmountSat - redemptionTreasuryFeeSat) * SATOSHI_MULTIPLIER;
+        return
+            (redemptionAmountSat - redemptionTreasuryFeeSat) *
+            SATOSHI_MULTIPLIER;
     }
-} 
+}

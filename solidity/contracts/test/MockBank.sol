@@ -22,7 +22,11 @@ contract MockBank is IBank {
         override
     {
         _allowances[msg.sender][spender] += amount;
-        emit BalanceApproval(msg.sender, spender, _allowances[msg.sender][spender]);
+        emit BalanceApproval(
+            msg.sender,
+            spender,
+            _allowances[msg.sender][spender]
+        );
     }
 
     function transferBalanceFrom(
@@ -31,10 +35,7 @@ contract MockBank is IBank {
         uint256 amount
     ) external override returns (bool) {
         uint256 currentAllowance = _allowances[sender][msg.sender];
-        require(
-            currentAllowance >= amount,
-            "MockBank: insufficient allowance"
-        );
+        require(currentAllowance >= amount, "MockBank: insufficient allowance");
         require(_balances[sender] >= amount, "MockBank: insufficient balance");
 
         _balances[sender] -= amount;
@@ -50,7 +51,11 @@ contract MockBank is IBank {
         _balances[account] = amount;
     }
 
-    function getAllowance(address owner, address spender) external view returns (uint256) {
+    function getAllowance(address owner, address spender)
+        external
+        view
+        returns (uint256)
+    {
         return _allowances[owner][spender];
     }
-} 
+}
