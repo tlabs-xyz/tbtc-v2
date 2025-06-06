@@ -20,10 +20,18 @@ pragma solidity ^0.8.0;
 interface IBank {
     /// @notice Emitted when an approval for `spender` to transfer `value`
     ///         tokens from `owner` is set.
-    event BalanceApproval(address indexed owner, address indexed spender, uint256 value);
+    event BalanceApproval(
+        address indexed owner,
+        address indexed spender,
+        uint256 value
+    );
 
     /// @notice Emitted when `value` tokens are transferred from `from` to `to`.
-    event TransferBalance(address indexed from, address indexed to, uint256 value);
+    event TransferBalance(
+        address indexed from,
+        address indexed to,
+        uint256 value
+    );
 
     /// @notice Increase the allowance of the spender address.
     /// @param spender Address of the spender.

@@ -13,4 +13,4 @@ contract TestBTCUtilsHelper {
     {
         return script.extractHashAt(0, script.length);
     }
-} 
+}
