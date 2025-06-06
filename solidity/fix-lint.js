@@ -29,5 +29,5 @@ testFiles.forEach((file) => {
 })
 
 console.log(
-  `Basic lint fixes applied. Run "npm run lint" to see remaining issues.`
+  "Basic lint fixes applied. Run \"npm run lint\" to see remaining issues."
 )
