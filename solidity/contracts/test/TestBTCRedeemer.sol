@@ -8,10 +8,7 @@ import "../integrator/IBank.sol";
 import "../integrator/BitcoinTx.sol";
 
 contract TestBTCRedeemer is AbstractBTCRedeemer {
-    event RequestRedemptionReturned(
-        uint256 redemptionKey,
-        uint256 tbtcAmount
-    );
+    event RequestRedemptionReturned(uint256 redemptionKey, uint256 tbtcAmount);
 
     function initialize(
         address _bridge,
@@ -41,7 +38,8 @@ contract TestBTCRedeemer is AbstractBTCRedeemer {
         uint64 redemptionAmountSat,
         uint64 redemptionTreasuryFeeSat
     ) external view returns (uint256) {
-        return _calculateTbtcAmount(redemptionAmountSat, redemptionTreasuryFeeSat);
+        return
+            _calculateTbtcAmount(redemptionAmountSat, redemptionTreasuryFeeSat);
     }
 
     // Expose internal owner for testing purposes
@@ -49,11 +47,10 @@ contract TestBTCRedeemer is AbstractBTCRedeemer {
         return owner();
     }
 
-    function getRedemptionKeyPublic(bytes20 walletPubKeyHash, bytes memory script)
-        external
-        pure
-        returns (uint256)
-    {
+    function getRedemptionKeyPublic(
+        bytes20 walletPubKeyHash,
+        bytes memory script
+    ) external pure returns (uint256) {
         return _getRedemptionKey(walletPubKeyHash, script);
     }
-} 
+}
