@@ -6,6 +6,7 @@ import {
 import { ArbitrumL2BitcoinDepositor } from "./l2-bitcoin-depositor"
 import { ArbitrumL2TBTCToken } from "./l2-tbtc-token"
 import { Chains, L2CrossChainContracts } from "../contracts"
+import { ArbitrumL2BitcoinRedeemer } from "./l2-bitcoin-redeemer"
 
 export * from "./l2-bitcoin-depositor"
 export * from "./l2-tbtc-token"
@@ -36,6 +37,11 @@ export async function loadArbitrumCrossChainContracts(
   )
   l2BitcoinDepositor.setDepositOwner(await ethereumAddressFromSigner(signer))
 
+  const l2BitcoinRedeemer = new ArbitrumL2BitcoinRedeemer(
+    { signerOrProvider: signer },
+    chainId
+  )
+
   const l2TbtcToken = new ArbitrumL2TBTCToken(
     { signerOrProvider: signer },
     chainId
@@ -43,6 +49,7 @@ export async function loadArbitrumCrossChainContracts(
 
   return {
     l2BitcoinDepositor,
+    l2BitcoinRedeemer,
     l2TbtcToken,
   }
 }

@@ -1,4 +1,6 @@
 import {
+  CrossChainContracts,
+  L2Chain,
   RedemptionRequest,
   TBTCContracts,
   WalletState,
@@ -33,10 +35,22 @@ export class RedemptionsService {
    * Bitcoin client handle.
    */
   private readonly bitcoinClient: BitcoinClient
+  /**
+   * Gets cross-chain contracts for the given supported L2 chain.
+   * @param _ Name of the L2 chain for which to get cross-chain contracts.
+   * @returns Cross-chain contracts for the given L2 chain or
+   *          undefined if not initialized.
+   */
+  readonly #crossChainContracts: (_: L2Chain) => CrossChainContracts | undefined
 
-  constructor(tbtcContracts: TBTCContracts, bitcoinClient: BitcoinClient) {
+  constructor(
+    tbtcContracts: TBTCContracts,
+    bitcoinClient: BitcoinClient,
+    crossChainContracts: (_: L2Chain) => CrossChainContracts | undefined
+  ) {
     this.tbtcContracts = tbtcContracts
     this.bitcoinClient = bitcoinClient
+    this.#crossChainContracts = crossChainContracts
   }
 
   /**
@@ -150,6 +164,52 @@ export class RedemptionsService {
   }
 
   /**
+   * Requests a redemption of TBTC v2 token into BTC using a custom integration.
+   * The function builds the redemption data and handles the redemption request
+   * through the provided redeemer proxy.
+   * @param bitcoinRedeemerAddress Bitcoin address the redeemed BTC should be
+   *        sent to. Only P2PKH, P2WPKH, P2SH, and P2WSH address types are supported.
+   * @param amount The amount to be redeemed with the precision of the tBTC
+   *        on-chain token contract.
+   * @param l2ChainName The name of the L2 chain to request redemption on.
+   * @returns Object containing:
+   *          - Target chain hash of the request redemption transaction
+   *            (for example, Ethereum transaction hash)
+   */
+  async requestCrossChainRedemption(
+    bitcoinRedeemerAddress: string,
+    amount: BigNumber,
+    l2ChainName: L2Chain
+  ): Promise<{
+    targetChainTxHash: Hex
+  }> {
+    const crossChainContracts = this.#crossChainContracts(l2ChainName)
+    if (!crossChainContracts) {
+      throw new Error(
+        `Cross-chain contracts for ${l2ChainName} not initialized`
+      )
+    }
+
+    const { redeemerOutputScript } =
+      await this.determineRedemptionData(
+        bitcoinRedeemerAddress,
+        BigNumber.from(amount)
+      )
+
+    const nonce = Math.round(Math.random() * 10000);
+
+    const txHash = await crossChainContracts.l2BitcoinRedeemer.requestRedemption(
+      amount,
+      redeemerOutputScript,
+      nonce
+    )
+
+    return {
+      targetChainTxHash: txHash
+    }
+  }
+
+  /**
    *
    * @param bitcoinRedeemerAddress Bitcoin address redeemed BTC should be
    *                               sent to. Only P2PKH, P2WPKH, P2SH, and P2WSH
@@ -227,8 +287,8 @@ export class RedemptionsService {
       if (candidateBTCBalance.lt(amount)) {
         console.debug(
           `The wallet (${candidatePublicKey.toString()})` +
-            `cannot handle the redemption request. ` +
-            `Continue the loop execution to the next wallet...`
+          `cannot handle the redemption request. ` +
+          `Continue the loop execution to the next wallet...`
         )
         continue
       }
@@ -242,11 +302,11 @@ export class RedemptionsService {
       if (pendingRedemption.requestedAt !== 0) {
         console.debug(
           `There is a pending redemption request from this wallet to the ` +
-            `same Bitcoin address. Given wallet public key` +
-            `(${candidatePublicKey.toString()}) and redeemer output script ` +
-            `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
-            `pending request at the same time. ` +
-            `Continue the loop execution to the next wallet...`
+          `same Bitcoin address. Given wallet public key` +
+          `(${candidatePublicKey.toString()}) and redeemer output script ` +
+          `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
+          `pending request at the same time. ` +
+          `Continue the loop execution to the next wallet...`
         )
         continue
       }
@@ -255,8 +315,8 @@ export class RedemptionsService {
 
       console.debug(
         `The wallet (${walletPublicKey.toString()})` +
-          `can handle the redemption request. ` +
-          `Stop the loop execution and proceed with the redemption...`
+        `can handle the redemption request. ` +
+        `Stop the loop execution and proceed with the redemption...`
       )
 
       break
@@ -316,8 +376,8 @@ export class RedemptionsService {
         if (state !== WalletState.Live || !walletPublicKey) {
           console.debug(
             `Wallet is not in Live state ` +
-              `(wallet public key hash: ${walletPublicKeyHash.toString()}). ` +
-              `Continue the loop execution to the next wallet...`
+            `(wallet public key hash: ${walletPublicKeyHash.toString()}). ` +
+            `Continue the loop execution to the next wallet...`
           )
           return
         }
@@ -330,8 +390,8 @@ export class RedemptionsService {
         if (!mainUtxo) {
           console.debug(
             `Could not find matching UTXO on chains ` +
-              `for wallet public key hash (${walletPublicKeyHash.toString()}). ` +
-              `Continue the loop execution to the next wallet...`
+            `for wallet public key hash (${walletPublicKeyHash.toString()}). ` +
+            `Continue the loop execution to the next wallet...`
           )
           return
         }
@@ -344,11 +404,11 @@ export class RedemptionsService {
         if (pendingRedemption.requestedAt !== 0) {
           console.debug(
             `There is a pending redemption request from this wallet to the ` +
-              `same Bitcoin address. Given wallet public key hash` +
-              `(${walletPublicKeyHash.toString()}) and redeemer output script ` +
-              `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
-              `pending request at the same time. ` +
-              `Continue the loop execution to the next wallet...`
+            `same Bitcoin address. Given wallet public key hash` +
+            `(${walletPublicKeyHash.toString()}) and redeemer output script ` +
+            `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
+            `pending request at the same time. ` +
+            `Continue the loop execution to the next wallet...`
           )
           return
         }
@@ -368,8 +428,8 @@ export class RedemptionsService {
         } else {
           console.debug(
             `The wallet (${walletPublicKeyHash.toString()})` +
-              `cannot handle the redemption request. ` +
-              `Continue the loop execution to the next wallet...`
+            `cannot handle the redemption request. ` +
+            `Continue the loop execution to the next wallet...`
           )
         }
       })
@@ -386,14 +446,14 @@ export class RedemptionsService {
       if (maxAmount.eq(0)) {
         throw new Error(
           "All live wallets in the network have the pending redemption for a given Bitcoin address. " +
-            "Please use another Bitcoin address."
+          "Please use another Bitcoin address."
         )
       }
 
       throw new Error(
         `Could not find a wallet with enough funds. ` +
-          `Maximum redemption amount is ${maxAmount.toString()} Satoshi ` +
-          `( ${maxAmount.div(BigNumber.from(1e8)).toString()} BTC )`
+        `Maximum redemption amount is ${maxAmount.toString()} Satoshi ` +
+        `( ${maxAmount.div(BigNumber.from(1e8)).toString()} BTC )`
       )
     }
 

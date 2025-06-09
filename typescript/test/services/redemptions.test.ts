@@ -8,6 +8,7 @@ import {
   BitcoinUtxo,
   EthereumAddress,
   Hex,
+  L2Chain,
   NewWalletRegisteredEvent,
   RedemptionRequest,
   RedemptionsService,
@@ -53,8 +54,8 @@ describe("Redemptions", () => {
 
       beforeEach(async () => {
         let redemptionsService
-        ;({ redemptionsService, tbtcContracts } =
-          prepareRedemptionsService(mainUtxo))
+          ; ({ redemptionsService, tbtcContracts } =
+            prepareRedemptionsService(mainUtxo))
 
         await redemptionsService.requestRedemption(
           BitcoinAddressConverter.outputScriptToAddress(
@@ -94,8 +95,8 @@ describe("Redemptions", () => {
         redeemerProxy = new MockRedeemerProxy(expectedRedeemerAddress)
 
         let redemptionsService
-        ;({ redemptionsService, tbtcContracts } =
-          prepareRedemptionsService(mainUtxo))
+          ; ({ redemptionsService, tbtcContracts } =
+            prepareRedemptionsService(mainUtxo))
 
         await redemptionsService.requestRedemptionWithProxy(
           BitcoinAddressConverter.outputScriptToAddress(
@@ -145,7 +146,9 @@ describe("Redemptions", () => {
 
           redemptionsService = new RedemptionsService(
             tbtcContracts,
-            bitcoinClient
+            bitcoinClient,
+            // Mock cross-chain contracts resolver.
+            (_: L2Chain) => undefined
           )
         })
 
@@ -183,7 +186,9 @@ describe("Redemptions", () => {
 
           redemptionsService = new RedemptionsService(
             tbtcContracts,
-            bitcoinClient
+            bitcoinClient,
+            // Mock cross-chain contracts resolver.
+            (_: L2Chain) => undefined
           )
         })
 
@@ -235,7 +240,9 @@ describe("Redemptions", () => {
             tbtcContracts.bridge.newWalletRegisteredEvents = []
             redemptionsService = new TestRedemptionsService(
               tbtcContracts,
-              bitcoinClient
+              bitcoinClient,
+              // Mock cross-chain contracts resolver.
+              (_: L2Chain) => undefined
             )
           })
 
@@ -306,7 +313,9 @@ describe("Redemptions", () => {
 
           redemptionsService = new TestRedemptionsService(
             tbtcContracts,
-            bitcoinClient
+            bitcoinClient,
+            // Mock cross-chain contracts resolver.
+            (_: L2Chain) => undefined
           )
         })
 
@@ -662,7 +671,9 @@ describe("Redemptions", () => {
         bitcoinClient = new MockBitcoinClient()
         redemptionsService = new TestRedemptionsService(
           tbtcContracts,
-          bitcoinClient
+          bitcoinClient,
+          // Mock cross-chain contracts resolver.
+          (_: L2Chain) => undefined
         )
       })
 
@@ -889,7 +900,9 @@ function prepareRedemptionsService(mainUtxo: BitcoinUtxo) {
 
   const redemptionsService = new RedemptionsService(
     tbtcContracts,
-    bitcoinClient
+    bitcoinClient,
+    // Mock cross-chain contracts resolver.
+    (_: L2Chain) => undefined
   )
   return { redemptionsService, tbtcContracts, bitcoinClient }
 }

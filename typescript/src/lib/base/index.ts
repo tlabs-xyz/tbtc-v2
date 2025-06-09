@@ -6,6 +6,7 @@ import {
 import { BaseL2BitcoinDepositor } from "./l2-bitcoin-depositor"
 import { BaseL2TBTCToken } from "./l2-tbtc-token"
 import { Chains, L2CrossChainContracts } from "../contracts"
+import { BaseL2BitcoinRedeemer } from "./l2-bitcoin-redeemer"
 
 export * from "./l2-bitcoin-depositor"
 export * from "./l2-tbtc-token"
@@ -36,10 +37,16 @@ export async function loadBaseCrossChainContracts(
   )
   l2BitcoinDepositor.setDepositOwner(await ethereumAddressFromSigner(signer))
 
+  const l2BitcoinRedeemer = new BaseL2BitcoinRedeemer(
+    { signerOrProvider: signer },
+    chainId
+  )
+
   const l2TbtcToken = new BaseL2TBTCToken({ signerOrProvider: signer }, chainId)
 
   return {
     l2BitcoinDepositor,
+    l2BitcoinRedeemer,
     l2TbtcToken,
   }
 }

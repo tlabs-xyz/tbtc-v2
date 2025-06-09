@@ -12,6 +12,7 @@ import { EthereumTBTCToken } from "./tbtc-token"
 import { EthereumTBTCVault } from "./tbtc-vault"
 import { EthereumAddress } from "./address"
 import { EthereumL1BitcoinDepositor } from "./l1-bitcoin-depositor"
+import { EthereumL1BitcoinRedeemer } from "./l1-bitcoin-redeemer"
 
 export * from "./address"
 export * from "./bridge"
@@ -131,6 +132,11 @@ export async function ethereumCrossChainContractsLoader(
 
   const loadL1Contracts = async (l2ChainName: L2Chain) => ({
     l1BitcoinDepositor: new EthereumL1BitcoinDepositor(
+      { signerOrProvider: signer },
+      chainId,
+      l2ChainName
+    ),
+    l1BitcoinRedeemer: new EthereumL1BitcoinRedeemer(
       { signerOrProvider: signer },
       chainId,
       l2ChainName
