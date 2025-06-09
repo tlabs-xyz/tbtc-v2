@@ -56,4 +56,4 @@ describe("StarkNetBitcoinDepositor - Dynamic Fee Estimation", () => {
     const fee = await depositor.estimateFee()
     expect(fee).to.be.gt(0)
   })
-}) 
+})

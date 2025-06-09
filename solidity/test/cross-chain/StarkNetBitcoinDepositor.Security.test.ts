@@ -49,4 +49,4 @@ describe("StarkNetBitcoinDepositor - Security & Edge Cases", () => {
     expect(await depositor.owner()).to.equal(owner.address)
     expect(await depositor.starkGateBridge()).to.equal(starkGateBridge.address)
   })
-}) 
+})
