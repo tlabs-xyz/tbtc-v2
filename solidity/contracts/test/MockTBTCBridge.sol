@@ -17,7 +17,7 @@ contract MockTBTCBridge is IBridge {
         bytes32 extraData
     ) external {
         depositRevealed = true;
-        depositKey = keccak256(abi.encodePacked(reveal, extraData));
+        depositKey = keccak256(abi.encode(reveal, extraData));
 
         deposit = IBridgeTypes.DepositRequest({
             depositor: msg.sender,

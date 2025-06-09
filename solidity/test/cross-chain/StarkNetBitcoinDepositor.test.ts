@@ -175,6 +175,8 @@ describe("StarkNetBitcoinDepositor", () => {
     beforeEach(async () => {
       await createSnapshot()
       await bridge.resetMock()
+      // Set the expected deposit key for the mock bridge
+      await bridge.setNextDepositKey(fixture.expectedDepositKey)
     })
 
     afterEach(async () => {
@@ -233,6 +235,9 @@ describe("StarkNetBitcoinDepositor", () => {
 
     beforeEach(async () => {
       await createSnapshot()
+
+      // Set the expected deposit key for the mock bridge
+      await bridge.setNextDepositKey(fixture.expectedDepositKey)
 
       // Initialize deposit first
       const l2DepositOwner = ethers.utils.hexZeroPad(STARKNET_RECIPIENT, 32)

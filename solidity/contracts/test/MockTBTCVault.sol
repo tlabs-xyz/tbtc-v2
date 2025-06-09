@@ -42,11 +42,11 @@ contract MockTBTCVault is ITBTCVault {
         external
         view
         override
-        returns (uint256 requestedAt, uint64 finalizedAt)
+        returns (uint64 requestedAt, uint64 finalizedAt)
     {
         DepositInfo memory info = deposits[depositKey];
         if (info.revealedAt != 0) {
-            return (uint256(info.revealedAt), uint64(block.timestamp)); // solhint-disable-line not-rely-on-time
+            return (uint64(info.revealedAt), uint64(block.timestamp)); // solhint-disable-line not-rely-on-time
         }
         return (0, 0);
     }
