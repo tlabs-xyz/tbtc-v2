@@ -14,6 +14,10 @@ contract MockTBTCToken is ERC20 {
         _mint(to, amount);
     }
 
+    function setShouldFailApprove(bool shouldFail) external {
+        _shouldFailApprove = shouldFail;
+    }
+
     function approve(address spender, uint256 amount)
         public
         override
@@ -23,9 +27,5 @@ contract MockTBTCToken is ERC20 {
             revert("Mock approve failed");
         }
         return super.approve(spender, amount);
-    }
-
-    function setShouldFailApprove(bool shouldFail) external {
-        _shouldFailApprove = shouldFail;
     }
 }

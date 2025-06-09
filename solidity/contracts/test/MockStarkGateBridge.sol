@@ -57,7 +57,7 @@ contract MockStarkGateBridge is IStarkGateBridge {
             messageFee: msg.value,
             callData: new uint256[](0)
         });
-        
+
         // Transfer tokens from sender
         IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
@@ -69,10 +69,10 @@ contract MockStarkGateBridge is IStarkGateBridge {
         uint256[] calldata message
     ) external payable returns (uint256, uint256) {
         require(!_shouldRevert, "Mock revert");
-        
+
         // Actually transfer tokens to simulate real StarkGate behavior
         IERC20(token).transferFrom(msg.sender, address(this), amount);
-        
+
         depositWithMessageCalled = true;
         _messageFee = msg.value;
         _depositCount++;
@@ -86,12 +86,7 @@ contract MockStarkGateBridge is IStarkGateBridge {
         return (_depositWithMessageReturn, block.timestamp); // solhint-disable-line not-rely-on-time
     }
 
-    function estimateDepositFeeWei()
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function estimateDepositFeeWei() external view override returns (uint256) {
         if (_shouldRevertEstimate) {
             revert("Mock revert estimate");
         }
