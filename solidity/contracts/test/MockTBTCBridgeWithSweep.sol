@@ -30,11 +30,11 @@ contract MockTBTCBridgeWithSweep is IBridge {
         // Create mock deposit
         _deposits[depositKey] = IBridgeTypes.DepositRequest({
             depositor: msg.sender,
-            amount: 100000000, // 1 BTC in satoshi
+            amount: 88800000, // Amount in satoshi that results in expectedTbtcAmount after fees
             revealedAt: uint32(block.timestamp), // solhint-disable-line not-rely-on-time
             vault: reveal.vault,
-            treasuryFee: 1000000, // 0.01 BTC in satoshi
-            sweptAt: uint32(block.timestamp + 1), // solhint-disable-line not-rely-on-time
+            treasuryFee: 898000, // Treasury fee in satoshi
+            sweptAt: 0, // Not swept initially
             extraData: extraData
         });
 
