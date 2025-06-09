@@ -4,17 +4,15 @@ pragma solidity 0.8.17;
 import "../integrator/ITBTCVault.sol";
 
 contract MockTBTCVault is ITBTCVault {
-    address public override tbtcToken;
-    mapping(uint256 => uint64) private _finalizedAt;
-
-    // Test data storage
     struct DepositInfo {
-        uint256 initialAmount;
-        uint256 tbtcAmount;
-        bytes32 l2DepositOwner;
-        bool exists;
+        address depositor;
+        uint256 amount;
+        uint32 revealedAt;
     }
-    mapping(uint256 => DepositInfo) private _deposits;
+
+    address public override tbtcToken;
+    uint32 public override optimisticMintingFeeDivisor = 1000; // 0.1% fee
+    mapping(uint256 => DepositInfo) private deposits;
 
     constructor() {
         // Will be set via setTbtcToken
@@ -24,59 +22,33 @@ contract MockTBTCVault is ITBTCVault {
         tbtcToken = _tbtcToken;
     }
 
+    function setOptimisticMintingFeeDivisor(uint32 _divisor) external {
+        optimisticMintingFeeDivisor = _divisor;
+    }
+
+    function setDepositInfo(
+        uint256 depositKey,
+        address depositor,
+        uint256 amount
+    ) external {
+        deposits[depositKey] = DepositInfo({
+            depositor: depositor,
+            amount: amount,
+            revealedAt: uint32(block.timestamp) // solhint-disable-line not-rely-on-time
+        });
+    }
+
     function optimisticMintingRequests(uint256 depositKey)
         external
         view
         override
         returns (uint64 requestedAt, uint64 finalizedAt)
     {
-        return (uint64(block.timestamp), _finalizedAt[depositKey]); // solhint-disable-line not-rely-on-time
-    }
-
-    function optimisticMintingFeeDivisor()
-        external
-        pure
-        override
-        returns (uint32)
-    {
-        return 1000; // 0.1% fee
-    }
-
-    // Test helper functions
-    function setOptimisticMintingFinalized(uint256 depositKey) external {
-        _finalizedAt[depositKey] = uint64(block.timestamp); // solhint-disable-line not-rely-on-time
-    }
-
-    function setDepositInfo(
-        uint256 depositKey,
-        uint256 initialAmount,
-        uint256 tbtcAmount,
-        bytes32 l2DepositOwner
-    ) external {
-        _deposits[depositKey] = DepositInfo({
-            initialAmount: initialAmount,
-            tbtcAmount: tbtcAmount,
-            l2DepositOwner: l2DepositOwner,
-            exists: true
-        });
-    }
-
-    function getDepositInfo(uint256 depositKey)
-        external
-        view
-        returns (
-            uint256 initialAmount,
-            uint256 tbtcAmount,
-            bytes32 l2DepositOwner
-        )
-    {
-        DepositInfo memory deposit = _deposits[depositKey];
-        require(deposit.exists, "Deposit does not exist");
-        return (
-            deposit.initialAmount,
-            deposit.tbtcAmount,
-            deposit.l2DepositOwner
-        );
+        DepositInfo memory info = deposits[depositKey];
+        if (info.revealedAt != 0) {
+            return (uint64(info.revealedAt), uint64(block.timestamp)); // solhint-disable-line not-rely-on-time
+        }
+        return (0, 0);
     }
 
     function isOptimisticMintingFinalized(bytes32 depositKey)
@@ -84,21 +56,7 @@ contract MockTBTCVault is ITBTCVault {
         view
         returns (bool)
     {
-        return _finalizedAt[uint256(depositKey)] > 0;
-    }
-
-    // Security testing features
-    mapping(uint256 => uint256) private _depositAmounts;
-
-    function setDepositAmount(uint256 depositKey, uint256 amount) external {
-        _depositAmounts[depositKey] = amount;
-    }
-
-    function getDepositAmount(uint256 depositKey)
-        external
-        view
-        returns (uint256)
-    {
-        return _depositAmounts[depositKey];
+        DepositInfo memory info = deposits[uint256(depositKey)];
+        return info.revealedAt != 0;
     }
 }

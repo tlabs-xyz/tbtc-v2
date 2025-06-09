@@ -37,6 +37,11 @@ describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
       // GREEN: Measure gas for current implementation
       const emptyMessage: string[] = []
 
+      // Approve tokens first
+      const [signer] = await ethers.getSigners()
+      await tbtcToken.mint(signer.address, TEST_AMOUNT)
+      await tbtcToken.approve(starkGateBridge.address, TEST_AMOUNT)
+
       // Measure gas for depositWithMessage
       const tx = await starkGateBridge.depositWithMessage(
         tbtcToken.address,
@@ -89,6 +94,11 @@ describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
       const testAddress = ethers.Wallet.createRandom().address
       await tbtcToken.mint(testAddress, TEST_AMOUNT)
 
+      // Use the minted address to approve and call
+      const [signer] = await ethers.getSigners()
+      await tbtcToken.mint(signer.address, TEST_AMOUNT)
+      await tbtcToken.approve(starkGateBridge.address, TEST_AMOUNT)
+
       // Test with empty array
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const emptyArray: any[] = []
@@ -101,8 +111,8 @@ describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
       )
 
       // Verify empty array is handled correctly
-      const lastCall = await starkGateBridge.getLastDepositWithMessageCall()
-      expect(lastCall.message.length).to.equal(0)
+      const lastCall = await starkGateBridge.getLastDepositCall()
+      expect(lastCall.callData.length).to.equal(0)
       expect(lastCall.l2Recipient).to.equal(TEST_RECIPIENT)
       expect(lastCall.amount).to.equal(TEST_AMOUNT)
 
@@ -113,7 +123,7 @@ describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
   describe("StarkGate Fee Analysis", () => {
     it("should analyze L1->L2 fee structure", async () => {
       // GREEN: Document fee analysis
-      const feeEstimate = await starkGateBridge.estimateMessageFee()
+      const feeEstimate = await starkGateBridge.estimateDepositFeeWei()
 
       // console.log("\n=== Fee Analysis ===")
       // console.log(
