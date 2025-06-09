@@ -143,11 +143,7 @@ describe("StarkNetBitcoinDepositor", () => {
       const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
       const initData = depositorImpl.interface.encodeFunctionData(
         "initialize",
-        [
-          bridge.address,
-          ethers.constants.AddressZero,
-          starkGateBridge.address,
-        ]
+        [bridge.address, ethers.constants.AddressZero, starkGateBridge.address]
       )
 
       await expect(
@@ -164,11 +160,7 @@ describe("StarkNetBitcoinDepositor", () => {
       const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
       const initData = depositorImpl.interface.encodeFunctionData(
         "initialize",
-        [
-          bridge.address,
-          tbtcVault.address,
-          ethers.constants.AddressZero,
-        ]
+        [bridge.address, tbtcVault.address, ethers.constants.AddressZero]
       )
 
       await expect(
@@ -289,9 +281,7 @@ describe("StarkNetBitcoinDepositor", () => {
       const lastCall = await starkGateBridge.getLastDepositCall()
       expect(lastCall.token).to.equal(tbtcToken.address)
       expect(lastCall.amount).to.equal(expectedTbtcAmount)
-      expect(lastCall.l2Recipient).to.equal(
-        BigNumber.from(STARKNET_RECIPIENT)
-      )
+      expect(lastCall.l2Recipient).to.equal(BigNumber.from(STARKNET_RECIPIENT))
       expect(lastCall.messageFee).to.equal(INITIAL_MESSAGE_FEE)
     })
 

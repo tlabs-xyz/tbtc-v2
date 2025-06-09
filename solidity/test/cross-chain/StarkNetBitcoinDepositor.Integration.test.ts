@@ -193,7 +193,6 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
       // Verify finalization events (amount may vary due to fee calculations)
       await expect(finalizeTx).to.emit(depositor, "DepositFinalized")
 
-
       // Verify StarkGate bridge was called correctly
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(await starkGateBridge.getDepositCount()).to.be.gt(0)
@@ -343,13 +342,13 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
       // Initialize and finalize deposit once
       const keys = await initializeDepositAndGetKey(depositData)
       await bridge.sweepDeposit(keys.uint256)
-      
+
       // Calculate the correct amount
       const amountSubTreasury = to1ePrecision(87902000, 10)
       const omFee = amountSubTreasury.div(1000)
       const txMaxFee = to1ePrecision(1000000, 10)
       const bridgeCalculatedAmount = amountSubTreasury.sub(omFee).sub(txMaxFee)
-      
+
       await tbtcToken.mint(depositor.address, bridgeCalculatedAmount)
 
       await depositor.finalizeDeposit(keys.bytes32, {
@@ -384,7 +383,7 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
       // Don't mint enough tBTC (insufficient balance)
       const insufficientAmount = BigNumber.from("1000") // Very small amount
       await tbtcToken.mint(depositor.address, insufficientAmount)
-      
+
       // Check balance after minting
       const balanceAfterMint = await tbtcToken.balanceOf(depositor.address)
       // console.log("Balance after mint:", balanceAfterMint.toString())

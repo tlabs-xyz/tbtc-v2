@@ -37,11 +37,13 @@ contract MockBridgeForStarkNet is IBridge {
                 fundingTx.locktime
             )
             .hash256View();
-            
+
         uint256 depositKey = uint256(
-            keccak256(abi.encodePacked(fundingTxHash, reveal.fundingOutputIndex))
+            keccak256(
+                abi.encodePacked(fundingTxHash, reveal.fundingOutputIndex)
+            )
         );
-        
+
         lastDepositKey = depositKey;
 
         // Create mock deposit
