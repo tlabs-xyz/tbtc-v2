@@ -94,8 +94,6 @@ describe("StarkNetBitcoinDepositor", () => {
       bridge.address,
       tbtcVault.address,
       starkGateBridge.address,
-      STARKNET_TBTC_TOKEN,
-      INITIAL_MESSAGE_FEE,
     ])
     const proxy = await ProxyFactory.deploy(depositorImpl.address, initData)
 
@@ -108,26 +106,9 @@ describe("StarkNetBitcoinDepositor", () => {
         starkGateBridge.address
       )
       expect(await depositor.tbtcToken()).to.equal(tbtcToken.address)
-      expect(await depositor.starkNetTBTCToken()).to.equal(STARKNET_TBTC_TOKEN)
-      expect(await depositor.l1ToL2MessageFee()).to.equal(INITIAL_MESSAGE_FEE)
     })
 
     it("should emit initialization event", async () => {
-      // const StarkNetBitcoinDepositor = await ethers.getContractFactory(
-      //   "StarkNetBitcoinDepositor"
-      // )
-      // const depositorImpl = await StarkNetBitcoinDepositor.deploy()
-      // const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
-      // const initData = depositorImpl.interface.encodeFunctionData(
-      //   "initialize",
-      //   [
-      //     bridge.address,
-      //     tbtcVault.address,
-      //     starkGateBridge.address,
-      //     STARKNET_TBTC_TOKEN,
-      //     INITIAL_MESSAGE_FEE,
-      //   ]
-      // )
       // We can't easily test events from proxy initialization
       // Skip this test or test it differently
     })
@@ -145,8 +126,6 @@ describe("StarkNetBitcoinDepositor", () => {
           ethers.constants.AddressZero,
           tbtcVault.address,
           starkGateBridge.address,
-          STARKNET_RECIPIENT,
-          INITIAL_MESSAGE_FEE,
         ]
       )
 
@@ -164,13 +143,7 @@ describe("StarkNetBitcoinDepositor", () => {
       const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
       const initData = depositorImpl.interface.encodeFunctionData(
         "initialize",
-        [
-          bridge.address,
-          ethers.constants.AddressZero,
-          starkGateBridge.address,
-          STARKNET_RECIPIENT,
-          INITIAL_MESSAGE_FEE,
-        ]
+        [bridge.address, ethers.constants.AddressZero, starkGateBridge.address]
       )
 
       await expect(
@@ -187,64 +160,12 @@ describe("StarkNetBitcoinDepositor", () => {
       const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
       const initData = depositorImpl.interface.encodeFunctionData(
         "initialize",
-        [
-          bridge.address,
-          tbtcVault.address,
-          ethers.constants.AddressZero,
-          STARKNET_RECIPIENT,
-          INITIAL_MESSAGE_FEE,
-        ]
+        [bridge.address, tbtcVault.address, ethers.constants.AddressZero]
       )
 
       await expect(
         ProxyFactory.deploy(depositorImpl.address, initData)
       ).to.be.revertedWith("StarkGate bridge address cannot be zero")
-    })
-
-    it("should revert with zero StarkNet tBTC token", async () => {
-      const StarkNetBitcoinDepositor = await ethers.getContractFactory(
-        "StarkNetBitcoinDepositor"
-      )
-      const depositorImpl = await StarkNetBitcoinDepositor.deploy()
-
-      const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
-      const initData = depositorImpl.interface.encodeFunctionData(
-        "initialize",
-        [
-          bridge.address,
-          tbtcVault.address,
-          starkGateBridge.address,
-          0, // Zero StarkNet tBTC token
-          INITIAL_MESSAGE_FEE,
-        ]
-      )
-
-      await expect(
-        ProxyFactory.deploy(depositorImpl.address, initData)
-      ).to.be.revertedWith("StarkNet tBTC token address cannot be zero")
-    })
-
-    it("should revert with zero message fee", async () => {
-      const StarkNetBitcoinDepositor = await ethers.getContractFactory(
-        "StarkNetBitcoinDepositor"
-      )
-      const depositorImpl = await StarkNetBitcoinDepositor.deploy()
-
-      const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
-      const initData = depositorImpl.interface.encodeFunctionData(
-        "initialize",
-        [
-          bridge.address,
-          tbtcVault.address,
-          starkGateBridge.address,
-          STARKNET_RECIPIENT,
-          0,
-        ]
-      )
-
-      await expect(
-        ProxyFactory.deploy(depositorImpl.address, initData)
-      ).to.be.revertedWith("L1->L2 message fee must be greater than zero")
     })
   })
 
@@ -254,6 +175,8 @@ describe("StarkNetBitcoinDepositor", () => {
     beforeEach(async () => {
       await createSnapshot()
       await bridge.resetMock()
+      // Set the expected deposit key for the mock bridge
+      await bridge.setNextDepositKey(fixture.expectedDepositKey)
     })
 
     afterEach(async () => {
@@ -305,13 +228,6 @@ describe("StarkNetBitcoinDepositor", () => {
     })
   })
 
-  describe("quoteFinalizeDeposit", () => {
-    it("should return current L1->L2 message fee", async () => {
-      const quotedFee = await depositor.quoteFinalizeDeposit(0) // depositKey not used in implementation
-      expect(quotedFee).to.equal(INITIAL_MESSAGE_FEE)
-    })
-  })
-
   describe("finalizeDeposit", () => {
     const expectedTbtcAmount = BigNumber.from("868140980000000000") // Actual calculated amount after fees (88800000 - 898000) * 1e10 * 0.999, without tx max fee reimbursement
     const depositKey =
@@ -319,6 +235,9 @@ describe("StarkNetBitcoinDepositor", () => {
 
     beforeEach(async () => {
       await createSnapshot()
+
+      // Set the expected deposit key for the mock bridge
+      await bridge.setNextDepositKey(fixture.expectedDepositKey)
 
       // Initialize deposit first
       const l2DepositOwner = ethers.utils.hexZeroPad(STARKNET_RECIPIENT, 32)
@@ -348,7 +267,7 @@ describe("StarkNetBitcoinDepositor", () => {
       await expect(tx).to.emit(depositor, "DepositFinalized")
 
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(await starkGateBridge.depositCalled()).to.be.true
+      expect(await starkGateBridge.getDepositCount()).to.be.gt(0)
     })
 
     it("should revert with insufficient fee", async () => {
@@ -367,8 +286,8 @@ describe("StarkNetBitcoinDepositor", () => {
       const lastCall = await starkGateBridge.getLastDepositCall()
       expect(lastCall.token).to.equal(tbtcToken.address)
       expect(lastCall.amount).to.equal(expectedTbtcAmount)
-      expect(lastCall.l2Recipient).to.equal(STARKNET_RECIPIENT)
-      expect(lastCall.value).to.equal(INITIAL_MESSAGE_FEE)
+      expect(lastCall.l2Recipient).to.equal(BigNumber.from(STARKNET_RECIPIENT))
+      expect(lastCall.messageFee).to.equal(INITIAL_MESSAGE_FEE)
     })
 
     it("should approve StarkGate bridge correctly", async () => {
@@ -382,59 +301,13 @@ describe("StarkNetBitcoinDepositor", () => {
         value: INITIAL_MESSAGE_FEE,
       })
 
-      // After deposit call, allowance should be back to 0 (the mock consumed it via transferFrom)
+      // After deposit call, the mock doesn't actually transfer tokens
+      // so the allowance remains what was approved
       const finalAllowance = await tbtcToken.allowance(
         depositor.address,
         starkGateBridge.address
       )
-      expect(finalAllowance).to.equal(0) // Mock consumed the allowance
-    })
-  })
-
-  describe("updateL1ToL2MessageFee", () => {
-    const newFee = ethers.utils.parseEther("0.02")
-
-    beforeEach(async () => {
-      await createSnapshot()
-    })
-
-    afterEach(async () => {
-      await restoreSnapshot()
-    })
-
-    it("should update fee successfully by owner", async () => {
-      const [owner] = await ethers.getSigners()
-
-      await expect(depositor.connect(owner).updateL1ToL2MessageFee(newFee))
-        .to.emit(depositor, "L1ToL2MessageFeeUpdated")
-        .withArgs(newFee)
-
-      expect(await depositor.l1ToL2MessageFee()).to.equal(newFee)
-    })
-
-    it("should revert with zero fee", async () => {
-      const [owner] = await ethers.getSigners()
-
-      await expect(
-        depositor.connect(owner).updateL1ToL2MessageFee(0)
-      ).to.be.revertedWith("Fee must be greater than 0")
-    })
-  })
-
-  describe("Gas optimization", () => {
-    beforeEach(async () => {
-      await createSnapshot()
-    })
-
-    afterEach(async () => {
-      await restoreSnapshot()
-    })
-
-    it("should keep quoteFinalizeDeposit under gas limit", async () => {
-      const gasEstimate = await depositor.estimateGas.quoteFinalizeDeposit(0) // depositKey not used
-
-      // Should be under 30k gas for view function
-      expect(gasEstimate.toNumber()).to.be.lessThan(30000)
+      expect(finalAllowance).to.equal(0) // Mock now consumes allowance via transferFrom
     })
   })
 })
