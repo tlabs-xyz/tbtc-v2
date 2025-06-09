@@ -49,9 +49,12 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         uint256 fee
     );
 
+
     /// @notice Emitted when the depositor is initialized
     /// @param starkGateBridge The address of the StarkGate bridge
-    event StarkNetBitcoinDepositorInitialized(address starkGateBridge);
+    event StarkNetBitcoinDepositorInitialized(
+        address starkGateBridge
+    );
 
     // ========== Constructor ==========
 
@@ -69,9 +72,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     function initialize(
         address _tbtcBridge,
         address _tbtcVault,
-        address _starkGateBridge,
-        uint256 _starkNetTBTCToken,
-        uint256 _l1ToL2MessageFee
+        address _starkGateBridge
     ) external initializer {
         require(_tbtcBridge != address(0), "Invalid tBTC Bridge");
         require(_tbtcVault != address(0), "Invalid tBTC Vault");
@@ -79,20 +80,6 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
             _starkGateBridge != address(0),
             "StarkGate bridge address cannot be zero"
         );
-        require(
-            _starkNetTBTCToken != 0,
-            "StarkNet tBTC token address cannot be zero"
-        );
-        require(
-            _l1ToL2MessageFee > 0,
-            "L1->L2 message fee must be greater than zero"
-        );
-
-        // Initialize the parent AbstractL1BTCDepositor (this sets tbtcToken)
-        __AbstractL1BTCDepositor_initialize(_tbtcBridge, _tbtcVault);
-
-        // Initialize OwnableUpgradeable
-        __Ownable_init();
 
         // Initialize the parent AbstractL1BTCDepositor (this sets tbtcToken)
         __AbstractL1BTCDepositor_initialize(_tbtcBridge, _tbtcVault);
@@ -102,7 +89,9 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
 
         starkGateBridge = IStarkGateBridge(_starkGateBridge);
 
-        emit StarkNetBitcoinDepositorInitialized(_starkGateBridge);
+        emit StarkNetBitcoinDepositorInitialized(
+            _starkGateBridge
+        );
     }
 
     // ========== External Functions ==========
@@ -112,6 +101,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
     function estimateFee() public view returns (uint256) {
         return starkGateBridge.estimateDepositFeeWei();
     }
+
 
     // ========== Internal Functions ==========
 
@@ -126,7 +116,10 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         // This function is called by finalizeDeposit which is payable
         // The caller must send ETH to cover the StarkGate bridge fee
         uint256 fee = estimateFee();
-        require(msg.value >= fee, "Insufficient L1->L2 message fee");
+        require(
+            msg.value >= fee,
+            "Insufficient L1->L2 message fee"
+        );
         require(address(tbtcToken) != address(0), "tBTC token not initialized");
 
         // Convert bytes32 to uint256 for StarkNet address format
@@ -146,6 +139,7 @@ contract StarkNetBitcoinDepositor is AbstractL1BTCDepositor {
         );
 
         // Emit event for StarkNet bridging
+        // slither-disable-next-line reentrancy-events
         emit TBTCBridgedToStarkNet(
             msg.sender,
             amount,

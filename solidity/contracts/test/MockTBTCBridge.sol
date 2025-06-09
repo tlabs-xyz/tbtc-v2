@@ -10,12 +10,15 @@ contract MockTBTCBridge is IBridge {
     bool public initializeDepositCalled;
     uint256 public nextDepositKey;
 
+    // Events to match real Bridge
+    event DepositRevealed(uint256 indexed depositKey);
+
     constructor() {
         nextDepositKey = 12345; // Default test value
     }
 
     function revealDepositWithExtraData(
-        IBridgeTypes.BitcoinTxInfo calldata fundingTx, // solhint-disable-line no-unused-vars
+        IBridgeTypes.BitcoinTxInfo calldata fundingTx,
         IBridgeTypes.DepositRevealInfo calldata reveal,
         bytes32 extraData
     ) external {
@@ -28,12 +31,14 @@ contract MockTBTCBridge is IBridge {
         _deposits[depositKey] = IBridgeTypes.DepositRequest({
             depositor: msg.sender,
             amount: 100000000, // 1 BTC in satoshi
-            revealedAt: uint32(block.timestamp), // solhint-disable-line not-rely-on-time
+            revealedAt: uint32(block.timestamp),
             vault: reveal.vault,
             treasuryFee: 1000000, // 0.01 BTC in satoshi
-            sweptAt: uint32(block.timestamp + 1), // solhint-disable-line not-rely-on-time
+            sweptAt: uint32(block.timestamp + 1),
             extraData: extraData
         });
+
+        emit DepositRevealed(depositKey);
     }
 
     function deposits(uint256 depositKey)
@@ -70,5 +75,10 @@ contract MockTBTCBridge is IBridge {
     function resetMock() external {
         initializeDepositCalled = false;
         nextDepositKey = 12345;
+    }
+
+    function sweepDeposit(uint256 depositKey) external {
+        require(_deposits[depositKey].revealedAt != 0, "Deposit not revealed");
+        _deposits[depositKey].sweptAt = uint32(block.timestamp);
     }
 }

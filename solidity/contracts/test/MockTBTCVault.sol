@@ -30,7 +30,7 @@ contract MockTBTCVault is ITBTCVault {
         override
         returns (uint64 requestedAt, uint64 finalizedAt)
     {
-        return (uint64(block.timestamp), _finalizedAt[depositKey]); // solhint-disable-line not-rely-on-time
+        return (uint64(block.timestamp), _finalizedAt[depositKey]);
     }
 
     function optimisticMintingFeeDivisor()
@@ -44,7 +44,7 @@ contract MockTBTCVault is ITBTCVault {
 
     // Test helper functions
     function setOptimisticMintingFinalized(uint256 depositKey) external {
-        _finalizedAt[depositKey] = uint64(block.timestamp); // solhint-disable-line not-rely-on-time
+        _finalizedAt[depositKey] = uint64(block.timestamp);
     }
 
     function setDepositInfo(
@@ -85,20 +85,5 @@ contract MockTBTCVault is ITBTCVault {
         returns (bool)
     {
         return _finalizedAt[uint256(depositKey)] > 0;
-    }
-
-    // Security testing features
-    mapping(uint256 => uint256) private _depositAmounts;
-
-    function setDepositAmount(uint256 depositKey, uint256 amount) external {
-        _depositAmounts[depositKey] = amount;
-    }
-
-    function getDepositAmount(uint256 depositKey)
-        external
-        view
-        returns (uint256)
-    {
-        return _depositAmounts[depositKey];
     }
 }
