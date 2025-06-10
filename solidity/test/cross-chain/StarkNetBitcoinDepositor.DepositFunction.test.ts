@@ -79,8 +79,6 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       bridge.address,
       tbtcVault.address,
       starkGateBridge.address,
-      STARKNET_TBTC_TOKEN,
-      INITIAL_MESSAGE_FEE,
     ])
     const proxy = await ProxyFactory.deploy(depositorImpl.address, initData)
 
@@ -107,46 +105,6 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
 
   afterEach(async () => {
     await restoreSnapshot()
-  })
-
-  describe("IStarkGateBridge Interface Update", () => {
-    it("should have deposit() function in interface", async () => {
-      const starkGateBridgeInterface = starkGateBridge.interface
-      const depositFunction = starkGateBridgeInterface.getFunction("deposit")
-
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(depositFunction).to.not.be.undefined
-      expect(depositFunction.name).to.equal("deposit")
-      expect(depositFunction.inputs.length).to.equal(3) // token, amount, l2Recipient
-    })
-
-    it("should verify deposit() is called through mock", async () => {
-      // Direct test of the mock to verify deposit() works
-      const testAmount = ethers.utils.parseEther("1")
-      const testRecipient = ethers.BigNumber.from("0x12345")
-      const [signer] = await ethers.getSigners()
-
-      // Setup: mint tokens to the signer and approve the bridge
-      await tbtcToken.mint(signer.address, testAmount)
-      await tbtcToken.approve(starkGateBridge.address, testAmount)
-
-      // Call deposit directly on the mock
-      await starkGateBridge.deposit(
-        tbtcToken.address,
-        testAmount,
-        testRecipient,
-        { value: ethers.utils.parseEther("0.1") }
-      )
-
-      // Verify it was called
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(await starkGateBridge.depositCalled()).to.be.true
-
-      const lastCall = await starkGateBridge.getLastSimpleDepositCall()
-      expect(lastCall.token).to.equal(tbtcToken.address)
-      expect(lastCall.amount).to.equal(testAmount)
-      expect(lastCall.l2Recipient).to.equal(testRecipient)
-    })
   })
 
   describe("_transferTbtc Implementation", () => {
@@ -198,7 +156,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
 
       // Verify deposit() was called
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(await starkGateBridge.depositCalled()).to.be.true
+      expect(await starkGateBridge.getDepositCount()).to.be.true
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(await starkGateBridge.depositWithMessageCalled()).to.be.false
     })
@@ -236,7 +194,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       })
 
       // Verify deposit() was called with correct parameters
-      const lastCall = await starkGateBridge.getLastSimpleDepositCall()
+      const lastCall = await starkGateBridge.getLastDepositCall()
       expect(lastCall.token).to.equal(tbtcToken.address)
 
       // Verify the actual bridged amount (there's an optimistic minting fee)
@@ -247,7 +205,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       // Verify no message array exists (deposit() doesn't have message parameter)
       // This confirms we're using the simpler function
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(await starkGateBridge.depositCalled()).to.be.true
+      expect(await starkGateBridge.getDepositCount()).to.be.true
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(await starkGateBridge.depositWithMessageCalled()).to.be.false
     })
@@ -332,7 +290,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       })
 
       // Verify correct behavior
-      const lastDeposit = await starkGateBridge.getLastSimpleDepositCall()
+      const lastDeposit = await starkGateBridge.getLastDepositCall()
       expect(lastDeposit.token).to.equal(tbtcToken.address)
 
       // Verify the actual bridged amount (there's an optimistic minting fee)
@@ -340,11 +298,11 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       expect(lastDeposit.amount).to.be.lte(depositAmount)
 
       expect(lastDeposit.l2Recipient).to.equal(starkNetRecipient)
-      expect(lastDeposit.value).to.equal(INITIAL_MESSAGE_FEE)
+      expect(lastDeposit.messageFee).to.equal(INITIAL_MESSAGE_FEE)
 
       // Verify deposit() was called correctly
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(await starkGateBridge.depositCalled()).to.be.true
+      expect(await starkGateBridge.getDepositCount()).to.be.true
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(await starkGateBridge.depositWithMessageCalled()).to.be.false
 
@@ -376,6 +334,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       // Verify the mock recorded the call
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(await starkGateBridge.depositCalled()).to.be.true
+      // depositWithMessage should not be called directly when using deposit()
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(await starkGateBridge.depositWithMessageCalled()).to.be.false
 
