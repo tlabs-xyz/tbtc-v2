@@ -209,6 +209,41 @@ export class RedemptionsService {
     }
   }
 
+  async relayRedemptionRequestToL1(
+    amount: BigNumber,
+    redeemerOutputScript: Hex,
+    encodedVm: Hex,
+    l2ChainName: L2Chain
+  ): Promise<{
+    targetChainTxHash: Hex
+  }> {
+    const crossChainContracts = this.#crossChainContracts(l2ChainName)
+    if (!crossChainContracts) {
+      throw new Error(
+        `Cross-chain contracts for ${l2ChainName} not initialized`
+      )
+    }
+
+    // The findWalletForRedemption operates on satoshi amount precision (1e8)
+    // while the amount parameter is TBTC token precision (1e18). We need to
+    // convert the amount to get proper results.
+    const { walletPublicKey, mainUtxo } = await this.findWalletForRedemption(
+      redeemerOutputScript,
+      amountToSatoshi(amount)
+    )
+
+    const txHash = await crossChainContracts.l1BitcoinRedeemer.requestRedemption(
+      walletPublicKey,
+      mainUtxo,
+      encodedVm
+    )
+
+    return {
+      targetChainTxHash: txHash
+    }
+  }
+
+
   /**
    *
    * @param bitcoinRedeemerAddress Bitcoin address redeemed BTC should be
