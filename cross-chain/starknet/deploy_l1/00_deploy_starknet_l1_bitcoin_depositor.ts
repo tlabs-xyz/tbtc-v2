@@ -1,8 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 
-const TBTC_BRIDGE_ADDRESS = "0x9b1a7fE5a16A15F2f9475C5B231750598b113403"
-const TBTC_VAULT_ADDRESS = "0xB5679dE944A79732A75CE5561919DF11F489448d5"
+const TBTC_BRIDGE_ADDRESS = "0x5e4861a80B55f035D899f66772117F00FA0E8e7B"
+const TBTC_VAULT_ADDRESS = "0x9C070027cdC9dc8F82416B2e5314E11DFb4FE3CD"
 
 // Wait for a specified number of blocks
 async function waitForBlocks(
@@ -60,7 +60,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await getNamedAccounts()
 
   console.log("Deploying StarkNetBitcoinDepositor for StarkNet integration...")
-  console.log(`Deployer address (L1 Testnet): ${deployer}`)
+  console.log(`Deployer address: ${deployer}`)
+
+  // Validate that the private key matches the expected deployer address
+  if (hre.network.name === "mainnet") {
+    const signer = await ethers.getSigner(deployer)
+    const signerAddress = await signer.getAddress()
+    
+    if (signerAddress.toLowerCase() !== deployer.toLowerCase()) {
+      throw new Error(
+        `Private key mismatch! The configured private key generates address ${signerAddress}, but expected deployer is ${deployer}. ` +
+        `Please ensure L1_ACCOUNTS_PK_MAINNET contains the private key for address ${deployer}.`
+      )
+    }
+    console.log("✅ Private key validation passed")
+  }
 
   // Get core tBTC contracts from mainnet/sepolia deployment
   let tbtcBridge: any
@@ -83,10 +97,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     starkGateBridge = "0xF6217de888fD6E6b2CbFBB2370973BE4c36a152D"
   } else if (hre.network.name === "mainnet") {
     // StarkNet mainnet configuration
-    starkGateBridge = "0xae0Ee0A63A2cE6BaeEFFE56e7714FB4EFE48D419" // StarkGate Ethereum Bridge
+    starkGateBridge = "0x2111A49ebb717959059693a3698872a0aE9866b9" // StarkGate L1 Bridge
   } else if (["hardhat", "localhost", "development"].includes(hre.network.name)) {
     // Local testing configuration with mock addresses
-    starkGateBridge = "0x1234567890123456789012345678901234567890" // Mock StarkGate bridge
+    starkGateBridge = "0x123..." // Placeholder Address
     console.log("⚠️  Using mock addresses for local testing")
   } else {
     throw new Error(`Unsupported network: ${hre.network.name}`)
