@@ -19,11 +19,11 @@ import { Hex } from "../utils"
 
 import MainnetBaseL1BitcoinDepositorDeployment from "./artifacts/mainnet/BaseL1BitcoinDepositor.json"
 import MainnetArbitrumL1BitcoinDepositorDeployment from "./artifacts/mainnet/ArbitrumOneL1BitcoinDepositor.json"
-import MainnetStarkNetL1BitcoinDepositorDeployment from "./artifacts/mainnet/StarkNetL1BitcoinDepositor.json"
+import MainnetStarkNetL1BitcoinDepositorDeployment from "./artifacts/mainnet/StarkNetBitcoinDepositor.json"
 
 import SepoliaBaseL1BitcoinDepositorDeployment from "./artifacts/sepolia/BaseL1BitcoinDepositor.json"
 import SepoliaArbitrumL1BitcoinDepositorDeployment from "./artifacts/sepolia/ArbitrumL1BitcoinDepositor.json"
-import SepoliaStarkNetL1BitcoinDepositorDeployment from "./artifacts/sepolia/StarkNetL1BitcoinDepositor.json"
+import SepoliaStarkNetL1BitcoinDepositorDeployment from "./artifacts/sepolia/StarkNetBitcoinDepositor.json"
 
 const artifactLoader = {
   getMainnet: (destinationChainName: DestinationChainName) => {
