@@ -1,8 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 
-const TBTC_BRIDGE_ADDRESS = "0x9b1a7fE5a16A15F2f9475C5B231750598b113403"
-const TBTC_VAULT_ADDRESS = "0xB5679dE944A79732A75CE5561919DF11F489448d5"
+const TBTC_BRIDGE_ADDRESS = "0x5e4861a80B55f035D899f66772117F00FA0E8e7B"
+const TBTC_VAULT_ADDRESS = "0x9C070027cdC9dc8F82416B2e5314E11DFb4FE3CD"
 
 // Wait for a specified number of blocks
 async function waitForBlocks(
@@ -60,7 +60,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await getNamedAccounts()
 
   console.log("Deploying StarkNetBitcoinDepositor for StarkNet integration...")
-  console.log(`Deployer address (L1 Testnet): ${deployer}`)
+  console.log(`Deployer address: ${deployer}`)
+
+  // Validate that the private key matches the expected deployer address
+  if (hre.network.name === "mainnet") {
+    const signer = await ethers.getSigner(deployer)
+    const signerAddress = await signer.getAddress()
+    
+    if (signerAddress.toLowerCase() !== deployer.toLowerCase()) {
+      throw new Error(
+        `Private key mismatch! The configured private key generates address ${signerAddress}, but expected deployer is ${deployer}. ` +
+        `Please ensure L1_ACCOUNTS_PK_MAINNET contains the private key for address ${deployer}.`
+      )
+    }
+    console.log("✅ Private key validation passed")
+  }
 
   // Get core tBTC contracts from mainnet/sepolia deployment
   let tbtcBridge: any
@@ -77,37 +91,22 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   // Network-specific StarkNet configuration
   let starkGateBridge: string
-  let starkNetTBTCToken: string
 
   if (hre.network.name === "sepolia") {
-    // StarkNet Sepolia testnet configuration
-    starkGateBridge = "0x95fa1deDF00d6B3c6EF7DfDB36dD954Eb9Dbe829"
-    starkNetTBTCToken =
-      "0x04e3bc49f130f9d0379082c24efd397a0eddfccdc6023a2f02a74d8527140276"
+    // StarkNet Sepolia testnet configuration - Updated to correct address
+    starkGateBridge = "0xF6217de888fD6E6b2CbFBB2370973BE4c36a152D"
   } else if (hre.network.name === "mainnet") {
     // StarkNet mainnet configuration
-    starkGateBridge = "0xae0Ee0A63A2cE6BaeEFFE56e7714FB4EFE48D419" // StarkGate Ethereum Bridge
-    // NOTE: Update this address with the actual mainnet tBTC token address on StarkNet before mainnet deployment
-    starkNetTBTCToken = "0x" // TODO: Add actual mainnet tBTC token address on StarkNet
+    starkGateBridge = "0x2111A49ebb717959059693a3698872a0aE9866b9" // StarkGate L1 Bridge
   } else if (["hardhat", "localhost", "development"].includes(hre.network.name)) {
     // Local testing configuration with mock addresses
-    starkGateBridge = "0x1234567890123456789012345678901234567890" // Mock StarkGate bridge
-    starkNetTBTCToken =
-      "0x0123456789012345678901234567890123456789012345678901234567890123" // Mock StarkNet tBTC token (32 bytes)
+    starkGateBridge = "0x123..." // Placeholder Address
     console.log("⚠️  Using mock addresses for local testing")
   } else {
     throw new Error(`Unsupported network: ${hre.network.name}`)
   }
 
-  const L1_TO_L2_MESSAGE_FEE = ethers.utils.parseEther("0.01") // Initial fee, can be updated by owner
-
   console.log(`Using StarkGate Bridge for StarkNet: ${starkGateBridge}`)
-  console.log(`Using StarkNet tBTC Token: ${starkNetTBTCToken}`)
-  console.log(
-    `Using L1->L2 Message Fee: ${ethers.utils.formatEther(
-      L1_TO_L2_MESSAGE_FEE
-    )} ETH`
-  )
 
   const [starkNetBitcoinDepositorDeployment, proxyDeployment] =
     await helpers.upgrades.deployProxy(
@@ -118,8 +117,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
           tbtcBridge.address,
           tbtcVault.address,
           starkGateBridge,
-          starkNetTBTCToken,
-          L1_TO_L2_MESSAGE_FEE,
         ],
         factoryOpts: {
           signer: await ethers.getSigner(deployer),
@@ -138,7 +135,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const starkNetBitcoinDepositor = starkNetBitcoinDepositorDeployment // The main contract instance
 
   console.log(
-    `StarkNetBitcoinDepositor (logic) deployed to: ${await starkNetBitcoinDepositor.address}`
+    `StarkNetBitcoinDepositor (logic) deployed to: ${starkNetBitcoinDepositor.address}`
   )
   console.log(
     `StarkNetBitcoinDepositorProxy deployed to: ${proxyDeployment.address}`
