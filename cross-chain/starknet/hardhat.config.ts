@@ -115,11 +115,11 @@ const config: HardhatUserConfig = {
       tags: ["allowStubs"],
     },
     sepolia: {
-      url: process.env.L1_CHAIN_API_URL || "https://1rpc.io/sepolia",
+      url: process.env.L1_CHAIN_SEPOLIA_API_URL,
       chainId: 11155111,
       deploy: ["deploy_l1"],
-      accounts: process.env.L1_ACCOUNTS_PRIVATE_KEYS
-        ? process.env.L1_ACCOUNTS_PRIVATE_KEYS.split(",").map((key) =>
+      accounts: process.env.L1_ACCOUNTS_PK_SEPOLIA
+        ? process.env.L1_ACCOUNTS_PK_SEPOLIA.split(",").map((key) =>
             key.startsWith("0x") ? key : `0x${key}`
           )
         : undefined,
@@ -131,11 +131,13 @@ const config: HardhatUserConfig = {
       httpHeaders: {},
     },
     mainnet: {
-      url: process.env.L1_CHAIN_API_URL || "https://cloudflare-eth.com",
+      url: process.env.L1_CHAIN_MAINNET_API_URL,
       chainId: 1,
       deploy: ["deploy_l1"],
-      accounts: process.env.CONTRACT_OWNER_ACCOUNT_PRIVATE_KEY
-        ? [process.env.CONTRACT_OWNER_ACCOUNT_PRIVATE_KEY]
+      accounts: process.env.L1_ACCOUNTS_PK_MAINNET
+        ? process.env.L1_ACCOUNTS_PK_MAINNET.split(",").map((key) =>
+          key.startsWith("0x") ? key : `0x${key}`
+        )
         : undefined,
       tags: [
         "etherscan",
@@ -192,7 +194,7 @@ const config: HardhatUserConfig = {
     deployer: {
       default: 1,
       sepolia: 0,
-      mainnet: "0x123694886DBf5Ac94DDA07135349534536D14cAf",
+      mainnet: "0x6CB1AdE9BA5B8D8988b989AeA3718Bc14D6F5B54", //StarkNet Bitcoin Depositor Deployer
     },
     governance: {
       default: 2,
