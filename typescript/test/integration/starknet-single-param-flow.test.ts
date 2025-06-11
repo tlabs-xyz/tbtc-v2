@@ -158,6 +158,7 @@ describe("StarkNet Single-Parameter Deposit Flow", () => {
       // Mock relayer response
       axiosStub.resolves({
         data: {
+          success: true,
           receipt: {
             transactionHash:
               "0xabc123def456789abc123def456789abc123def456789abc123def456789ab",
@@ -213,7 +214,7 @@ describe("StarkNet Single-Parameter Deposit Flow", () => {
       )
       expect(axiosStub.calledOnce).to.be.true
       expect(axiosStub.args[0][0]).to.equal(
-        "http://localhost:3001/api/starknetTestnet/reveal"
+        "https://tbtc-crosschain-relayer-swmku.ondigitalocean.app/api/StarknetTestnet/reveal"
       )
       expect(axiosStub.args[0][1]).to.have.property("l2DepositOwner")
       expect(axiosStub.args[0][1]).to.have.property("l2Sender")
@@ -240,6 +241,7 @@ describe("StarkNet Single-Parameter Deposit Flow", () => {
         capturedRequest = data
         return {
           data: {
+            success: true,
             receipt: {
               transactionHash:
                 "0xdef456789abc123def456789abc123def456789abc123def456789abc123de",
@@ -348,7 +350,7 @@ describe("StarkNet Single-Parameter Deposit Flow", () => {
             ),
           }
         )
-      ).to.be.rejectedWith("Relayer service temporarily unavailable")
+      ).to.be.rejectedWith("Relayer service error")
 
       // Cleanup
       setTimeoutStub.restore()
@@ -439,9 +441,8 @@ describe("StarkNet Single-Parameter Deposit Flow", () => {
   })
 
   describe("Backward compatibility", () => {
-    it("should show deprecation warning for two-parameter mode", async () => {
+    it("should reject two-parameter mode completely", async () => {
       // Arrange
-      const consoleWarnStub = sinon.stub(console, "warn")
       const ethereumSigner = {
         provider: {},
         address: "0x1234567890123456789012345678901234567890",
@@ -453,16 +454,16 @@ describe("StarkNet Single-Parameter Deposit Flow", () => {
         nodeUrl: "https://starknet-testnet.public.blastapi.io/rpc/v0_6",
       })
 
-      // Act
-      await tbtc.initializeCrossChain(
-        "StarkNet",
-        ethereumSigner as any,
-        starknetProvider
+      // Act & Assert - should throw error
+      await expect(
+        tbtc.initializeCrossChain(
+          "StarkNet",
+          ethereumSigner as any,
+          starknetProvider
+        )
+      ).to.be.rejectedWith(
+        "StarkNet does not support two-parameter initialization"
       )
-
-      // Assert
-      expect(consoleWarnStub.calledOnce).to.be.true
-      expect(consoleWarnStub.args[0][0]).to.include("deprecated")
     })
   })
 })
