@@ -35,6 +35,7 @@ describe("StarkNetDepositor Payload Format", () => {
     // Mock response
     axiosStub.resolves({
       data: {
+        success: true,
         receipt: {
           transactionHash: "0x123456",
           blockNumber: 12345,
@@ -65,10 +66,7 @@ describe("StarkNetDepositor Payload Format", () => {
     const call = axiosStub.getCall(0)
     const payload = call.args[1]
 
-    expect(payload).to.have.property("destinationChainDepositOwner")
-    expect(payload.destinationChainDepositOwner).to.equal(
-      testAddress.toLowerCase()
-    )
+    expect(payload).to.not.have.property("destinationChainDepositOwner")
     expect(payload).to.have.property("l2DepositOwner")
     expect(payload).to.have.property("l2Sender")
     expect(payload).to.have.property("fundingTx")
@@ -87,6 +85,7 @@ describe("StarkNetDepositor Payload Format", () => {
   it("should format addresses as lowercase", async () => {
     axiosStub.resolves({
       data: {
+        success: true,
         receipt: {
           transactionHash: "0xabc123",
           blockNumber: 12345,
@@ -118,9 +117,8 @@ describe("StarkNetDepositor Payload Format", () => {
     const payload = call.args[1]
 
     // Should be lowercase
-    expect(payload.destinationChainDepositOwner).to.equal(
-      testAddress.toLowerCase()
-    )
+    expect(payload.l2DepositOwner).to.equal(testAddress.toLowerCase())
+    expect(payload.l2Sender).to.equal(testAddress.toLowerCase())
   })
 
   it("should handle addresses without 0x prefix", () => {
@@ -145,6 +143,7 @@ describe("StarkNetDepositor Payload Format", () => {
   it("should include all required fields in payload", async () => {
     axiosStub.resolves({
       data: {
+        success: true,
         receipt: {
           transactionHash: "0xdef456",
           blockNumber: 67890,
@@ -198,7 +197,7 @@ describe("StarkNetDepositor Payload Format", () => {
     expect(payload.reveal).to.have.property("vault")
 
     // Check StarkNet-specific fields
-    expect(payload).to.have.property("destinationChainDepositOwner")
+    expect(payload).to.not.have.property("destinationChainDepositOwner")
     expect(payload).to.have.property("l2DepositOwner")
     expect(payload).to.have.property("l2Sender")
   })
@@ -209,6 +208,7 @@ describe("StarkNetDepositor Payload Format", () => {
 
     axiosStub.resolves({
       data: {
+        success: true,
         receipt: {
           transactionHash:
             "0x366220f9853aa8ad83376bcb3fd9377da7b55f03fc3a3aa4aed7b57f7cc60745",
@@ -236,10 +236,12 @@ describe("StarkNetDepositor Payload Format", () => {
     await depositor.initializeDeposit(depositTx, 0, deposit)
 
     // Verify deposit ID was logged
-    expect(consoleLogStub.calledOnce).to.be.true
-    expect(consoleLogStub.firstCall.args[0]).to.include(
-      "Deposit initialized with ID:"
-    )
+    const depositIdLogCall = consoleLogStub
+      .getCalls()
+      .find((call) => call.args[0]?.includes("Deposit initialized with ID:"))
+
+    expect(depositIdLogCall).to.exist
+    expect(depositIdLogCall!.args[0]).to.include("Deposit initialized with ID:")
 
     consoleLogStub.restore()
   })
