@@ -15,6 +15,44 @@ import { ethers } from "ethers"
 import { TransactionReceipt } from "@ethersproject/providers"
 
 /**
+ * Relayer request payload for revealing a deposit
+ */
+interface RelayerRevealRequest {
+  fundingTx: {
+    version: string
+    inputVector: string
+    outputVector: string
+    locktime: string
+  }
+  reveal: {
+    fundingOutputIndex: number
+    blindingFactor: string
+    walletPubKeyHash: string
+    refundPubKeyHash: string
+    refundLocktime: string
+    vault: string
+  }
+  l2DepositOwner: string
+  l2Sender: string
+}
+
+/**
+ * Relayer response for reveal deposit endpoint
+ */
+interface RelayerRevealResponse {
+  success: boolean
+  depositId?: string
+  message?: string
+  receipt?: {
+    transactionHash: string
+    blockNumber?: number
+    status?: number
+  }
+  error?: string
+  details?: any
+}
+
+/**
  * Configuration for StarkNetBitcoinDepositor
  */
 export interface StarkNetBitcoinDepositorConfig {
@@ -63,13 +101,28 @@ export class StarkNetBitcoinDepositor implements BitcoinDepositor {
     // Set default relayer URL based on chainId if not provided
     const enhancedConfig = { ...config }
     if (!enhancedConfig.relayerUrl) {
-      // Mainnet chainId: 0x534e5f4d41494e (SN_MAIN)
-      if (config.chainId === "0x534e5f4d41494e") {
-        enhancedConfig.relayerUrl = "https://relayer.tbtcscan.com/api/reveal"
+      // Check if we're in development mode
+      const isDevelopment =
+        typeof window !== "undefined" &&
+        (window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1") &&
+        false
+
+      // Determine chain name for URL (using PascalCase to match relayer chainName)
+      const chainNameMap: Record<string, string> = {
+        "0x534e5f474f45524c49": "StarknetTestnet", // SN_GOERLI
+        "0x534e5f5345504f4c4941": "StarknetTestnet", // SN_SEPOLIA - mapped to StarknetTestnet in relayer
+        "0x534e5f4d41494e": "StarknetMainnet", // SN_MAIN
+      }
+
+      const chainName = chainNameMap[config.chainId] || "StarknetTestnet"
+
+      if (isDevelopment) {
+        // Use local relayer for development with chain-specific endpoint
+        enhancedConfig.relayerUrl = `http://localhost:3001/api/${chainName}/reveal`
       } else {
-        // Default for testnet and other networks - use local relayer for testing
-        enhancedConfig.relayerUrl =
-          "http://localhost:3001/api/starknetTestnet/reveal"
+        // Production URLs with chain-specific endpoint
+        enhancedConfig.relayerUrl = `https://tbtc-crosschain-relayer-swmku.ondigitalocean.app/api/${chainName}/reveal`
       }
     }
 
@@ -191,24 +244,33 @@ export class StarkNetBitcoinDepositor implements BitcoinDepositor {
 
     // Retry configuration
     const maxRetries = 3
-    const delays = [1000, 2000, 4000] // Exponential backoff: 1s, 2s, 4s
+    const delays = [3000, 6000, 12000] // Exponential backoff: 3s, 6s, 12s
 
     let lastError: any
 
     // Attempt the request with retries
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        const response = await axios.post(
-          this.#config.relayerUrl!,
+        const requestPayload: RelayerRevealRequest = {
+          fundingTx,
+          reveal,
+          l2DepositOwner: formattedL2DepositOwner,
+          l2Sender: formattedL2Sender,
+        }
+
+        console.log(
+          `Sending reveal request to relayer (attempt ${attempt + 1}/${
+            maxRetries + 1
+          }):`,
           {
-            fundingTx,
-            reveal,
-            // PRIMARY field for StarkNet (new requirement)
-            destinationChainDepositOwner: formattedL2DepositOwner,
-            // Backward compatibility fields
-            l2DepositOwner: formattedL2DepositOwner,
-            l2Sender: formattedL2Sender,
-          },
+            url: this.#config.relayerUrl,
+            payload: requestPayload,
+          }
+        )
+
+        const response = await axios.post<RelayerRevealResponse>(
+          this.#config.relayerUrl!,
+          requestPayload,
           {
             timeout: 30000, // 30 seconds timeout
             headers: {
@@ -218,6 +280,12 @@ export class StarkNetBitcoinDepositor implements BitcoinDepositor {
         )
 
         const { data } = response
+        console.log("Relayer response:", {
+          status: response.status,
+          success: data.success,
+          depositId: data.depositId,
+          hasReceipt: !!data.receipt,
+        })
 
         // Calculate deposit ID
         let depositId: string | undefined
@@ -244,16 +312,21 @@ export class StarkNetBitcoinDepositor implements BitcoinDepositor {
           console.warn("Failed to calculate deposit ID:", e)
         }
 
-        // Handle test response format (for testing only)
-        if (data.transactionHash && !data.receipt) {
-          return Hex.from(data.transactionHash)
+        // Validate response
+        if (!data.success) {
+          throw new Error(
+            data.error ||
+              `Relayer returned unsuccessful response: ${
+                data.message || "Unknown error"
+              }`
+          )
         }
 
-        if (!data.receipt) {
+        if (!data.receipt || !data.receipt.transactionHash) {
           throw new Error(
-            `Unexpected response from ${
-              this.#config.relayerUrl
-            }: ${JSON.stringify(data)}`
+            `Invalid response from relayer: missing receipt or transactionHash. Response: ${JSON.stringify(
+              data
+            )}`
           )
         }
 
@@ -266,8 +339,41 @@ export class StarkNetBitcoinDepositor implements BitcoinDepositor {
       } catch (error: any) {
         lastError = error
 
+        // Special handling for 409 Conflict - deposit already exists
+        if (error.response?.status === 409) {
+          console.log(
+            "Deposit already exists, checking response data:",
+            error.response.data
+          )
+
+          // If the relayer returns deposit info in the error response, use it
+          const errorData = error.response.data
+          if (errorData?.depositId && errorData?.success === false) {
+            // The deposit ID is a decimal string, convert it to hex
+            try {
+              const depositIdBigInt = BigInt(errorData.depositId)
+              const depositIdHex = "0x" + depositIdBigInt.toString(16)
+              console.log("Converted deposit ID to hex:", depositIdHex)
+              return Hex.from(depositIdHex)
+            } catch (conversionError) {
+              console.error("Failed to convert deposit ID:", conversionError)
+              // Continue with normal error handling
+            }
+          }
+        }
+
         // Check if error is retryable and we have retries left
         if (attempt < maxRetries && this.isRetryableError(error)) {
+          console.log(
+            `Retryable error on attempt ${attempt + 1}, retrying in ${
+              delays[attempt]
+            }ms:`,
+            {
+              status: error.response?.status,
+              code: error.code,
+              message: error.message,
+            }
+          )
           // Retry after exponential backoff delay
           await new Promise((resolve) => setTimeout(resolve, delays[attempt]))
           continue
@@ -279,7 +385,9 @@ export class StarkNetBitcoinDepositor implements BitcoinDepositor {
     }
 
     // Format and throw the error
-    throw new Error(this.formatRelayerError(lastError))
+    const formattedError = this.formatRelayerError(lastError)
+    console.error("StarkNet depositor throwing error:", formattedError)
+    throw new Error(formattedError)
   }
 
   /**
@@ -295,6 +403,11 @@ export class StarkNetBitcoinDepositor implements BitcoinDepositor {
       error.code === "ENOTFOUND"
     ) {
       return true
+    }
+
+    // Don't retry on 409 (Conflict) - deposit already exists
+    if (error.response?.status === 409) {
+      return false
     }
 
     // Server errors (5xx)
@@ -323,16 +436,23 @@ export class StarkNetBitcoinDepositor implements BitcoinDepositor {
       // Handle HTTP errors
       if (error.response) {
         const status = error.response.status
+        const data = error.response.data as RelayerRevealResponse | any
 
         if (status === 500) {
-          return "Relayer service temporarily unavailable. Please try again later."
+          // Check if there's more specific error info
+          const errorDetail =
+            data?.error || data?.message || "Internal server error"
+          return `Relayer service error: ${errorDetail}. Please try again in a few moments.`
         }
 
         if (status === 400) {
+          // Check for structured error response
           const errorMessage =
-            error.response.data?.error ||
-            error.response.data?.message ||
-            "Invalid request"
+            data?.error ||
+            data?.message ||
+            (data?.details
+              ? `Invalid request: ${JSON.stringify(data.details)}`
+              : "Invalid request")
           return `Relayer error: ${errorMessage}`
         }
 
@@ -346,6 +466,14 @@ export class StarkNetBitcoinDepositor implements BitcoinDepositor {
 
         if (status === 404) {
           return "Relayer request failed: Not Found"
+        }
+
+        if (status === 409) {
+          // Deposit already exists - this might be okay, return the deposit ID if available
+          const depositId = data?.depositId
+          return `This deposit has already been initialized${
+            depositId ? ` (ID: ${depositId})` : ""
+          }. You can check the transaction status on Etherscan or wait for the bridging to complete (15-30 minutes).`
         }
 
         if (status >= 502 && status < 600) {
