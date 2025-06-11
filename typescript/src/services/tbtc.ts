@@ -243,26 +243,19 @@ export class TBTC {
   /**
    * Internal property to store L2 signer/provider for advanced use cases.
    * @internal
-   * @deprecated Will be removed in next major version. Use two-parameter pattern instead.
+   * @deprecated Will be removed in next major version.
    */
   _l2Signer?: EthereumSigner | StarkNetProvider
 
   /**
    * Initializes cross-chain contracts for the given L2 chain.
    *
-   * For StarkNet, this method now supports single-parameter initialization:
+   * For StarkNet, use single-parameter initialization:
    * ```
-   * // Recommended: Single-parameter (StarkNet wallet only)
    * await tbtc.initializeCrossChain("StarkNet", starknetProvider)
    * ```
    *
-   * The two-parameter pattern is deprecated but still supported:
-   * ```
-   * // Deprecated: Two-parameter (requires Ethereum wallet)
-   * await tbtc.initializeCrossChain("StarkNet", ethereumSigner, starknetProvider)
-   * ```
-   *
-   * For other L2 chains, continue using the standard pattern:
+   * For other L2 chains, use the standard pattern:
    * ```
    * await tbtc.initializeCrossChain("Base", ethereumSigner)
    * ```
@@ -274,21 +267,19 @@ export class TBTC {
    *
    * @param l2ChainName Name of the L2 chain
    * @param signerOrEthereumSigner For StarkNet: StarkNet provider/account.
-   *                        For other L2s: Ethereum signer.
-   * @param l2Provider [DEPRECATED] For StarkNet two-parameter mode only.
+   *                               For other L2s: Ethereum signer.
+   * @param l2Provider Deprecated parameter - will throw error if provided
    * @returns Void promise
    * @throws Throws an error if:
    *         - Cross-chain contracts loader not available
    *         - Invalid provider type for StarkNet
    *         - No connected account in StarkNet provider
+   *         - Two-parameter mode is used for StarkNet (no longer supported)
    *
    * @example
-   * // StarkNet with single parameter (recommended)
+   * // StarkNet with single parameter
    * const starknetAccount = await starknet.connect();
    * await tbtc.initializeCrossChain("StarkNet", starknetAccount);
-   *
-   * @deprecated The two-parameter variant for StarkNet is deprecated.
-   *            Use single-parameter initialization instead.
    */
   async initializeCrossChain(
     l2ChainName: DestinationChainName,
@@ -349,73 +340,39 @@ export class TBTC {
           throw new Error("StarkNet chain ID not available in chain mapping")
         }
 
-        let walletAddressHex: string
-        let starknetProvider: StarkNetProvider | undefined
-
-        // Detect single vs two-parameter mode
-        const isSingleParameterMode = l2Provider === undefined
-
-        if (isSingleParameterMode) {
-          // Single-parameter mode: StarkNet provider only (recommended)
-          // Note: _l2Signer is NOT stored in this mode to encourage the new pattern
-          if (!signerOrEthereumSigner) {
-            throw new Error("StarkNet provider is required")
-          }
-
-          starknetProvider = signerOrEthereumSigner as StarkNetProvider
-
-          // Extract address from StarkNet provider using the new method
-          try {
-            walletAddressHex = await TBTC.extractStarkNetAddress(
-              starknetProvider
-            )
-          } catch (error) {
-            // Check if it's a Provider-only (no account) for backward compatibility
-            // Only apply backward compatibility if it's NOT an Account object
-            if (
-              !("address" in starknetProvider) &&
-              !("account" in starknetProvider) &&
-              "getChainId" in starknetProvider &&
-              typeof starknetProvider.getChainId === "function"
-            ) {
-              // Provider-only - use placeholder address for backward compatibility
-              walletAddressHex = "0x0"
-            } else {
-              // Re-throw the error for invalid providers or invalid addresses
-              throw error
-            }
-          }
-        } else {
-          // Two-parameter mode: Ethereum signer + StarkNet provider (deprecated)
-          console.warn(
-            "Two-parameter initializeCrossChain for StarkNet is deprecated. " +
+        // StarkNet only supports single-parameter mode
+        if (l2Provider !== undefined) {
+          throw new Error(
+            "StarkNet does not support two-parameter initialization. " +
               "Please use: initializeCrossChain('StarkNet', starknetProvider)"
           )
+        }
 
-          if (!signerOrEthereumSigner) {
-            throw new Error("Ethereum signer is required")
+        if (!signerOrEthereumSigner) {
+          throw new Error("StarkNet provider is required")
+        }
+
+        const starknetProvider = signerOrEthereumSigner as StarkNetProvider
+        let walletAddressHex: string
+
+        // Extract address from StarkNet provider using the new method
+        try {
+          walletAddressHex = await TBTC.extractStarkNetAddress(starknetProvider)
+        } catch (error) {
+          // Check if it's a Provider-only (no account) for backward compatibility
+          // Only apply backward compatibility if it's NOT an Account object
+          if (
+            !("address" in starknetProvider) &&
+            !("account" in starknetProvider) &&
+            "getChainId" in starknetProvider &&
+            typeof starknetProvider.getChainId === "function"
+          ) {
+            // Provider-only - use placeholder address for backward compatibility
+            walletAddressHex = "0x0"
+          } else {
+            // Re-throw the error for invalid providers or invalid addresses
+            throw error
           }
-
-          if (!l2Provider) {
-            throw new Error(
-              "StarkNet provider is required for two-parameter initialization"
-            )
-          }
-
-          // Store _l2Signer for backward compatibility in two-parameter mode
-          this._l2Signer = signerOrEthereumSigner
-
-          // Extract wallet address from Ethereum signer
-          const walletAddress = await ethereumAddressFromSigner(
-            signerOrEthereumSigner as EthereumSigner
-          )
-          if (!walletAddress) {
-            throw new Error(
-              "Could not extract wallet address from Ethereum signer"
-            )
-          }
-          walletAddressHex = walletAddress.identifierHex
-          starknetProvider = l2Provider
         }
 
         l2CrossChainContracts = await loadStarkNetCrossChainInterfaces(
