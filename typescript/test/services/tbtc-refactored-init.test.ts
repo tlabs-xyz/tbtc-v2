@@ -46,79 +46,60 @@ describe("Refactored initializeCrossChain", () => {
   })
 
   describe("two-parameter pattern", () => {
-    it("should accept separate ethereum and starknet parameters", async () => {
-      // Act & Assert - should not throw
+    it("should reject two-parameter initialization for StarkNet", async () => {
+      // Act & Assert - should throw error
       await expect(
         tbtc.initializeCrossChain("StarkNet", ethereumSigner, starknetProvider)
-      ).not.to.be.rejected
-
-      // Should initialize contracts
-      const contracts = tbtc.crossChainContracts("StarkNet")
-      expect(contracts).to.exist
-    })
-
-    it("should store _l2Signer property for backward compatibility", async () => {
-      // Act
-      await tbtc.initializeCrossChain(
-        "StarkNet",
-        ethereumSigner,
-        starknetProvider
+      ).to.be.rejectedWith(
+        "StarkNet does not support two-parameter initialization. " +
+          "Please use: initializeCrossChain('StarkNet', starknetProvider)"
       )
-
-      // Assert - should store _l2Signer in two-parameter mode for backward compatibility
-      expect((tbtc as any)._l2Signer).to.equal(ethereumSigner)
     })
 
-    it("should pass provider directly to loader", async () => {
-      // Act
-      await tbtc.initializeCrossChain(
-        "StarkNet",
-        ethereumSigner,
-        starknetProvider
+    it("should not accept ethereum signer with starknet provider", async () => {
+      // Act & Assert
+      await expect(
+        tbtc.initializeCrossChain("StarkNet", ethereumSigner, starknetProvider)
+      ).to.be.rejectedWith(
+        "StarkNet does not support two-parameter initialization"
       )
-
-      // Assert - No dynamic imports or type checking needed
-      const contracts = tbtc.crossChainContracts("StarkNet")
-      expect(contracts).to.exist
     })
 
-    it("should throw error if StarkNet provider is missing", async () => {
+    it("should reject when passing null as second provider", async () => {
       // Act & Assert
       await expect(
         tbtc.initializeCrossChain("StarkNet", ethereumSigner, null as any)
       ).to.be.rejectedWith(
-        "StarkNet provider is required for two-parameter initialization"
+        "StarkNet does not support two-parameter initialization"
+      )
+    })
+
+    it("should reject when passing any defined value as second provider", async () => {
+      // Act & Assert - passing any truthy value should fail
+      await expect(
+        tbtc.initializeCrossChain("StarkNet", ethereumSigner, {} as any)
+      ).to.be.rejectedWith(
+        "StarkNet does not support two-parameter initialization"
       )
     })
   })
 
   describe("backward compatibility", () => {
-    it("should support two-parameter pattern with deprecation warning", async () => {
-      let warnMessage = ""
-      console.warn = (msg: string) => {
-        warnMessage = msg
-      }
-
-      // Act - old two-parameter pattern
+    it("should reject two-parameter pattern for StarkNet", async () => {
+      // Act & Assert - old two-parameter pattern should now throw
       const ethSigner = Wallet.createRandom()
-      await tbtc.initializeCrossChain("StarkNet", ethSigner, starknetProvider)
-
-      // Assert - should show deprecation warning
-      expect(warnMessage).to.include("deprecated")
-
-      // Should initialize contracts
-      const contracts = tbtc.crossChainContracts("StarkNet")
-      expect(contracts).to.exist
+      await expect(
+        tbtc.initializeCrossChain("StarkNet", ethSigner, starknetProvider)
+      ).to.be.rejectedWith(
+        "StarkNet does not support two-parameter initialization"
+      )
     })
 
-    it("should support old pattern with Ethereum signer", async () => {
-      // Act - old pattern with Ethereum signer
-      await expect(tbtc.initializeCrossChain("StarkNet", ethereumSigner)).not.to
-        .be.rejected
-
-      // Should initialize contracts
-      const contracts = tbtc.crossChainContracts("StarkNet")
-      expect(contracts).to.exist
+    it("should accept single-parameter initialization", async () => {
+      // With mocked contracts, single-parameter mode succeeds
+      // In real implementation, this would fail with Ethereum signer
+      await expect(tbtc.initializeCrossChain("StarkNet", starknetProvider)).to
+        .not.be.rejected
     })
   })
 
