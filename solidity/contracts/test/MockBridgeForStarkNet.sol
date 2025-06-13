@@ -80,37 +80,6 @@ contract MockBridgeForStarkNet is IBridge {
         emit DepositRevealed(bytes32(depositKey));
     }
 
-    function deposits(uint256 depositKey)
-        external
-        view
-        override
-        returns (IBridgeTypes.DepositRequest memory)
-    {
-        return _deposits[depositKey];
-    }
-
-    function depositParameters()
-        external
-        pure
-        returns (
-            uint64,
-            uint64,
-            uint64 depositTxMaxFee,
-            uint32
-        )
-    {
-        return (0, 0, 1000000, 0); // 0.01 BTC max fee
-    }
-
-    // Test helper functions
-    function wasInitializeDepositCalled() external view returns (bool) {
-        return initializeDepositCalled;
-    }
-
-    function getLastDepositKey() external view returns (uint256) {
-        return lastDepositKey;
-    }
-
     function resetMock() external {
         initializeDepositCalled = false;
         lastDepositKey = 0;
@@ -155,6 +124,29 @@ contract MockBridgeForStarkNet is IBridge {
         );
     }
 
+    function sweepDeposit(uint256 depositKey) external {
+        require(depositExists[depositKey], "Deposit does not exist");
+        _deposits[depositKey].sweptAt = uint32(block.timestamp); // solhint-disable-line not-rely-on-time
+    }
+
+    function deposits(uint256 depositKey)
+        external
+        view
+        override
+        returns (IBridgeTypes.DepositRequest memory)
+    {
+        return _deposits[depositKey];
+    }
+
+    // Test helper functions
+    function wasInitializeDepositCalled() external view returns (bool) {
+        return initializeDepositCalled;
+    }
+
+    function getLastDepositKey() external view returns (uint256) {
+        return lastDepositKey;
+    }
+
     function pendingRedemptions(uint256 redemptionKey)
         external
         view
@@ -186,9 +178,17 @@ contract MockBridgeForStarkNet is IBridge {
         redemptionTimeoutSlashingAmount = _redemptionTimeoutSlashingAmount;
         redemptionTimeoutNotifierRewardMultiplier = _redemptionTimeoutNotifierRewardMultiplier;
     }
-    
-    function sweepDeposit(uint256 depositKey) external {
-        require(depositExists[depositKey], "Deposit does not exist");
-        _deposits[depositKey].sweptAt = uint32(block.timestamp); // solhint-disable-line not-rely-on-time
+
+    function depositParameters()
+        external
+        pure
+        returns (
+            uint64,
+            uint64,
+            uint64 depositTxMaxFee,
+            uint32
+        )
+    {
+        return (0, 0, 1000000, 0); // 0.01 BTC max fee
     }
 }
