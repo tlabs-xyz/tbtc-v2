@@ -62,7 +62,7 @@ describe("TBTC Single-Parameter StarkNet Initialization", () => {
       expect(consoleWarnCalls.length).to.equal(0)
     })
 
-    it("should maintain backward compatibility with two-parameter mode", async () => {
+    it("should reject two-parameter mode", async () => {
       // Arrange
       const { Wallet } = await import("ethers")
       const mockEthSigner = Wallet.createRandom()
@@ -70,14 +70,12 @@ describe("TBTC Single-Parameter StarkNet Initialization", () => {
         nodeUrl: "https://starknet-testnet.public.blastapi.io/rpc/v0_6",
       })
 
-      // Act
-      await tbtc.initializeCrossChain("StarkNet", mockEthSigner, mockProvider)
-
-      // Assert
-      expect(consoleWarnCalls.length).to.be.greaterThan(0)
-      expect(consoleWarnCalls[0]).to.include("deprecated")
-      const contracts = tbtc.crossChainContracts("StarkNet")
-      expect(contracts).to.exist
+      // Act & Assert
+      await expect(
+        tbtc.initializeCrossChain("StarkNet", mockEthSigner, mockProvider)
+      ).to.be.rejectedWith(
+        "StarkNet does not support two-parameter initialization"
+      )
     })
 
     it("should error when StarkNet provider is invalid", async () => {
@@ -210,7 +208,7 @@ describe("TBTC Single-Parameter StarkNet Initialization", () => {
       expect(consoleWarnCalls.length).to.equal(0)
     })
 
-    it("should warn for two-parameter mode", async () => {
+    it("should reject two-parameter mode without warning", async () => {
       // Arrange
       const { Wallet } = await import("ethers")
       const ethSigner = Wallet.createRandom()
@@ -218,14 +216,15 @@ describe("TBTC Single-Parameter StarkNet Initialization", () => {
         nodeUrl: "https://starknet-testnet.public.blastapi.io/rpc/v0_6",
       })
 
-      // Act
-      await tbtc.initializeCrossChain("StarkNet", ethSigner, provider)
-
-      // Assert
-      expect(consoleWarnCalls.length).to.equal(1)
-      expect(consoleWarnCalls[0]).to.match(
-        /Two-parameter initializeCrossChain for StarkNet is deprecated/
+      // Act & Assert
+      await expect(
+        tbtc.initializeCrossChain("StarkNet", ethSigner, provider)
+      ).to.be.rejectedWith(
+        "StarkNet does not support two-parameter initialization"
       )
+
+      // Should not warn since it's rejected immediately
+      expect(consoleWarnCalls.length).to.equal(0)
     })
   })
 

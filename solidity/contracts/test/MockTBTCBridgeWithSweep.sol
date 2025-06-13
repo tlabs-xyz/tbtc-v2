@@ -22,7 +22,7 @@ contract MockTBTCBridgeWithSweep is IBridge {
     uint256 public nextDepositKey;
 
     // Events to match real Bridge
-    event DepositRevealed(bytes32 indexed depositKey);
+    event DepositRevealed(uint256 indexed depositKey);
     // Added for redemption mocks
     event RedemptionRequestedMock(
         bytes20 walletPubKeyHash,
@@ -32,11 +32,11 @@ contract MockTBTCBridgeWithSweep is IBridge {
     );
 
     constructor() {
-        nextDepositKey = 0xebff13c2304229ab4a97bfbfabeac82c9c0704e4aae2acf022252ac8dc1101d1; // Expected test value
+        nextDepositKey = 12345; // Default test value
     }
 
     function revealDepositWithExtraData(
-        IBridgeTypes.BitcoinTxInfo calldata, // fundingTx - unused in mock
+        IBridgeTypes.BitcoinTxInfo calldata,
         IBridgeTypes.DepositRevealInfo calldata reveal,
         bytes32 extraData
     ) external {
@@ -52,11 +52,11 @@ contract MockTBTCBridgeWithSweep is IBridge {
             revealedAt: uint32(block.timestamp), // solhint-disable-line not-rely-on-time
             vault: reveal.vault,
             treasuryFee: 898000, // Treasury fee in satoshi
-            sweptAt: uint32(block.timestamp + 1), // solhint-disable-line not-rely-on-time
+            sweptAt: 0, // Not swept initially
             extraData: extraData
         });
 
-        emit DepositRevealed(bytes32(depositKey));
+        emit DepositRevealed(depositKey);
     }
 
     function deposits(uint256 depositKey)
@@ -92,23 +92,11 @@ contract MockTBTCBridgeWithSweep is IBridge {
 
     function resetMock() external {
         initializeDepositCalled = false;
-        // Keep the expected deposit key for tests
-        nextDepositKey = 0xebff13c2304229ab4a97bfbfabeac82c9c0704e4aae2acf022252ac8dc1101d1;
+        nextDepositKey = 12345;
     }
 
     function sweepDeposit(uint256 depositKey) external {
-        // For testing purposes, if deposit doesn't exist, create a mock one
-        if (_deposits[depositKey].revealedAt == 0) {
-            _deposits[depositKey] = IBridgeTypes.DepositRequest({
-                depositor: msg.sender,
-                amount: 88800000, // Amount in satoshi that results in expectedTbtcAmount after fees
-                revealedAt: uint32(block.timestamp - 1), // Set to past to allow sweep, solhint-disable-line not-rely-on-time
-                vault: address(0),
-                treasuryFee: 898000, // Treasury fee in satoshi
-                sweptAt: 0,
-                extraData: bytes32(0)
-            });
-        }
+        require(_deposits[depositKey].revealedAt != 0, "Deposit not revealed");
         _deposits[depositKey].sweptAt = uint32(block.timestamp); // solhint-disable-line not-rely-on-time
     }
 
