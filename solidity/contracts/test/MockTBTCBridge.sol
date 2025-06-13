@@ -4,7 +4,6 @@ pragma solidity 0.8.17;
 import "../integrator/IBridge.sol";
 
 contract MockTBTCBridge is IBridge {
-    mapping(uint256 => IBridgeTypes.DepositRequest) private _deposits;
     // Added for redemption mocks
     mapping(uint256 => IBridgeTypes.RedemptionRequest)
         internal _pendingRedemptions;
@@ -17,10 +16,6 @@ contract MockTBTCBridge is IBridge {
     uint96 internal _redemptionTimeoutSlashingAmount = 10**18;
     uint32 internal _redemptionTimeoutNotifierRewardMultiplier = 5;
 
-    // Track calls for testing
-    bool public initializeDepositCalled;
-    uint256 public nextDepositKey;
-
     // Added for redemption mocks
     event RedemptionRequestedMock(
         bytes20 walletPubKeyHash,
@@ -29,39 +24,64 @@ contract MockTBTCBridge is IBridge {
         uint256 redemptionKey
     );
 
-    constructor() {
-        nextDepositKey = 12345; // Default test value
-    }
+    IBridgeTypes.DepositRequest public deposit;
+    bool public depositRevealed;
+    bytes32 public depositKey;
+
+    // Events to match real Bridge
+    event DepositRevealed(bytes32 indexed depositKey);
 
     function revealDepositWithExtraData(
-        IBridgeTypes.BitcoinTxInfo calldata fundingTx, // solhint-disable-line no-unused-vars
+        IBridgeTypes.BitcoinTxInfo calldata,
         IBridgeTypes.DepositRevealInfo calldata reveal,
         bytes32 extraData
     ) external {
-        initializeDepositCalled = true;
+        depositRevealed = true;
+        depositKey = keccak256(abi.encode(reveal, extraData));
 
-        // Use predefined deposit key for testing
-        uint256 depositKey = nextDepositKey;
-
-        // Create mock deposit
-        _deposits[depositKey] = IBridgeTypes.DepositRequest({
+        deposit = IBridgeTypes.DepositRequest({
             depositor: msg.sender,
-            amount: 100000000, // 1 BTC in satoshi
+            amount: 100000000 - 12098,
             revealedAt: uint32(block.timestamp), // solhint-disable-line not-rely-on-time
             vault: reveal.vault,
-            treasuryFee: 1000000, // 0.01 BTC in satoshi
-            sweptAt: uint32(block.timestamp + 1), // solhint-disable-line not-rely-on-time
+            treasuryFee: 12098,
+            sweptAt: uint32(block.timestamp), // solhint-disable-line not-rely-on-time
             extraData: extraData
         });
+
+        emit DepositRevealed(depositKey);
     }
 
-    function deposits(uint256 depositKey)
+    function deposits(uint256)
         external
         view
         override
         returns (IBridgeTypes.DepositRequest memory)
     {
-        return _deposits[depositKey];
+        return deposit;
+    }
+
+    // Helper functions for testing
+    function resetMock() external {
+        depositRevealed = false;
+        depositKey = bytes32(0);
+        deposit = IBridgeTypes.DepositRequest({
+            depositor: address(0),
+            amount: 0,
+            revealedAt: 0,
+            vault: address(0),
+            treasuryFee: 0,
+            sweptAt: 0,
+            extraData: bytes32(0)
+        });
+    }
+
+    function setDepositSweptAt(uint32 sweptAt) external {
+        deposit.sweptAt = sweptAt;
+    }
+
+    function sweepDeposit() external {
+        deposit.sweptAt = uint32(block.timestamp); // solhint-disable-line not-rely-on-time
     }
 
     function depositParameters()
@@ -74,21 +94,7 @@ contract MockTBTCBridge is IBridge {
             uint32
         )
     {
-        return (0, 0, 1000000, 0); // 0.01 BTC max fee
-    }
-
-    // Test helper functions
-    function wasInitializeDepositCalled() external view returns (bool) {
-        return initializeDepositCalled;
-    }
-
-    function setNextDepositKey(uint256 _nextDepositKey) external {
-        nextDepositKey = _nextDepositKey;
-    }
-
-    function resetMock() external {
-        initializeDepositCalled = false;
-        nextDepositKey = 12345;
+        return (0, 0, 1000000, 0);
     }
 
     // Function to allow tests to modify the redemptionTxMaxFee

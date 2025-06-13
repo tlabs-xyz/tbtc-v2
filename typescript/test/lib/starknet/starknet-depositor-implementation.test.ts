@@ -112,6 +112,14 @@ describe("StarkNetDepositor - T-001 Implementation", () => {
       const mockReceipt = createMockDeposit()
       mockReceipt.extraData = Hex.from("0x" + "00".repeat(31) + "01")
 
+      // Mock setTimeout to speed up retries
+      const setTimeoutStub = sinon
+        .stub(global, "setTimeout")
+        .callsFake((fn: any) => {
+          fn() // Execute immediately
+          return {} as any
+        })
+
       // Mock failures then success
       let callCount = 0
       axios.post = sinon.stub().callsFake(() => {
@@ -141,6 +149,9 @@ describe("StarkNetDepositor - T-001 Implementation", () => {
         "0x" + "1234567890abcdef".repeat(4)
       )
       expect(callCount).to.equal(3)
+
+      // Cleanup
+      setTimeoutStub.restore()
     })
 
     it("should not retry on client errors", async () => {
@@ -194,7 +205,10 @@ describe("StarkNetDepositor - T-001 Implementation", () => {
       axios.post = sinon.stub().callsFake((url: string) => {
         capturedUrl = url
         return Promise.resolve({
-          data: { receipt: { transactionHash: "0x" + "1".repeat(64) } },
+          data: {
+            success: true,
+            receipt: { transactionHash: "0x" + "1".repeat(64) },
+          },
         })
       })
 
@@ -202,7 +216,9 @@ describe("StarkNetDepositor - T-001 Implementation", () => {
       await depositor.initializeDeposit(mockDepositTx, 0, mockReceipt)
 
       // Assert
-      expect(capturedUrl).to.equal("https://relayer.tbtcscan.com/api/reveal")
+      expect(capturedUrl).to.equal(
+        "https://tbtc-crosschain-relayer-swmku.ondigitalocean.app/api/StarknetMainnet/reveal"
+      )
     })
 
     it("should use custom URL when provided", async () => {
@@ -223,7 +239,10 @@ describe("StarkNetDepositor - T-001 Implementation", () => {
       axios.post = sinon.stub().callsFake((url: string) => {
         capturedUrl = url
         return Promise.resolve({
-          data: { receipt: { transactionHash: "0x" + "1".repeat(64) } },
+          data: {
+            success: true,
+            receipt: { transactionHash: "0x" + "1".repeat(64) },
+          },
         })
       })
 
