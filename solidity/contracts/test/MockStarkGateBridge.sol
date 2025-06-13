@@ -1,91 +1,65 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.17;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../cross-chain/starknet/interfaces/IStarkGateBridge.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MockStarkGateBridge is IStarkGateBridge {
     uint256 public messageNonce = 1;
-    uint256 private _customReturnValue;
-    bool private _useCustomReturnValue;
+    uint256 private _depositWithMessageReturn = 1;
+    bool private _shouldRevert;
+    uint256 private _customFee;
+    bool private _useCustomFee;
+    bool private _shouldRevertEstimate;
+    uint256 private _messageFee;
+    uint256 private _depositCount;
 
     // Track calls for testing
     struct DepositCall {
         address token;
         uint256 amount;
         uint256 l2Recipient;
-        uint256[] message;
-        uint256 value;
+        uint256 messageFee;
+        uint256[] callData;
     }
 
     struct SimpleDepositCall {
         address token;
         uint256 amount;
         uint256 l2Recipient;
-        uint256 value;
     }
 
-    DepositCall public lastDepositCall;
-    SimpleDepositCall public lastSimpleDepositCall;
+    DepositCall private _lastDepositCall;
     bool public depositWithMessageCalled;
     bool public depositCalled;
-    uint256 public depositCallCount;
+    SimpleDepositCall public lastSimpleDepositCall;
 
-    // Storage for deposits
-    struct DepositInfo {
-        address token;
-        uint256 amount;
-        uint256 l2Recipient;
-        uint256[] message;
-        address depositor;
-    }
-
-    mapping(uint256 => DepositInfo) public deposits;
-    uint256 public nextNonce = 1;
-
-    // Security testing features
-    bool public shouldRevert = false;
-    bool public shouldRevertEstimate = false;
-
+    // Additional deposit() function for tests that expect it
     function deposit(
         address token,
         uint256 amount,
         uint256 l2Recipient
-    ) external payable override returns (uint256) {
-        require(!shouldRevert, "Mock: deposit reverted");
-        require(msg.value > 0, "L1->L2 message fee required");
-
-        // Track the call
+    ) external payable override {
+        require(!_shouldRevert, "Mock revert");
         depositCalled = true;
-        depositCallCount++;
         lastSimpleDepositCall = SimpleDepositCall({
             token: token,
             amount: amount,
-            l2Recipient: l2Recipient,
-            value: msg.value
+            l2Recipient: l2Recipient
         });
-
-        // Transfer tokens
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
-
-        // Store deposit info
-        deposits[nextNonce] = DepositInfo({
+        // Don't internally call depositWithMessage to avoid double transfer
+        // Just update the state directly
+        _depositCount++;
+        _lastDepositCall = DepositCall({
             token: token,
             amount: amount,
             l2Recipient: l2Recipient,
-            message: new uint256[](0),
-            depositor: msg.sender
+            messageFee: msg.value,
+            callData: new uint256[](0)
         });
 
-        uint256 nonce = nextNonce;
-        nextNonce++;
-
-        // Handle custom return value if set
-        if (_useCustomReturnValue) {
-            return _customReturnValue;
-        }
-
-        return nonce;
+        // Transfer tokens from sender
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
 
     function depositWithMessage(
@@ -93,38 +67,33 @@ contract MockStarkGateBridge is IStarkGateBridge {
         uint256 amount,
         uint256 l2Recipient,
         uint256[] calldata message
-    ) external payable override returns (uint256) {
+    ) external payable returns (uint256, uint256) {
+        require(!_shouldRevert, "Mock revert");
+
+        // Actually transfer tokens to simulate real StarkGate behavior
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+
         depositWithMessageCalled = true;
-        depositCallCount++;
-        lastDepositCall = DepositCall({
+        _messageFee = msg.value;
+        _depositCount++;
+        _lastDepositCall = DepositCall({
             token: token,
             amount: amount,
             l2Recipient: l2Recipient,
-            message: message,
-            value: msg.value
+            messageFee: msg.value,
+            callData: message
         });
+        return (_depositWithMessageReturn, block.timestamp); // solhint-disable-line not-rely-on-time
+    }
 
-        if (_useCustomReturnValue) {
-            return _customReturnValue;
+    function estimateDepositFeeWei() external view override returns (uint256) {
+        if (_shouldRevertEstimate) {
+            revert("Mock revert estimate");
         }
-        return messageNonce++;
-    }
-
-    uint256 public dynamicFee = 0.01 ether;
-    bool public shouldFailEstimation = false;
-
-    function estimateMessageFee() external view override returns (uint256) {
-        require(!shouldRevertEstimate, "Mock: estimate reverted");
-        require(!shouldFailEstimation, "Estimation failed");
-        return dynamicFee;
-    }
-
-    function setDynamicFee(uint256 _fee) external {
-        dynamicFee = _fee;
-    }
-
-    function setShouldFailEstimation(bool _shouldFail) external {
-        shouldFailEstimation = _shouldFail;
+        if (_useCustomFee) {
+            return _customFee;
+        }
+        return 0.01 ether;
     }
 
     function depositWithMessageCancelRequest(
@@ -133,20 +102,15 @@ contract MockStarkGateBridge is IStarkGateBridge {
         uint256,
         uint256[] calldata,
         uint256
-    ) external override {
+    ) external {
         // Mock implementation
     }
 
-    function l1ToL2MessageNonce() external view override returns (uint256) {
+    function l1ToL2MessageNonce() external view returns (uint256) {
         return messageNonce;
     }
 
-    function isDepositCancellable(uint256)
-        external
-        pure
-        override
-        returns (bool)
-    {
+    function isDepositCancellable(uint256) external pure returns (bool) {
         return true;
     }
 
@@ -156,30 +120,61 @@ contract MockStarkGateBridge is IStarkGateBridge {
     }
 
     function getLastDepositRecipient() external view returns (uint256) {
-        return lastDepositCall.l2Recipient;
+        return _lastDepositCall.l2Recipient;
     }
 
     function getLastDepositAmount() external view returns (uint256) {
-        return lastDepositCall.amount;
+        return _lastDepositCall.amount;
     }
 
     function getLastDepositToken() external view returns (address) {
-        return lastDepositCall.token;
+        return _lastDepositCall.token;
     }
 
     function getLastDepositValue() external view returns (uint256) {
-        return lastDepositCall.value;
+        return _lastDepositCall.messageFee;
+    }
+
+    function getMessageFee() external view returns (uint256) {
+        return _messageFee;
     }
 
     // Test control functions
     function setDepositWithMessageReturn(uint256 value) external {
-        _customReturnValue = value;
-        _useCustomReturnValue = true;
+        _depositWithMessageReturn = value;
     }
 
-    // Helper functions for deposit() testing
-    function wasDepositCalled() external view returns (bool) {
-        return depositCalled;
+    function setShouldRevert(bool shouldRevert) external {
+        _shouldRevert = shouldRevert;
+    }
+
+    function setEstimateDepositFeeWeiReturn(uint256 fee) external {
+        _customFee = fee;
+        _useCustomFee = true;
+    }
+
+    function setShouldRevertEstimate(bool shouldRevert) external {
+        _shouldRevertEstimate = shouldRevert;
+    }
+
+    function resetMock() external {
+        depositWithMessageCalled = false;
+        _depositCount = 0;
+        _depositWithMessageReturn = 1;
+        messageNonce = 1;
+        _shouldRevert = false;
+        _useCustomFee = false;
+        _shouldRevertEstimate = false;
+        depositCalled = false;
+        _messageFee = 0;
+    }
+
+    function getDepositCount() external view returns (uint256) {
+        return _depositCount;
+    }
+
+    function getLastDepositCall() external view returns (DepositCall memory) {
+        return _lastDepositCall;
     }
 
     function getLastSimpleDepositCall()
@@ -188,45 +183,5 @@ contract MockStarkGateBridge is IStarkGateBridge {
         returns (SimpleDepositCall memory)
     {
         return lastSimpleDepositCall;
-    }
-
-    function resetMock() external {
-        depositWithMessageCalled = false;
-        depositCalled = false;
-        depositCallCount = 0;
-        _useCustomReturnValue = false;
-        messageNonce = 1;
-    }
-
-    function getDepositCount() external view returns (uint256) {
-        return depositCallCount;
-    }
-
-    function getLastDepositCall()
-        external
-        view
-        returns (SimpleDepositCall memory)
-    {
-        return lastSimpleDepositCall;
-    }
-
-    function getLastDepositWithMessageCall()
-        external
-        view
-        returns (DepositCall memory)
-    {
-        return lastDepositCall;
-    }
-
-    function setShouldRevert(bool _shouldRevert) external {
-        shouldRevert = _shouldRevert;
-    }
-
-    function setShouldRevertEstimate(bool _shouldRevert) external {
-        shouldRevertEstimate = _shouldRevert;
-    }
-
-    function setEstimateMessageFeeReturn(uint256 _fee) external {
-        dynamicFee = _fee;
     }
 }
