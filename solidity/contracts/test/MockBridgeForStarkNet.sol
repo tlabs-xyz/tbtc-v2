@@ -19,15 +19,6 @@ contract MockBridgeForStarkNet is IBridge {
     uint96 internal _redemptionTimeoutSlashingAmount = 10**18; // 1 TBTC with 18 decimals
     uint32 internal _redemptionTimeoutNotifierRewardMultiplier = 5; // 5%
 
-    // Events to match real Bridge
-    event DepositRevealed(uint256 indexed depositKey);
-    // Added for redemption mocks
-    event RedemptionRequestedMock(
-        bytes20 walletPubKeyHash,
-        uint64 amount,
-        bytes redeemerOutputScript,
-        uint256 redemptionKey
-    );
     mapping(uint256 => IBridgeTypes.DepositRequest) private _deposits;
 
     // Track calls for testing
@@ -37,6 +28,13 @@ contract MockBridgeForStarkNet is IBridge {
 
     // Events to match real Bridge
     event DepositRevealed(bytes32 indexed depositKey);
+    // Added for redemption mocks
+    event RedemptionRequestedMock(
+        bytes20 walletPubKeyHash,
+        uint64 amount,
+        bytes redeemerOutputScript,
+        uint256 redemptionKey
+    );
 
     constructor() {
         // Remove the fixed depositKey initialization
