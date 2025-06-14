@@ -141,7 +141,7 @@ export async function ethereumCrossChainContractsLoader(
     l1BitcoinRedeemer: new EthereumL1BitcoinRedeemer(
       { signerOrProvider: signer },
       chainId,
-      l2ChainName
+      destinationChainName
     ),
   })
 

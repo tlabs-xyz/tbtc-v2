@@ -4,14 +4,8 @@ import {
   EthersContractHandle,
 } from "../ethereum/adapter"
 import { L2BitcoinRedeemer as L2BitcoinRedeemerTypechain } from "../../../typechain/L2BitcoinRedeemer"
-import {
-  ChainIdentifier,
-  Chains,
-  L2BitcoinRedeemer,
-} from "../contracts"
-import {
-  EthereumAddress,
-} from "../ethereum"
+import { ChainIdentifier, Chains, L2BitcoinRedeemer } from "../contracts"
+import { EthereumAddress } from "../ethereum"
 import { Hex } from "../utils"
 import { BigNumber } from "ethers"
 
@@ -23,7 +17,8 @@ import ArbitrumSepoliaL2BitcoinRedeemerDeployment from "./artifacts/arbitrumSepo
  */
 export class ArbitrumL2BitcoinRedeemer
   extends EthersContractHandle<L2BitcoinRedeemerTypechain>
-  implements L2BitcoinRedeemer {
+  implements L2BitcoinRedeemer
+{
   constructor(config: EthersContractConfig, chainId: Chains.Arbitrum) {
     let deployment: EthersContractDeployment
 

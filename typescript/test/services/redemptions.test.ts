@@ -54,8 +54,8 @@ describe("Redemptions", () => {
 
       beforeEach(async () => {
         let redemptionsService
-          ; ({ redemptionsService, tbtcContracts } =
-            prepareRedemptionsService(mainUtxo))
+        ;({ redemptionsService, tbtcContracts } =
+          prepareRedemptionsService(mainUtxo))
 
         await redemptionsService.requestRedemption(
           BitcoinAddressConverter.outputScriptToAddress(
@@ -95,8 +95,8 @@ describe("Redemptions", () => {
         redeemerProxy = new MockRedeemerProxy(expectedRedeemerAddress)
 
         let redemptionsService
-          ; ({ redemptionsService, tbtcContracts } =
-            prepareRedemptionsService(mainUtxo))
+        ;({ redemptionsService, tbtcContracts } =
+          prepareRedemptionsService(mainUtxo))
 
         await redemptionsService.requestRedemptionWithProxy(
           BitcoinAddressConverter.outputScriptToAddress(

@@ -12,7 +12,6 @@ import {
 } from "../contracts"
 import { EthereumAddress } from "./index"
 import { Hex } from "../utils"
-import { BigNumber } from "ethers"
 
 import SepoliaBaseL1BitcoinRedeemerDeployment from "./artifacts/sepolia/BaseL1BitcoinRedeemer.json"
 import SepoliaArbitrumL1BitcoinRedeemerDeployment from "./artifacts/sepolia/ArbitrumL1BitcoinRedeemer.json"

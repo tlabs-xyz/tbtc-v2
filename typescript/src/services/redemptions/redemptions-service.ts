@@ -184,28 +184,28 @@ export class RedemptionsService {
     targetChainTxHash: Hex
   }> {
     const crossChainContracts = this.#crossChainContracts(l2ChainName)
-    if (!crossChainContracts) {
+    if (!crossChainContracts || !crossChainContracts.l2BitcoinRedeemer) {
       throw new Error(
-        `Cross-chain contracts for ${l2ChainName} not initialized`
+        `Cross-chain redeemer contracts for ${l2ChainName} not initialized`
       )
     }
 
-    const { redeemerOutputScript } =
-      await this.determineRedemptionData(
-        bitcoinRedeemerAddress,
-        BigNumber.from(amount)
-      )
-
-    const nonce = Math.round(Math.random() * 10000);
-
-    const txHash = await crossChainContracts.l2BitcoinRedeemer.requestRedemption(
-      amount,
-      redeemerOutputScript,
-      nonce
+    const { redeemerOutputScript } = await this.determineRedemptionData(
+      bitcoinRedeemerAddress,
+      BigNumber.from(amount)
     )
 
+    const nonce = Math.round(Math.random() * 10000)
+
+    const txHash =
+      await crossChainContracts.l2BitcoinRedeemer.requestRedemption(
+        amount,
+        redeemerOutputScript,
+        nonce
+      )
+
     return {
-      targetChainTxHash: txHash
+      targetChainTxHash: txHash,
     }
   }
 
@@ -232,17 +232,17 @@ export class RedemptionsService {
       amountToSatoshi(amount)
     )
 
-    const txHash = await crossChainContracts.l1BitcoinRedeemer.requestRedemption(
-      walletPublicKey,
-      mainUtxo,
-      encodedVm
-    )
+    const txHash =
+      await crossChainContracts.l1BitcoinRedeemer.requestRedemption(
+        walletPublicKey,
+        mainUtxo,
+        encodedVm
+      )
 
     return {
-      targetChainTxHash: txHash
+      targetChainTxHash: txHash,
     }
   }
-
 
   /**
    *
@@ -322,8 +322,8 @@ export class RedemptionsService {
       if (candidateBTCBalance.lt(amount)) {
         console.debug(
           `The wallet (${candidatePublicKey.toString()})` +
-          `cannot handle the redemption request. ` +
-          `Continue the loop execution to the next wallet...`
+            `cannot handle the redemption request. ` +
+            `Continue the loop execution to the next wallet...`
         )
         continue
       }
@@ -337,11 +337,11 @@ export class RedemptionsService {
       if (pendingRedemption.requestedAt !== 0) {
         console.debug(
           `There is a pending redemption request from this wallet to the ` +
-          `same Bitcoin address. Given wallet public key` +
-          `(${candidatePublicKey.toString()}) and redeemer output script ` +
-          `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
-          `pending request at the same time. ` +
-          `Continue the loop execution to the next wallet...`
+            `same Bitcoin address. Given wallet public key` +
+            `(${candidatePublicKey.toString()}) and redeemer output script ` +
+            `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
+            `pending request at the same time. ` +
+            `Continue the loop execution to the next wallet...`
         )
         continue
       }
@@ -350,8 +350,8 @@ export class RedemptionsService {
 
       console.debug(
         `The wallet (${walletPublicKey.toString()})` +
-        `can handle the redemption request. ` +
-        `Stop the loop execution and proceed with the redemption...`
+          `can handle the redemption request. ` +
+          `Stop the loop execution and proceed with the redemption...`
       )
 
       break
@@ -411,8 +411,8 @@ export class RedemptionsService {
         if (state !== WalletState.Live || !walletPublicKey) {
           console.debug(
             `Wallet is not in Live state ` +
-            `(wallet public key hash: ${walletPublicKeyHash.toString()}). ` +
-            `Continue the loop execution to the next wallet...`
+              `(wallet public key hash: ${walletPublicKeyHash.toString()}). ` +
+              `Continue the loop execution to the next wallet...`
           )
           return
         }
@@ -425,8 +425,8 @@ export class RedemptionsService {
         if (!mainUtxo) {
           console.debug(
             `Could not find matching UTXO on chains ` +
-            `for wallet public key hash (${walletPublicKeyHash.toString()}). ` +
-            `Continue the loop execution to the next wallet...`
+              `for wallet public key hash (${walletPublicKeyHash.toString()}). ` +
+              `Continue the loop execution to the next wallet...`
           )
           return
         }
@@ -439,11 +439,11 @@ export class RedemptionsService {
         if (pendingRedemption.requestedAt !== 0) {
           console.debug(
             `There is a pending redemption request from this wallet to the ` +
-            `same Bitcoin address. Given wallet public key hash` +
-            `(${walletPublicKeyHash.toString()}) and redeemer output script ` +
-            `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
-            `pending request at the same time. ` +
-            `Continue the loop execution to the next wallet...`
+              `same Bitcoin address. Given wallet public key hash` +
+              `(${walletPublicKeyHash.toString()}) and redeemer output script ` +
+              `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
+              `pending request at the same time. ` +
+              `Continue the loop execution to the next wallet...`
           )
           return
         }
@@ -463,8 +463,8 @@ export class RedemptionsService {
         } else {
           console.debug(
             `The wallet (${walletPublicKeyHash.toString()})` +
-            `cannot handle the redemption request. ` +
-            `Continue the loop execution to the next wallet...`
+              `cannot handle the redemption request. ` +
+              `Continue the loop execution to the next wallet...`
           )
         }
       })
@@ -481,14 +481,14 @@ export class RedemptionsService {
       if (maxAmount.eq(0)) {
         throw new Error(
           "All live wallets in the network have the pending redemption for a given Bitcoin address. " +
-          "Please use another Bitcoin address."
+            "Please use another Bitcoin address."
         )
       }
 
       throw new Error(
         `Could not find a wallet with enough funds. ` +
-        `Maximum redemption amount is ${maxAmount.toString()} Satoshi ` +
-        `( ${maxAmount.div(BigNumber.from(1e8)).toString()} BTC )`
+          `Maximum redemption amount is ${maxAmount.toString()} Satoshi ` +
+          `( ${maxAmount.div(BigNumber.from(1e8)).toString()} BTC )`
       )
     }
 

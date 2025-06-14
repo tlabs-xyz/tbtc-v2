@@ -19,7 +19,7 @@ export type CrossChainInterfaces = DestinationChainInterfaces &
 export type DestinationChainInterfaces = {
   destinationChainTbtcToken: DestinationChainTBTCToken
   destinationChainBitcoinDepositor: BitcoinDepositor
-  l2BitcoinRedeemer: L2BitcoinRedeemer
+  l2BitcoinRedeemer?: L2BitcoinRedeemer
 }
 
 /**
