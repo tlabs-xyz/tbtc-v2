@@ -37,23 +37,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   if (hre.network.tags.basescan) {
     await hre.run("verify:verify", {
       contract: "@keep-network/tbtc-v2/contracts/Timelock.sol:Timelock",
-      address: "0xAa60F9662cf00876b380c06d7e11611fE83B672F",
-      constructorArguments: [
-        86400,
-        [governance],
-        [
-          "0x9C20993E98aa5A6BAD8AD0FC42C2f4cc3008096f",
-          "0x2844a0d6442034D3027A05635F4224d966C54fD7",
-          "0xeceC507477b969FC05053fB044619b723D458E8e",
-          "0x739730cCb2a34cc83D3e30645002C52bA4B06167",
-          "0x3c7832b15407D1BD8aE03C41D2A849006A0cD905",
-          "0xA6d76e990fE10C4b741ceb87590bE6cb23979a6e",
-          "0x49848f38D31e2b150190E44a4fE056a239EA1aad",
-          "0x76C6CEf8ae443fA7404dD60dabc18B9158e37A75",
-          "0xe05808c1EFe0302b27Fc21F0E4a0f15e21e62e78",
-          governance,
-        ],
-      ],
+      address: timelock.address,
+      constructorArguments: timelock.args,
     })
   }
 }
