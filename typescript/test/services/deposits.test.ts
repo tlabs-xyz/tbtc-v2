@@ -2046,11 +2046,11 @@ describe("Deposits", () => {
           )
 
           l1BitcoinRedeemer = new MockL1BitcoinRedeemer(
-            EthereumAddress.from("8Y8suFL5DzjFjqQeWZPvR85KtGNDC6DTiJxuLQA4LXYW")
+            EthereumAddress.from("0x1111111111111111111111111111111111111111")
           )
 
           l2BitcoinRedeemer = new MockL2BitcoinRedeemer(
-            EthereumAddress.from("D61d47F917Cd1188BfEAC6D79f682a3cCA1BBEc7")
+            EthereumAddress.from("0x2222222222222222222222222222222222222222")
           )
 
           crossChainContracts = {
@@ -2265,11 +2265,11 @@ describe("Deposits", () => {
         )
 
         l1BitcoinRedeemer = new MockL1BitcoinRedeemer(
-          EthereumAddress.from("D61d47F917Cd1188BfEAC6D79f682a3cCA1BBEc7")
+          EthereumAddress.from("0x1111111111111111111111111111111111111111")
         )
 
         l2BitcoinRedeemer = new MockL2BitcoinRedeemer(
-          EthereumAddress.from("8Y8suFL5DzjFjqQeWZPvR85KtGNDC6DTiJxuLQA4LXYW")
+          EthereumAddress.from("0x2222222222222222222222222222222222222222")
         )
 
         crossChainContracts = {
@@ -2625,10 +2625,10 @@ describe("Deposits", () => {
       )
 
       l1BitcoinRedeemer = new MockL1BitcoinRedeemer(
-        EthereumAddress.from("8Y8suFL5DzjFjqQeWZPvR85KtGNDC6DTiJxuLQA4LXYW")
+        EthereumAddress.from("0x1111111111111111111111111111111111111111")
       )
       l2BitcoinRedeemer = new MockL2BitcoinRedeemer(
-        EthereumAddress.from("D61d47F917Cd1188BfEAC6D79f682a3cCA1BBEc7")
+        EthereumAddress.from("0x2222222222222222222222222222222222222222")
       )
 
       crossChainContracts = {
