@@ -3,7 +3,7 @@ import {
   EthersContractDeployment,
   EthersContractHandle,
 } from "../ethereum/adapter"
-import { L2BitcoinRedeemer as L2BitcoinRedeemerTypechain } from "../../../typechain/L2BitcoinRedeemer"
+import { ArbitrumL2BitcoinRedeemer as L2BitcoinRedeemerTypechain } from "../../../typechain/ArbitrumL2BitcoinRedeemer"
 import { ChainIdentifier, Chains, L2BitcoinRedeemer } from "../contracts"
 import { EthereumAddress } from "../ethereum"
 import { Hex } from "../utils"

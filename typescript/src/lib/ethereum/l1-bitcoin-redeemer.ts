@@ -7,15 +7,16 @@ import { L1BitcoinRedeemer as L1BitcoinRedeemerTypechain } from "../../../typech
 import {
   ChainIdentifier,
   Chains,
+  DestinationChainName,
   L1BitcoinRedeemer,
   L2Chain,
 } from "../contracts"
 import { EthereumAddress } from "./index"
 import { Hex } from "../utils"
 
-import SepoliaBaseL1BitcoinRedeemerDeployment from "./artifacts/sepolia/BaseL1BitcoinRedeemer.json"
-import SepoliaArbitrumL1BitcoinRedeemerDeployment from "./artifacts/sepolia/ArbitrumL1BitcoinRedeemer.json"
+import SepoliaL1BitcoinRedeemerDeployment from "./artifacts/sepolia/L1BitcoinRedeemer.json"
 import { BitcoinHashUtils, BitcoinUtxo } from "../bitcoin"
+import { BytesLike } from "ethers"
 
 const artifactLoader = {
   // TODO: Add mainnet deployment artifacts and uncomment this
@@ -30,15 +31,11 @@ const artifactLoader = {
   //   }
   // },
 
-  getSepolia: (l2ChainName: L2Chain) => {
-    switch (l2ChainName) {
-      case "Base":
-        return SepoliaBaseL1BitcoinRedeemerDeployment
-      case "Arbitrum":
-        return SepoliaArbitrumL1BitcoinRedeemerDeployment
-      default:
-        throw new Error("Unsupported L2 chain")
+  getSepolia: (l2ChainName: DestinationChainName) => {
+    if (l2ChainName === "Base" || l2ChainName === "Arbitrum") {
+      return SepoliaL1BitcoinRedeemerDeployment
     }
+    throw new Error("Unsupported L2 chain")
   },
 }
 
@@ -88,7 +85,7 @@ export class EthereumL1BitcoinRedeemer
   async requestRedemption(
     walletPublicKey: Hex,
     mainUtxo: BitcoinUtxo,
-    encodedVm: Hex
+    encodedVm: BytesLike
   ): Promise<Hex> {
     const walletPublicKeyHash =
       BitcoinHashUtils.computeHash160(walletPublicKey).toPrefixedString()

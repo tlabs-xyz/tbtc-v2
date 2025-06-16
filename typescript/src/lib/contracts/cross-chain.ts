@@ -1,5 +1,5 @@
 import { ChainIdentifier } from "./chain-identifier"
-import { BigNumber } from "ethers"
+import { BigNumber, BytesLike } from "ethers"
 import { TransactionReceipt } from "@ethersproject/providers"
 import { ChainMapping, DestinationChainName } from "./chain"
 import { BitcoinRawTxVectors, BitcoinUtxo } from "../bitcoin"
@@ -222,7 +222,7 @@ export interface L1BitcoinRedeemer {
   requestRedemption(
     walletPublicKey: Hex,
     mainUtxo: BitcoinUtxo,
-    encodedVm: Hex
+    encodedVm: BytesLike
   ): Promise<Hex>
 }
 

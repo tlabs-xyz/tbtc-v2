@@ -1,5 +1,6 @@
 import {
   CrossChainContracts,
+  DestinationChainName,
   L2Chain,
   RedemptionRequest,
   TBTCContracts,
@@ -14,7 +15,7 @@ import {
   BitcoinTxOutput,
   BitcoinUtxo,
 } from "../../lib/bitcoin"
-import { BigNumber, BigNumberish } from "ethers"
+import { BigNumber, BigNumberish, BytesLike } from "ethers"
 import { amountToSatoshi, ApiUrl, endpointUrl, Hex } from "../../lib/utils"
 import { RedeemerProxy } from "./redeemer-proxy"
 import {
@@ -212,8 +213,8 @@ export class RedemptionsService {
   async relayRedemptionRequestToL1(
     amount: BigNumber,
     redeemerOutputScript: Hex,
-    encodedVm: Hex,
-    l2ChainName: L2Chain
+    encodedVm: BytesLike,
+    l2ChainName: DestinationChainName
   ): Promise<{
     targetChainTxHash: Hex
   }> {
