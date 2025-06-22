@@ -63,7 +63,9 @@ describe("StarkNetDepositor - T-001 Implementation", () => {
 
       // Assert
       expect(result).to.not.be.instanceOf(Hex)
-      expect((result as TransactionReceipt).transactionHash).to.equal("0xabc123def456")
+      expect((result as TransactionReceipt).transactionHash).to.equal(
+        "0xabc123def456"
+      )
 
       // Check axios was called correctly
       const stub = axios.post as sinon.SinonStub
