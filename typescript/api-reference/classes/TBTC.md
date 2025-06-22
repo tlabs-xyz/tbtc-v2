@@ -49,7 +49,7 @@ Entrypoint component of the tBTC v2 SDK.
 
 #### Defined in
 
-[services/tbtc.ts:64](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L64)
+[services/tbtc.ts:65](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L65)
 
 ## Properties
 
@@ -63,7 +63,7 @@ the `initializeCrossChain` method.
 
 #### Defined in
 
-[services/tbtc.ts:62](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L62)
+[services/tbtc.ts:63](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L63)
 
 ___
 
@@ -75,13 +75,13 @@ Reference to the cross-chain contracts loader.
 
 #### Defined in
 
-[services/tbtc.ts:56](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L56)
+[services/tbtc.ts:57](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L57)
 
 ___
 
 ### \_l2Signer
 
-• `Optional` **\_l2Signer**: [`EthereumSigner`](../README.md#ethereumsigner) \| [`StarkNetProvider`](../README.md#starknetprovider)
+• `Optional` **\_l2Signer**: [`EthereumSigner`](../README.md#ethereumsigner) \| [`StarkNetProvider`](../README.md#starknetprovider) \| `SuiSignerWithAddress`
 
 Internal property to store L2 signer/provider for advanced use cases.
 
@@ -91,7 +91,7 @@ Will be removed in next major version.
 
 #### Defined in
 
-[services/tbtc.ts:248](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L248)
+[services/tbtc.ts:249](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L249)
 
 ___
 
@@ -103,7 +103,7 @@ Bitcoin client handle for low-level access.
 
 #### Defined in
 
-[services/tbtc.ts:52](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L52)
+[services/tbtc.ts:53](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L53)
 
 ___
 
@@ -115,7 +115,7 @@ Service supporting the tBTC v2 deposit flow.
 
 #### Defined in
 
-[services/tbtc.ts:35](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L35)
+[services/tbtc.ts:36](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L36)
 
 ___
 
@@ -128,7 +128,7 @@ and operators.
 
 #### Defined in
 
-[services/tbtc.ts:40](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L40)
+[services/tbtc.ts:41](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L41)
 
 ___
 
@@ -140,7 +140,7 @@ Service supporting the tBTC v2 redemption flow.
 
 #### Defined in
 
-[services/tbtc.ts:44](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L44)
+[services/tbtc.ts:45](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L45)
 
 ___
 
@@ -152,7 +152,7 @@ Handle to tBTC contracts for low-level access.
 
 #### Defined in
 
-[services/tbtc.ts:48](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L48)
+[services/tbtc.ts:49](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L49)
 
 ## Methods
 
@@ -184,7 +184,7 @@ Cross-chain contracts for the given L2 chain or
 
 #### Defined in
 
-[services/tbtc.ts:408](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L408)
+[services/tbtc.ts:440](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L440)
 
 ___
 
@@ -197,6 +197,11 @@ Initializes cross-chain contracts for the given L2 chain.
 For StarkNet, use single-parameter initialization:
 ```
 await tbtc.initializeCrossChain("StarkNet", starknetProvider)
+```
+
+For SUI, use single-parameter initialization:
+```
+await tbtc.initializeCrossChain("Sui", suiSigner)
 ```
 
 For other L2 chains, use the standard pattern:
@@ -214,7 +219,7 @@ await tbtc.initializeCrossChain("Base", ethereumSigner)
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `l2ChainName` | [`DestinationChainName`](../README.md#destinationchainname) | Name of the L2 chain |
-| `signerOrEthereumSigner` | [`EthereumSigner`](../README.md#ethereumsigner) \| [`StarkNetProvider`](../README.md#starknetprovider) | For StarkNet: StarkNet provider/account. For other L2s: Ethereum signer. |
+| `signerOrEthereumSigner` | [`EthereumSigner`](../README.md#ethereumsigner) \| [`StarkNetProvider`](../README.md#starknetprovider) \| `SuiSignerWithAddress` | For StarkNet: StarkNet provider/account. For SUI: SUI signer/wallet. For other L2s: Ethereum signer. |
 | `l2Provider?` | [`StarkNetProvider`](../README.md#starknetprovider) | Deprecated parameter - will throw error if provided |
 
 #### Returns
@@ -227,9 +232,9 @@ Void promise
 
 Throws an error if:
         - Cross-chain contracts loader not available
-        - Invalid provider type for StarkNet
+        - Invalid provider type for StarkNet or SUI
         - No connected account in StarkNet provider
-        - Two-parameter mode is used for StarkNet (no longer supported)
+        - Two-parameter mode is used for StarkNet or SUI (no longer supported)
 
 **`Example`**
 
@@ -237,11 +242,15 @@ Throws an error if:
 // StarkNet with single parameter
 const starknetAccount = await starknet.connect();
 await tbtc.initializeCrossChain("StarkNet", starknetAccount);
+
+// SUI with single parameter
+const suiWallet = await wallet.connect();
+await tbtc.initializeCrossChain("Sui", suiWallet);
 ```
 
 #### Defined in
 
-[services/tbtc.ts:284](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L284)
+[services/tbtc.ts:295](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L295)
 
 ___
 
@@ -269,7 +278,7 @@ Throws an error if the provider is invalid or address cannot be extracted.
 
 #### Defined in
 
-[services/tbtc.ts:202](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L202)
+[services/tbtc.ts:203](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L203)
 
 ___
 
@@ -301,7 +310,7 @@ This function is especially useful for local development as it gives
 
 #### Defined in
 
-[services/tbtc.ts:188](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L188)
+[services/tbtc.ts:189](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L189)
 
 ___
 
@@ -335,7 +344,7 @@ Throws an error if the underlying signer's Ethereum network is
 
 #### Defined in
 
-[services/tbtc.ts:141](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L141)
+[services/tbtc.ts:142](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L142)
 
 ___
 
@@ -367,7 +376,7 @@ Throws an error if the signer's Ethereum network is other than
 
 #### Defined in
 
-[services/tbtc.ts:95](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L95)
+[services/tbtc.ts:96](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L96)
 
 ___
 
@@ -399,4 +408,4 @@ Throws an error if the signer's Ethereum network is other than
 
 #### Defined in
 
-[services/tbtc.ts:117](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L117)
+[services/tbtc.ts:118](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L118)
