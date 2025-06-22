@@ -219,7 +219,7 @@ export class RedemptionsService {
     targetChainTxHash: Hex
   }> {
     const crossChainContracts = this.#crossChainContracts(l2ChainName)
-    if (!crossChainContracts) {
+    if (!crossChainContracts || !crossChainContracts.l1BitcoinRedeemer) {
       throw new Error(
         `Cross-chain contracts for ${l2ChainName} not initialized`
       )

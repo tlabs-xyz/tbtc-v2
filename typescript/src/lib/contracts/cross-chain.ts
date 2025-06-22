@@ -27,7 +27,7 @@ export type DestinationChainInterfaces = {
  */
 export type L1CrossChainContracts = {
   l1BitcoinDepositor: L1BitcoinDepositor
-  l1BitcoinRedeemer: L1BitcoinRedeemer
+  l1BitcoinRedeemer: L1BitcoinRedeemer | null
 }
 
 /**

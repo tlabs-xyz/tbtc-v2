@@ -132,18 +132,28 @@ export async function ethereumCrossChainContractsLoader(
 
   const loadL1Contracts = async (
     destinationChainName: DestinationChainName
-  ) => ({
-    l1BitcoinDepositor: new EthereumL1BitcoinDepositor(
-      { signerOrProvider: signer },
-      chainId,
-      destinationChainName
-    ),
-    l1BitcoinRedeemer: new EthereumL1BitcoinRedeemer(
-      { signerOrProvider: signer },
-      chainId,
-      destinationChainName
-    ),
-  })
+  ) => {
+    let l1BitcoinRedeemer: EthereumL1BitcoinRedeemer | null = null
+    if (
+      destinationChainName === "Base" ||
+      destinationChainName === "Arbitrum"
+    ) {
+      l1BitcoinRedeemer = new EthereumL1BitcoinRedeemer(
+        { signerOrProvider: signer },
+        chainId,
+        destinationChainName
+      )
+    }
+
+    return {
+      l1BitcoinDepositor: new EthereumL1BitcoinDepositor(
+        { signerOrProvider: signer },
+        chainId,
+        destinationChainName
+      ),
+      l1BitcoinRedeemer,
+    }
+  }
 
   return {
     loadChainMapping,

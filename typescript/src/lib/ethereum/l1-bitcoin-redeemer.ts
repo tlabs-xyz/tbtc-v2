@@ -9,7 +9,6 @@ import {
   Chains,
   DestinationChainName,
   L1BitcoinRedeemer,
-  L2Chain,
 } from "../contracts"
 import { EthereumAddress } from "./index"
 import { Hex } from "../utils"
@@ -51,7 +50,7 @@ export class EthereumL1BitcoinRedeemer
   constructor(
     config: EthersContractConfig,
     chainId: Chains.Ethereum,
-    l2ChainName: L2Chain
+    l2ChainName: DestinationChainName
   ) {
     let deployment: EthersContractDeployment
 
