@@ -448,7 +448,7 @@ Aggregates L1-specific TBTC cross-chain contracts.
 | Name | Type |
 | :------ | :------ |
 | `l1BitcoinDepositor` | [`L1BitcoinDepositor`](interfaces/L1BitcoinDepositor.md) |
-| `l1BitcoinRedeemer` | [`L1BitcoinRedeemer`](interfaces/L1BitcoinRedeemer.md) |
+| `l1BitcoinRedeemer` | [`L1BitcoinRedeemer`](interfaces/L1BitcoinRedeemer.md) \| ``null`` |
 
 #### Defined in
 
