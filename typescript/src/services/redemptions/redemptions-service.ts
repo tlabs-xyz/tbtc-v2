@@ -180,10 +180,8 @@ export class RedemptionsService {
   async requestCrossChainRedemption(
     bitcoinRedeemerAddress: string,
     amount: BigNumber,
-    l2ChainName: L2Chain
-  ): Promise<{
-    targetChainTxHash: Hex
-  }> {
+    l2ChainName: DestinationChainName
+  ): Promise<{ targetChainTxHash: Hex }> {
     const crossChainContracts = this.#crossChainContracts(l2ChainName)
     if (!crossChainContracts || !crossChainContracts.l2BitcoinRedeemer) {
       throw new Error(
@@ -191,11 +189,9 @@ export class RedemptionsService {
       )
     }
 
-    const { redeemerOutputScript } = await this.determineRedemptionData(
-      bitcoinRedeemerAddress,
-      BigNumber.from(amount)
+    const redeemerOutputScript = await this.getRedeemerOutputScript(
+      bitcoinRedeemerAddress
     )
-
     const nonce = Math.round(Math.random() * 10000)
 
     const txHash =
