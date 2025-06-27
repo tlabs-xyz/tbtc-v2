@@ -151,22 +151,27 @@ export class SuiBitcoinDepositor implements BitcoinDepositor {
         })
       }
 
-      // Wait for the transaction to be indexed
-      await this.#client.waitForTransaction({
+      // Wait for the transaction to be indexed and get the indexed result
+      const indexedTransaction = await this.#client.waitForTransaction({
         digest: result.digest,
+        options: {
+          showEffects: true,
+          showEvents: true,
+        },
       })
 
       // Check if transaction was successful
-      if (result.effects?.status?.status !== "success") {
+      // The structure is confirmed to exist based on actual response
+      if (indexedTransaction.effects?.status?.status !== "success") {
         throw new SuiError(
           `Transaction failed: ${
-            result.effects?.status?.error || "Unknown error"
+            indexedTransaction.effects?.status?.error || "Unknown error"
           }`
         )
       }
 
       // Validate that DepositInitialized event was emitted
-      const depositEvent = result.events?.find(
+      const depositEvent = indexedTransaction.events?.find(
         (e: any) =>
           e.type === `${this.#packageId}::BitcoinDepositor::DepositInitialized`
       )
@@ -176,13 +181,11 @@ export class SuiBitcoinDepositor implements BitcoinDepositor {
           "DepositInitialized event not found in transaction. " +
             "The relayer may not process this deposit."
         )
-      } else {
-        console.log("SUI DepositInitialized event:", depositEvent)
       }
 
-      // Return the full transaction result object
+      // Return the indexed transaction result which has all the proper fields
       // The CrossChainDepositor will extract the transaction hash if needed
-      return result
+      return indexedTransaction
     } catch (error) {
       if (error instanceof SuiError) {
         throw error
