@@ -77,7 +77,7 @@ export class SuiBitcoinDepositor implements BitcoinDepositor {
     depositOutputIndex: number,
     deposit: DepositReceipt,
     vault?: ChainIdentifier // Ignored for SUI - no vault support
-  ): Promise<Hex> {
+  ): Promise<Hex | any> {
     // This method is called by CrossChainDepositor in L2Transaction mode
     // It initiates the deposit on SUI, which triggers the relayer
 
@@ -120,18 +120,36 @@ export class SuiBitcoinDepositor implements BitcoinDepositor {
       ],
     })
 
-    // Execute transaction and return digest
+    // Execute transaction and return result
     try {
-      // Use the client to sign and execute transaction
-      const result = await this.#client.signAndExecuteTransaction({
-        signer: this.#signer,
-        transaction: tx,
-        options: {
-          showEffects: true,
-          showEvents: true,
-          showObjectChanges: true,
-        },
-      })
+      let result: any
+
+      // Check if signer has signAndExecuteTransaction method (wallet adapter)
+      if (
+        this.#signer &&
+        typeof this.#signer.signAndExecuteTransaction === "function"
+      ) {
+        // Use wallet adapter's signAndExecuteTransaction
+        result = await this.#signer.signAndExecuteTransaction({
+          transaction: tx,
+          options: {
+            showEffects: true,
+            showEvents: true,
+            showObjectChanges: true,
+          },
+        })
+      } else {
+        // Fallback to client method for keypair signers
+        result = await this.#client.signAndExecuteTransaction({
+          signer: this.#signer,
+          transaction: tx,
+          options: {
+            showEffects: true,
+            showEvents: true,
+            showObjectChanges: true,
+          },
+        })
+      }
 
       // Wait for the transaction to be indexed
       await this.#client.waitForTransaction({
@@ -149,7 +167,7 @@ export class SuiBitcoinDepositor implements BitcoinDepositor {
 
       // Validate that DepositInitialized event was emitted
       const depositEvent = result.events?.find(
-        (e) =>
+        (e: any) =>
           e.type === `${this.#packageId}::BitcoinDepositor::DepositInitialized`
       )
 
@@ -162,7 +180,9 @@ export class SuiBitcoinDepositor implements BitcoinDepositor {
         console.log("SUI DepositInitialized event:", depositEvent)
       }
 
-      return Hex.from(result.digest)
+      // Return the full transaction result object
+      // The CrossChainDepositor will extract the transaction hash if needed
+      return result
     } catch (error) {
       if (error instanceof SuiError) {
         throw error
