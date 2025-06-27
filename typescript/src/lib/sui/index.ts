@@ -46,9 +46,7 @@ export async function loadSuiCrossChainInterfaces(
   const networkUrl =
     chainId === Chains.Sui.Mainnet
       ? "https://fullnode.mainnet.sui.io:443"
-      : chainId === Chains.Sui.Testnet
-      ? "https://fullnode.testnet.sui.io:443"
-      : "https://fullnode.devnet.sui.io:443"
+      : "https://fullnode.testnet.sui.io:443"
 
   const client = new SuiClientClass({ url: networkUrl })
 
@@ -144,32 +142,16 @@ function loadSuiArtifacts(chainId: Chains.Sui): SuiArtifacts {
       return MAINNET_CONFIG
     case Chains.Sui.Testnet:
       return {
-        // From project deployment details
         packageId:
-          "0x1db1fcdaada7c286d77f3347e593e06d8f33b8255e0861033a0a9f321f4eade7",
+          "0x3d78316ce8ee3fe48d7ff85cdc2d0df9d459f43d802d96f58f7b59984c2dd3ae",
         tbtcCoinType:
-          "0x1db1fcdaada7c286d77f3347e593e06d8f33b8255e0861033a0a9f321f4eade7::TBTC::TBTC",
-        // Shared objects from deployment:
+          "0x3d78316ce8ee3fe48d7ff85cdc2d0df9d459f43d802d96f58f7b59984c2dd3ae::TBTC::TBTC",
         receiverStateId:
-          "0x53863ea35ecec8e66c78e389e3968ddd594d3071e94696d56685677e420e9de5",
+          "0x10f421d7960be14c07057fd821332ee8a9d717873c62e7fa370fa99913e8e924",
         gatewayStateId:
-          "0x4329bd8869d23c6b0e3020d74f3c1199aa7a34a45ee9d7aca496c70439220510",
+          "0x19ab17536712e3e2efa9a1c01acbf5c09ae53e969cb9046dc382f5f49b603d52",
         tokenStateId:
-          "0x7c3ee5fb7f905dff8b70daadd953758c92b6f72ed121474c98c3129993d24e93",
-      }
-    case Chains.Sui.Devnet:
-      // Use testnet artifacts for devnet (placeholder until devnet deployment)
-      return {
-        packageId:
-          "0x1db1fcdaada7c286d77f3347e593e06d8f33b8255e0861033a0a9f321f4eade7",
-        tbtcCoinType:
-          "0x1db1fcdaada7c286d77f3347e593e06d8f33b8255e0861033a0a9f321f4eade7::TBTC::TBTC",
-        receiverStateId:
-          "0x53863ea35ecec8e66c78e389e3968ddd594d3071e94696d56685677e420e9de5",
-        gatewayStateId:
-          "0x4329bd8869d23c6b0e3020d74f3c1199aa7a34a45ee9d7aca496c70439220510",
-        tokenStateId:
-          "0x7c3ee5fb7f905dff8b70daadd953758c92b6f72ed121474c98c3129993d24e93",
+          "0x0d59e4970772269ee917280da592089c7de389ed67164ce4c07ed508917fdf08",
       }
     default:
       throw new Error("Unsupported SUI network")
