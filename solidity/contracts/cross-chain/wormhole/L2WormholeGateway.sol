@@ -238,6 +238,8 @@ contract L2WormholeGateway is
     ///         limited to the amount of tBTC bridged through Wormhole to that
     ///         chain.
     /// @dev Requirements:
+    ///      - The native chain doesn't have a Wormhole tBTC gateway, so the token
+    ///        minted by Wormhole should be considered canonical.
     ///      - The sender must have at least `amount` of the canonical tBTC and
     ///        it has to be approved for L2WormholeGateway.
     ///      - The L2WormholeGateway must have at least `amount` of the wormhole
@@ -249,20 +251,24 @@ contract L2WormholeGateway is
     ///      to the `recipient` contract address on the recipient chain. The `arbiterFee` is
     ///      not applicable and implicitly 0.
     /// @param amount The amount of tBTC to be sent.
-    /// @param recipientChain The Wormhole chain ID of the recipient chain.
+    /// @param recipientNativeChain The Wormhole chain ID of the recipient chain.
     /// @param recipient The Wormhole-formatted address of the target contract on the recipient chain
     ///                  that will receive the tokens and process the payload.
     /// @param nonce The Wormhole nonce used to batch messages together.
     /// @param payload The arbitrary data to be passed to and processed by the `recipient`
     ///                contract on the recipient chain.
     /// @return The Wormhole sequence number.
-    function sendTbtcWithPayload(
+    function sendTbtcWithPayloadToNativeChain(
         uint256 amount,
-        uint16 recipientChain,
+        uint16 recipientNativeChain,
         bytes32 recipient,
         uint32 nonce,
         bytes calldata payload
     ) external payable nonReentrant returns (uint64) {
+        require(
+            gateways[recipientNativeChain] == bytes32(0),
+            "No Wormhole tBTC gateway on the native chain"
+        );
         require(recipient != bytes32(0), "0x0 recipient not allowed");
         require(amount != 0, "Amount must not be 0");
 
@@ -280,7 +286,7 @@ contract L2WormholeGateway is
 
         emit WormholeTbtcSent(
             amount,
-            recipientChain,
+            recipientNativeChain,
             bytes32(0), // No specific tBTC gateway from 'gateways' mapping is used; 'recipient' is the direct target contract.
             recipient,
             0, // arbiterFee is 0 as this function sends with payload
@@ -295,7 +301,7 @@ contract L2WormholeGateway is
             bridge.transferTokensWithPayload{value: msg.value}(
                 address(bridgeToken),
                 amount,
-                recipientChain,
+                recipientNativeChain,
                 recipient,
                 nonce,
                 payload
