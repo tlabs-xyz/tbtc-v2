@@ -41,7 +41,7 @@ import "../../integrator/IL2WormholeGateway.sol";
 ///            - A unique identifier for the transaction..
 ///         4. This L2BTCRedeemerWormhole contract:
 ///            a. Takes custody of the specified amount of L2TBTC from the user.
-///            b. Calls the `sendTbtcWithPayload` function on the
+///            b. Calls the `sendTbtcWithPayloadToNativeChain` function on the
 ///               L2WormholeGateway contract.
 ///         5. The L2WormholeGateway contract then:
 ///            a. Burns the L2TBTC tokens (now held by L2BTCRedeemerWormhole).
@@ -169,7 +169,7 @@ contract L2BTCRedeemerWormhole is
         tbtc.safeTransferFrom(msg.sender, address(this), amount);
 
         // Approve the L2WormholeGateway to spend/burn tBTC held by this contract.
-        // This allows the gateway's sendTbtcWithPayload function to
+        // This allows the gateway's sendTbtcWithPayloadToNativeChain function to
         // successfully call tbtc.burnFrom(address(this), amount).
         tbtc.safeIncreaseAllowance(address(gateway), amount);
 
@@ -177,7 +177,7 @@ contract L2BTCRedeemerWormhole is
         emit RedemptionRequestedOnL2(amount, redeemerOutputScript, nonce);
 
         return
-            gateway.sendTbtcWithPayload{value: msg.value}(
+            gateway.sendTbtcWithPayloadToNativeChain{value: msg.value}(
                 amount,
                 recipientChain,
                 l1BtcRedeemerWormholeAddress,

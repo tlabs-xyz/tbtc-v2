@@ -3,7 +3,7 @@
 pragma solidity 0.8.17;
 
 interface IL2WormholeGateway {
-    function sendTbtcWithPayload(
+    function sendTbtcWithPayloadToNativeChain(
         uint256 amount,
         uint16 recipientChain,
         bytes32 recipient,
