@@ -47,7 +47,7 @@ export class BaseL2BitcoinRedeemer
     }
 
     super(config, deployment)
-    
+
     this.recipientChain = recipientChain
     // Initialize Wormhole core contract
     this.wormholeCore = new Contract(
