@@ -187,14 +187,15 @@ export interface L1BitcoinDepositor {
    * @param deposit Data of the revealed deposit
    * @param vault Optional parameter denoting the vault the given deposit
    *        should be routed to
-   * @returns Transaction hash of the reveal deposit transaction.
+   * @returns Transaction hash of the reveal deposit transaction or a
+   *         transaction result object for non-EVM chains.
    */
   initializeDeposit(
     depositTx: BitcoinRawTxVectors,
     depositOutputIndex: number,
     deposit: DepositReceipt,
     vault?: ChainIdentifier
-  ): Promise<Hex>
+  ): Promise<Hex | any>
 }
 
 /**

@@ -77,7 +77,7 @@ ___
 
 ### initializeDeposit
 
-▸ **initializeDeposit**(`depositTx`, `depositOutputIndex`, `deposit`, `vault?`): `Promise`\<[`Hex`](../classes/Hex.md)\>
+▸ **initializeDeposit**(`depositTx`, `depositOutputIndex`, `deposit`, `vault?`): `Promise`\<`any`\>
 
 Initializes the cross-chain deposit directly on the given L1 chain.
 
@@ -92,10 +92,11 @@ Initializes the cross-chain deposit directly on the given L1 chain.
 
 #### Returns
 
-`Promise`\<[`Hex`](../classes/Hex.md)\>
+`Promise`\<`any`\>
 
-Transaction hash of the reveal deposit transaction.
+Transaction hash of the reveal deposit transaction or a
+        transaction result object for non-EVM chains.
 
 #### Defined in
 
-[lib/contracts/cross-chain.ts:192](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L192)
+[lib/contracts/cross-chain.ts:193](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L193)

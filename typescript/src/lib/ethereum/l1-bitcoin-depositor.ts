@@ -24,6 +24,7 @@ import MainnetStarkNetL1BitcoinDepositorDeployment from "./artifacts/mainnet/Sta
 import SepoliaBaseL1BitcoinDepositorDeployment from "./artifacts/sepolia/BaseL1BitcoinDepositor.json"
 import SepoliaArbitrumL1BitcoinDepositorDeployment from "./artifacts/sepolia/ArbitrumL1BitcoinDepositor.json"
 import SepoliaStarkNetL1BitcoinDepositorDeployment from "./artifacts/sepolia/StarkNetBitcoinDepositor.json"
+import SepoliaSuiL1BitcoinDepositorDeployment from "./artifacts/sepolia/SuiL1BitcoinDepositor.json"
 
 const artifactLoader = {
   getMainnet: (destinationChainName: DestinationChainName) => {
@@ -47,6 +48,8 @@ const artifactLoader = {
         return SepoliaArbitrumL1BitcoinDepositorDeployment
       case "StarkNet":
         return SepoliaStarkNetL1BitcoinDepositorDeployment
+      case "Sui":
+        return SepoliaSuiL1BitcoinDepositorDeployment
       default:
         throw new Error("Unsupported destination chain")
     }
@@ -84,10 +87,13 @@ export class EthereumL1BitcoinDepositor
 
     super(config, deployment)
 
-    // Use StarkNet encoder for StarkNet, otherwise use Ethereum encoder
+    // Use appropriate encoder for each destination chain
     if (destinationChainName === "StarkNet") {
       const { StarkNetExtraDataEncoder } = require("../starknet")
       this.#extraDataEncoder = new StarkNetExtraDataEncoder()
+    } else if (destinationChainName === "Sui") {
+      const { SuiExtraDataEncoder } = require("../sui")
+      this.#extraDataEncoder = new SuiExtraDataEncoder()
     } else {
       this.#extraDataEncoder = new EthereumExtraDataEncoder()
     }
