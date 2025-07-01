@@ -208,7 +208,6 @@ export class RedemptionsService {
 
   async relayRedemptionRequestToL1(
     amount: BigNumber,
-    redeemerOutputScript: Hex,
     encodedVm: BytesLike,
     l2ChainName: DestinationChainName
   ): Promise<{
@@ -225,7 +224,6 @@ export class RedemptionsService {
     // while the amount parameter is TBTC token precision (1e18). We need to
     // convert the amount to get proper results.
     const { walletPublicKey, mainUtxo } = await this.findWalletForRedemption(
-      redeemerOutputScript,
       amountToSatoshi(amount)
     )
 
@@ -270,8 +268,8 @@ export class RedemptionsService {
     // while the amount parameter is TBTC token precision (1e18). We need to
     // convert the amount to get proper results.
     const { walletPublicKey, mainUtxo } = await this.findWalletForRedemption(
-      redeemerOutputScript,
-      amountToSatoshi(amount)
+      amountToSatoshi(amount),
+      redeemerOutputScript
     )
 
     return { walletPublicKey, mainUtxo, redeemerOutputScript }
@@ -364,14 +362,14 @@ export class RedemptionsService {
   /**
    * Finds the oldest live wallet that has enough BTC to handle a redemption
    * request.
+   * @param amount The amount to be redeemed in satoshis.
    * @param redeemerOutputScript The redeemer output script the redeemed funds are
    *        supposed to be locked on. Must not be prepended with length.
-   * @param amount The amount to be redeemed in satoshis.
    * @returns Promise with the wallet details needed to request a redemption.
    */
   protected async findWalletForRedemption(
-    redeemerOutputScript: Hex,
-    amount: BigNumber
+    amount: BigNumber,
+    redeemerOutputScript?: Hex
   ): Promise<{
     walletPublicKey: Hex
     mainUtxo: BitcoinUtxo
@@ -427,22 +425,25 @@ export class RedemptionsService {
           )
           return
         }
-        const pendingRedemption =
-          await this.tbtcContracts.bridge.pendingRedemptions(
-            walletPublicKey,
-            redeemerOutputScript
-          )
 
-        if (pendingRedemption.requestedAt !== 0) {
-          console.debug(
-            `There is a pending redemption request from this wallet to the ` +
-              `same Bitcoin address. Given wallet public key hash` +
-              `(${walletPublicKeyHash.toString()}) and redeemer output script ` +
-              `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
-              `pending request at the same time. ` +
-              `Continue the loop execution to the next wallet...`
-          )
-          return
+        if (redeemerOutputScript) {
+          const pendingRedemption =
+            await this.tbtcContracts.bridge.pendingRedemptions(
+              walletPublicKey,
+              redeemerOutputScript
+            )
+
+          if (pendingRedemption.requestedAt !== 0) {
+            console.debug(
+              `There is a pending redemption request from this wallet to the ` +
+                `same Bitcoin address. Given wallet public key hash` +
+                `(${walletPublicKeyHash.toString()}) and redeemer output script ` +
+                `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
+                `pending request at the same time. ` +
+                `Continue the loop execution to the next wallet...`
+            )
+            return
+          }
         }
 
         const walletBTCBalance = mainUtxo.value.sub(pendingRedemptionsValue)
