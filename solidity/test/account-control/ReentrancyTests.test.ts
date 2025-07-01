@@ -81,7 +81,15 @@ describe("Advanced Reentrancy Tests", () => {
       })
 
       it("should prevent read-only reentrancy in minting capacity calculations", async () => {
-        const { basicMintingPolicy, qcAddress } = fixture
+        const { basicMintingPolicy, qcMinter, qcAddress } = fixture
+
+        // Grant MINTER_ROLE to the QCMinter on the BasicMintingPolicy
+        const MINTER_ROLE = await basicMintingPolicy.MINTER_ROLE()
+        await basicMintingPolicy.grantRole(MINTER_ROLE, qcMinter.address)
+
+        // Grant MINTER_ROLE to the user on QCMinter
+        const QC_MINTER_ROLE = await qcMinter.MINTER_ROLE()
+        await qcMinter.grantRole(QC_MINTER_ROLE, fixture.user.address)
 
         // Simulate read-only reentrancy attempt
         // Attacker tries to call getAvailableMintingCapacity during a minting operation
@@ -93,13 +101,9 @@ describe("Advanced Reentrancy Tests", () => {
         )
 
         // During minting, capacity calculation should remain consistent
-        await basicMintingPolicy
+        await qcMinter
           .connect(fixture.user)
-          .requestMint(
-            qcAddress.address,
-            fixture.user.address,
-            TEST_DATA.AMOUNTS.NORMAL_MINT
-          )
+          .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.NORMAL_MINT)
 
         // Capacity should decrease after minting
         const capacity3 = await basicMintingPolicy.getAvailableMintingCapacity(
@@ -142,20 +146,36 @@ describe("Advanced Reentrancy Tests", () => {
       })
 
       it("should prevent double fulfillment through reentrancy", async () => {
-        const { basicRedemptionPolicy, qcAddress, tbtc } = fixture
+        const { basicRedemptionPolicy, qcRedeemer, qcAddress, tbtc } = fixture
+
+        // Grant roles
+        const REDEEMER_ROLE = await basicRedemptionPolicy.REDEEMER_ROLE()
+        await basicRedemptionPolicy.grantRole(REDEEMER_ROLE, qcRedeemer.address)
+        await basicRedemptionPolicy.grantRole(
+          REDEEMER_ROLE,
+          fixture.deployer.address
+        )
+
+        const ARBITER_ROLE = await basicRedemptionPolicy.ARBITER_ROLE()
+        await basicRedemptionPolicy.grantRole(
+          ARBITER_ROLE,
+          fixture.deployer.address
+        )
 
         // Setup redemption
         const redemptionAmount = TEST_DATA.AMOUNTS.NORMAL_MINT
         const redemptionId = ethers.utils.id("test_redemption")
         tbtc.balanceOf.returns(redemptionAmount)
 
-        await basicRedemptionPolicy.requestRedemption(
-          redemptionId,
-          qcAddress.address,
-          fixture.user.address,
-          redemptionAmount,
-          TEST_DATA.BTC_ADDRESSES.TEST
-        )
+        await basicRedemptionPolicy
+          .connect(fixture.deployer)
+          .requestRedemption(
+            redemptionId,
+            qcAddress.address,
+            fixture.user.address,
+            redemptionAmount,
+            TEST_DATA.BTC_ADDRESSES.TEST
+          )
 
         // First fulfillment
         const mockSpvData = createMockSpvData()
@@ -179,7 +199,9 @@ describe("Advanced Reentrancy Tests", () => {
             mockSpvData.txInfo,
             mockSpvData.proof
           )
-        ).to.be.revertedWith("Already fulfilled")
+        ).to.be.revertedWith(
+          "BRP-1305: recordFulfillment failed - Redemption already fulfilled, cannot process twice"
+        )
       })
     })
   })
@@ -208,6 +230,10 @@ describe("Advanced Reentrancy Tests", () => {
 
       it("should prevent reentrancy during service lookups", async () => {
         const { qcMinter, qcAddress } = fixture
+
+        // Grant MINTER_ROLE to user
+        const MINTER_ROLE = await qcMinter.MINTER_ROLE()
+        await qcMinter.grantRole(MINTER_ROLE, fixture.user.address)
 
         // Service lookups during operations should not allow reentrancy
         // This is more of a defensive programming check
@@ -275,13 +301,17 @@ describe("Advanced Reentrancy Tests", () => {
         const { singleWatchdog, qcAddress, watchdog } = fixture
 
         const reserveBalance = TEST_DATA.AMOUNTS.RESERVE_BALANCE
-        const condition = "Strategic attestation"
+
+        // Grant WATCHDOG_OPERATOR_ROLE to watchdog
+        const WATCHDOG_OPERATOR_ROLE =
+          await singleWatchdog.WATCHDOG_OPERATOR_ROLE()
+        await singleWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
         // Attestation should not allow reentrancy to other watchdog functions
         await expect(
           singleWatchdog
             .connect(watchdog)
-            .attestReserves(qcAddress.address, reserveBalance, condition)
+            .attestReserves(qcAddress.address, reserveBalance)
         ).to.not.be.reverted
 
         // Subsequent calls should work independently
@@ -295,6 +325,11 @@ describe("Advanced Reentrancy Tests", () => {
 
         const testReason = ethers.utils.id("TEST_REASON")
 
+        // Grant WATCHDOG_OPERATOR_ROLE to watchdog
+        const WATCHDOG_OPERATOR_ROLE =
+          await singleWatchdog.WATCHDOG_OPERATOR_ROLE()
+        await singleWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
+
         // Different watchdog roles should not allow reentrancy between each other
         await singleWatchdog
           .connect(watchdog)
@@ -302,11 +337,7 @@ describe("Advanced Reentrancy Tests", () => {
 
         await singleWatchdog
           .connect(watchdog)
-          .attestReserves(
-            qcAddress.address,
-            TEST_DATA.AMOUNTS.RESERVE_BALANCE,
-            "Post status change attestation"
-          )
+          .attestReserves(qcAddress.address, TEST_DATA.AMOUNTS.RESERVE_BALANCE)
 
         // Both operations should complete successfully
         const status = await fixture.qcData.getQCStatus(qcAddress.address)
@@ -366,16 +397,16 @@ describe("Advanced Reentrancy Tests", () => {
         // multiple malicious contracts creating reentrancy chains
 
         // For now, verify that basic operations don't allow reentrancy
-        const { basicMintingPolicy, qcAddress } = fixture
+        const { qcMinter, qcAddress } = fixture
+
+        // Grant MINTER_ROLE to user
+        const MINTER_ROLE = await qcMinter.MINTER_ROLE()
+        await qcMinter.grantRole(MINTER_ROLE, fixture.user.address)
 
         await expect(
-          basicMintingPolicy
+          qcMinter
             .connect(fixture.user)
-            .requestMint(
-              qcAddress.address,
-              fixture.user.address,
-              TEST_DATA.AMOUNTS.NORMAL_MINT
-            )
+            .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.NORMAL_MINT)
         ).to.not.be.reverted
       })
     })
@@ -390,31 +421,35 @@ describe("Advanced Reentrancy Tests", () => {
         // This would test explicit reentrancy guards if implemented
         // Currently our contracts don't have explicit guards, which might be a gap
 
-        const { basicMintingPolicy, qcAddress } = fixture
+        const { qcMinter, qcAddress } = fixture
+
+        // Grant MINTER_ROLE to user
+        const MINTER_ROLE = await qcMinter.MINTER_ROLE()
+        await qcMinter.grantRole(MINTER_ROLE, fixture.user.address)
 
         // Basic operation should work
         await expect(
-          basicMintingPolicy
+          qcMinter
             .connect(fixture.user)
-            .requestMint(
-              qcAddress.address,
-              fixture.user.address,
-              TEST_DATA.AMOUNTS.NORMAL_MINT
-            )
+            .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.NORMAL_MINT)
         ).to.not.be.reverted
       })
 
       it("should test gas limit based reentrancy protection", async () => {
         // Test that functions consume enough gas to prevent certain reentrancy attacks
-        const { basicMintingPolicy, qcAddress } = fixture
+        const { basicMintingPolicy, qcMinter, qcAddress } = fixture
 
-        const tx = await basicMintingPolicy
+        // Grant MINTER_ROLE to the QCMinter on the BasicMintingPolicy
+        const MINTER_ROLE = await basicMintingPolicy.MINTER_ROLE()
+        await basicMintingPolicy.grantRole(MINTER_ROLE, qcMinter.address)
+
+        // Grant MINTER_ROLE to the user on QCMinter
+        const QC_MINTER_ROLE = await qcMinter.MINTER_ROLE()
+        await qcMinter.grantRole(QC_MINTER_ROLE, fixture.user.address)
+
+        const tx = await qcMinter
           .connect(fixture.user)
-          .requestMint(
-            qcAddress.address,
-            fixture.user.address,
-            TEST_DATA.AMOUNTS.NORMAL_MINT
-          )
+          .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.NORMAL_MINT)
 
         const receipt = await tx.wait()
 

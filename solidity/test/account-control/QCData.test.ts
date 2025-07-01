@@ -69,7 +69,12 @@ describe("QCData", () => {
 
         await expect(tx)
           .to.emit(qcData, "QCRegistered")
-          .withArgs(qcAddress.address)
+          .withArgs(
+            qcAddress.address,
+            qcManager.address,
+            ethers.utils.parseEther("1000"),
+            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+          )
       })
 
       it("should revert when QC already registered", async () => {
@@ -127,7 +132,14 @@ describe("QCData", () => {
 
         await expect(tx)
           .to.emit(qcData, "QCStatusChanged")
-          .withArgs(qcAddress.address, 0, 1, testReason)
+          .withArgs(
+            qcAddress.address,
+            0,
+            1,
+            testReason,
+            qcManager.address,
+            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+          )
       })
 
       it("should handle all valid status values", async () => {
@@ -197,7 +209,13 @@ describe("QCData", () => {
 
         await expect(tx)
           .to.emit(qcData, "QCMintedAmountUpdated")
-          .withArgs(qcAddress.address, 0, mintedAmount)
+          .withArgs(
+            qcAddress.address,
+            0,
+            mintedAmount,
+            qcManager.address,
+            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+          )
       })
 
       it("should handle zero amount", async () => {
@@ -268,7 +286,12 @@ describe("QCData", () => {
 
         await expect(tx)
           .to.emit(qcData, "WalletRegistered")
-          .withArgs(qcAddress.address, testBtcAddress)
+          .withArgs(
+            qcAddress.address,
+            testBtcAddress,
+            qcManager.address,
+            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+          )
       })
 
       it("should register multiple wallets for same QC", async () => {
@@ -346,7 +369,12 @@ describe("QCData", () => {
 
         await expect(tx)
           .to.emit(qcData, "WalletDeRegistrationRequested")
-          .withArgs(qcAddress.address, testBtcAddress)
+          .withArgs(
+            qcAddress.address,
+            testBtcAddress,
+            qcManager.address,
+            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+          )
       })
 
       it("should revert when wallet not registered", async () => {
@@ -388,7 +416,12 @@ describe("QCData", () => {
 
         await expect(tx)
           .to.emit(qcData, "WalletDeRegistrationFinalized")
-          .withArgs(qcAddress.address, testBtcAddress)
+          .withArgs(
+            qcAddress.address,
+            testBtcAddress,
+            qcManager.address,
+            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+          )
       })
 
       it("should revert when wallet not registered", async () => {

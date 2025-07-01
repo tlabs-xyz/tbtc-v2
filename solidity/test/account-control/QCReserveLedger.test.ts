@@ -105,6 +105,7 @@ describe("QCReserveLedger", () => {
             attester.address,
             qcAddress.address,
             reserveBalance,
+            0, // oldBalance
             blockTimestamp,
             tx.blockNumber
           )
@@ -136,6 +137,7 @@ describe("QCReserveLedger", () => {
             attester.address,
             qcAddress.address,
             newReserveBalance,
+            reserveBalance, // oldBalance
             blockTimestamp,
             tx.blockNumber
           )
@@ -353,7 +355,7 @@ describe("QCReserveLedger", () => {
 
         await expect(tx)
           .to.emit(qcReserveLedger, "AttestationInvalidated")
-          .withArgs(qcAddress.address, blockTimestamp, reason)
+          .withArgs(qcAddress.address, blockTimestamp, reason, deployer.address)
       })
 
       it("should revert for non-existent attestation", async () => {

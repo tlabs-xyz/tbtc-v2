@@ -93,6 +93,7 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
     /// @notice Initializes the contract. MUST BE CALLED from the child
     ///         contract initializer.
     // slither-disable-next-line dead-code
+    // solhint-disable-next-line func-name-mixedcase
     function __AbstractBTCRedeemer_initialize(
         address _thresholdBridge,
         address _tbtcToken,

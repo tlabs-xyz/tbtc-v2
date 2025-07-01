@@ -38,6 +38,7 @@ describe("BasicRedemptionPolicy", () => {
 
   // Roles
   let POLICY_ADMIN_ROLE: string
+  let REDEEMER_ROLE: string
 
   // Test data
   const redemptionAmount = ethers.utils.parseEther("5")
@@ -58,6 +59,7 @@ describe("BasicRedemptionPolicy", () => {
 
     // Generate role hashes
     POLICY_ADMIN_ROLE = ethers.utils.id("POLICY_ADMIN_ROLE")
+    REDEEMER_ROLE = ethers.utils.id("REDEEMER_ROLE")
   })
 
   beforeEach(async () => {
@@ -102,6 +104,9 @@ describe("BasicRedemptionPolicy", () => {
     mockSystemState.minMintAmount.returns(ethers.utils.parseEther("0.01"))
     mockTbtc.balanceOf.returns(redemptionAmount)
     mockSpvValidator.verifyRedemptionFulfillment.returns(true)
+
+    // Grant REDEEMER_ROLE to deployer for testing
+    await basicRedemptionPolicy.grantRole(REDEEMER_ROLE, deployer.address)
   })
 
   afterEach(async () => {
@@ -140,6 +145,24 @@ describe("BasicRedemptionPolicy", () => {
   })
 
   describe("requestRedemption", () => {
+    context("when called without REDEEMER_ROLE", () => {
+      it("should revert", async () => {
+        await expect(
+          basicRedemptionPolicy
+            .connect(user)
+            .requestRedemption(
+              redemptionId,
+              qcAddress.address,
+              user.address,
+              redemptionAmount,
+              bitcoinAddress
+            )
+        ).to.be.revertedWith(
+          `AccessControl: account ${user.address.toLowerCase()} is missing role ${REDEEMER_ROLE}`
+        )
+      })
+    })
+
     context("when called with valid parameters", () => {
       let tx: any
 

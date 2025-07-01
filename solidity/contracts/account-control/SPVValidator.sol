@@ -4,21 +4,21 @@ pragma solidity 0.8.17;
 /*
  * SPV Validator Design Philosophy
  * ==============================
- * 
- * This contract bridges the gap between Account Control's SPV needs and 
+ *
+ * This contract bridges the gap between Account Control's SPV needs and
  * Bridge's proven SPV infrastructure without modifying production Bridge.
- * 
+ *
  * WHY NOT MODIFY BRIDGE?
  * - Bridge secures millions in BTC and is battle-tested in production
  * - Redeploying Bridge carries significant risk and operational overhead
  * - Bridge's SPV logic is internal and not designed for external access
- * 
+ *
  * OUR APPROACH:
  * - Replicate Bridge's exact SPV validation algorithms
  * - Use same relay contract and difficulty parameters as Bridge
  * - Provide clean interface tailored for Account Control needs
  * - Maintain identical security guarantees without production risks
- * 
+ *
  * SECURITY CONSIDERATIONS:
  * - SPV logic is copied verbatim from Bridge's BitcoinTx.validateProof()
  * - Same cryptographic verification as production Bridge
@@ -41,12 +41,12 @@ import "../bridge/IRelay.sol";
 ///      (which would require redeployment of a critical system component),
 ///      we created this lightweight validator that replicates Bridge's exact
 ///      SPV verification logic. This approach:
-///      
+///
 ///      1. Avoids the risk of redeploying Bridge in production
 ///      2. Reuses the same battle-tested SPV algorithms that secure millions in BTC
 ///      3. Uses the same relay and difficulty parameters as Bridge
 ///      4. Provides a clean interface for Account Control system needs
-///      
+///
 ///      The validator acts as a "bridge" to Bridge's proven SPV infrastructure,
 ///      giving Account Control access to production-grade SPV verification
 ///      without touching the core Bridge contract.
@@ -58,7 +58,7 @@ contract SPVValidator is AccessControl {
 
     /// @notice The relay contract for difficulty validation
     IRelay public immutable relay;
-    
+
     /// @notice The difficulty factor required for SPV proofs
     uint96 public immutable txProofDifficultyFactor;
 
@@ -71,7 +71,7 @@ contract SPVValidator is AccessControl {
         address indexed validator,
         uint256 indexed timestamp
     );
-    
+
     event WalletControlVerified(
         address indexed qc,
         string btcAddress,
@@ -79,7 +79,7 @@ contract SPVValidator is AccessControl {
         address indexed verifiedBy,
         uint256 timestamp
     );
-    
+
     event RedemptionFulfillmentVerified(
         bytes32 indexed redemptionId,
         bytes32 indexed txHash,
@@ -93,10 +93,10 @@ contract SPVValidator is AccessControl {
     constructor(address _relay, uint96 _txProofDifficultyFactor) {
         require(_relay != address(0), "Invalid relay address");
         require(_txProofDifficultyFactor > 0, "Invalid difficulty factor");
-        
+
         relay = IRelay(_relay);
         txProofDifficultyFactor = _txProofDifficultyFactor;
-        
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(CONFIG_ROLE, msg.sender);
     }
@@ -174,14 +174,14 @@ contract SPVValidator is AccessControl {
         // Step 2: Additional validation for wallet control
         // TODO: Implement OP_RETURN challenge verification
         // TODO: Implement input address verification
-        
+
         // For now, return true if SPV verification passed
         // Prevent unused variable warnings
         qc;
         btcAddress;
         challenge;
         txHash;
-        
+
         return true;
     }
 
@@ -205,14 +205,14 @@ contract SPVValidator is AccessControl {
         // Step 2: Additional validation for redemption fulfillment
         // TODO: Implement payment output verification
         // TODO: Implement amount verification
-        
+
         // For now, return true if SPV verification passed
         // Prevent unused variable warnings
         redemptionId;
         userBtcAddress;
         expectedAmount;
         txHash;
-        
+
         return true;
     }
 
@@ -220,7 +220,10 @@ contract SPVValidator is AccessControl {
     /// @dev This replicates Bridge's evaluateProofDifficulty() to maintain consistency
     ///      with production Bridge validation without requiring Bridge modifications.
     /// @param bitcoinHeaders Bitcoin headers chain being part of the SPV proof
-    function _evaluateProofDifficulty(bytes memory bitcoinHeaders) private view {
+    function _evaluateProofDifficulty(bytes memory bitcoinHeaders)
+        private
+        view
+    {
         uint256 currentEpochDifficulty = relay.getCurrentEpochDifficulty();
         uint256 previousEpochDifficulty = relay.getPrevEpochDifficulty();
 
@@ -257,4 +260,4 @@ contract SPVValidator is AccessControl {
             "Insufficient accumulated difficulty in header chain"
         );
     }
-} 
+}

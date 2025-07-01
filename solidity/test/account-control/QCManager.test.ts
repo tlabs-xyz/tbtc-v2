@@ -69,8 +69,8 @@ describe("QCManager", () => {
   const mintedAmount = ethers.utils.parseEther("5")
 
   before(async () => {
-    // eslint-disable-next-line prettier/prettier
-    [deployer, governance, qcAddress, watchdog, thirdParty] =
+    // eslint-disable-next-line @typescript-eslint/no-extra-semi
+    ;[deployer, governance, qcAddress, watchdog, thirdParty] =
       await ethers.getSigners()
 
     // Generate service keys
@@ -193,9 +193,10 @@ describe("QCManager", () => {
       })
 
       it("should emit QCRegistrationInitiated event", async () => {
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(qcManager, "QCRegistrationInitiated")
-          .withArgs(qcAddress.address, deployer.address)
+          .withArgs(qcAddress.address, deployer.address, currentBlock.timestamp)
       })
     })
 
@@ -264,9 +265,17 @@ describe("QCManager", () => {
       })
 
       it("should emit QCStatusChanged event", async () => {
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(qcManager, "QCStatusChanged")
-          .withArgs(qcAddress.address, 0, 1, testReason, watchdog.address)
+          .withArgs(
+            qcAddress.address,
+            0,
+            1,
+            testReason,
+            watchdog.address,
+            currentBlock.timestamp
+          )
       })
     })
 
@@ -774,6 +783,7 @@ describe("QCManager", () => {
       })
 
       it("should emit QCStatusChanged event", async () => {
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(qcManager, "QCStatusChanged")
           .withArgs(
@@ -781,7 +791,8 @@ describe("QCManager", () => {
             0,
             1,
             ethers.utils.formatBytes32String("UNDERCOLLATERALIZED"),
-            watchdog.address
+            watchdog.address,
+            currentBlock.timestamp
           )
       })
     })
@@ -1126,7 +1137,13 @@ describe("QCManager", () => {
           )
           await expect(tx)
             .to.emit(qcManager, "GovernanceActionQueued")
-            .withArgs(actionHash, expectedExecutionTime, "QC_ONBOARDING")
+            .withArgs(
+              actionHash,
+              expectedExecutionTime,
+              "QC_ONBOARDING",
+              timeLockedAdmin.address,
+              currentBlock.timestamp
+            )
         })
 
         it("should set correct execution time", async () => {
@@ -1249,9 +1266,10 @@ describe("QCManager", () => {
         })
 
         it("should emit QCRegistrationInitiated event", async () => {
+          const blockTime = await helpers.time.latest()
           await expect(tx)
             .to.emit(qcManager, "QCRegistrationInitiated")
-            .withArgs(qcAddress.address, timeLockedAdmin.address)
+            .withArgs(qcAddress.address, timeLockedAdmin.address, blockTime + 1)
         })
       })
 
@@ -1358,7 +1376,13 @@ describe("QCManager", () => {
           )
           await expect(tx)
             .to.emit(qcManager, "GovernanceActionQueued")
-            .withArgs(actionHash, expectedExecutionTime, "MINTING_CAP_INCREASE")
+            .withArgs(
+              actionHash,
+              expectedExecutionTime,
+              "MINTING_CAP_INCREASE",
+              timeLockedAdmin.address,
+              currentBlock.timestamp
+            )
         })
       })
 
@@ -1446,15 +1470,28 @@ describe("QCManager", () => {
         })
 
         it("should emit GovernanceActionExecuted event", async () => {
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
           await expect(tx)
             .to.emit(qcManager, "GovernanceActionExecuted")
-            .withArgs(actionHash, "MINTING_CAP_INCREASE")
+            .withArgs(
+              actionHash,
+              "MINTING_CAP_INCREASE",
+              timeLockedAdmin.address,
+              currentBlock.timestamp
+            )
         })
 
         it("should emit MintingCapIncreased event", async () => {
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
           await expect(tx)
             .to.emit(qcManager, "MintingCapIncreased")
-            .withArgs(qcAddress.address, currentCap, newCap)
+            .withArgs(
+              qcAddress.address,
+              currentCap,
+              newCap,
+              timeLockedAdmin.address,
+              currentBlock.timestamp
+            )
         })
       })
 
@@ -1495,6 +1532,7 @@ describe("QCManager", () => {
         })
 
         it("should emit QCStatusChanged event", async () => {
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
           await expect(tx)
             .to.emit(qcManager, "QCStatusChanged")
             .withArgs(
@@ -1502,14 +1540,21 @@ describe("QCManager", () => {
               0,
               1,
               emergencyReason,
-              watchdog.address
+              watchdog.address,
+              currentBlock.timestamp
             )
         })
 
         it("should emit QCEmergencyPaused event", async () => {
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
           await expect(tx)
             .to.emit(qcManager, "QCEmergencyPaused")
-            .withArgs(qcAddress.address, emergencyReason, watchdog.address)
+            .withArgs(
+              qcAddress.address,
+              emergencyReason,
+              watchdog.address,
+              currentBlock.timestamp
+            )
         })
       })
 
@@ -1633,10 +1678,19 @@ describe("QCManager", () => {
           .connect(timeLockedAdmin)
           .executeMintingCapIncrease(qcAddress.address, increasedCap)
 
+        const executeBlock = await ethers.provider.getBlock(
+          executeTx.blockNumber
+        )
         await expect(executeTx)
           .to.emit(qcManager, "GovernanceActionExecuted")
           .and.to.emit(qcManager, "MintingCapIncreased")
-          .withArgs(qcAddress.address, currentCap, increasedCap)
+          .withArgs(
+            qcAddress.address,
+            currentCap,
+            increasedCap,
+            timeLockedAdmin.address,
+            executeBlock.timestamp
+          )
       })
 
       it("should allow emergency pause without delay", async () => {
@@ -1649,9 +1703,17 @@ describe("QCManager", () => {
           .connect(watchdog)
           .emergencyPauseQC(qcAddress.address, emergencyReason)
 
+        const emergencyBlock = await ethers.provider.getBlock(
+          emergencyTx.blockNumber
+        )
         await expect(emergencyTx)
           .to.emit(qcManager, "QCEmergencyPaused")
-          .withArgs(qcAddress.address, emergencyReason, watchdog.address)
+          .withArgs(
+            qcAddress.address,
+            emergencyReason,
+            watchdog.address,
+            emergencyBlock.timestamp
+          )
       })
     })
   })
