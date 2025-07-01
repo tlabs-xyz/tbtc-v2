@@ -16,7 +16,7 @@ interface IRedemptionPolicy {
         DEFAULTED
     }
 
-    /// @notice Request redemption of tBTC tokens  
+    /// @notice Request redemption of tBTC tokens
     /// @param redemptionId The unique identifier for this redemption
     /// @param qc The address of the Qualified Custodian
     /// @param user The address requesting the redemption
@@ -26,7 +26,7 @@ interface IRedemptionPolicy {
     function requestRedemption(
         bytes32 redemptionId,
         address qc,
-        address user, 
+        address user,
         uint256 amount,
         string calldata btcAddress
     ) external returns (bool success);
@@ -45,16 +45,15 @@ interface IRedemptionPolicy {
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
     ) external returns (bool success);
-    
+
     /// @notice Flag a redemption as defaulted
     /// @param redemptionId The unique identifier of the redemption
     /// @param reason The reason for the default
     /// @return success True if the default was successfully flagged
-    function flagDefault(
-        bytes32 redemptionId,
-        bytes32 reason
-    ) external returns (bool success);
-    
+    function flagDefault(bytes32 redemptionId, bytes32 reason)
+        external
+        returns (bool success);
+
     /// @notice Check if a redemption request is valid
     /// @param user The address requesting the redemption
     /// @param qc The address of the Qualified Custodian
@@ -65,7 +64,7 @@ interface IRedemptionPolicy {
         address qc,
         uint256 amount
     ) external view returns (bool valid);
-    
+
     /// @notice Get redemption timeout period
     /// @return timeout The timeout period in seconds
     function getRedemptionTimeout() external view returns (uint256 timeout);

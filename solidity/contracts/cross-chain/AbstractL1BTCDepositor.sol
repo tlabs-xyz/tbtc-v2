@@ -149,6 +149,7 @@ abstract contract AbstractL1BTCDepositor is
         _;
     }
 
+    // solhint-disable-next-line func-name-mixedcase
     function __AbstractL1BTCDepositor_initialize(
         address _tbtcBridge,
         address _tbtcVault

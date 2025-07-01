@@ -2,7 +2,9 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers } from "hardhat"
 
-const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+const func: DeployFunction = async function ConfigureAccountControlSystem(
+  hre: HardhatRuntimeEnvironment
+) {
   const { getNamedAccounts, deployments } = hre
   const { deployer } = await getNamedAccounts()
   const { log, get, execute } = deployments
@@ -146,6 +148,26 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   } else {
     log("Skipping TBTC grantRole in test mode")
   }
+
+  // Grant MINTER_ROLE to QCMinter in BasicMintingPolicy (for defense-in-depth)
+  const POLICY_MINTER_ROLE = ethers.utils.id("MINTER_ROLE")
+  await execute(
+    "BasicMintingPolicy",
+    { from: deployer, log: true },
+    "grantRole",
+    POLICY_MINTER_ROLE,
+    qcMinter.address
+  )
+
+  // Grant REDEEMER_ROLE to QCRedeemer in BasicRedemptionPolicy (for defense-in-depth)
+  const POLICY_REDEEMER_ROLE = ethers.utils.id("REDEEMER_ROLE")
+  await execute(
+    "BasicRedemptionPolicy",
+    { from: deployer, log: true },
+    "grantRole",
+    POLICY_REDEEMER_ROLE,
+    qcRedeemer.address
+  )
 
   log("Step 3: Setting up Single Watchdog roles...")
 

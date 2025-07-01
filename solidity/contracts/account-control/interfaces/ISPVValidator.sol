@@ -48,4 +48,4 @@ interface ISPVValidator {
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
     ) external view returns (bool verified);
-} 
+}

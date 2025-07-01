@@ -191,6 +191,10 @@ describe("Account Control System - Integration Test", () => {
     await qcData.grantRole(QC_MANAGER_ROLE, qcManager.address)
     await qcManager.grantRole(QC_ADMIN_ROLE, basicMintingPolicy.address)
 
+    // Grant MINTER_ROLE to QCMinter on BasicMintingPolicy
+    const MINTER_ROLE = await basicMintingPolicy.MINTER_ROLE()
+    await basicMintingPolicy.grantRole(MINTER_ROLE, qcMinter.address)
+
     // Transfer ownership of TBTC to the minting policy so it can mint
     await tbtc.transferOwnership(basicMintingPolicy.address)
 
@@ -203,6 +207,10 @@ describe("Account Control System - Integration Test", () => {
 
     // Grant QCRedeemer the ARBITER role in BasicRedemptionPolicy so it can record fulfillments
     await basicRedemptionPolicy.grantRole(ARBITER_ROLE, qcRedeemer.address)
+
+    // Grant QCRedeemer the REDEEMER_ROLE in BasicRedemptionPolicy
+    const REDEEMER_ROLE = await basicRedemptionPolicy.REDEEMER_ROLE()
+    await basicRedemptionPolicy.grantRole(REDEEMER_ROLE, qcRedeemer.address)
 
     // Grant watchdog operator role
     await singleWatchdog.grantRole(
@@ -309,11 +317,7 @@ describe("Account Control System - Integration Test", () => {
 
       await singleWatchdog
         .connect(watchdog)
-        .attestReserves(
-          qcAddress.address,
-          initialReserveBalance,
-          "INITIAL_ATTESTATION"
-        )
+        .attestReserves(qcAddress.address, initialReserveBalance)
 
       const attestation = await qcReserveLedger.getCurrentAttestation(
         qcAddress.address
@@ -328,11 +332,7 @@ describe("Account Control System - Integration Test", () => {
 
       await singleWatchdog
         .connect(watchdog)
-        .attestReserves(
-          qcAddress.address,
-          initialReserveBalance,
-          "INITIAL_ATTESTATION"
-        )
+        .attestReserves(qcAddress.address, initialReserveBalance)
 
       // Initially not stale
       const isStale = await qcReserveLedger.isAttestationStale(
@@ -351,17 +351,17 @@ describe("Account Control System - Integration Test", () => {
       await qcManager.registerQC(qcAddress.address)
       await singleWatchdog
         .connect(watchdog)
-        .attestReserves(
-          qcAddress.address,
-          initialReserveBalance,
-          "INITIAL_ATTESTATION"
-        )
+        .attestReserves(qcAddress.address, initialReserveBalance)
 
       // Check available capacity
       const mintCapacity = await qcManager.getAvailableMintingCapacity(
         qcAddress.address
       )
       expect(mintCapacity).to.equal(initialReserveBalance) // Full reserve available
+
+      // Grant MINTER_ROLE to user
+      const MINTER_ROLE = await qcMinter.MINTER_ROLE()
+      await qcMinter.grantRole(MINTER_ROLE, user.address)
 
       // Request minting
       await qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
@@ -386,11 +386,7 @@ describe("Account Control System - Integration Test", () => {
 
       await singleWatchdog
         .connect(watchdog)
-        .attestReserves(
-          qcAddress.address,
-          initialReserveBalance,
-          "INITIAL_ATTESTATION"
-        )
+        .attestReserves(qcAddress.address, initialReserveBalance)
 
       // Should have zero capacity when UnderReview
       const mintCapacity = await qcManager.getAvailableMintingCapacity(
@@ -409,11 +405,12 @@ describe("Account Control System - Integration Test", () => {
       await qcManager.registerQC(qcAddress.address)
       await singleWatchdog
         .connect(watchdog)
-        .attestReserves(
-          qcAddress.address,
-          initialReserveBalance,
-          "INITIAL_ATTESTATION"
-        )
+        .attestReserves(qcAddress.address, initialReserveBalance)
+
+      // Grant MINTER_ROLE to user
+      const MINTER_ROLE = await qcMinter.MINTER_ROLE()
+      await qcMinter.grantRole(MINTER_ROLE, user.address)
+
       await qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
 
       // User should have tBTC balance
@@ -469,6 +466,10 @@ describe("Account Control System - Integration Test", () => {
 
   describe("Emergency Controls", () => {
     it("should support granular pause functionality", async () => {
+      // Grant MINTER_ROLE to user
+      const MINTER_ROLE = await qcMinter.MINTER_ROLE()
+      await qcMinter.grantRole(MINTER_ROLE, user.address)
+
       // Pause minting
       await systemState.pauseMinting()
       expect(await systemState.isMintingPaused()).to.be.true
@@ -477,11 +478,7 @@ describe("Account Control System - Integration Test", () => {
       await qcManager.registerQC(qcAddress.address)
       await singleWatchdog
         .connect(watchdog)
-        .attestReserves(
-          qcAddress.address,
-          ethers.utils.parseEther("10"),
-          "INITIAL_ATTESTATION"
-        )
+        .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
 
       // Minting should fail when paused
       await expect(
@@ -558,15 +555,19 @@ describe("Account Control System - Integration Test", () => {
       )
       expect(currentPolicy).to.equal(newMintingPolicy.address)
 
+      // Grant MINTER_ROLE to QCMinter on new policy
+      const MINTER_ROLE_NEW = await newMintingPolicy.MINTER_ROLE()
+      await newMintingPolicy.grantRole(MINTER_ROLE_NEW, qcMinter.address)
+
+      // Grant MINTER_ROLE to user on QCMinter
+      const QC_MINTER_ROLE = await qcMinter.MINTER_ROLE()
+      await qcMinter.grantRole(QC_MINTER_ROLE, user.address)
+
       // Test that new policy works
       await qcManager.registerQC(qcAddress.address)
       await singleWatchdog
         .connect(watchdog)
-        .attestReserves(
-          qcAddress.address,
-          ethers.utils.parseEther("10"),
-          "INITIAL_ATTESTATION"
-        )
+        .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
 
       // Should still be able to mint with new policy
       await qcMinter
@@ -583,16 +584,16 @@ describe("Account Control System - Integration Test", () => {
       // Test that existing tBTC functionality still works
       const totalSupplyBefore = await tbtc.totalSupply()
 
+      // Grant MINTER_ROLE to user on QCMinter
+      const QC_MINTER_ROLE = await qcMinter.MINTER_ROLE()
+      await qcMinter.grantRole(QC_MINTER_ROLE, user.address)
+
       // Test basic transfer functionality (TBTC is ERC20)
       // First mint some tokens to test transfer
       await qcManager.registerQC(qcAddress.address)
       await singleWatchdog
         .connect(watchdog)
-        .attestReserves(
-          qcAddress.address,
-          ethers.utils.parseEther("10"),
-          "INITIAL_ATTESTATION"
-        )
+        .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
       await qcMinter
         .connect(user)
         .requestQCMint(qcAddress.address, ethers.utils.parseEther("5"))

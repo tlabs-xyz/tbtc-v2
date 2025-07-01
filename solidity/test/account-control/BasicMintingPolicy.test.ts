@@ -36,6 +36,7 @@ describe("BasicMintingPolicy", () => {
 
   // Roles
   let POLICY_ADMIN_ROLE: string
+  let MINTER_ROLE: string
 
   // Test amounts
   const minMintAmount = ethers.utils.parseEther("0.1")
@@ -56,6 +57,7 @@ describe("BasicMintingPolicy", () => {
 
     // Generate role hashes
     POLICY_ADMIN_ROLE = ethers.utils.id("POLICY_ADMIN_ROLE")
+    MINTER_ROLE = ethers.utils.id("MINTER_ROLE")
   })
 
   beforeEach(async () => {
@@ -96,6 +98,9 @@ describe("BasicMintingPolicy", () => {
     mockQcData.getQCStatus.returns(0) // Active
     mockQcData.getQCMintedAmount.returns(0)
     mockQcManager.getAvailableMintingCapacity.returns(availableCapacity)
+
+    // Grant MINTER_ROLE to deployer for testing
+    await basicMintingPolicy.grantRole(MINTER_ROLE, deployer.address)
   })
 
   afterEach(async () => {
@@ -135,6 +140,18 @@ describe("BasicMintingPolicy", () => {
   })
 
   describe("requestMint", () => {
+    context("when called without MINTER_ROLE", () => {
+      it("should revert", async () => {
+        await expect(
+          basicMintingPolicy
+            .connect(user)
+            .requestMint(qcAddress.address, user.address, normalMintAmount)
+        ).to.be.revertedWith(
+          `AccessControl: account ${user.address.toLowerCase()} is missing role ${MINTER_ROLE}`
+        )
+      })
+    })
+
     context("when called with invalid parameters", () => {
       it("should revert with zero QC address", async () => {
         await expect(
@@ -268,7 +285,14 @@ describe("BasicMintingPolicy", () => {
       it("should emit MintCompleted event", async () => {
         await expect(tx)
           .to.emit(basicMintingPolicy, "MintCompleted")
-          .withArgs(mintId, qcAddress.address, user.address, normalMintAmount)
+          .withArgs(
+            mintId,
+            qcAddress.address,
+            user.address,
+            normalMintAmount,
+            deployer.address, // completedBy - the address calling requestMint (has MINTER_ROLE)
+            await ethers.provider.getBlock(tx.blockNumber).then(b => b.timestamp) // timestamp
+          )
       })
 
       it("should return unique mint ID", async () => {

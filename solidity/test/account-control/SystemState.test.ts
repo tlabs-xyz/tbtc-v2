@@ -89,11 +89,12 @@ describe("SystemState", () => {
       describe("pauseMinting", () => {
         it("should pause minting successfully", async () => {
           const tx = await systemState.connect(pauserAccount).pauseMinting()
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
 
           expect(await systemState.isMintingPaused()).to.be.true
           await expect(tx)
             .to.emit(systemState, "MintingPaused")
-            .withArgs(pauserAccount.address)
+            .withArgs(pauserAccount.address, currentBlock.timestamp)
         })
 
         it("should revert when already paused", async () => {
@@ -112,11 +113,12 @@ describe("SystemState", () => {
 
         it("should unpause minting successfully", async () => {
           const tx = await systemState.connect(pauserAccount).unpauseMinting()
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
 
           expect(await systemState.isMintingPaused()).to.be.false
           await expect(tx)
             .to.emit(systemState, "MintingUnpaused")
-            .withArgs(pauserAccount.address)
+            .withArgs(pauserAccount.address, currentBlock.timestamp)
         })
 
         it("should revert when not paused", async () => {
@@ -131,11 +133,12 @@ describe("SystemState", () => {
       describe("pauseRedemption", () => {
         it("should pause redemption successfully", async () => {
           const tx = await systemState.connect(pauserAccount).pauseRedemption()
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
 
           expect(await systemState.isRedemptionPaused()).to.be.true
           await expect(tx)
             .to.emit(systemState, "RedemptionPaused")
-            .withArgs(pauserAccount.address)
+            .withArgs(pauserAccount.address, currentBlock.timestamp)
         })
 
         it("should revert when already paused", async () => {
@@ -156,11 +159,12 @@ describe("SystemState", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .unpauseRedemption()
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
 
           expect(await systemState.isRedemptionPaused()).to.be.false
           await expect(tx)
             .to.emit(systemState, "RedemptionUnpaused")
-            .withArgs(pauserAccount.address)
+            .withArgs(pauserAccount.address, currentBlock.timestamp)
         })
 
         it("should revert when not paused", async () => {
@@ -175,11 +179,12 @@ describe("SystemState", () => {
       describe("pauseRegistry", () => {
         it("should pause registry successfully", async () => {
           const tx = await systemState.connect(pauserAccount).pauseRegistry()
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
 
           expect(await systemState.isRegistryPaused()).to.be.true
           await expect(tx)
             .to.emit(systemState, "RegistryPaused")
-            .withArgs(pauserAccount.address)
+            .withArgs(pauserAccount.address, currentBlock.timestamp)
         })
 
         it("should revert when already paused", async () => {
@@ -198,11 +203,12 @@ describe("SystemState", () => {
 
         it("should unpause registry successfully", async () => {
           const tx = await systemState.connect(pauserAccount).unpauseRegistry()
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
 
           expect(await systemState.isRegistryPaused()).to.be.false
           await expect(tx)
             .to.emit(systemState, "RegistryUnpaused")
-            .withArgs(pauserAccount.address)
+            .withArgs(pauserAccount.address, currentBlock.timestamp)
         })
 
         it("should revert when not paused", async () => {
@@ -246,6 +252,7 @@ describe("SystemState", () => {
     context("when called by parameter admin", () => {
       describe("setMinMintAmount", () => {
         it("should update min mint amount successfully", async () => {
+          const oldAmount = await systemState.minMintAmount()
           const tx = await systemState
             .connect(adminAccount)
             .setMinMintAmount(testMinMintAmount)
@@ -253,12 +260,13 @@ describe("SystemState", () => {
           expect(await systemState.minMintAmount()).to.equal(testMinMintAmount)
           await expect(tx)
             .to.emit(systemState, "MinMintAmountUpdated")
-            .withArgs(testMinMintAmount, adminAccount.address)
+            .withArgs(oldAmount, testMinMintAmount, adminAccount.address)
         })
 
-        it("should allow zero min amount", async () => {
-          await systemState.connect(adminAccount).setMinMintAmount(0)
-          expect(await systemState.minMintAmount()).to.equal(0)
+        it("should revert with zero min amount", async () => {
+          await expect(
+            systemState.connect(adminAccount).setMinMintAmount(0)
+          ).to.be.revertedWith("Invalid amount")
         })
 
         it("should allow updating multiple times", async () => {
@@ -274,6 +282,7 @@ describe("SystemState", () => {
 
       describe("setMaxMintAmount", () => {
         it("should update max mint amount successfully", async () => {
+          const oldAmount = await systemState.maxMintAmount()
           const tx = await systemState
             .connect(adminAccount)
             .setMaxMintAmount(testMaxMintAmount)
@@ -281,13 +290,13 @@ describe("SystemState", () => {
           expect(await systemState.maxMintAmount()).to.equal(testMaxMintAmount)
           await expect(tx)
             .to.emit(systemState, "MaxMintAmountUpdated")
-            .withArgs(testMaxMintAmount, adminAccount.address)
+            .withArgs(oldAmount, testMaxMintAmount, adminAccount.address)
         })
 
         it("should revert with zero max amount", async () => {
           await expect(
             systemState.connect(adminAccount).setMaxMintAmount(0)
-          ).to.be.revertedWith("Max amount must be greater than zero")
+          ).to.be.revertedWith("Max amount cannot be less than min amount")
         })
 
         it("should allow very large amounts", async () => {
@@ -300,6 +309,7 @@ describe("SystemState", () => {
 
       describe("setRedemptionTimeout", () => {
         it("should update redemption timeout successfully", async () => {
+          const oldTimeout = await systemState.redemptionTimeout()
           const tx = await systemState
             .connect(adminAccount)
             .setRedemptionTimeout(testRedemptionTimeout)
@@ -309,13 +319,13 @@ describe("SystemState", () => {
           )
           await expect(tx)
             .to.emit(systemState, "RedemptionTimeoutUpdated")
-            .withArgs(testRedemptionTimeout, adminAccount.address)
+            .withArgs(oldTimeout, testRedemptionTimeout, adminAccount.address)
         })
 
         it("should revert with zero timeout", async () => {
           await expect(
             systemState.connect(adminAccount).setRedemptionTimeout(0)
-          ).to.be.revertedWith("Timeout must be greater than zero")
+          ).to.be.revertedWith("Invalid timeout")
         })
 
         it("should handle various timeout values", async () => {
@@ -333,6 +343,7 @@ describe("SystemState", () => {
 
       describe("setStaleThreshold", () => {
         it("should update stale threshold successfully", async () => {
+          const oldThreshold = await systemState.staleThreshold()
           const tx = await systemState
             .connect(adminAccount)
             .setStaleThreshold(testStaleThreshold)
@@ -342,13 +353,13 @@ describe("SystemState", () => {
           )
           await expect(tx)
             .to.emit(systemState, "StaleThresholdUpdated")
-            .withArgs(testStaleThreshold, adminAccount.address)
+            .withArgs(oldThreshold, testStaleThreshold, adminAccount.address)
         })
 
         it("should revert with zero threshold", async () => {
           await expect(
             systemState.connect(adminAccount).setStaleThreshold(0)
-          ).to.be.revertedWith("Threshold must be greater than zero")
+          ).to.be.revertedWith("Invalid threshold")
         })
 
         it("should handle various threshold values", async () => {
@@ -519,21 +530,27 @@ describe("SystemState", () => {
     })
 
     context("boundary conditions", () => {
-      it("should handle maximum values for parameters", async () => {
+      it("should handle maximum allowed values for parameters", async () => {
         const maxUint256 = ethers.constants.MaxUint256
+        const maxTimeout = 30 * 24 * 3600 // 30 days
+        const maxThreshold = 7 * 24 * 3600 // 7 days
 
         await systemState.connect(adminAccount).setMaxMintAmount(maxUint256)
         expect(await systemState.maxMintAmount()).to.equal(maxUint256)
 
-        await systemState.connect(adminAccount).setRedemptionTimeout(maxUint256)
-        expect(await systemState.redemptionTimeout()).to.equal(maxUint256)
+        await systemState.connect(adminAccount).setRedemptionTimeout(maxTimeout)
+        expect(await systemState.redemptionTimeout()).to.equal(maxTimeout)
 
-        await systemState.connect(adminAccount).setStaleThreshold(maxUint256)
-        expect(await systemState.staleThreshold()).to.equal(maxUint256)
+        await systemState.connect(adminAccount).setStaleThreshold(maxThreshold)
+        expect(await systemState.staleThreshold()).to.equal(maxThreshold)
       })
 
       it("should handle very small non-zero values", async () => {
         const smallValue = 1
+        
+        // First set min amount to 1 to allow setting max amount to 1
+        await systemState.connect(adminAccount).setMinMintAmount(smallValue)
+        expect(await systemState.minMintAmount()).to.equal(smallValue)
 
         await systemState.connect(adminAccount).setMaxMintAmount(smallValue)
         expect(await systemState.maxMintAmount()).to.equal(smallValue)

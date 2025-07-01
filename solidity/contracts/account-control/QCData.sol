@@ -10,51 +10,51 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// 3-state models as specified in the architecture.
 contract QCData is AccessControl {
     bytes32 public constant QC_MANAGER_ROLE = keccak256("QC_MANAGER_ROLE");
-    
+
     /// @dev QC status enumeration - simple 3-state model
     enum QCStatus {
-        Active,     // QC is fully operational with minting/redemption rights
+        Active, // QC is fully operational with minting/redemption rights
         UnderReview, // QC's minting rights are paused pending review
-        Revoked     // QC's rights are permanently terminated
+        Revoked // QC's rights are permanently terminated
     }
-    
+
     /// @dev Wallet status enumeration - comprehensive 4-state model
     enum WalletStatus {
-        Inactive,               // Wallet is registered but not yet active
-        Active,                 // Wallet is active and operational
-        PendingDeRegistration,  // Wallet deregistration requested, pending finalization
-        Deregistered           // Wallet has been permanently deregistered
+        Inactive, // Wallet is registered but not yet active
+        Active, // Wallet is active and operational
+        PendingDeRegistration, // Wallet deregistration requested, pending finalization
+        Deregistered // Wallet has been permanently deregistered
     }
-    
+
     /// @dev Qualified Custodian data structure - optimized for gas efficiency
     struct Custodian {
-        uint256 totalMintedAmount;      // Total tBTC minted by this QC
-        uint256 maxMintingCapacity;     // Maximum tBTC this QC can mint
-        uint256 registeredAt;           // Timestamp when QC was registered
-        QCStatus status;                // Pack enum with next field
-        string[] walletAddresses;       // Array of registered wallet addresses
+        uint256 totalMintedAmount; // Total tBTC minted by this QC
+        uint256 maxMintingCapacity; // Maximum tBTC this QC can mint
+        uint256 registeredAt; // Timestamp when QC was registered
+        QCStatus status; // Pack enum with next field
+        string[] walletAddresses; // Array of registered wallet addresses
         mapping(string => WalletStatus) walletStatuses;
         mapping(string => uint256) walletRegistrationTimes;
     }
-    
+
     /// @dev Wallet information structure
     struct WalletInfo {
         address qc;
         WalletStatus status;
         uint256 registeredAt;
     }
-    
+
     /// @dev Maps QC addresses to their data
     mapping(address => Custodian) private custodians;
-    
+
     /// @dev Maps wallet addresses to their information
     mapping(string => WalletInfo) private wallets;
-    
+
     /// @dev Array of all registered QC addresses
     address[] private registeredQCs;
-    
+
     // =================== STANDARDIZED EVENTS ===================
-    
+
     /// @dev Emitted when a QC is registered
     event QCRegistered(
         address indexed qc,
@@ -62,7 +62,7 @@ contract QCData is AccessControl {
         uint256 indexed maxMintingCapacity,
         uint256 timestamp
     );
-    
+
     /// @dev Emitted when a QC's status changes
     event QCStatusChanged(
         address indexed qc,
@@ -72,7 +72,7 @@ contract QCData is AccessControl {
         address changedBy,
         uint256 timestamp
     );
-    
+
     /// @dev Emitted when a wallet is registered
     event WalletRegistered(
         address indexed qc,
@@ -80,7 +80,7 @@ contract QCData is AccessControl {
         address indexed registeredBy,
         uint256 indexed timestamp
     );
-    
+
     /// @dev Emitted when wallet deregistration is requested
     event WalletDeRegistrationRequested(
         address indexed qc,
@@ -88,7 +88,7 @@ contract QCData is AccessControl {
         address indexed requestedBy,
         uint256 indexed timestamp
     );
-    
+
     /// @dev Emitted when wallet deregistration is finalized
     event WalletDeRegistrationFinalized(
         address indexed qc,
@@ -96,7 +96,7 @@ contract QCData is AccessControl {
         address indexed finalizedBy,
         uint256 indexed timestamp
     );
-    
+
     /// @dev Emitted when QC minted amount is updated
     event QCMintedAmountUpdated(
         address indexed qc,
@@ -105,7 +105,7 @@ contract QCData is AccessControl {
         address updatedBy,
         uint256 timestamp
     );
-    
+
     /// @dev Emitted when QC max minting capacity is updated
     event QCMaxMintingCapacityUpdated(
         address indexed qc,
@@ -114,59 +114,68 @@ contract QCData is AccessControl {
         address updatedBy,
         uint256 timestamp
     );
-    
+
     /// @dev Emitted when QC manager role is granted
     event QCManagerRoleGranted(
         address indexed manager,
         address indexed grantedBy,
         uint256 indexed timestamp
     );
-    
+
     /// @dev Emitted when QC manager role is revoked
     event QCManagerRoleRevoked(
         address indexed manager,
         address indexed revokedBy,
         uint256 indexed timestamp
     );
-    
+
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(QC_MANAGER_ROLE, msg.sender);
     }
-    
+
     /// @notice Grant QC_MANAGER_ROLE to an address (typically QCManager contract)
     /// @param manager The address to grant the role to
     /// @dev Only callable by DEFAULT_ADMIN_ROLE
-    function grantQCManagerRole(address manager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function grantQCManagerRole(address manager)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         require(manager != address(0), "Invalid manager address");
         _grantRole(QC_MANAGER_ROLE, manager);
         emit QCManagerRoleGranted(manager, msg.sender, block.timestamp);
     }
-    
+
     /// @notice Revoke QC_MANAGER_ROLE from an address
     /// @param manager The address to revoke the role from
     /// @dev Only callable by DEFAULT_ADMIN_ROLE
-    function revokeQCManagerRole(address manager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function revokeQCManagerRole(address manager)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         _revokeRole(QC_MANAGER_ROLE, manager);
         emit QCManagerRoleRevoked(manager, msg.sender, block.timestamp);
     }
-    
+
     /// @notice Register a new Qualified Custodian
     /// @param qc The address of the QC to register
     /// @param maxMintingCapacity The maximum minting capacity for this QC
-    function registerQC(address qc, uint256 maxMintingCapacity) external onlyRole(QC_MANAGER_ROLE) {
+    function registerQC(address qc, uint256 maxMintingCapacity)
+        external
+        onlyRole(QC_MANAGER_ROLE)
+    {
         require(qc != address(0), "Invalid QC address");
         require(custodians[qc].registeredAt == 0, "QC already registered");
         require(maxMintingCapacity > 0, "Invalid minting capacity");
-        
+
         custodians[qc].status = QCStatus.Active;
         custodians[qc].maxMintingCapacity = maxMintingCapacity;
         custodians[qc].registeredAt = block.timestamp;
         registeredQCs.push(qc);
-        
+
         emit QCRegistered(qc, msg.sender, maxMintingCapacity, block.timestamp);
     }
-    
+
     /// @notice Update QC status
     /// @param qc The address of the QC
     /// @param newStatus The new status for the QC
@@ -177,75 +186,90 @@ contract QCData is AccessControl {
         bytes32 reason
     ) external onlyRole(QC_MANAGER_ROLE) {
         require(isQCRegistered(qc), "QC not registered");
-        
+
         QCStatus oldStatus = custodians[qc].status;
         custodians[qc].status = newStatus;
-        
-        emit QCStatusChanged(qc, oldStatus, newStatus, reason, msg.sender, block.timestamp);
+
+        emit QCStatusChanged(
+            qc,
+            oldStatus,
+            newStatus,
+            reason,
+            msg.sender,
+            block.timestamp
+        );
     }
-    
+
     /// @notice Register a wallet for a QC
     /// @param qc The address of the QC
     /// @param btcAddress The Bitcoin address to register
-    function registerWallet(
-        address qc,
-        string calldata btcAddress
-    ) external onlyRole(QC_MANAGER_ROLE) {
+    function registerWallet(address qc, string calldata btcAddress)
+        external
+        onlyRole(QC_MANAGER_ROLE)
+    {
         require(isQCRegistered(qc), "QC not registered");
         require(bytes(btcAddress).length > 0, "Invalid wallet address");
         require(!isWalletRegistered(btcAddress), "Wallet already registered");
-        
+
         // Add to QC's wallet list
         custodians[qc].walletAddresses.push(btcAddress);
         custodians[qc].walletStatuses[btcAddress] = WalletStatus.Active;
         custodians[qc].walletRegistrationTimes[btcAddress] = block.timestamp;
-        
+
         // Store wallet info
         wallets[btcAddress] = WalletInfo({
             qc: qc,
             status: WalletStatus.Active,
             registeredAt: block.timestamp
         });
-        
+
         emit WalletRegistered(qc, btcAddress, msg.sender, block.timestamp);
     }
-    
+
     /// @notice Request wallet deregistration
     /// @param btcAddress The Bitcoin address to deregister
-    function requestWalletDeRegistration(
-        string calldata btcAddress
-    ) external onlyRole(QC_MANAGER_ROLE) {
+    function requestWalletDeRegistration(string calldata btcAddress)
+        external
+        onlyRole(QC_MANAGER_ROLE)
+    {
         require(isWalletRegistered(btcAddress), "Wallet not registered");
         require(isWalletActive(btcAddress), "Wallet not active");
-        
+
         address qc = wallets[btcAddress].qc;
-        custodians[qc].walletStatuses[btcAddress] = WalletStatus.PendingDeRegistration;
+        custodians[qc].walletStatuses[btcAddress] = WalletStatus
+            .PendingDeRegistration;
         wallets[btcAddress].status = WalletStatus.PendingDeRegistration;
-        
-        emit WalletDeRegistrationRequested(qc, btcAddress, msg.sender, block.timestamp);
+
+        emit WalletDeRegistrationRequested(
+            qc,
+            btcAddress,
+            msg.sender,
+            block.timestamp
+        );
     }
-    
+
     /// @notice Finalize wallet deregistration
     /// @param btcAddress The Bitcoin address to finalize deregistration
-    function finalizeWalletDeRegistration(
-        string calldata btcAddress
-    ) external onlyRole(QC_MANAGER_ROLE) {
+    function finalizeWalletDeRegistration(string calldata btcAddress)
+        external
+        onlyRole(QC_MANAGER_ROLE)
+    {
         require(isWalletRegistered(btcAddress), "Wallet not registered");
         require(
             wallets[btcAddress].status == WalletStatus.PendingDeRegistration,
             "Wallet not pending deregistration"
         );
-        
+
         address qc = wallets[btcAddress].qc;
         custodians[qc].walletStatuses[btcAddress] = WalletStatus.Deregistered;
         wallets[btcAddress].status = WalletStatus.Deregistered;
         // Note: Keep qc address for audit trail instead of zeroing it
-        
+
         // Remove wallet from QC's active list - cache storage array in memory for gas optimization
         string[] storage qcWallets = custodians[qc].walletAddresses;
         uint256 walletCount = qcWallets.length;
         bytes32 targetHash = keccak256(bytes(btcAddress));
-        
+
         for (uint256 i = 0; i < walletCount; i++) {
             if (keccak256(bytes(qcWallets[i])) == targetHash) {
                 qcWallets[i] = qcWallets[walletCount - 1];
@@ -253,142 +277,191 @@ contract QCData is AccessControl {
                 break;
             }
         }
-        
-        emit WalletDeRegistrationFinalized(qc, btcAddress, msg.sender, block.timestamp);
+
+        emit WalletDeRegistrationFinalized(
+            qc,
+            btcAddress,
+            msg.sender,
+            block.timestamp
+        );
     }
-    
+
     /// @notice Update QC minted amount
     /// @param qc The address of the QC
     /// @param newAmount The new total minted amount
-    function updateQCMintedAmount(
-        address qc,
-        uint256 newAmount
-    ) external onlyRole(QC_MANAGER_ROLE) {
+    function updateQCMintedAmount(address qc, uint256 newAmount)
+        external
+        onlyRole(QC_MANAGER_ROLE)
+    {
         require(isQCRegistered(qc), "QC not registered");
-        
+
         uint256 oldAmount = custodians[qc].totalMintedAmount;
         custodians[qc].totalMintedAmount = newAmount;
-        
-        emit QCMintedAmountUpdated(qc, oldAmount, newAmount, msg.sender, block.timestamp);
+
+        emit QCMintedAmountUpdated(
+            qc,
+            oldAmount,
+            newAmount,
+            msg.sender,
+            block.timestamp
+        );
     }
-    
+
     /// @notice Update QC max minting capacity
     /// @param qc The address of the QC
     /// @param newCapacity The new maximum minting capacity
-    function updateMaxMintingCapacity(
-        address qc,
-        uint256 newCapacity
-    ) external onlyRole(QC_MANAGER_ROLE) {
+    function updateMaxMintingCapacity(address qc, uint256 newCapacity)
+        external
+        onlyRole(QC_MANAGER_ROLE)
+    {
         require(isQCRegistered(qc), "QC not registered");
         require(newCapacity > 0, "Invalid capacity");
-        
+
         uint256 oldCapacity = custodians[qc].maxMintingCapacity;
         custodians[qc].maxMintingCapacity = newCapacity;
-        
-        emit QCMaxMintingCapacityUpdated(qc, oldCapacity, newCapacity, msg.sender, block.timestamp);
+
+        emit QCMaxMintingCapacityUpdated(
+            qc,
+            oldCapacity,
+            newCapacity,
+            msg.sender,
+            block.timestamp
+        );
     }
-    
+
     /// @notice Get QC status
     /// @param qc The address of the QC
     /// @return status The current status of the QC
     function getQCStatus(address qc) external view returns (QCStatus status) {
         return custodians[qc].status;
     }
-    
+
     /// @notice Get QC minted amount
     /// @param qc The address of the QC
     /// @return amount The total amount minted by the QC
-    function getQCMintedAmount(address qc) external view returns (uint256 amount) {
+    function getQCMintedAmount(address qc)
+        external
+        view
+        returns (uint256 amount)
+    {
         return custodians[qc].totalMintedAmount;
     }
-    
+
     /// @notice Get QC max minting capacity
     /// @param qc The address of the QC
     /// @return capacity The maximum minting capacity of the QC
-    function getMaxMintingCapacity(address qc) external view returns (uint256 capacity) {
+    function getMaxMintingCapacity(address qc)
+        external
+        view
+        returns (uint256 capacity)
+    {
         return custodians[qc].maxMintingCapacity;
     }
-    
+
     /// @notice Get QC minting data (capacity and current minted amount)
     /// @param qc The address of the QC
     /// @return maxCapacity The maximum minting capacity
     /// @return currentMinted The current minted amount
-    function getMintingData(address qc) external view returns (uint256 maxCapacity, uint256 currentMinted) {
-        return (custodians[qc].maxMintingCapacity, custodians[qc].totalMintedAmount);
+    function getMintingData(address qc)
+        external
+        view
+        returns (uint256 maxCapacity, uint256 currentMinted)
+    {
+        return (
+            custodians[qc].maxMintingCapacity,
+            custodians[qc].totalMintedAmount
+        );
     }
-    
+
     /// @notice Get wallet status
     /// @param btcAddress The Bitcoin address
     /// @return status The current status of the wallet
-    function getWalletStatus(string calldata btcAddress) 
-        external 
-        view 
-        returns (WalletStatus status) 
+    function getWalletStatus(string calldata btcAddress)
+        external
+        view
+        returns (WalletStatus status)
     {
         return wallets[btcAddress].status;
     }
-    
+
     /// @notice Get wallet owner QC
     /// @param btcAddress The Bitcoin address
     /// @return qc The address of the QC that owns the wallet
-    function getWalletOwner(string calldata btcAddress) 
-        external 
-        view 
-        returns (address qc) 
+    function getWalletOwner(string calldata btcAddress)
+        external
+        view
+        returns (address qc)
     {
         return wallets[btcAddress].qc;
     }
-    
+
     /// @notice Get all registered QCs
     /// @return qcs Array of all registered QC addresses
     function getAllQCs() external view returns (address[] memory qcs) {
         return registeredQCs;
     }
-    
+
     /// @notice Get QC wallet addresses
     /// @param qc The address of the QC
     /// @return addresses Array of wallet addresses for the QC
-    function getQCWallets(address qc) 
-        external 
-        view 
-        returns (string[] memory addresses) 
+    function getQCWallets(address qc)
+        external
+        view
+        returns (string[] memory addresses)
     {
         return custodians[qc].walletAddresses;
     }
-    
+
     /// @notice Check if QC is registered
     /// @param qc The address of the QC
     /// @return registered True if the QC is registered
     function isQCRegistered(address qc) public view returns (bool registered) {
         return custodians[qc].registeredAt != 0;
     }
-    
+
     /// @notice Check if wallet is currently active
     /// @param btcAddress The Bitcoin address
     /// @return active True if the wallet is active
-    function isWalletActive(string calldata btcAddress) public view returns (bool active) {
+    function isWalletActive(string calldata btcAddress)
+        public
+        view
+        returns (bool active)
+    {
         return wallets[btcAddress].status == WalletStatus.Active;
     }
-    
+
     /// @notice Check if wallet has been deregistered
     /// @param btcAddress The Bitcoin address
     /// @return deregistered True if the wallet has been deregistered
-    function isWalletDeregistered(string calldata btcAddress) external view returns (bool deregistered) {
+    function isWalletDeregistered(string calldata btcAddress)
+        external
+        view
+        returns (bool deregistered)
+    {
         return wallets[btcAddress].status == WalletStatus.Deregistered;
     }
-    
+
     /// @notice Check if wallet is registered
     /// @param btcAddress The Bitcoin address
     /// @return registered True if the wallet is registered
-    function isWalletRegistered(string calldata btcAddress) public view returns (bool registered) {
+    function isWalletRegistered(string calldata btcAddress)
+        public
+        view
+        returns (bool registered)
+    {
         return wallets[btcAddress].registeredAt != 0;
     }
-    
+
     /// @notice Check if wallet can be activated (is inactive but not deregistered)
     /// @param btcAddress The Bitcoin address
     /// @return canActivate True if the wallet can be activated
-    function canActivateWallet(string calldata btcAddress) external view returns (bool canActivate) {
-        return wallets[btcAddress].status == WalletStatus.Inactive && 
-               wallets[btcAddress].registeredAt != 0;
+    function canActivateWallet(string calldata btcAddress)
+        external
+        view
+        returns (bool canActivate)
+    {
+        return
+            wallets[btcAddress].status == WalletStatus.Inactive &&
+            wallets[btcAddress].registeredAt != 0;
     }
 }

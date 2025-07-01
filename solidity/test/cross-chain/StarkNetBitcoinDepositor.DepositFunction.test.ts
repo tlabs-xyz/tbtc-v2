@@ -85,17 +85,17 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     depositor = StarkNetBitcoinDepositor.attach(proxy.address)
 
     // Verify initialization
-    // console.log("Vault address:", tbtcVault.address)
-    // console.log("Vault tbtcToken:", await tbtcVault.tbtcToken())
-    // console.log("Depositor tbtcToken:", await depositor.tbtcToken())
-    // console.log("Depositor tbtcVault:", await depositor.tbtcVault())
+    console.log("Vault address:", tbtcVault.address)
+    console.log("Vault tbtcToken:", await tbtcVault.tbtcToken())
+    console.log("Depositor tbtcToken:", await depositor.tbtcToken())
+    console.log("Depositor tbtcVault:", await depositor.tbtcVault())
 
     // Debug: Check if we can manually get the token from vault
     // const ITBTCVault = await ethers.getContractAt(
     //   "ITBTCVault",
     //   tbtcVault.address
     // )
-    // console.log("Manual vault.tbtcToken():", await ITBTCVault.tbtcToken())
+    console.log("Manual vault.tbtcToken():", await ITBTCVault.tbtcToken())
   })
 
   beforeEach(async () => {
@@ -136,18 +136,18 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       await tbtcToken.mint(depositor.address, depositAmount)
 
       // Debug logging
-      // console.log("=== Debug Info ===")
-      // console.log(
-      //   "tbtcToken address from depositor:",
-      //   await depositor.tbtcToken()
-      // )
-      // console.log("Expected tbtcToken address:", tbtcToken.address)
-      // console.log("Depositor address:", depositor.address)
-      // console.log(
-      //   "Depositor tBTC balance:",
-      //   await tbtcToken.balanceOf(depositor.address)
-      // )
-      // console.log("==================")
+      console.log("=== Debug Info ===")
+      console.log(
+        "tbtcToken address from depositor:",
+        await depositor.tbtcToken()
+      )
+      console.log("Expected tbtcToken address:", tbtcToken.address)
+      console.log("Depositor address:", depositor.address)
+      console.log(
+        "Depositor tBTC balance:",
+        await tbtcToken.balanceOf(depositor.address)
+      )
+      console.log("==================")
 
       // Finalize deposit - this should call deposit(), not depositWithMessage()
       await depositor.finalizeDeposit(depositKey, {

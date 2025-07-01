@@ -33,6 +33,7 @@ import "./Redemption.sol";
 ///         amount. The goal of this penalty is to introduce a cost that guards
 ///         against repeated malicious redemption requests.
 // slither-disable-next-line missing-inheritance
+// solhint-disable-next-line max-states-count
 contract RedemptionWatchtower is OwnableUpgradeable {
     struct VetoProposal {
         // Address of the redeemer that requested the redemption.
