@@ -144,9 +144,10 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
         bytes memory redemptionOutputScript,
         uint256 amount
     ) internal returns (uint256 redemptionKey, uint256 tbtcAmount) {
-        // Approve the TBTC vault to pull tBTC tokens from this contract to proceed
-        // with unminting.
-        tbtcToken.approve(address(tbtcVault), amount);
+        // Reset approval to 0 and approve the TBTC vault to pull tBTC tokens from
+        // this contract to proceed with unminting.
+        tbtcToken.safeApprove(address(tbtcVault), 0);
+        tbtcToken.safeApprove(address(tbtcVault), amount);
         // Unmint tBTC tokens. This burns the ERC-20 tokens and credits this
         // contract's balance in the Bank with the corresponding value in satoshis.
         tbtcVault.unmint(amount);
