@@ -13,9 +13,15 @@ contract TestBTCRedeemer is AbstractBTCRedeemer {
     function initialize(
         address _bridge,
         address _tbtcToken,
-        address _bank
+        address _bank,
+        address _tbtcVault
     ) external {
-        __AbstractBTCRedeemer_initialize(_bridge, _tbtcToken, _bank);
+        __AbstractBTCRedeemer_initialize(
+            _bridge,
+            _tbtcToken,
+            _bank,
+            _tbtcVault
+        );
         _transferOwnership(msg.sender); // Set owner for rescueTbtc
     }
 

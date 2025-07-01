@@ -51,9 +51,15 @@ contract MockL1BTCRedeemerWormhole is
         address _thresholdBridge,
         address _wormholeTokenBridge,
         address _tbtcToken,
-        address _bank
+        address _bank,
+        address _tbtcVault
     ) external initializer {
-        __AbstractBTCRedeemer_initialize(_thresholdBridge, _tbtcToken, _bank);
+        __AbstractBTCRedeemer_initialize(
+            _thresholdBridge,
+            _tbtcToken,
+            _bank,
+            _tbtcVault
+        );
         __ReentrancyGuard_init();
         __Ownable_init();
 
