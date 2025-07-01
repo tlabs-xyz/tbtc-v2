@@ -38,8 +38,8 @@ describe("QCRedeemer", () => {
   let ARBITER_ROLE: string
 
   before(async () => {
-    // eslint-disable-next-line prettier/prettier
-    [deployer, governance, user, qcAddress, watchdog, thirdParty] =
+    // eslint-disable-next-line @typescript-eslint/no-extra-semi
+    ;[deployer, governance, user, qcAddress, watchdog, thirdParty] =
       await ethers.getSigners()
 
     // Generate service keys
@@ -197,13 +197,16 @@ describe("QCRedeemer", () => {
       })
 
       it("should emit RedemptionRequested event", async () => {
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(qcRedeemer, "RedemptionRequested")
           .withArgs(
             redemptionId,
             user.address,
             qcAddress.address,
-            redemptionAmount
+            redemptionAmount,
+            user.address,
+            currentBlock.timestamp
           )
       })
 
@@ -329,9 +332,17 @@ describe("QCRedeemer", () => {
       })
 
       it("should emit RedemptionFulfilled event", async () => {
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(qcRedeemer, "RedemptionFulfilled")
-          .withArgs(redemptionId)
+          .withArgs(
+            redemptionId,
+            user.address,
+            qcAddress.address,
+            redemptionAmount,
+            arbiter.address,
+            currentBlock.timestamp
+          )
       })
     })
   })
@@ -425,9 +436,18 @@ describe("QCRedeemer", () => {
       })
 
       it("should emit RedemptionDefaulted event", async () => {
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(qcRedeemer, "RedemptionDefaulted")
-          .withArgs(redemptionId, defaultReason)
+          .withArgs(
+            redemptionId,
+            user.address,
+            qcAddress.address,
+            ethers.utils.parseEther("5"),
+            defaultReason,
+            watchdog.address,
+            currentBlock.timestamp
+          )
       })
     })
   })
@@ -516,11 +536,26 @@ describe("QCRedeemer", () => {
   })
 
   describe("updateRedemptionPolicy", () => {
-    it("should emit RedemptionPolicyUpdated event", async () => {
+    it("should emit RedemptionPolicyUpdated event when called by admin", async () => {
       const tx = await qcRedeemer.updateRedemptionPolicy()
+      const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
       await expect(tx)
         .to.emit(qcRedeemer, "RedemptionPolicyUpdated")
-        .withArgs(mockRedemptionPolicy.address, mockRedemptionPolicy.address)
+        .withArgs(
+          mockRedemptionPolicy.address,
+          mockRedemptionPolicy.address,
+          deployer.address,
+          currentBlock.timestamp
+        )
+    })
+
+    it("should revert when called by non-admin", async () => {
+      const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
+      await expect(
+        qcRedeemer.connect(user).updateRedemptionPolicy()
+      ).to.be.revertedWith(
+        `AccessControl: account ${user.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
+      )
     })
   })
 

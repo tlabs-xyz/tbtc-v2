@@ -213,7 +213,12 @@ describe("Race Condition Tests", () => {
       })
 
       it("should handle multiple small concurrent mints correctly", async () => {
-        const { basicMintingPolicy, qcAddress } = fixture
+        const { qcMinter, qcAddress } = fixture
+
+        // Grant MINTER_ROLE to test users
+        const MINTER_ROLE = await qcMinter.MINTER_ROLE()
+        await qcMinter.grantRole(MINTER_ROLE, user1.address)
+        await qcMinter.grantRole(MINTER_ROLE, user2.address)
 
         const smallAmount = ethers.utils.parseEther("0.1")
         const numRequests = 10
@@ -223,9 +228,7 @@ describe("Race Condition Tests", () => {
         for (let i = 0; i < numRequests; i++) {
           const user = i % 2 === 0 ? user1 : user2 // Alternate between users
           promises.push(
-            basicMintingPolicy
-              .connect(user)
-              .requestMint(qcAddress.address, user.address, smallAmount)
+            qcMinter.connect(user).requestQCMint(qcAddress.address, smallAmount)
           )
         }
 
@@ -251,12 +254,16 @@ describe("Race Condition Tests", () => {
 
     context("Policy Update During Minting", () => {
       it("should handle policy updates during active minting operations", async () => {
-        const { protocolRegistry, basicMintingPolicy, qcAddress } = fixture
+        const { protocolRegistry, qcMinter, qcAddress } = fixture
+
+        // Grant MINTER_ROLE to user1
+        const MINTER_ROLE = await qcMinter.MINTER_ROLE()
+        await qcMinter.grantRole(MINTER_ROLE, user1.address)
 
         // Start a minting operation
-        const mintPromise = basicMintingPolicy
+        const mintPromise = qcMinter
           .connect(user1)
-          .requestMint(qcAddress.address, user1.address, mintAmount)
+          .requestQCMint(qcAddress.address, mintAmount)
 
         // Simulate policy update during minting (should not affect in-flight operations)
         // Note: This would require deploying a new policy contract
@@ -266,10 +273,7 @@ describe("Race Condition Tests", () => {
         await expect(
           protocolRegistry
             .connect(user2)
-            .setService(
-              await basicMintingPolicy.MINTING_POLICY_KEY(),
-              newPolicyAddress
-            )
+            .setService(await qcMinter.MINTING_POLICY_KEY(), newPolicyAddress)
         ).to.be.revertedWith("AccessControl: account")
 
         // Original minting should complete successfully
@@ -495,50 +499,43 @@ describe("Race Condition Tests", () => {
       })
 
       it("should prevent redemption ID collisions", async () => {
-        const { basicRedemptionPolicy, qcAddress, tbtc } = fixture
+        const { qcRedeemer, qcAddress, tbtc } = fixture
 
         const redemptionAmount = ethers.utils.parseEther("2")
-        tbtc.balanceOf.returns(redemptionAmount)
+        tbtc.balanceOf.whenCalledWith(user1.address).returns(redemptionAmount)
+        tbtc.balanceOf.whenCalledWith(user2.address).returns(redemptionAmount)
 
-        // Use the same redemption ID (collision scenario)
-        const redemptionId = ethers.utils.id("collision_test")
-
-        const redeem1 = basicRedemptionPolicy
+        // Race condition: Both users try to create redemptions simultaneously
+        const redeem1 = qcRedeemer
           .connect(user1)
-          .requestRedemption(
-            redemptionId,
-            qcAddress.address,
-            user1.address,
-            redemptionAmount,
-            TEST_DATA.BTC_ADDRESSES.TEST
-          )
+          .initiateRedemption(qcAddress.address, redemptionAmount)
 
-        const redeem2 = basicRedemptionPolicy
+        const redeem2 = qcRedeemer
           .connect(user2)
-          .requestRedemption(
-            redemptionId,
-            qcAddress.address,
-            user2.address,
-            redemptionAmount,
-            TEST_DATA.BTC_ADDRESSES.TEST
-          )
+          .initiateRedemption(qcAddress.address, redemptionAmount)
 
-        // First should succeed, second should fail due to ID collision
-        const results = await Promise.allSettled([redeem1, redeem2])
-        const successes = results.filter((r) => r.status === "fulfilled").length
-        const failures = results.filter((r) => r.status === "rejected").length
+        // Both should succeed with unique IDs
+        const results = await Promise.all([redeem1, redeem2])
 
-        // Exactly one should succeed, one should fail due to collision detection
-        expect(successes).to.equal(1)
-        expect(failures).to.equal(1)
+        // Extract redemption IDs from events
+        const [tx1, tx2] = results
+        const receipt1 = await tx1.wait()
+        const receipt2 = await tx2.wait()
 
-        // Verify the failure is due to redemption ID collision
-        const rejectedResult = results.find(
-          (r) => r.status === "rejected"
-        ) as PromiseRejectedResult
-        expect(rejectedResult.reason.message).to.include(
-          "Redemption ID already used"
+        const event1 = receipt1.events?.find(
+          (e: any) => e.event === "RedemptionRequested"
         )
+        const event2 = receipt2.events?.find(
+          (e: any) => e.event === "RedemptionRequested"
+        )
+
+        const id1 = event1?.args?.redemptionId
+        const id2 = event2?.args?.redemptionId
+
+        // IDs should be unique
+        expect(id1).to.not.equal(id2)
+        expect(id1).to.not.be.undefined
+        expect(id2).to.not.be.undefined
       })
     })
 
@@ -604,6 +601,10 @@ describe("Race Condition Tests", () => {
     context("Service Update Race Conditions", () => {
       it("should maintain consistency during service updates", async () => {
         const { protocolRegistry, qcMinter, qcAddress } = fixture
+
+        // Grant MINTER_ROLE to user1
+        const MINTER_ROLE = await qcMinter.MINTER_ROLE()
+        await qcMinter.grantRole(MINTER_ROLE, user1.address)
 
         // Start an operation using current service
         const mintPromise = qcMinter

@@ -16,15 +16,15 @@ interface IMintingPolicy {
         address user,
         uint256 amount
     ) external returns (bytes32 mintId);
-    
+
     /// @notice Get available minting capacity for a QC
     /// @param qc The address of the Qualified Custodian
     /// @return availableCapacity The amount available for minting
-    function getAvailableMintingCapacity(address qc) 
-        external 
-        view 
+    function getAvailableMintingCapacity(address qc)
+        external
+        view
         returns (uint256 availableCapacity);
-    
+
     /// @notice Check if a QC is eligible for minting
     /// @param qc The address of the Qualified Custodian
     /// @param amount The amount to mint
