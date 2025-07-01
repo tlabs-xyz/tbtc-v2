@@ -28,6 +28,7 @@ import "../bridge/Bridge.sol";
 ///         and are refunded for the spent gas from the `ReimbursementPool`.
 ///         There are two types of maintainers: wallet maintainers and SPV
 ///         maintainers.
+// solhint-disable-next-line max-states-count
 contract MaintainerProxy is Ownable, Reimbursable {
     Bridge public bridge;
 

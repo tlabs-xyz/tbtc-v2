@@ -99,6 +99,7 @@ abstract contract AbstractBTCDepositor {
     /// @notice Initializes the contract. MUST BE CALLED from the child
     ///         contract initializer.
     // slither-disable-next-line dead-code
+    // solhint-disable-next-line func-name-mixedcase
     function __AbstractBTCDepositor_initialize(
         address _bridge,
         address _tbtcVault

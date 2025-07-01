@@ -171,16 +171,16 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
       await expect(initTx).to.emit(bridge, "DepositRevealed")
 
       // Step 2: Simulate tBTC minting (mock bridge behavior)
-      // console.log(
-      //   "Attempting to sweep deposit with key:",
-      //   depositKey.toString()
-      // )
-      // console.log("Deposit key as hex:", depositKey.toHexString())
+      console.log(
+        "Attempting to sweep deposit with key:",
+        depositKey.toString()
+      )
+      console.log("Deposit key as hex:", depositKey.toHexString())
       // const storedKeys = await bridge.getDepositKeys()
-      // console.log(
-      //   "Stored deposit keys:",
-      //   storedKeys.map((k) => k.toString())
-      // )
+      console.log(
+        "Stored deposit keys:",
+        storedKeys.map((k) => k.toString())
+      )
 
       await bridge.sweepDeposit(depositKey)
       await tbtcToken.mint(depositor.address, DEPOSIT_AMOUNT.sub(TREASURY_FEE))
@@ -373,7 +373,7 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
 
       // Check initial balance
       const initialBalance = await tbtcToken.balanceOf(depositor.address)
-      // console.log("Initial depositor balance:", initialBalance.toString())
+      console.log("Initial depositor balance:", initialBalance.toString())
       expect(initialBalance).to.equal(0) // Should be 0 at start
 
       // Initialize deposit
@@ -386,7 +386,7 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
 
       // Check balance after minting
       const balanceAfterMint = await tbtcToken.balanceOf(depositor.address)
-      // console.log("Balance after mint:", balanceAfterMint.toString())
+      console.log("Balance after mint:", balanceAfterMint.toString())
       expect(balanceAfterMint).to.equal(insufficientAmount)
 
       // Finalization should fail due to insufficient balance for calculated amount
@@ -441,8 +441,8 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
       expect(await starkGateBridge.getDepositCount()).to.equal(numberOfDeposits)
 
       // Log performance metrics (informational)
-      // console.log(`Processed ${numberOfDeposits} deposits in ${totalTime}ms`)
-      // console.log(`Average time per deposit: ${totalTime / numberOfDeposits}ms`)
+      console.log(`Processed ${numberOfDeposits} deposits in ${totalTime}ms`)
+      console.log(`Average time per deposit: ${totalTime / numberOfDeposits}ms`)
     })
 
     it("should maintain gas efficiency across multiple deposits", async () => {
@@ -528,14 +528,14 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
       const finalizeReceipt = await finalizeTx.wait()
 
       // Log gas breakdown
-      // console.log("Gas Cost Analysis:")
-      // console.log(`  Initialization: ${initReceipt.gasUsed.toString()} gas`)
-      // console.log(`  Finalization: ${finalizeReceipt.gasUsed.toString()} gas`)
-      // console.log(
-      //   `  Total: ${initReceipt.gasUsed
-      //     .add(finalizeReceipt.gasUsed)
-      //     .toString()} gas`
-      // )
+      console.log("Gas Cost Analysis:")
+      console.log(`  Initialization: ${initReceipt.gasUsed.toString()} gas`)
+      console.log(`  Finalization: ${finalizeReceipt.gasUsed.toString()} gas`)
+      console.log(
+        `  Total: ${initReceipt.gasUsed
+          .add(finalizeReceipt.gasUsed)
+          .toString()} gas`
+      )
 
       // Verify current gas costs (TODO: optimize to 150k target in T-016)
       expect(initReceipt.gasUsed.toNumber()).to.be.lessThan(220000) // Current: ~210k, target: 150k

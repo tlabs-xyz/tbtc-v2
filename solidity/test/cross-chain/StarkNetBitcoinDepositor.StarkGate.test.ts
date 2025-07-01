@@ -54,9 +54,9 @@ describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
       const receipt = await tx.wait()
       const gasUsedWithMessage = receipt.gasUsed
 
-      // console.log(
-      //   `\nGas used with depositWithMessage (empty array): ${gasUsedWithMessage}`
-      // )
+      console.log(
+        `\nGas used with depositWithMessage (empty array): ${gasUsedWithMessage}`
+      )
 
       // Store for comparison
       expect(gasUsedWithMessage).to.be.gt(20000) // Typical base cost
@@ -64,26 +64,26 @@ describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
 
     it("should document StarkGate interface research findings", async () => {
       // GREEN: Based on StarkGate documentation research
-      // console.log("\n=== StarkGate Interface Research ===")
-      // console.log("Based on official documentation and contract analysis:")
-      // console.log("1. StarkGate has TWO deposit functions:")
-      // console.log("   - deposit(token, amount, l2Recipient)")
-      // console.log(
-      //   "   - depositWithMessage(token, amount, l2Recipient, message[])"
-      // )
-      // console.log("")
-      // console.log("2. Key differences:")
-      // console.log("   - deposit(): Simple token transfer, no L2 callback")
-      // console.log(
-      //   "   - depositWithMessage(): Can trigger L2 contract execution"
-      // )
-      // console.log("")
-      // console.log(
-      //   "3. Current implementation uses depositWithMessage with empty array"
-      // )
-      // console.log(
-      //   "   This adds unnecessary overhead (~2000 gas) for array processing"
-      // )
+      console.log("\n=== StarkGate Interface Research ===")
+      console.log("Based on official documentation and contract analysis:")
+      console.log("1. StarkGate has TWO deposit functions:")
+      console.log("   - deposit(token, amount, l2Recipient)")
+      console.log(
+        "   - depositWithMessage(token, amount, l2Recipient, message[])"
+      )
+      console.log("")
+      console.log("2. Key differences:")
+      console.log("   - deposit(): Simple token transfer, no L2 callback")
+      console.log(
+        "   - depositWithMessage(): Can trigger L2 contract execution"
+      )
+      console.log("")
+      console.log(
+        "3. Current implementation uses depositWithMessage with empty array"
+      )
+      console.log(
+        "   This adds unnecessary overhead (~2000 gas) for array processing"
+      )
 
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(true).to.be.true // Document findings
@@ -116,7 +116,7 @@ describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
       expect(lastCall.l2Recipient).to.equal(TEST_RECIPIENT)
       expect(lastCall.amount).to.equal(TEST_AMOUNT)
 
-      // console.log("\nEmpty array handling confirmed - no issues")
+      console.log("\nEmpty array handling confirmed - no issues")
     })
   })
 
@@ -125,16 +125,16 @@ describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
       // GREEN: Document fee analysis
       const feeEstimate = await starkGateBridge.estimateDepositFeeWei()
 
-      // console.log("\n=== Fee Analysis ===")
-      // console.log(
-      //   `Base message fee: ${ethers.utils.formatEther(feeEstimate)} ETH`
-      // )
-      // console.log("Fee structure findings:")
-      // console.log(
-      //   "- Fees are the same for both deposit() and depositWithMessage()"
-      // )
-      // console.log("- Empty message array does NOT affect L1->L2 messaging fees")
-      // console.log("- Only L1 gas costs differ between functions")
+      console.log("\n=== Fee Analysis ===")
+      console.log(
+        `Base message fee: ${ethers.utils.formatEther(feeEstimate)} ETH`
+      )
+      console.log("Fee structure findings:")
+      console.log(
+        "- Fees are the same for both deposit() and depositWithMessage()"
+      )
+      console.log("- Empty message array does NOT affect L1->L2 messaging fees")
+      console.log("- Only L1 gas costs differ between functions")
 
       expect(feeEstimate).to.equal(MESSAGE_FEE)
     })
@@ -153,23 +153,23 @@ describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
           "For simple tBTC transfers without L2 callbacks, deposit() is more efficient",
       }
 
-      // console.log("\n=== P-002 Research Findings ===")
-      // console.log(JSON.stringify(findings, null, 2))
-      // console.log("\n=== Recommendation ===")
-      // console.log(
-      //   "UPDATE StarkNetBitcoinDepositor to use simpler deposit() function"
-      // )
-      // console.log("This will:")
-      // console.log("- Save ~2000 gas per transaction")
-      // console.log("- Simplify the code (no empty array needed)")
-      // console.log("- Align with StarkGate's intended usage pattern")
-      // console.log("\n=== Implementation Change ===")
-      // console.log("Replace:")
-      // console.log(
-      //   "  starkGateBridge.depositWithMessage(token, amount, recipient, [])"
-      // )
-      // console.log("With:")
-      // console.log("  starkGateBridge.deposit(token, amount, recipient)")
+      console.log("\n=== P-002 Research Findings ===")
+      console.log(JSON.stringify(findings, null, 2))
+      console.log("\n=== Recommendation ===")
+      console.log(
+        "UPDATE StarkNetBitcoinDepositor to use simpler deposit() function"
+      )
+      console.log("This will:")
+      console.log("- Save ~2000 gas per transaction")
+      console.log("- Simplify the code (no empty array needed)")
+      console.log("- Align with StarkGate's intended usage pattern")
+      console.log("\n=== Implementation Change ===")
+      console.log("Replace:")
+      console.log(
+        "  starkGateBridge.depositWithMessage(token, amount, recipient, [])"
+      )
+      console.log("With:")
+      console.log("  starkGateBridge.deposit(token, amount, recipient)")
 
       // Research complete
       expect(findings.recommendedFunction).to.equal("deposit")

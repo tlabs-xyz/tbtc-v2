@@ -141,8 +141,7 @@ describe("SingleWatchdog", () => {
       it("should submit reserve attestation successfully", async () => {
         const tx = await singleWatchdog.attestReserves(
           qcAddress.address,
-          reserveBalance,
-          condition
+          reserveBalance
         )
 
         expect(
@@ -150,14 +149,15 @@ describe("SingleWatchdog", () => {
         ).to.have.been.calledWith(qcAddress.address, reserveBalance)
 
         await expect(tx)
-          .to.emit(singleWatchdog, "WatchdogAttestation")
+          .to.emit(singleWatchdog, "WatchdogReserveAttestation")
           .withArgs(
             qcAddress.address,
             reserveBalance,
+            0, // oldBalance
+            deployer.address,
             (
               await ethers.provider.getBlock(tx.blockNumber)
-            ).timestamp,
-            condition
+            ).timestamp
           )
       })
 
@@ -165,8 +165,7 @@ describe("SingleWatchdog", () => {
         await expect(
           singleWatchdog.attestReserves(
             ethers.constants.AddressZero,
-            reserveBalance,
-            condition
+            reserveBalance
           )
         ).to.be.revertedWith("Invalid QC address")
       })
@@ -177,7 +176,7 @@ describe("SingleWatchdog", () => {
         await expect(
           singleWatchdog
             .connect(thirdParty)
-            .attestReserves(qcAddress.address, reserveBalance, condition)
+            .attestReserves(qcAddress.address, reserveBalance)
         ).to.be.revertedWith(
           `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${WATCHDOG_OPERATOR_ROLE}`
         )
@@ -244,9 +243,16 @@ describe("SingleWatchdog", () => {
           reason
         )
 
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(singleWatchdog, "WatchdogQCStatusChange")
-          .withArgs(qcAddress.address, 1, reason)
+          .withArgs(
+            qcAddress.address,
+            1,
+            reason,
+            deployer.address,
+            currentBlock.timestamp
+          )
       })
     })
   })
@@ -282,9 +288,16 @@ describe("SingleWatchdog", () => {
         expect(mockQcRedeemer.recordRedemptionFulfillment).to.have.been
           .calledOnce
 
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(singleWatchdog, "WatchdogRedemptionAction")
-          .withArgs(redemptionId, "FULFILLED", ethers.constants.HashZero)
+          .withArgs(
+            redemptionId,
+            "FULFILLED",
+            ethers.constants.HashZero,
+            deployer.address,
+            currentBlock.timestamp
+          )
       })
     })
   })
@@ -304,9 +317,16 @@ describe("SingleWatchdog", () => {
           reason
         )
 
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(singleWatchdog, "WatchdogRedemptionAction")
-          .withArgs(redemptionId, "DEFAULTED", reason)
+          .withArgs(
+            redemptionId,
+            "DEFAULTED",
+            reason,
+            deployer.address,
+            currentBlock.timestamp
+          )
       })
     })
   })
@@ -328,9 +348,16 @@ describe("SingleWatchdog", () => {
           reason
         )
 
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(singleWatchdog, "WatchdogQCStatusChange")
-          .withArgs(qcAddress.address, 2, reason)
+          .withArgs(
+            qcAddress.address,
+            2,
+            reason,
+            deployer.address,
+            currentBlock.timestamp
+          )
       })
     })
   })
@@ -348,12 +375,15 @@ describe("SingleWatchdog", () => {
         mockQcManager.verifyQCSolvency.returns(false)
         const tx = await singleWatchdog.verifySolvencyAndAct(qcAddress.address)
         // Enum QCStatus { Active, UnderReview, Revoked }
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(singleWatchdog, "WatchdogQCStatusChange")
           .withArgs(
             qcAddress.address,
             1,
-            ethers.utils.formatBytes32String("INSOLVENCY_DETECTED")
+            ethers.utils.formatBytes32String("INSOLVENCY_DETECTED"),
+            deployer.address,
+            currentBlock.timestamp
           )
       })
     })
@@ -369,7 +399,7 @@ describe("SingleWatchdog", () => {
       // Third party should now be able to attest reserves
       await singleWatchdog
         .connect(thirdParty)
-        .attestReserves(qcAddress.address, reserveBalance, condition)
+        .attestReserves(qcAddress.address, reserveBalance)
       expect(
         mockQcReserveLedger.submitReserveAttestation
       ).to.have.been.calledWith(qcAddress.address, reserveBalance)
@@ -382,11 +412,7 @@ describe("SingleWatchdog", () => {
       ).to.be.false
 
       await expect(
-        singleWatchdog.attestReserves(
-          qcAddress.address,
-          reserveBalance,
-          condition
-        )
+        singleWatchdog.attestReserves(qcAddress.address, reserveBalance)
       ).to.be.revertedWith(
         `AccessControl: account ${deployer.address.toLowerCase()} is missing role ${WATCHDOG_OPERATOR_ROLE}`
       )
@@ -413,11 +439,7 @@ describe("SingleWatchdog", () => {
       })
 
       it("should use updated services", async () => {
-        await singleWatchdog.attestReserves(
-          qcAddress.address,
-          reserveBalance,
-          condition
-        )
+        await singleWatchdog.attestReserves(qcAddress.address, reserveBalance)
         await singleWatchdog.registerWalletWithProof(
           qcAddress.address,
           btcAddress,
@@ -472,11 +494,7 @@ describe("SingleWatchdog", () => {
         )
 
         await expect(
-          singleWatchdog.attestReserves(
-            qcAddress.address,
-            reserveBalance,
-            condition
-          )
+          singleWatchdog.attestReserves(qcAddress.address, reserveBalance)
         ).to.be.reverted
       })
     })

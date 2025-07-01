@@ -15,25 +15,27 @@ import "../bridge/BitcoinTx.sol";
 /// attestations, wallet registration, and redemption arbitration.
 /// Integrates with all system components through ProtocolRegistry.
 contract SingleWatchdog is AccessControl {
-    bytes32 public constant WATCHDOG_OPERATOR_ROLE = keccak256("WATCHDOG_OPERATOR_ROLE");
-    
+    bytes32 public constant WATCHDOG_OPERATOR_ROLE =
+        keccak256("WATCHDOG_OPERATOR_ROLE");
+
     // Service keys for ProtocolRegistry
     bytes32 public constant QC_MANAGER_KEY = keccak256("QC_MANAGER");
     bytes32 public constant QC_DATA_KEY = keccak256("QC_DATA");
-    bytes32 public constant QC_RESERVE_LEDGER_KEY = keccak256("QC_RESERVE_LEDGER");
+    bytes32 public constant QC_RESERVE_LEDGER_KEY =
+        keccak256("QC_RESERVE_LEDGER");
     bytes32 public constant QC_REDEEMER_KEY = keccak256("QC_REDEEMER");
-    
+
     ProtocolRegistry public immutable protocolRegistry;
-    
+
     /// @dev Tracking for monitoring operations
     mapping(address => uint256) public lastAttestationTime;
     mapping(address => uint256) public attestationCount;
     mapping(string => uint256) public walletRegistrationTime;
     mapping(bytes32 => uint256) public redemptionHandlingTime;
-    
+
     /// @dev Events
     // =================== STANDARDIZED EVENTS ===================
-    
+
     /// @dev Emitted when Watchdog submits reserve attestation
     event WatchdogReserveAttestation(
         address indexed qc,
@@ -42,7 +44,7 @@ contract SingleWatchdog is AccessControl {
         address submittedBy,
         uint256 timestamp
     );
-    
+
     /// @dev Emitted when Watchdog takes action on redemption
     event WatchdogRedemptionAction(
         bytes32 indexed redemptionId,
@@ -51,7 +53,7 @@ contract SingleWatchdog is AccessControl {
         address indexed actionBy,
         uint256 timestamp
     );
-    
+
     /// @dev Emitted when Watchdog changes QC status
     event WatchdogQCStatusChange(
         address indexed qc,
@@ -60,37 +62,37 @@ contract SingleWatchdog is AccessControl {
         address indexed changedBy,
         uint256 timestamp
     );
-    
+
     /// @dev Emitted when Watchdog registers wallet
     event WatchdogWalletRegistration(
         address indexed qc,
         string btcAddress,
         bytes32 challengeHash
     );
-    
+
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(WATCHDOG_OPERATOR_ROLE, msg.sender);
     }
-    
+
     /// @notice Verify QC solvency (ARBITER_ROLE)
     /// @param qc The QC address
     /// @return solvent True if QC is solvent
-    function verifyQCSolvency(address qc) 
-        external 
-        onlyRole(WATCHDOG_OPERATOR_ROLE) 
-        returns (bool solvent) 
+    function verifyQCSolvency(address qc)
+        external
+        onlyRole(WATCHDOG_OPERATOR_ROLE)
+        returns (bool solvent)
     {
         require(qc != address(0), "Invalid QC address");
-        
+
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
         );
-        
+
         return qcManager.verifyQCSolvency(qc);
     }
-    
+
     /// @notice Set QC status (ARBITER_ROLE)
     /// @param qc The QC address
     /// @param status The new status (as uint256)
@@ -102,11 +104,11 @@ contract SingleWatchdog is AccessControl {
     ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
         require(qc != address(0), "Invalid QC address");
         require(reason != bytes32(0), "Reason required");
-        
+
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
         );
-        
+
         // Convert uint256 to QCStatus enum
         QCData.QCStatus qcStatus;
         if (status == 0) {
@@ -118,33 +120,45 @@ contract SingleWatchdog is AccessControl {
         } else {
             revert("Invalid status");
         }
-        
+
         qcManager.setQCStatus(qc, qcStatus, reason);
-        
-        emit WatchdogQCStatusChange(qc, qcStatus, reason, msg.sender, block.timestamp);
+
+        emit WatchdogQCStatusChange(
+            qc,
+            qcStatus,
+            reason,
+            msg.sender,
+            block.timestamp
+        );
     }
-    
+
     /// @notice Submit reserve attestation (ATTESTER_ROLE)
     /// @param qc The QC address
     /// @param balance The attested balance
-    function attestReserves(
-        address qc,
-        uint256 balance
-    ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
+    function attestReserves(address qc, uint256 balance)
+        external
+        onlyRole(WATCHDOG_OPERATOR_ROLE)
+    {
         require(qc != address(0), "Invalid QC address");
-        
+
         QCReserveLedger reserveLedger = QCReserveLedger(
             protocolRegistry.getService(QC_RESERVE_LEDGER_KEY)
         );
-        
+
         reserveLedger.submitReserveAttestation(qc, balance);
-        
+
         lastAttestationTime[qc] = block.timestamp;
         attestationCount[qc]++;
-        
-        emit WatchdogReserveAttestation(qc, balance, 0, msg.sender, block.timestamp);
+
+        emit WatchdogReserveAttestation(
+            qc,
+            balance,
+            0,
+            msg.sender,
+            block.timestamp
+        );
     }
-    
+
     /// @notice Register wallet with SPV proof (REGISTRAR_ROLE)
     /// @param qc The QC address
     /// @param btcAddress The Bitcoin address
@@ -160,23 +174,25 @@ contract SingleWatchdog is AccessControl {
         require(bytes(btcAddress).length > 0, "Invalid wallet address");
         require(spvProof.length > 0, "SPV proof required");
         require(challengeHash != bytes32(0), "Challenge hash required");
-        
+
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
         );
-        
+
         // Create placeholder SPV data structures for the new interface
         // In production, this would be constructed from actual SPV proof data
-        bytes32 challenge = keccak256(abi.encodePacked(qc, btcAddress, challengeHash));
-        
+        bytes32 challenge = keccak256(
+            abi.encodePacked(qc, btcAddress, challengeHash)
+        );
+
         // Create minimal transaction info structure
         BitcoinTx.Info memory txInfo = BitcoinTx.Info({
             version: bytes4(0x01000000),
             inputVector: spvProof, // Placeholder - use proof data as input vector
-            outputVector: spvProof, // Placeholder - use proof data as output vector  
+            outputVector: spvProof, // Placeholder - use proof data as output vector
             locktime: bytes4(0x00000000)
         });
-        
+
         // Create minimal proof structure
         BitcoinTx.Proof memory proof = BitcoinTx.Proof({
             merkleProof: spvProof, // Placeholder - use proof data as merkle proof
@@ -185,14 +201,14 @@ contract SingleWatchdog is AccessControl {
             coinbasePreimage: bytes32(0), // Placeholder coinbase preimage
             coinbaseProof: spvProof // Placeholder - use proof data as coinbase proof
         });
-        
+
         qcManager.registerWallet(qc, btcAddress, challenge, txInfo, proof);
-        
+
         walletRegistrationTime[btcAddress] = block.timestamp;
-        
+
         emit WatchdogWalletRegistration(qc, btcAddress, challengeHash);
     }
-    
+
     /// @notice Record redemption fulfillment (ARBITER_ROLE)
     /// @param redemptionId The redemption identifier
     /// @param userBtcAddress The user's Bitcoin address
@@ -208,39 +224,57 @@ contract SingleWatchdog is AccessControl {
     ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
         require(redemptionId != bytes32(0), "Invalid redemption ID");
         require(bytes(userBtcAddress).length > 0, "Bitcoin address required");
-        
+
         QCRedeemer redeemer = QCRedeemer(
             protocolRegistry.getService(QC_REDEEMER_KEY)
         );
-        
-        redeemer.recordRedemptionFulfillment(redemptionId, userBtcAddress, expectedAmount, txInfo, proof);
-        
+
+        redeemer.recordRedemptionFulfillment(
+            redemptionId,
+            userBtcAddress,
+            expectedAmount,
+            txInfo,
+            proof
+        );
+
         redemptionHandlingTime[redemptionId] = block.timestamp;
-        
-        emit WatchdogRedemptionAction(redemptionId, "FULFILLED", bytes32(0), msg.sender, block.timestamp);
+
+        emit WatchdogRedemptionAction(
+            redemptionId,
+            "FULFILLED",
+            bytes32(0),
+            msg.sender,
+            block.timestamp
+        );
     }
-    
+
     /// @notice Flag redemption as defaulted (ARBITER_ROLE)
     /// @param redemptionId The redemption identifier
     /// @param reason The reason for default
-    function flagRedemptionDefault(
-        bytes32 redemptionId,
-        bytes32 reason
-    ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
+    function flagRedemptionDefault(bytes32 redemptionId, bytes32 reason)
+        external
+        onlyRole(WATCHDOG_OPERATOR_ROLE)
+    {
         require(redemptionId != bytes32(0), "Invalid redemption ID");
         require(reason != bytes32(0), "Reason required");
-        
+
         QCRedeemer redeemer = QCRedeemer(
             protocolRegistry.getService(QC_REDEEMER_KEY)
         );
-        
+
         redeemer.flagDefaultedRedemption(redemptionId, reason);
-        
+
         redemptionHandlingTime[redemptionId] = block.timestamp;
-        
-        emit WatchdogRedemptionAction(redemptionId, "DEFAULTED", reason, msg.sender, block.timestamp);
+
+        emit WatchdogRedemptionAction(
+            redemptionId,
+            "DEFAULTED",
+            reason,
+            msg.sender,
+            block.timestamp
+        );
     }
-    
+
     /// @notice Change QC status (ARBITER_ROLE)
     /// @param qc The QC address
     /// @param newStatus The new status
@@ -252,39 +286,51 @@ contract SingleWatchdog is AccessControl {
     ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
         require(qc != address(0), "Invalid QC address");
         require(reason != bytes32(0), "Reason required");
-        
+
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
         );
-        
+
         qcManager.setQCStatus(qc, newStatus, reason);
-        
-        emit WatchdogQCStatusChange(qc, newStatus, reason, msg.sender, block.timestamp);
+
+        emit WatchdogQCStatusChange(
+            qc,
+            newStatus,
+            reason,
+            msg.sender,
+            block.timestamp
+        );
     }
-    
+
     /// @notice Verify QC solvency and take action if needed (ARBITER_ROLE)
     /// @param qc The QC address
     /// @return solvent True if QC is solvent
-    function verifySolvencyAndAct(address qc) 
-        external 
-        onlyRole(WATCHDOG_OPERATOR_ROLE) 
-        returns (bool solvent) 
+    function verifySolvencyAndAct(address qc)
+        external
+        onlyRole(WATCHDOG_OPERATOR_ROLE)
+        returns (bool solvent)
     {
         require(qc != address(0), "Invalid QC address");
-        
+
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
         );
-        
+
         solvent = qcManager.verifyQCSolvency(qc);
-        
+
         if (!solvent) {
-            emit WatchdogQCStatusChange(qc, QCData.QCStatus.UnderReview, "INSOLVENCY_DETECTED", msg.sender, block.timestamp);
+            emit WatchdogQCStatusChange(
+                qc,
+                QCData.QCStatus.UnderReview,
+                "INSOLVENCY_DETECTED",
+                msg.sender,
+                block.timestamp
+            );
         }
-        
+
         return solvent;
     }
-    
+
     /// @notice Strategic attestation for critical conditions
     /// @param qc The QC address
     /// @param balance The attested balance
@@ -298,19 +344,19 @@ contract SingleWatchdog is AccessControl {
         // 1. Insolvency detection
         // 2. Staleness prevention
         // 3. Wallet deregistration support
-        
+
         bytes32 conditionHash = keccak256(abi.encodePacked(condition));
-        
+
         require(
             conditionHash == keccak256("INSOLVENCY") ||
-            conditionHash == keccak256("STALENESS") ||
-            conditionHash == keccak256("DEREGISTRATION"),
+                conditionHash == keccak256("STALENESS") ||
+                conditionHash == keccak256("DEREGISTRATION"),
             "Invalid strategic condition"
         );
-        
+
         this.attestReserves(qc, balance);
     }
-    
+
     /// @notice Bulk handle multiple redemptions (emergency use)
     /// @param redemptionIds Array of redemption IDs
     /// @param fulfill True to fulfill, false to default
@@ -322,14 +368,14 @@ contract SingleWatchdog is AccessControl {
     ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
         require(redemptionIds.length > 0, "No redemptions provided");
         require(reason != bytes32(0), "Reason required");
-        
+
         QCRedeemer redeemer = QCRedeemer(
             protocolRegistry.getService(QC_REDEEMER_KEY)
         );
-        
+
         for (uint256 i = 0; i < redemptionIds.length; i++) {
             bytes32 redemptionId = redemptionIds[i];
-            
+
             if (fulfill) {
                 // Use empty SPV proof for bulk operations (emergency only)
                 // Create placeholder SPV data for bulk operations (emergency only)
@@ -339,7 +385,7 @@ contract SingleWatchdog is AccessControl {
                     outputVector: "",
                     locktime: bytes4(0)
                 });
-                
+
                 BitcoinTx.Proof memory proof = BitcoinTx.Proof({
                     merkleProof: "",
                     txIndexInBlock: 0,
@@ -347,47 +393,74 @@ contract SingleWatchdog is AccessControl {
                     coinbasePreimage: bytes32(0),
                     coinbaseProof: ""
                 });
-                
-                redeemer.recordRedemptionFulfillment(redemptionId, "", 0, txInfo, proof);
-                emit WatchdogRedemptionAction(redemptionId, "BULK_FULFILLED", reason, msg.sender, block.timestamp);
+
+                redeemer.recordRedemptionFulfillment(
+                    redemptionId,
+                    "",
+                    0,
+                    txInfo,
+                    proof
+                );
+                emit WatchdogRedemptionAction(
+                    redemptionId,
+                    "BULK_FULFILLED",
+                    reason,
+                    msg.sender,
+                    block.timestamp
+                );
             } else {
                 redeemer.flagDefaultedRedemption(redemptionId, reason);
-                emit WatchdogRedemptionAction(redemptionId, "BULK_DEFAULTED", reason, msg.sender, block.timestamp);
+                emit WatchdogRedemptionAction(
+                    redemptionId,
+                    "BULK_DEFAULTED",
+                    reason,
+                    msg.sender,
+                    block.timestamp
+                );
             }
-            
+
             redemptionHandlingTime[redemptionId] = block.timestamp;
         }
     }
-    
+
     /// @notice Get Watchdog statistics
     /// @param qc The QC address
     /// @return stats Array containing [lastAttestationTime, attestationCount, isOperational]
-    function getWatchdogStats(address qc) 
-        external 
-        view 
-        returns (uint256[3] memory stats) 
+    function getWatchdogStats(address qc)
+        external
+        view
+        returns (uint256[3] memory stats)
     {
         stats[0] = lastAttestationTime[qc];
         stats[1] = attestationCount[qc];
         stats[2] = hasRole(WATCHDOG_OPERATOR_ROLE, msg.sender) ? 1 : 0;
-        
+
         return stats;
     }
-    
+
     /// @notice Check if Watchdog is operational
     /// @return operational True if Watchdog has necessary roles
     function isWatchdogOperational() external view returns (bool operational) {
         // Check if this contract has been granted the necessary roles
-        try protocolRegistry.getService(QC_RESERVE_LEDGER_KEY) returns (address ledgerAddress) {
+        try protocolRegistry.getService(QC_RESERVE_LEDGER_KEY) returns (
+            address ledgerAddress
+        ) {
             QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
-            if (!reserveLedger.hasRole(reserveLedger.ATTESTER_ROLE(), address(this))) {
+            if (
+                !reserveLedger.hasRole(
+                    reserveLedger.ATTESTER_ROLE(),
+                    address(this)
+                )
+            ) {
                 return false;
             }
         } catch {
             return false;
         }
-        
-        try protocolRegistry.getService(QC_MANAGER_KEY) returns (address managerAddress) {
+
+        try protocolRegistry.getService(QC_MANAGER_KEY) returns (
+            address managerAddress
+        ) {
             QCManager qcManager = QCManager(managerAddress);
             if (!qcManager.hasRole(qcManager.REGISTRAR_ROLE(), address(this))) {
                 return false;
@@ -398,8 +471,10 @@ contract SingleWatchdog is AccessControl {
         } catch {
             return false;
         }
-        
-        try protocolRegistry.getService(QC_REDEEMER_KEY) returns (address redeemerAddress) {
+
+        try protocolRegistry.getService(QC_REDEEMER_KEY) returns (
+            address redeemerAddress
+        ) {
             QCRedeemer redeemer = QCRedeemer(redeemerAddress);
             if (!redeemer.hasRole(redeemer.ARBITER_ROLE(), address(this))) {
                 return false;
@@ -407,10 +482,10 @@ contract SingleWatchdog is AccessControl {
         } catch {
             return false;
         }
-        
+
         return true;
     }
-    
+
     /// @notice Setup Watchdog roles (DAO only)
     /// @dev This function grants this contract the necessary roles in all system contracts
     function setupWatchdogRoles() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -419,14 +494,14 @@ contract SingleWatchdog is AccessControl {
             protocolRegistry.getService(QC_RESERVE_LEDGER_KEY)
         );
         reserveLedger.grantRole(reserveLedger.ATTESTER_ROLE(), address(this));
-        
+
         // Grant REGISTRAR_ROLE and ARBITER_ROLE in QCManager
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
         );
         qcManager.grantRole(qcManager.REGISTRAR_ROLE(), address(this));
         qcManager.grantRole(qcManager.ARBITER_ROLE(), address(this));
-        
+
         // Grant ARBITER_ROLE in QCRedeemer
         QCRedeemer redeemer = QCRedeemer(
             protocolRegistry.getService(QC_REDEEMER_KEY)

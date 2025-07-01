@@ -4,7 +4,9 @@ import type {
 } from "hardhat/types"
 import type { DeployFunction } from "hardhat-deploy/types"
 
-const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+const func: DeployFunction = async function ResolveWalletRegistry(
+  hre: HardhatRuntimeEnvironment
+) {
   const { deployments, helpers, getNamedAccounts } = hre
   const { deploy, log } = deployments
   const { deployer } = await getNamedAccounts()
