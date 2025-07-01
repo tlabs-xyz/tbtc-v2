@@ -6,6 +6,7 @@ import type {
   MockTBTCToken,
   TestBTCRedeemer,
   MockBank,
+  MockTBTCVault,
 } from "../../typechain"
 
 import { to1ePrecision } from "../helpers/contract-test-helpers"
@@ -30,6 +31,7 @@ describe("AbstractBTCRedeemer", () => {
   let bridge: MockTBTCBridge
   let tbtcToken: MockTBTCToken
   let bank: MockBank
+  let tbtcVault: MockTBTCVault
   let redeemer: TestBTCRedeemer
   let fixture: ReturnType<typeof loadFixture>
   let deployer: any
@@ -51,11 +53,21 @@ describe("AbstractBTCRedeemer", () => {
     )
     bank = (await MockBankFactory.deploy()) as MockBank
 
+    const MockTBTCVaultFactory = await ethers.getContractFactory(
+      "contracts/test/MockTBTCVault.sol:MockTBTCVault"
+    )
+    tbtcVault = (await MockTBTCVaultFactory.deploy()) as MockTBTCVault
+
     const TestBTCRedeemerFactory = await ethers.getContractFactory(
       "TestBTCRedeemer"
     )
     redeemer = await TestBTCRedeemerFactory.deploy()
-    await redeemer.initialize(bridge.address, tbtcToken.address, bank.address)
+    await redeemer.initialize(
+      bridge.address,
+      tbtcToken.address,
+      bank.address,
+      tbtcVault.address
+    )
 
     // Calculate expectedRedemptionKey for the fixture
     const testWalletPkh = `0x${"a".repeat(40)}`
@@ -71,7 +83,7 @@ describe("AbstractBTCRedeemer", () => {
 
     // Assert that contract initializer works as expected.
     await expect(
-      redeemer.initialize(bridge.address, tbtcToken.address, bank.address)
+      redeemer.initialize(bridge.address, tbtcToken.address, bank.address, tbtcVault.address)
     ).to.be.revertedWith("AbstractBTCRedeemer already initialized")
   })
 
@@ -91,7 +103,7 @@ describe("AbstractBTCRedeemer", () => {
 
     it("should initialize with valid parameters", async () => {
       await expect(
-        testRedeemer.initialize(bridge.address, tbtcToken.address, bank.address)
+        testRedeemer.initialize(bridge.address, tbtcToken.address, bank.address, tbtcVault.address)
       ).to.not.be.reverted
       expect(await testRedeemer.thresholdBridge()).to.equal(bridge.address)
       expect(await testRedeemer.tbtcToken()).to.equal(tbtcToken.address)
@@ -103,7 +115,8 @@ describe("AbstractBTCRedeemer", () => {
         testRedeemer.initialize(
           ethers.constants.AddressZero,
           tbtcToken.address,
-          bank.address
+          bank.address,
+          tbtcVault.address
         )
       ).to.be.revertedWith("Threshold Bridge address cannot be zero")
     })
@@ -113,7 +126,8 @@ describe("AbstractBTCRedeemer", () => {
         testRedeemer.initialize(
           bridge.address,
           ethers.constants.AddressZero,
-          bank.address
+          bank.address,
+          tbtcVault.address
         )
       ).to.be.revertedWith("TBTC token address cannot be zero")
     })
@@ -123,19 +137,32 @@ describe("AbstractBTCRedeemer", () => {
         testRedeemer.initialize(
           bridge.address,
           tbtcToken.address,
-          ethers.constants.AddressZero
+          ethers.constants.AddressZero,
+          tbtcVault.address
         )
       ).to.be.revertedWith("Bank address cannot be zero")
+    })
+
+    it("should revert if _tbtcVault is zero address", async () => {
+      await expect(
+        testRedeemer.initialize(
+          bridge.address,
+          tbtcToken.address,
+          bank.address,
+          ethers.constants.AddressZero
+        )
+      ).to.be.revertedWith("TBTC vault address cannot be zero")
     })
 
     it("should revert on re-initialization", async () => {
       await testRedeemer.initialize(
         bridge.address,
         tbtcToken.address,
-        bank.address
+        bank.address,
+        tbtcVault.address
       )
       await expect(
-        testRedeemer.initialize(bridge.address, tbtcToken.address, bank.address)
+        testRedeemer.initialize(bridge.address, tbtcToken.address, bank.address, tbtcVault.address)
       ).to.be.revertedWith("AbstractBTCRedeemer already initialized")
     })
   })
