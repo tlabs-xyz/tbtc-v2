@@ -66,6 +66,8 @@ contract MockTBTCVault is ITBTCVault {
     }
 
     function unmint(uint256 amount) external override {
+        // Transfer tBTC tokens from the caller to this vault
+        IERC20(tbtcToken).transferFrom(msg.sender, address(this), amount);
         totalUnminted += amount;
         emit Unminted(amount);
     }

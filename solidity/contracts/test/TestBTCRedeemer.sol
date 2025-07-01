@@ -31,11 +31,13 @@ contract TestBTCRedeemer is AbstractBTCRedeemer {
         bytes calldata redemptionOutputScript,
         uint64 amount
     ) external {
+        // Convert satoshis to tBTC (1e18 precision)
+        uint256 amountInTbtc = uint256(amount) * SATOSHI_MULTIPLIER;
         (uint256 redemptionKey, uint256 tbtcAmount) = _requestRedemption(
             walletPubKeyHash,
             mainUtxo,
             redemptionOutputScript,
-            amount
+            amountInTbtc
         );
         emit RequestRedemptionReturned(redemptionKey, tbtcAmount);
     }

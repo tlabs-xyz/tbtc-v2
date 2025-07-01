@@ -57,6 +57,7 @@ describe("AbstractBTCRedeemer", () => {
       "contracts/test/MockTBTCVault.sol:MockTBTCVault"
     )
     tbtcVault = (await MockTBTCVaultFactory.deploy()) as MockTBTCVault
+    await tbtcVault.setTbtcToken(tbtcToken.address)
 
     const TestBTCRedeemerFactory = await ethers.getContractFactory(
       "TestBTCRedeemer"
@@ -83,7 +84,12 @@ describe("AbstractBTCRedeemer", () => {
 
     // Assert that contract initializer works as expected.
     await expect(
-      redeemer.initialize(bridge.address, tbtcToken.address, bank.address, tbtcVault.address)
+      redeemer.initialize(
+        bridge.address,
+        tbtcToken.address,
+        bank.address,
+        tbtcVault.address
+      )
     ).to.be.revertedWith("AbstractBTCRedeemer already initialized")
   })
 
@@ -103,7 +109,12 @@ describe("AbstractBTCRedeemer", () => {
 
     it("should initialize with valid parameters", async () => {
       await expect(
-        testRedeemer.initialize(bridge.address, tbtcToken.address, bank.address, tbtcVault.address)
+        testRedeemer.initialize(
+          bridge.address,
+          tbtcToken.address,
+          bank.address,
+          tbtcVault.address
+        )
       ).to.not.be.reverted
       expect(await testRedeemer.thresholdBridge()).to.equal(bridge.address)
       expect(await testRedeemer.tbtcToken()).to.equal(tbtcToken.address)
@@ -162,7 +173,12 @@ describe("AbstractBTCRedeemer", () => {
         tbtcVault.address
       )
       await expect(
-        testRedeemer.initialize(bridge.address, tbtcToken.address, bank.address, tbtcVault.address)
+        testRedeemer.initialize(
+          bridge.address,
+          tbtcToken.address,
+          bank.address,
+          tbtcVault.address
+        )
       ).to.be.revertedWith("AbstractBTCRedeemer already initialized")
     })
   })
@@ -195,6 +211,11 @@ describe("AbstractBTCRedeemer", () => {
         await createSnapshot()
         // Pre-request the redemption to cause a revert on the second attempt
         await bank.setBalance(redeemer.address, fixture.amountToRedeemSat)
+        // Mint tBTC tokens to the redeemer for unminting
+        await tbtcToken.mint(
+          redeemer.address,
+          fixture.amountToRedeemSat.mul(BigNumber.from(10).pow(10))
+        )
         await redeemer.requestRedemptionPublic(
           fixture.walletPubKeyHash,
           fixture.mainUtxo,
@@ -210,6 +231,11 @@ describe("AbstractBTCRedeemer", () => {
       it("should revert", async () => {
         // Set balance again for the new attempt
         await bank.setBalance(redeemer.address, fixture.amountToRedeemSat)
+        // Mint tBTC tokens to the redeemer for unminting
+        await tbtcToken.mint(
+          redeemer.address,
+          fixture.amountToRedeemSat.mul(BigNumber.from(10).pow(10))
+        )
         await expect(
           redeemer.requestRedemptionPublic(
             fixture.walletPubKeyHash,
@@ -234,6 +260,11 @@ describe("AbstractBTCRedeemer", () => {
         await createSnapshot()
         // Grant allowance and set balance for the redeemer contract
         await bank.setBalance(redeemer.address, fixture.amountToRedeemSat)
+        // Mint tBTC tokens to the redeemer for unminting
+        await tbtcToken.mint(
+          redeemer.address,
+          fixture.amountToRedeemSat.mul(BigNumber.from(10).pow(10))
+        )
 
         tx = await redeemer.requestRedemptionPublic(
           fixture.walletPubKeyHash,
