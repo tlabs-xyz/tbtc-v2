@@ -15,6 +15,15 @@ import "../token/TBTC.sol";
 /// before calling tBTC.mint() directly after validation.
 /// Demonstrates the Policy contract pattern for upgradeable business logic.
 contract BasicMintingPolicy is IMintingPolicy, AccessControl {
+    // Custom errors for gas-efficient reverts
+    error InvalidQCAddress();
+    error InvalidUserAddress();
+    error InvalidAmount();
+    error MintingPaused();
+    error AmountOutsideAllowedRange();
+    error QCNotActive();
+    error InsufficientMintingCapacity();
+
     bytes32 public constant POLICY_ADMIN_ROLE = keccak256("POLICY_ADMIN_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant MINTING_POLICY_KEY = keccak256("MINTING_POLICY");
@@ -75,37 +84,37 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         uint256 amount
     ) external override onlyRole(MINTER_ROLE) returns (bytes32 mintId) {
         // Validate inputs
-        require(qc != address(0), "Invalid QC address");
-        require(user != address(0), "Invalid user address");
-        require(amount > 0, "Amount must be greater than zero");
+        if (qc == address(0)) revert InvalidQCAddress();
+        if (user == address(0)) revert InvalidUserAddress();
+        if (amount == 0) revert InvalidAmount();
 
         // Check system state
         SystemState systemState = SystemState(
             protocolRegistry.getService(SYSTEM_STATE_KEY)
         );
-        require(!systemState.isMintingPaused(), "Minting is paused");
-        require(
-            amount >= systemState.minMintAmount() &&
-                amount <= systemState.maxMintAmount(),
-            "Amount outside allowed range"
-        );
+        if (systemState.isMintingPaused()) revert MintingPaused();
+        if (amount < systemState.minMintAmount() || amount > systemState.maxMintAmount()) {
+            revert AmountOutsideAllowedRange();
+        }
 
         // Check QC status
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        require(
-            qcData.getQCStatus(qc) == QCData.QCStatus.Active,
-            "QC not active"
-        );
+        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
+            revert QCNotActive();
+        }
 
         // Check minting capacity
         uint256 availableCapacity = getAvailableMintingCapacity(qc);
-        require(amount <= availableCapacity, "Insufficient minting capacity");
+        if (amount > availableCapacity) revert InsufficientMintingCapacity();
 
         // Generate unique mint ID
         mintId = _generateMintId(qc, user, amount);
 
         // Perform the mint
-        // TODO: Is this correct way to mint? Or should some other tbtc-v2 contract do it?
+        // NOTE: Direct minting is correct for Account Control system.
+        // Unlike the main Bridge/Bank/Vault system which uses Bank balances,
+        // Account Control operates independently with QC-backed reserves.
+        // The policy validates QC capacity and directly mints against verified reserves.
         TBTC tbtcToken = TBTC(protocolRegistry.getService(TBTC_TOKEN_KEY));
         tbtcToken.mint(user, amount);
 

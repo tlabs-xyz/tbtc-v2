@@ -11,6 +11,19 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 contract QCData is AccessControl {
     bytes32 public constant QC_MANAGER_ROLE = keccak256("QC_MANAGER_ROLE");
 
+    // Custom errors for gas-efficient reverts
+    error InvalidManagerAddress();
+    error InvalidQCAddress();
+    error QCAlreadyRegistered();
+    error InvalidMintingCapacity();
+    error QCNotRegistered();
+    error InvalidWalletAddress();
+    error WalletAlreadyRegistered();
+    error WalletNotRegistered();
+    error WalletNotActive();
+    error WalletNotPendingDeregistration();
+    error InvalidCapacity();
+
     /// @dev QC status enumeration - simple 3-state model
     enum QCStatus {
         Active, // QC is fully operational with minting/redemption rights
@@ -141,7 +154,7 @@ contract QCData is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(manager != address(0), "Invalid manager address");
+        if (manager == address(0)) revert InvalidManagerAddress();
         _grantRole(QC_MANAGER_ROLE, manager);
         emit QCManagerRoleGranted(manager, msg.sender, block.timestamp);
     }
@@ -164,9 +177,9 @@ contract QCData is AccessControl {
         external
         onlyRole(QC_MANAGER_ROLE)
     {
-        require(qc != address(0), "Invalid QC address");
-        require(custodians[qc].registeredAt == 0, "QC already registered");
-        require(maxMintingCapacity > 0, "Invalid minting capacity");
+        if (qc == address(0)) revert InvalidQCAddress();
+        if (custodians[qc].registeredAt != 0) revert QCAlreadyRegistered();
+        if (maxMintingCapacity == 0) revert InvalidMintingCapacity();
 
         custodians[qc].status = QCStatus.Active;
         custodians[qc].maxMintingCapacity = maxMintingCapacity;
@@ -185,7 +198,7 @@ contract QCData is AccessControl {
         QCStatus newStatus,
         bytes32 reason
     ) external onlyRole(QC_MANAGER_ROLE) {
-        require(isQCRegistered(qc), "QC not registered");
+        if (!isQCRegistered(qc)) revert QCNotRegistered();
 
         QCStatus oldStatus = custodians[qc].status;
         custodians[qc].status = newStatus;
@@ -207,9 +220,9 @@ contract QCData is AccessControl {
         external
         onlyRole(QC_MANAGER_ROLE)
     {
-        require(isQCRegistered(qc), "QC not registered");
-        require(bytes(btcAddress).length > 0, "Invalid wallet address");
-        require(!isWalletRegistered(btcAddress), "Wallet already registered");
+        if (!isQCRegistered(qc)) revert QCNotRegistered();
+        if (bytes(btcAddress).length == 0) revert InvalidWalletAddress();
+        if (isWalletRegistered(btcAddress)) revert WalletAlreadyRegistered();
 
         // Add to QC's wallet list
         custodians[qc].walletAddresses.push(btcAddress);
@@ -232,8 +245,8 @@ contract QCData is AccessControl {
         external
         onlyRole(QC_MANAGER_ROLE)
     {
-        require(isWalletRegistered(btcAddress), "Wallet not registered");
-        require(isWalletActive(btcAddress), "Wallet not active");
+        if (!isWalletRegistered(btcAddress)) revert WalletNotRegistered();
+        if (!isWalletActive(btcAddress)) revert WalletNotActive();
 
         address qc = wallets[btcAddress].qc;
         custodians[qc].walletStatuses[btcAddress] = WalletStatus
@@ -254,11 +267,10 @@ contract QCData is AccessControl {
         external
         onlyRole(QC_MANAGER_ROLE)
     {
-        require(isWalletRegistered(btcAddress), "Wallet not registered");
-        require(
-            wallets[btcAddress].status == WalletStatus.PendingDeRegistration,
-            "Wallet not pending deregistration"
-        );
+        if (!isWalletRegistered(btcAddress)) revert WalletNotRegistered();
+        if (wallets[btcAddress].status != WalletStatus.PendingDeRegistration) {
+            revert WalletNotPendingDeregistration();
+        }
 
         address qc = wallets[btcAddress].qc;
         custodians[qc].walletStatuses[btcAddress] = WalletStatus.Deregistered;
@@ -293,7 +305,7 @@ contract QCData is AccessControl {
         external
         onlyRole(QC_MANAGER_ROLE)
     {
-        require(isQCRegistered(qc), "QC not registered");
+        if (!isQCRegistered(qc)) revert QCNotRegistered();
 
         uint256 oldAmount = custodians[qc].totalMintedAmount;
         custodians[qc].totalMintedAmount = newAmount;
@@ -314,8 +326,8 @@ contract QCData is AccessControl {
         external
         onlyRole(QC_MANAGER_ROLE)
     {
-        require(isQCRegistered(qc), "QC not registered");
-        require(newCapacity > 0, "Invalid capacity");
+        if (!isQCRegistered(qc)) revert QCNotRegistered();
+        if (newCapacity == 0) revert InvalidCapacity();
 
         uint256 oldCapacity = custodians[qc].maxMintingCapacity;
         custodians[qc].maxMintingCapacity = newCapacity;

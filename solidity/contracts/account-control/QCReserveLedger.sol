@@ -11,6 +11,11 @@ import "./SystemState.sol";
 /// by a trusted attester (the Watchdog). Contains staleness detection to
 /// ensure reserve data is fresh for minting capacity calculations.
 contract QCReserveLedger is AccessControl {
+    // Custom errors for gas-efficient reverts
+    error InvalidQCAddress();
+    error NoAttestationExists();
+    error ReasonRequired();
+
     bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
     bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
 
@@ -93,7 +98,7 @@ contract QCReserveLedger is AccessControl {
         external
         onlyRole(ATTESTER_ROLE)
     {
-        require(qc != address(0), "Invalid QC address");
+        if (qc == address(0)) revert InvalidQCAddress();
 
         // Get old balance for event emission
         uint256 oldBalance = hasAttestation[qc]
@@ -223,11 +228,10 @@ contract QCReserveLedger is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(
-            reserveAttestations[qc].timestamp != 0,
-            "No attestation exists"
-        );
-        require(reason != bytes32(0), "Reason required");
+        if (reserveAttestations[qc].timestamp == 0) {
+            revert NoAttestationExists();
+        }
+        if (reason == bytes32(0)) revert ReasonRequired();
 
         reserveAttestations[qc].isValid = false;
 

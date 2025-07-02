@@ -160,7 +160,7 @@ describe("BasicMintingPolicy", () => {
             user.address,
             normalMintAmount
           )
-        ).to.be.revertedWith("Invalid QC address")
+        ).to.be.revertedWith("InvalidQCAddress")
       })
 
       it("should revert with zero user address", async () => {
@@ -170,13 +170,13 @@ describe("BasicMintingPolicy", () => {
             ethers.constants.AddressZero,
             normalMintAmount
           )
-        ).to.be.revertedWith("Invalid user address")
+        ).to.be.revertedWith("InvalidUserAddress")
       })
 
       it("should revert with zero amount", async () => {
         await expect(
           basicMintingPolicy.requestMint(qcAddress.address, user.address, 0)
-        ).to.be.revertedWith("Amount must be greater than zero")
+        ).to.be.revertedWith("InvalidAmount")
       })
     })
 
@@ -190,7 +190,7 @@ describe("BasicMintingPolicy", () => {
             user.address,
             normalMintAmount
           )
-        ).to.be.revertedWith("Minting is paused")
+        ).to.be.revertedWith("MintingPaused")
       })
 
       it("should revert when amount is below minimum", async () => {
@@ -202,7 +202,7 @@ describe("BasicMintingPolicy", () => {
             user.address,
             tooSmallAmount
           )
-        ).to.be.revertedWith("Amount outside allowed range")
+        ).to.be.revertedWith("AmountOutsideAllowedRange")
       })
 
       it("should revert when amount is above maximum", async () => {
@@ -214,7 +214,7 @@ describe("BasicMintingPolicy", () => {
             user.address,
             tooLargeAmount
           )
-        ).to.be.revertedWith("Amount outside allowed range")
+        ).to.be.revertedWith("AmountOutsideAllowedRange")
       })
     })
 
@@ -228,7 +228,7 @@ describe("BasicMintingPolicy", () => {
             user.address,
             normalMintAmount
           )
-        ).to.be.revertedWith("QC not active")
+        ).to.be.revertedWith("QCNotActive")
       })
     })
 
@@ -243,7 +243,7 @@ describe("BasicMintingPolicy", () => {
             user.address,
             normalMintAmount
           )
-        ).to.be.revertedWith("Insufficient minting capacity")
+        ).to.be.revertedWith("InsufficientMintingCapacity")
       })
     })
 
@@ -291,7 +291,9 @@ describe("BasicMintingPolicy", () => {
             user.address,
             normalMintAmount,
             deployer.address, // completedBy - the address calling requestMint (has MINTER_ROLE)
-            await ethers.provider.getBlock(tx.blockNumber).then(b => b.timestamp) // timestamp
+            await ethers.provider
+              .getBlock(tx.blockNumber)
+              .then((b) => b.timestamp) // timestamp
           )
       })
 
@@ -500,7 +502,7 @@ describe("BasicMintingPolicy", () => {
             user.address,
             normalMintAmount
           )
-        ).to.be.revertedWith("Insufficient minting capacity")
+        ).to.be.revertedWith("InsufficientMintingCapacity")
       })
 
       it("should handle SystemState parameter changes", async () => {
@@ -521,7 +523,7 @@ describe("BasicMintingPolicy", () => {
             user.address,
             normalMintAmount
           )
-        ).to.be.revertedWith("Amount outside allowed range")
+        ).to.be.revertedWith("AmountOutsideAllowedRange")
       })
 
       it("should handle QCData status changes", async () => {
@@ -542,7 +544,7 @@ describe("BasicMintingPolicy", () => {
             user.address,
             normalMintAmount
           )
-        ).to.be.revertedWith("QC not active")
+        ).to.be.revertedWith("QCNotActive")
       })
     })
 
@@ -570,7 +572,7 @@ describe("BasicMintingPolicy", () => {
             user.address,
             normalMintAmount
           )
-        ).to.be.revertedWith("Insufficient minting capacity")
+        ).to.be.revertedWith("InsufficientMintingCapacity")
       })
     })
 
