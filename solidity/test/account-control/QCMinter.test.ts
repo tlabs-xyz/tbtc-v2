@@ -296,7 +296,7 @@ describe("QCMinter", () => {
         // Grant MINTER_ROLE to user2
         const MINTER_ROLE = await qcMinter.MINTER_ROLE()
         await qcMinter.grantRole(MINTER_ROLE, user2.address)
-        
+
         mockMintingPolicy.requestMint
           .whenCalledWith(qcAddress.address, user.address, mintAmount)
           .returns(mintId)
@@ -306,19 +306,37 @@ describe("QCMinter", () => {
       })
 
       it("should handle multiple concurrent mints", async () => {
-        const tx1 = await qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
+        const tx1 = await qcMinter
+          .connect(user)
+          .requestQCMint(qcAddress.address, mintAmount)
         const currentBlock1 = await ethers.provider.getBlock(tx1.blockNumber)
-        
+
         await expect(tx1)
           .to.emit(qcMinter, "QCMintRequested")
-          .withArgs(qcAddress.address, user.address, mintAmount, mintId, user.address, currentBlock1.timestamp)
+          .withArgs(
+            qcAddress.address,
+            user.address,
+            mintAmount,
+            mintId,
+            user.address,
+            currentBlock1.timestamp
+          )
 
-        const tx2 = await qcMinter.connect(user2).requestQCMint(qcAddress.address, mintAmount)
+        const tx2 = await qcMinter
+          .connect(user2)
+          .requestQCMint(qcAddress.address, mintAmount)
         const currentBlock2 = await ethers.provider.getBlock(tx2.blockNumber)
-        
+
         await expect(tx2)
           .to.emit(qcMinter, "QCMintRequested")
-          .withArgs(qcAddress.address, user2.address, mintAmount, mintId2, user2.address, currentBlock2.timestamp)
+          .withArgs(
+            qcAddress.address,
+            user2.address,
+            mintAmount,
+            mintId2,
+            user2.address,
+            currentBlock2.timestamp
+          )
       })
     })
 
@@ -329,22 +347,40 @@ describe("QCMinter", () => {
         mockMintingPolicy.requestMint
           .whenCalledWith(qcAddress.address, user.address, mintAmount)
           .returns(mintId)
-        const tx1 = await qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
+        const tx1 = await qcMinter
+          .connect(user)
+          .requestQCMint(qcAddress.address, mintAmount)
         const currentBlock1 = await ethers.provider.getBlock(tx1.blockNumber)
-        
+
         await expect(tx1)
           .to.emit(qcMinter, "QCMintRequested")
-          .withArgs(qcAddress.address, user.address, mintAmount, mintId, user.address, currentBlock1.timestamp)
+          .withArgs(
+            qcAddress.address,
+            user.address,
+            mintAmount,
+            mintId,
+            user.address,
+            currentBlock1.timestamp
+          )
 
         mockMintingPolicy.requestMint
           .whenCalledWith(qcAddress.address, user.address, mintAmount)
           .returns(mintId2)
-        const tx2 = await qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
+        const tx2 = await qcMinter
+          .connect(user)
+          .requestQCMint(qcAddress.address, mintAmount)
         const currentBlock2 = await ethers.provider.getBlock(tx2.blockNumber)
-        
+
         await expect(tx2)
           .to.emit(qcMinter, "QCMintRequested")
-          .withArgs(qcAddress.address, user.address, mintAmount, mintId2, user.address, currentBlock2.timestamp)
+          .withArgs(
+            qcAddress.address,
+            user.address,
+            mintAmount,
+            mintId2,
+            user.address,
+            currentBlock2.timestamp
+          )
       })
     })
 
@@ -363,12 +399,21 @@ describe("QCMinter", () => {
       })
 
       it("should use updated minting policy", async () => {
-        const tx = await qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
+        const tx = await qcMinter
+          .connect(user)
+          .requestQCMint(qcAddress.address, mintAmount)
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-        
+
         await expect(tx)
           .to.emit(qcMinter, "QCMintRequested")
-          .withArgs(qcAddress.address, user.address, mintAmount, newMintId, user.address, currentBlock.timestamp)
+          .withArgs(
+            qcAddress.address,
+            user.address,
+            mintAmount,
+            newMintId,
+            user.address,
+            currentBlock.timestamp
+          )
 
         expect(newMintingPolicy.requestMint).to.have.been.calledWith(
           qcAddress.address,
@@ -411,23 +456,41 @@ describe("QCMinter", () => {
       it("should handle maximum mint amount", async () => {
         const maxMintAmount = ethers.constants.MaxUint256
         mockMintingPolicy.requestMint.returns(mintId)
-        const tx = await qcMinter.connect(user).requestQCMint(qcAddress.address, maxMintAmount)
+        const tx = await qcMinter
+          .connect(user)
+          .requestQCMint(qcAddress.address, maxMintAmount)
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-        
+
         await expect(tx)
           .to.emit(qcMinter, "QCMintRequested")
-          .withArgs(qcAddress.address, user.address, maxMintAmount, mintId, user.address, currentBlock.timestamp)
+          .withArgs(
+            qcAddress.address,
+            user.address,
+            maxMintAmount,
+            mintId,
+            user.address,
+            currentBlock.timestamp
+          )
       })
 
       it("should handle minimum mint amount", async () => {
         const minMintAmount = ethers.BigNumber.from(1)
         mockMintingPolicy.requestMint.returns(mintId)
-        const tx = await qcMinter.connect(user).requestQCMint(qcAddress.address, minMintAmount)
+        const tx = await qcMinter
+          .connect(user)
+          .requestQCMint(qcAddress.address, minMintAmount)
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-        
+
         await expect(tx)
           .to.emit(qcMinter, "QCMintRequested")
-          .withArgs(qcAddress.address, user.address, minMintAmount, mintId, user.address, currentBlock.timestamp)
+          .withArgs(
+            qcAddress.address,
+            user.address,
+            minMintAmount,
+            mintId,
+            user.address,
+            currentBlock.timestamp
+          )
       })
     })
 

@@ -36,6 +36,7 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
     error InvalidReason();
     error NoRedemptionsProvided();
     error ReasonRequiredForDefault();
+    error SPVValidatorNotAvailable();
 
     bytes32 public constant POLICY_ADMIN_ROLE = keccak256("POLICY_ADMIN_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
@@ -177,7 +178,7 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         
         // Bitcoin address format check
         bytes memory addr = bytes(btcAddress);
-        if (!(addr[0] == '1' || addr[0] == '3' || (addr[0] == 'b' && addr.length > 1 && addr[1] == 'c'))) {
+        if (!(addr[0] == 0x31 || addr[0] == 0x33 || (addr[0] == 0x62 && addr.length > 1 && addr[1] == 0x63))) {
             revert InvalidBitcoinAddressFormat(btcAddress);
         }
 
@@ -401,22 +402,21 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
     ) private view returns (bool verified) {
-        try protocolRegistry.getService(SPV_VALIDATOR_KEY) returns (
-            address validatorAddress
-        ) {
-            ISPVValidator spvValidator = ISPVValidator(validatorAddress);
-            return
-                spvValidator.verifyRedemptionFulfillment(
-                    redemptionId,
-                    userBtcAddress,
-                    expectedAmount,
-                    txInfo,
-                    proof
-                );
-        } catch {
-            // If SPV validator not available, reject verification
-            return false;
+        // Check if SPV validator service is available
+        if (!protocolRegistry.hasService(SPV_VALIDATOR_KEY)) {
+            revert SPVValidatorNotAvailable();
         }
+        
+        address validatorAddress = protocolRegistry.getService(SPV_VALIDATOR_KEY);
+        ISPVValidator spvValidator = ISPVValidator(validatorAddress);
+        return
+            spvValidator.verifyRedemptionFulfillment(
+                redemptionId,
+                userBtcAddress,
+                expectedAmount,
+                txInfo,
+                proof
+            );
     }
 
     /// @notice Emergency function to bulk handle redemptions (DAO only)

@@ -9,6 +9,10 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// all system contracts and enabling upgrades to individual components
 /// without requiring full-system redeployment.
 contract ProtocolRegistry is AccessControl {
+    // Custom errors for gas-efficient reverts
+    error InvalidServiceAddress();
+    error ServiceNotRegistered();
+
     bytes32 public constant PARAMETER_ADMIN_ROLE =
         keccak256("PARAMETER_ADMIN_ROLE");
 
@@ -36,7 +40,7 @@ contract ProtocolRegistry is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(serviceAddress != address(0), "Invalid service address");
+        if (serviceAddress == address(0)) revert InvalidServiceAddress();
 
         address oldAddress = services[serviceId];
         services[serviceId] = serviceAddress;
@@ -55,7 +59,7 @@ contract ProtocolRegistry is AccessControl {
     /// @return The address of the requested service
     function getService(bytes32 serviceId) external view returns (address) {
         address serviceAddress = services[serviceId];
-        require(serviceAddress != address(0), "Service not registered");
+        if (serviceAddress == address(0)) revert ServiceNotRegistered();
         return serviceAddress;
     }
 

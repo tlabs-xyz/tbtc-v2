@@ -134,26 +134,36 @@ describe("QCRedeemer", () => {
         await expect(
           qcRedeemer
             .connect(user)
-            .initiateRedemption(ethers.constants.AddressZero, redemptionAmount, validLegacyBtc)
-        ).to.be.revertedWith("Invalid QC address")
+            .initiateRedemption(
+              ethers.constants.AddressZero,
+              redemptionAmount,
+              validLegacyBtc
+            )
+        ).to.be.revertedWith("InvalidQCAddress")
       })
 
       it("should revert with zero amount", async () => {
         await expect(
-          qcRedeemer.connect(user).initiateRedemption(qcAddress.address, 0, validLegacyBtc)
-        ).to.be.revertedWith("Amount must be greater than zero")
+          qcRedeemer
+            .connect(user)
+            .initiateRedemption(qcAddress.address, 0, validLegacyBtc)
+        ).to.be.revertedWith("InvalidAmount")
       })
 
       it("should revert if Bitcoin address is empty", async () => {
         await expect(
-          qcRedeemer.connect(user).initiateRedemption(qcAddress.address, redemptionAmount, "")
-        ).to.be.revertedWith("Bitcoin address required")
+          qcRedeemer
+            .connect(user)
+            .initiateRedemption(qcAddress.address, redemptionAmount, "")
+        ).to.be.revertedWith("BitcoinAddressRequired")
       })
 
       it("should revert if Bitcoin address is invalid format", async () => {
         await expect(
-          qcRedeemer.connect(user).initiateRedemption(qcAddress.address, redemptionAmount, invalidBtc)
-        ).to.be.revertedWith("Invalid Bitcoin address format")
+          qcRedeemer
+            .connect(user)
+            .initiateRedemption(qcAddress.address, redemptionAmount, invalidBtc)
+        ).to.be.revertedWith("InvalidBitcoinAddressFormat")
       })
     })
 
@@ -166,8 +176,12 @@ describe("QCRedeemer", () => {
         await expect(
           qcRedeemer
             .connect(user)
-            .initiateRedemption(qcAddress.address, redemptionAmount, validLegacyBtc)
-        ).to.be.revertedWith("Redemption request failed")
+            .initiateRedemption(
+              qcAddress.address,
+              redemptionAmount,
+              validLegacyBtc
+            )
+        ).to.be.revertedWith("RedemptionRequestFailed")
       })
     })
 
@@ -232,7 +246,11 @@ describe("QCRedeemer", () => {
       it("should return unique redemption ID", async () => {
         const tx2 = await qcRedeemer
           .connect(user)
-          .initiateRedemption(qcAddress.address, redemptionAmount, validBech32Btc)
+          .initiateRedemption(
+            qcAddress.address,
+            redemptionAmount,
+            validBech32Btc
+          )
         const receipt2 = await tx2.wait()
         const event2 = receipt2.events?.find(
           (e: any) => e.event === "RedemptionRequested"
@@ -299,7 +317,7 @@ describe("QCRedeemer", () => {
           qcRedeemer
             .connect(watchdog)
             .flagDefaultedRedemption(redemptionId, defaultReason)
-        ).to.be.revertedWith("Redemption not pending")
+        ).to.be.revertedWith("RedemptionNotPending")
       })
     })
 
@@ -320,7 +338,7 @@ describe("QCRedeemer", () => {
               mockSpvData.txInfo,
               mockSpvData.proof
             )
-        ).to.be.revertedWith("Fulfillment verification failed")
+        ).to.be.revertedWith("FulfillmentVerificationFailed")
       })
     })
 
@@ -414,7 +432,7 @@ describe("QCRedeemer", () => {
           qcRedeemer
             .connect(watchdog)
             .flagDefaultedRedemption(redemptionId, defaultReason)
-        ).to.be.revertedWith("Redemption not pending")
+        ).to.be.revertedWith("RedemptionNotPending")
       })
     })
 
@@ -428,7 +446,7 @@ describe("QCRedeemer", () => {
           qcRedeemer
             .connect(watchdog)
             .flagDefaultedRedemption(redemptionId, defaultReason)
-        ).to.be.revertedWith("Default flagging failed")
+        ).to.be.revertedWith("DefaultFlaggingFailed")
       })
     })
 
@@ -701,7 +719,7 @@ describe("QCRedeemer", () => {
               mockSpvData.txInfo,
               mockSpvData.proof
             )
-        ).to.be.revertedWith("Fulfillment verification failed")
+        ).to.be.revertedWith("FulfillmentVerificationFailed")
       })
     })
   })

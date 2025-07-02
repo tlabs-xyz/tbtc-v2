@@ -102,7 +102,7 @@ describe("SystemState", () => {
 
           await expect(
             systemState.connect(pauserAccount).pauseMinting()
-          ).to.be.revertedWith("Minting already paused")
+          ).to.be.revertedWith("MintingAlreadyPaused")
         })
       })
 
@@ -126,7 +126,7 @@ describe("SystemState", () => {
 
           await expect(
             systemState.connect(pauserAccount).unpauseMinting()
-          ).to.be.revertedWith("Minting not paused")
+          ).to.be.revertedWith("MintingNotPaused")
         })
       })
 
@@ -146,7 +146,7 @@ describe("SystemState", () => {
 
           await expect(
             systemState.connect(pauserAccount).pauseRedemption()
-          ).to.be.revertedWith("Redemption already paused")
+          ).to.be.revertedWith("RedemptionAlreadyPaused")
         })
       })
 
@@ -172,7 +172,7 @@ describe("SystemState", () => {
 
           await expect(
             systemState.connect(pauserAccount).unpauseRedemption()
-          ).to.be.revertedWith("Redemption not paused")
+          ).to.be.revertedWith("RedemptionNotPaused")
         })
       })
 
@@ -192,7 +192,7 @@ describe("SystemState", () => {
 
           await expect(
             systemState.connect(pauserAccount).pauseRegistry()
-          ).to.be.revertedWith("Registry already paused")
+          ).to.be.revertedWith("RegistryAlreadyPaused")
         })
       })
 
@@ -216,7 +216,55 @@ describe("SystemState", () => {
 
           await expect(
             systemState.connect(pauserAccount).unpauseRegistry()
-          ).to.be.revertedWith("Registry not paused")
+          ).to.be.revertedWith("RegistryNotPaused")
+        })
+      })
+
+      describe("pauseWalletRegistration", () => {
+        it("should pause wallet registration successfully", async () => {
+          const tx = await systemState
+            .connect(pauserAccount)
+            .pauseWalletRegistration()
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+
+          expect(await systemState.isWalletRegistrationPaused()).to.be.true
+          await expect(tx)
+            .to.emit(systemState, "WalletRegistrationPaused")
+            .withArgs(pauserAccount.address, currentBlock.timestamp)
+        })
+
+        it("should revert when already paused", async () => {
+          await systemState.connect(pauserAccount).pauseWalletRegistration()
+
+          await expect(
+            systemState.connect(pauserAccount).pauseWalletRegistration()
+          ).to.be.revertedWith("WalletRegistrationAlreadyPaused")
+        })
+      })
+
+      describe("unpauseWalletRegistration", () => {
+        beforeEach(async () => {
+          await systemState.connect(pauserAccount).pauseWalletRegistration()
+        })
+
+        it("should unpause wallet registration successfully", async () => {
+          const tx = await systemState
+            .connect(pauserAccount)
+            .unpauseWalletRegistration()
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+
+          expect(await systemState.isWalletRegistrationPaused()).to.be.false
+          await expect(tx)
+            .to.emit(systemState, "WalletRegistrationUnpaused")
+            .withArgs(pauserAccount.address, currentBlock.timestamp)
+        })
+
+        it("should revert when not paused", async () => {
+          await systemState.connect(pauserAccount).unpauseWalletRegistration()
+
+          await expect(
+            systemState.connect(pauserAccount).unpauseWalletRegistration()
+          ).to.be.revertedWith("WalletRegistrationNotPaused")
         })
       })
     })
@@ -245,6 +293,14 @@ describe("SystemState", () => {
           `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
         )
       })
+
+      it("should revert for pauseWalletRegistration", async () => {
+        await expect(
+          systemState.connect(thirdParty).pauseWalletRegistration()
+        ).to.be.revertedWith(
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
+        )
+      })
     })
   })
 
@@ -266,7 +322,7 @@ describe("SystemState", () => {
         it("should revert with zero min amount", async () => {
           await expect(
             systemState.connect(adminAccount).setMinMintAmount(0)
-          ).to.be.revertedWith("Invalid amount")
+          ).to.be.revertedWith("InvalidAmount")
         })
 
         it("should allow updating multiple times", async () => {
@@ -277,6 +333,15 @@ describe("SystemState", () => {
           await systemState.connect(adminAccount).setMinMintAmount(newAmount)
 
           expect(await systemState.minMintAmount()).to.equal(newAmount)
+        })
+
+        it("should revert when min amount exceeds max amount", async () => {
+          const currentMax = await systemState.maxMintAmount()
+          const invalidMinAmount = currentMax.add(1)
+
+          await expect(
+            systemState.connect(adminAccount).setMinMintAmount(invalidMinAmount)
+          ).to.be.revertedWith("MinAmountExceedsMax")
         })
       })
 
@@ -296,7 +361,7 @@ describe("SystemState", () => {
         it("should revert with zero max amount", async () => {
           await expect(
             systemState.connect(adminAccount).setMaxMintAmount(0)
-          ).to.be.revertedWith("Max amount cannot be less than min amount")
+          ).to.be.revertedWith("MaxAmountBelowMin")
         })
 
         it("should allow very large amounts", async () => {
@@ -325,7 +390,7 @@ describe("SystemState", () => {
         it("should revert with zero timeout", async () => {
           await expect(
             systemState.connect(adminAccount).setRedemptionTimeout(0)
-          ).to.be.revertedWith("Invalid timeout")
+          ).to.be.revertedWith("InvalidTimeout")
         })
 
         it("should handle various timeout values", async () => {
@@ -359,7 +424,7 @@ describe("SystemState", () => {
         it("should revert with zero threshold", async () => {
           await expect(
             systemState.connect(adminAccount).setStaleThreshold(0)
-          ).to.be.revertedWith("Invalid threshold")
+          ).to.be.revertedWith("InvalidThreshold")
         })
 
         it("should handle various threshold values", async () => {
@@ -372,6 +437,150 @@ describe("SystemState", () => {
             .connect(adminAccount)
             .setStaleThreshold(7 * 24 * 3600)
           expect(await systemState.staleThreshold()).to.equal(7 * 24 * 3600)
+        })
+
+        it("should revert when threshold exceeds 7 days", async () => {
+          const invalidThreshold = 7 * 24 * 3600 + 1 // 7 days + 1 second
+
+          await expect(
+            systemState
+              .connect(adminAccount)
+              .setStaleThreshold(invalidThreshold)
+          ).to.be.revertedWith("ThresholdTooLong")
+        })
+      })
+
+      describe("setWalletRegistrationDelay", () => {
+        it("should update wallet registration delay successfully", async () => {
+          const newDelay = 2 * 3600 // 2 hours
+          const oldDelay = await systemState.walletRegistrationDelay()
+          const tx = await systemState
+            .connect(adminAccount)
+            .setWalletRegistrationDelay(newDelay)
+
+          expect(await systemState.walletRegistrationDelay()).to.equal(newDelay)
+          await expect(tx)
+            .to.emit(systemState, "WalletRegistrationDelayUpdated")
+            .withArgs(oldDelay, newDelay, adminAccount.address)
+        })
+
+        it("should allow zero delay", async () => {
+          await systemState.connect(adminAccount).setWalletRegistrationDelay(0)
+          expect(await systemState.walletRegistrationDelay()).to.equal(0)
+        })
+
+        it("should revert when delay exceeds 24 hours", async () => {
+          const invalidDelay = 24 * 3600 + 1 // 24 hours + 1 second
+
+          await expect(
+            systemState
+              .connect(adminAccount)
+              .setWalletRegistrationDelay(invalidDelay)
+          ).to.be.revertedWith("DelayTooLong")
+        })
+      })
+
+      describe("setEmergencyPauseDuration", () => {
+        it("should update emergency pause duration successfully", async () => {
+          const newDuration = 3 * 24 * 3600 // 3 days
+          const oldDuration = await systemState.emergencyPauseDuration()
+          const tx = await systemState
+            .connect(adminAccount)
+            .setEmergencyPauseDuration(newDuration)
+
+          expect(await systemState.emergencyPauseDuration()).to.equal(
+            newDuration
+          )
+          await expect(tx)
+            .to.emit(systemState, "EmergencyPauseDurationUpdated")
+            .withArgs(oldDuration, newDuration, adminAccount.address)
+        })
+
+        it("should revert with zero duration", async () => {
+          await expect(
+            systemState.connect(adminAccount).setEmergencyPauseDuration(0)
+          ).to.be.revertedWith("InvalidDuration")
+        })
+
+        it("should revert when duration exceeds 30 days", async () => {
+          const invalidDuration = 30 * 24 * 3600 + 1 // 30 days + 1 second
+
+          await expect(
+            systemState
+              .connect(adminAccount)
+              .setEmergencyPauseDuration(invalidDuration)
+          ).to.be.revertedWith("DurationTooLong")
+        })
+      })
+
+      describe("setEmergencyCouncil", () => {
+        let newCouncil: SignerWithAddress
+
+        beforeEach(async () => {
+          ;[, , , , , newCouncil] = await ethers.getSigners()
+        })
+
+        it("should update emergency council successfully", async () => {
+          const oldCouncil = await systemState.emergencyCouncil()
+          const tx = await systemState
+            .connect(deployer)
+            .setEmergencyCouncil(newCouncil.address)
+
+          expect(await systemState.emergencyCouncil()).to.equal(
+            newCouncil.address
+          )
+          await expect(tx)
+            .to.emit(systemState, "EmergencyCouncilUpdated")
+            .withArgs(oldCouncil, newCouncil.address, deployer.address)
+        })
+
+        it("should grant PAUSER_ROLE to new council", async () => {
+          await systemState
+            .connect(deployer)
+            .setEmergencyCouncil(newCouncil.address)
+
+          expect(await systemState.hasRole(PAUSER_ROLE, newCouncil.address)).to
+            .be.true
+        })
+
+        it("should revoke PAUSER_ROLE from old council", async () => {
+          // First set a council
+          await systemState
+            .connect(deployer)
+            .setEmergencyCouncil(newCouncil.address)
+          expect(await systemState.hasRole(PAUSER_ROLE, newCouncil.address)).to
+            .be.true
+
+          // Then change to another council
+          const anotherCouncil = thirdParty
+          await systemState
+            .connect(deployer)
+            .setEmergencyCouncil(anotherCouncil.address)
+
+          expect(await systemState.hasRole(PAUSER_ROLE, newCouncil.address)).to
+            .be.false
+          expect(await systemState.hasRole(PAUSER_ROLE, anotherCouncil.address))
+            .to.be.true
+        })
+
+        it("should revert with zero address", async () => {
+          await expect(
+            systemState
+              .connect(deployer)
+              .setEmergencyCouncil(ethers.constants.AddressZero)
+          ).to.be.revertedWith("InvalidCouncilAddress")
+        })
+
+        it("should only be callable by DEFAULT_ADMIN_ROLE", async () => {
+          await expect(
+            systemState
+              .connect(adminAccount)
+              .setEmergencyCouncil(newCouncil.address)
+          ).to.be.revertedWith(
+            `AccessControl: account ${adminAccount.address.toLowerCase()} is missing role ${
+              ethers.constants.HashZero
+            }`
+          )
         })
       })
     })
@@ -410,6 +619,22 @@ describe("SystemState", () => {
           `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PARAMETER_ADMIN_ROLE}`
         )
       })
+
+      it("should revert for setWalletRegistrationDelay", async () => {
+        await expect(
+          systemState.connect(thirdParty).setWalletRegistrationDelay(3600)
+        ).to.be.revertedWith(
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PARAMETER_ADMIN_ROLE}`
+        )
+      })
+
+      it("should revert for setEmergencyPauseDuration", async () => {
+        await expect(
+          systemState.connect(thirdParty).setEmergencyPauseDuration(86400)
+        ).to.be.revertedWith(
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PARAMETER_ADMIN_ROLE}`
+        )
+      })
     })
   })
 
@@ -443,6 +668,19 @@ describe("SystemState", () => {
 
         await systemState.connect(pauserAccount).unpauseRegistry()
         expect(await systemState.isFunctionPaused("registry")).to.be.false
+      })
+
+      it("should return correct status for wallet registration", async () => {
+        expect(await systemState.isFunctionPaused("wallet_registration")).to.be
+          .false
+
+        await systemState.connect(pauserAccount).pauseWalletRegistration()
+        expect(await systemState.isFunctionPaused("wallet_registration")).to.be
+          .true
+
+        await systemState.connect(pauserAccount).unpauseWalletRegistration()
+        expect(await systemState.isFunctionPaused("wallet_registration")).to.be
+          .false
       })
 
       it("should return false for unknown function names", async () => {
@@ -503,16 +741,25 @@ describe("SystemState", () => {
         expect(await systemState.isMintingPaused()).to.be.true
         expect(await systemState.isRedemptionPaused()).to.be.false
         expect(await systemState.isRegistryPaused()).to.be.false
+        expect(await systemState.isWalletRegistrationPaused()).to.be.false
 
         await systemState.connect(pauserAccount).pauseRedemption()
         expect(await systemState.isMintingPaused()).to.be.true
         expect(await systemState.isRedemptionPaused()).to.be.true
         expect(await systemState.isRegistryPaused()).to.be.false
+        expect(await systemState.isWalletRegistrationPaused()).to.be.false
+
+        await systemState.connect(pauserAccount).pauseWalletRegistration()
+        expect(await systemState.isMintingPaused()).to.be.true
+        expect(await systemState.isRedemptionPaused()).to.be.true
+        expect(await systemState.isRegistryPaused()).to.be.false
+        expect(await systemState.isWalletRegistrationPaused()).to.be.true
 
         await systemState.connect(pauserAccount).unpauseMinting()
         expect(await systemState.isMintingPaused()).to.be.false
         expect(await systemState.isRedemptionPaused()).to.be.true
         expect(await systemState.isRegistryPaused()).to.be.false
+        expect(await systemState.isWalletRegistrationPaused()).to.be.true
       })
 
       it("should handle parameter updates during paused state", async () => {
@@ -547,7 +794,7 @@ describe("SystemState", () => {
 
       it("should handle very small non-zero values", async () => {
         const smallValue = 1
-        
+
         // First set min amount to 1 to allow setting max amount to 1
         await systemState.connect(adminAccount).setMinMintAmount(smallValue)
         expect(await systemState.minMintAmount()).to.equal(smallValue)
@@ -592,6 +839,15 @@ describe("SystemState", () => {
           systemState.connect(pauserAccount).unpauseRegistry()
         ).to.emit(systemState, "RegistryUnpaused")
 
+        // Wallet registration pause/unpause events
+        await expect(
+          systemState.connect(pauserAccount).pauseWalletRegistration()
+        ).to.emit(systemState, "WalletRegistrationPaused")
+
+        await expect(
+          systemState.connect(pauserAccount).unpauseWalletRegistration()
+        ).to.emit(systemState, "WalletRegistrationUnpaused")
+
         // Parameter events
         await expect(
           systemState.connect(adminAccount).setMinMintAmount(testMinMintAmount)
@@ -612,6 +868,20 @@ describe("SystemState", () => {
             .connect(adminAccount)
             .setStaleThreshold(testStaleThreshold)
         ).to.emit(systemState, "StaleThresholdUpdated")
+
+        await expect(
+          systemState.connect(adminAccount).setWalletRegistrationDelay(3600)
+        ).to.emit(systemState, "WalletRegistrationDelayUpdated")
+
+        await expect(
+          systemState
+            .connect(adminAccount)
+            .setEmergencyPauseDuration(3 * 24 * 3600)
+        ).to.emit(systemState, "EmergencyPauseDurationUpdated")
+
+        await expect(
+          systemState.connect(deployer).setEmergencyCouncil(thirdParty.address)
+        ).to.emit(systemState, "EmergencyCouncilUpdated")
       })
     })
   })

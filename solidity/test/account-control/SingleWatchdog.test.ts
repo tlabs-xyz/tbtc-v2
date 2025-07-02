@@ -167,7 +167,7 @@ describe("SingleWatchdog", () => {
             ethers.constants.AddressZero,
             reserveBalance
           )
-        ).to.be.revertedWith("Invalid QC address")
+        ).to.be.revertedWith("InvalidQCAddress")
       })
     })
 
@@ -222,7 +222,7 @@ describe("SingleWatchdog", () => {
             spvProof,
             challengeHash
           )
-        ).to.be.revertedWith("Invalid wallet address")
+        ).to.be.revertedWith("InvalidWalletAddress")
       })
     })
   })

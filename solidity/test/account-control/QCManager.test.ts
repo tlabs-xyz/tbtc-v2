@@ -204,7 +204,7 @@ describe("QCManager", () => {
       it("should revert with zero address", async () => {
         await expect(
           qcManager.registerQC(ethers.constants.AddressZero)
-        ).to.be.revertedWith("Invalid QC address")
+        ).to.be.revertedWith("InvalidQCAddress")
       })
 
       it("should revert when QC already registered", async () => {
@@ -212,7 +212,7 @@ describe("QCManager", () => {
 
         await expect(
           qcManager.registerQC(qcAddress.address)
-        ).to.be.revertedWith("QC already registered")
+        ).to.be.revertedWith("QCAlreadyRegistered")
       })
     })
 
@@ -289,7 +289,7 @@ describe("QCManager", () => {
           qcManager
             .connect(watchdog)
             .setQCStatus(qcAddress.address, 1, testReason)
-        ).to.be.revertedWith("QC not registered")
+        ).to.be.revertedWith("QCNotRegistered")
       })
     })
 
@@ -303,7 +303,7 @@ describe("QCManager", () => {
           qcManager
             .connect(watchdog)
             .setQCStatus(qcAddress.address, 0, testReason) // Revoked -> Active
-        ).to.be.revertedWith("Invalid status transition")
+        ).to.be.revertedWith("InvalidStatusTransition")
       })
     })
 
@@ -365,9 +365,18 @@ describe("QCManager", () => {
       })
 
       it("should emit WalletRegistrationRequested event", async () => {
+        const receipt = await tx.wait()
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
+        )
         await expect(tx)
           .to.emit(qcManager, "WalletRegistrationRequested")
-          .withArgs(qcAddress.address, testBtcAddress, watchdog.address)
+          .withArgs(
+            qcAddress.address,
+            testBtcAddress,
+            watchdog.address,
+            timestamp
+          )
       })
     })
 
@@ -383,7 +392,7 @@ describe("QCManager", () => {
               testTxInfo,
               testProof
             )
-        ).to.be.revertedWith("Invalid wallet address")
+        ).to.be.revertedWith("InvalidWalletAddress")
       })
 
       it("should revert with SPV verification failure", async () => {
@@ -398,7 +407,7 @@ describe("QCManager", () => {
               testTxInfo,
               testProof
             )
-        ).to.be.revertedWith("SPV verification failed")
+        ).to.be.revertedWith("SPVVerificationFailed")
       })
     })
 
@@ -418,7 +427,7 @@ describe("QCManager", () => {
               testTxInfo,
               testProof
             )
-        ).to.be.revertedWith("QC not registered")
+        ).to.be.revertedWith("QCNotRegistered")
       })
     })
 
@@ -438,7 +447,7 @@ describe("QCManager", () => {
               testTxInfo,
               testProof
             )
-        ).to.be.revertedWith("QC not active")
+        ).to.be.revertedWith("QCNotActive")
       })
     })
 
@@ -519,7 +528,7 @@ describe("QCManager", () => {
       it("should revert", async () => {
         await expect(
           qcManager.requestWalletDeRegistration(testBtcAddress)
-        ).to.be.revertedWith("Wallet not registered")
+        ).to.be.revertedWith("WalletNotRegistered")
       })
     })
 
@@ -529,7 +538,7 @@ describe("QCManager", () => {
           qcManager
             .connect(thirdParty)
             .requestWalletDeRegistration(testBtcAddress)
-        ).to.be.revertedWith("Not authorized")
+        ).to.be.revertedWith("NotAuthorizedForWalletDeregistration")
       })
     })
 
@@ -543,7 +552,7 @@ describe("QCManager", () => {
           qcManager
             .connect(qcAddress)
             .requestWalletDeRegistration(testBtcAddress)
-        ).to.be.revertedWith("Wallet not active")
+        ).to.be.revertedWith("WalletNotActive")
       })
     })
 
@@ -606,7 +615,7 @@ describe("QCManager", () => {
           qcManager
             .connect(watchdog)
             .finalizeWalletDeRegistration(testBtcAddress, newReserveBalance)
-        ).to.be.revertedWith("Wallet not registered")
+        ).to.be.revertedWith("WalletNotRegistered")
       })
     })
 
@@ -620,7 +629,7 @@ describe("QCManager", () => {
           qcManager
             .connect(watchdog)
             .finalizeWalletDeRegistration(testBtcAddress, newReserveBalance)
-        ).to.be.revertedWith("Wallet not pending deregistration")
+        ).to.be.revertedWith("WalletNotPendingDeregistration")
       })
     })
 
@@ -632,7 +641,7 @@ describe("QCManager", () => {
           qcManager
             .connect(watchdog)
             .finalizeWalletDeRegistration(testBtcAddress, insufficientBalance)
-        ).to.be.revertedWith("QC would become insolvent")
+        ).to.be.revertedWith("QCWouldBecomeInsolvent")
       })
     })
 
@@ -737,11 +746,23 @@ describe("QCManager", () => {
       })
 
       it("should emit SolvencyCheckPerformed event", async () => {
-        await expect(
-          qcManager.connect(watchdog).verifyQCSolvency(qcAddress.address)
+        const tx = await qcManager
+          .connect(watchdog)
+          .verifyQCSolvency(qcAddress.address)
+        const receipt = await tx.wait()
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
         )
+        await expect(tx)
           .to.emit(qcManager, "SolvencyCheckPerformed")
-          .withArgs(qcAddress.address, true, mintedAmount, reserveBalance)
+          .withArgs(
+            qcAddress.address,
+            true,
+            mintedAmount,
+            reserveBalance,
+            watchdog.address,
+            timestamp
+          )
       })
     })
 
@@ -764,13 +785,19 @@ describe("QCManager", () => {
 
       it("should emit SolvencyCheckPerformed event with false", async () => {
         const insufficientReserves = mintedAmount.sub(1)
+        const receipt = await tx.wait()
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
+        )
         await expect(tx)
           .to.emit(qcManager, "SolvencyCheckPerformed")
           .withArgs(
             qcAddress.address,
             false,
             mintedAmount,
-            insufficientReserves
+            insufficientReserves,
+            watchdog.address,
+            timestamp
           )
       })
 
@@ -805,7 +832,7 @@ describe("QCManager", () => {
       it("should revert", async () => {
         await expect(
           qcManager.connect(watchdog).verifyQCSolvency(qcAddress.address)
-        ).to.be.revertedWith("QC not registered")
+        ).to.be.revertedWith("QCNotRegistered")
       })
     })
 
@@ -813,7 +840,7 @@ describe("QCManager", () => {
       it("should revert", async () => {
         await expect(
           qcManager.connect(thirdParty).verifyQCSolvency(qcAddress.address)
-        ).to.be.revertedWith("Only arbiter can verify solvency")
+        ).to.be.revertedWith("NotAuthorizedForSolvency")
       })
     })
   })
@@ -844,7 +871,7 @@ describe("QCManager", () => {
       it("should revert", async () => {
         await expect(
           qcManager.updateQCMintedAmount(qcAddress.address, newAmount)
-        ).to.be.revertedWith("QC not registered")
+        ).to.be.revertedWith("QCNotRegistered")
       })
     })
 
@@ -940,7 +967,7 @@ describe("QCManager", () => {
           qcManager
             .connect(watchdog)
             .setQCStatus(qcAddress.address, 0, testReason) // Active
-        ).to.be.revertedWith("Invalid status transition")
+        ).to.be.revertedWith("InvalidStatusTransition")
       })
 
       it("should reject Revoked -> UnderReview", async () => {
@@ -950,7 +977,7 @@ describe("QCManager", () => {
           qcManager
             .connect(watchdog)
             .setQCStatus(qcAddress.address, 1, testReason) // UnderReview
-        ).to.be.revertedWith("Invalid status transition")
+        ).to.be.revertedWith("InvalidStatusTransition")
       })
     })
   })
@@ -1006,7 +1033,7 @@ describe("QCManager", () => {
           qcManager
             .connect(watchdog)
             .finalizeWalletDeRegistration(testBtcAddress, reserveBalance)
-        ).to.be.revertedWith("QC Reserve Ledger not available")
+        ).to.be.revertedWith("QCReserveLedgerNotAvailable")
       })
     })
 
@@ -1165,7 +1192,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .queueQCOnboarding(ethers.constants.AddressZero, maxMintingCap)
-          ).to.be.revertedWith("Invalid QC address")
+          ).to.be.revertedWith("InvalidQCAddress")
         })
 
         it("should revert with zero minting capacity", async () => {
@@ -1173,7 +1200,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .queueQCOnboarding(qcAddress.address, 0)
-          ).to.be.revertedWith("Invalid minting capacity")
+          ).to.be.revertedWith("InvalidMintingCapacity")
         })
 
         it("should revert when QC already registered", async () => {
@@ -1182,7 +1209,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .queueQCOnboarding(qcAddress.address, maxMintingCap)
-          ).to.be.revertedWith("QC already registered")
+          ).to.be.revertedWith("QCAlreadyRegistered")
         })
 
         it("should revert when action already queued", async () => {
@@ -1194,7 +1221,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .queueQCOnboarding(qcAddress.address, maxMintingCap)
-          ).to.be.revertedWith("Action already queued")
+          ).to.be.revertedWith("ActionAlreadyQueued")
         })
       })
 
@@ -1254,22 +1281,43 @@ describe("QCManager", () => {
         })
 
         it("should emit GovernanceActionExecuted event", async () => {
+          const receipt = await tx.wait()
+          const { timestamp } = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
           await expect(tx)
             .to.emit(qcManager, "GovernanceActionExecuted")
-            .withArgs(actionHash, "QC_ONBOARDING")
+            .withArgs(
+              actionHash,
+              "QC_ONBOARDING",
+              timeLockedAdmin.address,
+              timestamp
+            )
         })
 
         it("should emit QCOnboarded event", async () => {
+          const receipt = await tx.wait()
+          const { timestamp } = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
           await expect(tx)
             .to.emit(qcManager, "QCOnboarded")
-            .withArgs(qcAddress.address, maxMintingCap)
+            .withArgs(
+              qcAddress.address,
+              maxMintingCap,
+              timeLockedAdmin.address,
+              timestamp
+            )
         })
 
         it("should emit QCRegistrationInitiated event", async () => {
-          const blockTime = await helpers.time.latest()
+          const receipt = await tx.wait()
+          const { timestamp } = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
           await expect(tx)
             .to.emit(qcManager, "QCRegistrationInitiated")
-            .withArgs(qcAddress.address, timeLockedAdmin.address, blockTime + 1)
+            .withArgs(qcAddress.address, timeLockedAdmin.address, timestamp)
         })
       })
 
@@ -1279,7 +1327,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .executeQCOnboarding(qcAddress.address, maxMintingCap)
-          ).to.be.revertedWith("Delay period not elapsed")
+          ).to.be.revertedWith("DelayPeriodNotElapsed")
         })
       })
 
@@ -1296,7 +1344,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .executeQCOnboarding(thirdParty.address, maxMintingCap)
-          ).to.be.revertedWith("Action not queued")
+          ).to.be.revertedWith("ActionNotQueued")
         })
       })
 
@@ -1316,7 +1364,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .executeQCOnboarding(qcAddress.address, maxMintingCap)
-          ).to.be.revertedWith("Action already executed")
+          ).to.be.revertedWith("ActionAlreadyExecuted")
         })
       })
 
@@ -1392,7 +1440,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .queueMintingCapIncrease(ethers.constants.AddressZero, newCap)
-          ).to.be.revertedWith("Invalid QC address")
+          ).to.be.revertedWith("InvalidQCAddress")
         })
 
         it("should revert with zero minting capacity", async () => {
@@ -1400,7 +1448,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .queueMintingCapIncrease(qcAddress.address, 0)
-          ).to.be.revertedWith("Invalid minting capacity")
+          ).to.be.revertedWith("InvalidMintingCapacity")
         })
 
         it("should revert when QC not registered", async () => {
@@ -1409,7 +1457,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .queueMintingCapIncrease(qcAddress.address, newCap)
-          ).to.be.revertedWith("QC not registered")
+          ).to.be.revertedWith("QCNotRegistered")
         })
 
         it("should revert when new cap is not higher than current", async () => {
@@ -1418,7 +1466,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .queueMintingCapIncrease(qcAddress.address, lowerCap)
-          ).to.be.revertedWith("New cap must be higher than current")
+          ).to.be.revertedWith("NewCapMustBeHigher")
         })
       })
     })
@@ -1501,7 +1549,7 @@ describe("QCManager", () => {
             qcManager
               .connect(timeLockedAdmin)
               .executeMintingCapIncrease(qcAddress.address, newCap)
-          ).to.be.revertedWith("Delay period not elapsed")
+          ).to.be.revertedWith("DelayPeriodNotElapsed")
         })
       })
     })
@@ -1564,7 +1612,7 @@ describe("QCManager", () => {
             qcManager
               .connect(watchdog)
               .emergencyPauseQC(ethers.constants.AddressZero, emergencyReason)
-          ).to.be.revertedWith("Invalid QC address")
+          ).to.be.revertedWith("InvalidQCAddress")
         })
 
         it("should revert with empty reason", async () => {
@@ -1572,7 +1620,7 @@ describe("QCManager", () => {
             qcManager
               .connect(watchdog)
               .emergencyPauseQC(qcAddress.address, ethers.constants.HashZero)
-          ).to.be.revertedWith("Reason required")
+          ).to.be.revertedWith("ReasonRequired")
         })
 
         it("should revert when QC not registered", async () => {
@@ -1581,7 +1629,7 @@ describe("QCManager", () => {
             qcManager
               .connect(watchdog)
               .emergencyPauseQC(qcAddress.address, emergencyReason)
-          ).to.be.revertedWith("QC not registered")
+          ).to.be.revertedWith("QCNotRegistered")
         })
       })
 
