@@ -107,9 +107,9 @@ public entry fun initialize_deposit(
 
 ### Shared Objects (Testnet)
 
-- ReceiverState: `0x53863ea35ecec8e66c78e389e3968ddd594d3071e94696d56685677e420e9de5`
-- GatewayState: `0x4329bd8869d23c6b0e3020d74f3c1199aa7a34a45ee9d7aca496c70439220510`
-- TokenState: `0x7c3ee5fb7f905dff8b70daadd953758c92b6f72ed121474c98c3129993d24e93`
+- ReceiverState: `0x10f421d7960be14c07057fd821332ee8a9d717873c62e7fa370fa99913e8e924`
+- GatewayState: `0x19ab17536712e3e2efa9a1c01acbf5c09ae53e969cb9046dc382f5f49b603d52`
+- TokenState: `0x0d59e4970772269ee917280da592089c7de389ed67164ce4c07ed508917fdf08`
 
 ## Usage Examples
 
@@ -171,8 +171,8 @@ await deposit.initializeReveal()
 
 ### L2 Contracts (SUI Testnet)
 
-- Package: `0x1db1fcdaada7c286d77f3347e593e06d8f33b8255e0861033a0a9f321f4eade7`
-- tBTC Type: `0x1db1fcdaada7c286d77f3347e593e06d8f33b8255e0861033a0a9f321f4eade7::TBTC::TBTC`
+- Package: `0x3d78316ce8ee3fe48d7ff85cdc2d0df9d459f43d802d96f58f7b59984c2dd3ae`
+- tBTC Type: `0x3d78316ce8ee3fe48d7ff85cdc2d0df9d459f43d802d96f58f7b59984c2dd3ae::TBTC::TBTC`
 
 ### Wormhole Configuration
 
