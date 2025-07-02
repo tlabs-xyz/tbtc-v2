@@ -28,6 +28,7 @@ contract QCReserveLedger is AccessControl {
     /// @dev Maps QC addresses to their latest reserve attestation
     mapping(address => ReserveAttestation) public reserveAttestations;
 
+    // TODO: Do we want to store historical attestations? Maybe for legal reasons?
     /// @dev Maps QC addresses to historical attestations
     mapping(address => ReserveAttestation[]) public attestationHistory;
 
@@ -84,6 +85,7 @@ contract QCReserveLedger is AccessControl {
         _grantRole(ATTESTER_ROLE, msg.sender);
     }
 
+    // NOTE: No SPV proof is required here because the attester is trusted. Fix?
     /// @notice Submit reserve attestation for a QC (Watchdog only)
     /// @param qc The address of the Qualified Custodian
     /// @param balance The attested reserve balance in satoshis

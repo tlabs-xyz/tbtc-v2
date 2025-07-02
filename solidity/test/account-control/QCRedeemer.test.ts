@@ -125,20 +125,35 @@ describe("QCRedeemer", () => {
 
   describe("initiateRedemption", () => {
     const redemptionAmount = ethers.utils.parseEther("5")
+    const validLegacyBtc = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
+    const validBech32Btc = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
+    const invalidBtc = "not_a_btc_address"
 
     context("when called with invalid parameters", () => {
       it("should revert with zero QC address", async () => {
         await expect(
           qcRedeemer
             .connect(user)
-            .initiateRedemption(ethers.constants.AddressZero, redemptionAmount)
+            .initiateRedemption(ethers.constants.AddressZero, redemptionAmount, validLegacyBtc)
         ).to.be.revertedWith("Invalid QC address")
       })
 
       it("should revert with zero amount", async () => {
         await expect(
-          qcRedeemer.connect(user).initiateRedemption(qcAddress.address, 0)
+          qcRedeemer.connect(user).initiateRedemption(qcAddress.address, 0, validLegacyBtc)
         ).to.be.revertedWith("Amount must be greater than zero")
+      })
+
+      it("should revert if Bitcoin address is empty", async () => {
+        await expect(
+          qcRedeemer.connect(user).initiateRedemption(qcAddress.address, redemptionAmount, "")
+        ).to.be.revertedWith("Bitcoin address required")
+      })
+
+      it("should revert if Bitcoin address is invalid format", async () => {
+        await expect(
+          qcRedeemer.connect(user).initiateRedemption(qcAddress.address, redemptionAmount, invalidBtc)
+        ).to.be.revertedWith("Invalid Bitcoin address format")
       })
     })
 
@@ -151,7 +166,7 @@ describe("QCRedeemer", () => {
         await expect(
           qcRedeemer
             .connect(user)
-            .initiateRedemption(qcAddress.address, redemptionAmount)
+            .initiateRedemption(qcAddress.address, redemptionAmount, validLegacyBtc)
         ).to.be.revertedWith("Redemption request failed")
       })
     })
@@ -159,11 +174,13 @@ describe("QCRedeemer", () => {
     context("when all validations pass", () => {
       let tx: any
       let redemptionId: string
+      let usedBtc: string
 
       beforeEach(async () => {
+        usedBtc = validLegacyBtc
         tx = await qcRedeemer
           .connect(user)
-          .initiateRedemption(qcAddress.address, redemptionAmount)
+          .initiateRedemption(qcAddress.address, redemptionAmount, usedBtc)
         const receipt = await tx.wait()
         const event = receipt.events?.find(
           (e: any) => e.event === "RedemptionRequested"
@@ -171,13 +188,13 @@ describe("QCRedeemer", () => {
         redemptionId = event?.args?.redemptionId
       })
 
-      it("should call policy requestRedemption", async () => {
+      it("should call policy requestRedemption with correct BTC address", async () => {
         expect(mockRedemptionPolicy.requestRedemption).to.have.been.calledWith(
           redemptionId,
           qcAddress.address,
           user.address,
           redemptionAmount,
-          "placeholder_btc_address"
+          usedBtc
         )
       })
 
@@ -188,15 +205,16 @@ describe("QCRedeemer", () => {
         )
       })
 
-      it("should create redemption record", async () => {
+      it("should create redemption record with correct BTC address", async () => {
         const redemption = await qcRedeemer.getRedemption(redemptionId)
         expect(redemption.user).to.equal(user.address)
         expect(redemption.qc).to.equal(qcAddress.address)
         expect(redemption.amount).to.equal(redemptionAmount)
         expect(redemption.status).to.equal(1) // Pending
+        expect(redemption.userBtcAddress).to.equal(usedBtc)
       })
 
-      it("should emit RedemptionRequested event", async () => {
+      it("should emit RedemptionRequested event with correct BTC address", async () => {
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
           .to.emit(qcRedeemer, "RedemptionRequested")
@@ -205,6 +223,7 @@ describe("QCRedeemer", () => {
             user.address,
             qcAddress.address,
             redemptionAmount,
+            usedBtc,
             user.address,
             currentBlock.timestamp
           )
@@ -213,13 +232,12 @@ describe("QCRedeemer", () => {
       it("should return unique redemption ID", async () => {
         const tx2 = await qcRedeemer
           .connect(user)
-          .initiateRedemption(qcAddress.address, redemptionAmount)
+          .initiateRedemption(qcAddress.address, redemptionAmount, validBech32Btc)
         const receipt2 = await tx2.wait()
         const event2 = receipt2.events?.find(
           (e: any) => e.event === "RedemptionRequested"
         )
         const redemptionId2 = event2?.args?.redemptionId
-
         expect(redemptionId).to.not.equal(redemptionId2)
       })
     })
