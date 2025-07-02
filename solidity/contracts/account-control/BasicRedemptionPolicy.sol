@@ -21,6 +21,22 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         DEFAULT
     }
 
+    // Custom errors for gas-efficient reverts
+    error InvalidRedemptionId();
+    error RedemptionIdAlreadyUsed(bytes32 redemptionId);
+    error InvalidBitcoinAddress(string btcAddress);
+    error InvalidBitcoinAddressFormat(string btcAddress);
+    error ValidationFailed(address user, address qc, uint256 amount);
+    error RedemptionNotRequested(bytes32 redemptionId);
+    error InvalidAmount(uint256 amount);
+    error RedemptionAlreadyFulfilled(bytes32 redemptionId);
+    error RedemptionAlreadyDefaulted(bytes32 redemptionId);
+    error RedemptionsArePaused();
+    error SPVVerificationFailed(bytes32 redemptionId);
+    error InvalidReason();
+    error NoRedemptionsProvided();
+    error ReasonRequiredForDefault();
+
     bytes32 public constant POLICY_ADMIN_ROLE = keccak256("POLICY_ADMIN_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
     bytes32 public constant REDEEMER_ROLE = keccak256("REDEEMER_ROLE");
@@ -31,39 +47,6 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
     bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
     bytes32 public constant TBTC_TOKEN_KEY = keccak256("TBTC_TOKEN");
     bytes32 public constant SPV_VALIDATOR_KEY = keccak256("SPV_VALIDATOR");
-
-    // Error codes for systematic error tracking
-    // Format: CCFF where CC=contract(11=BasicRedemptionPolicy), FF=function
-    uint16 public constant ERR_BRP_VALIDATE_INVALID_USER = 1101;
-    uint16 public constant ERR_BRP_VALIDATE_INVALID_QC = 1102;
-    uint16 public constant ERR_BRP_VALIDATE_INVALID_AMOUNT = 1103;
-    uint16 public constant ERR_BRP_VALIDATE_SYSTEM_PAUSED = 1104;
-    uint16 public constant ERR_BRP_VALIDATE_AMOUNT_TOO_SMALL = 1105;
-    uint16 public constant ERR_BRP_VALIDATE_QC_NOT_REGISTERED = 1106;
-    uint16 public constant ERR_BRP_VALIDATE_QC_INVALID_STATUS = 1107;
-    uint16 public constant ERR_BRP_VALIDATE_INSUFFICIENT_BALANCE = 1108;
-    uint16 public constant ERR_BRP_REQUEST_INVALID_ID = 1201;
-    uint16 public constant ERR_BRP_REQUEST_ID_COLLISION = 1202;
-    uint16 public constant ERR_BRP_REQUEST_INVALID_QC = 1203;
-    uint16 public constant ERR_BRP_REQUEST_INVALID_USER = 1204;
-    uint16 public constant ERR_BRP_REQUEST_INVALID_AMOUNT = 1205;
-    uint16 public constant ERR_BRP_REQUEST_INVALID_BTC_ADDR = 1206;
-    uint16 public constant ERR_BRP_REQUEST_VALIDATION_FAILED = 1207;
-    uint16 public constant ERR_BRP_FULFILL_INVALID_ID = 1301;
-    uint16 public constant ERR_BRP_FULFILL_NOT_REQUESTED = 1302;
-    uint16 public constant ERR_BRP_FULFILL_INVALID_BTC_ADDR = 1303;
-    uint16 public constant ERR_BRP_FULFILL_INVALID_AMOUNT = 1304;
-    uint16 public constant ERR_BRP_FULFILL_ALREADY_FULFILLED = 1305;
-    uint16 public constant ERR_BRP_FULFILL_ALREADY_DEFAULTED = 1306;
-    uint16 public constant ERR_BRP_FULFILL_SYSTEM_PAUSED = 1307;
-    uint16 public constant ERR_BRP_FULFILL_SPV_FAILED = 1308;
-    uint16 public constant ERR_BRP_DEFAULT_INVALID_ID = 1401;
-    uint16 public constant ERR_BRP_DEFAULT_NOT_REQUESTED = 1402;
-    uint16 public constant ERR_BRP_DEFAULT_INVALID_REASON = 1403;
-    uint16 public constant ERR_BRP_DEFAULT_ALREADY_FULFILLED = 1404;
-    uint16 public constant ERR_BRP_DEFAULT_ALREADY_DEFAULTED = 1405;
-    uint16 public constant ERR_BRP_BULK_NO_REDEMPTIONS = 1501;
-    uint16 public constant ERR_BRP_BULK_REASON_REQUIRED = 1502;
 
     ProtocolRegistry public immutable protocolRegistry;
 
@@ -100,15 +83,6 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         string btcAddress,
         address requestedBy,
         uint256 timestamp
-    );
-
-    /// @dev Enhanced error event for logging failed transaction attempts
-    event ErrorLogged(
-        uint16 indexed errorCode,
-        string indexed functionName,
-        address indexed caller,
-        bytes32 contextHash,
-        string message
     );
 
     constructor(address _protocolRegistry) {
@@ -188,119 +162,29 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         uint256 amount,
         string calldata btcAddress
     ) external onlyRole(REDEEMER_ROLE) returns (bool success) {
-        // Input validation - fail fast with detailed error messages and context
+        // Validate redemption-specific inputs only
         if (redemptionId == bytes32(0)) {
-            _logError(
-                ERR_BRP_REQUEST_INVALID_ID,
-                "requestRedemption",
-                msg.sender,
-                bytes32(0),
-                "requestRedemption: Invalid redemption ID - cannot be zero bytes32"
-            );
-            require(
-                false,
-                "BRP-1201: requestRedemption failed - Invalid redemption ID (zero bytes32)"
-            );
+            revert InvalidRedemptionId();
         }
 
         if (requestedRedemptions[redemptionId]) {
-            _logError(
-                ERR_BRP_REQUEST_ID_COLLISION,
-                "requestRedemption",
-                msg.sender,
-                redemptionId,
-                "requestRedemption: Redemption ID collision - ID already used, potential attack"
-            );
-            require(
-                false,
-                "BRP-1202: requestRedemption failed - Redemption ID already used, potential collision attack"
-            );
-        }
-
-        if (qc == address(0)) {
-            _logError(
-                ERR_BRP_REQUEST_INVALID_QC,
-                "requestRedemption",
-                msg.sender,
-                redemptionId,
-                "requestRedemption: Invalid QC address - cannot be zero address"
-            );
-            require(
-                false,
-                "BRP-1203: requestRedemption failed - Invalid QC address (zero address)"
-            );
-        }
-
-        if (user == address(0)) {
-            _logError(
-                ERR_BRP_REQUEST_INVALID_USER,
-                "requestRedemption",
-                msg.sender,
-                redemptionId,
-                "requestRedemption: Invalid user address - cannot be zero address"
-            );
-            require(
-                false,
-                "BRP-1204: requestRedemption failed - Invalid user address (zero address)"
-            );
-        }
-
-        if (amount == 0) {
-            _logError(
-                ERR_BRP_REQUEST_INVALID_AMOUNT,
-                "requestRedemption",
-                msg.sender,
-                redemptionId,
-                string(
-                    abi.encodePacked(
-                        "requestRedemption: Invalid amount (",
-                        _uintToString(amount),
-                        ") - must be greater than zero"
-                    )
-                )
-            );
-            require(
-                false,
-                "BRP-1205: requestRedemption failed - Amount must be greater than zero"
-            );
+            revert RedemptionIdAlreadyUsed(redemptionId);
         }
 
         if (bytes(btcAddress).length == 0) {
-            _logError(
-                ERR_BRP_REQUEST_INVALID_BTC_ADDR,
-                "requestRedemption",
-                msg.sender,
-                redemptionId,
-                "requestRedemption: Invalid Bitcoin address - cannot be empty string"
-            );
-            require(
-                false,
-                "BRP-1206: requestRedemption failed - Invalid Bitcoin address (empty string)"
-            );
+            revert InvalidBitcoinAddress(btcAddress);
+        }
+        
+        // Bitcoin address format check
+        bytes memory addr = bytes(btcAddress);
+        if (!(addr[0] == '1' || addr[0] == '3' || (addr[0] == 'b' && addr.length > 1 && addr[1] == 'c'))) {
+            revert InvalidBitcoinAddressFormat(btcAddress);
         }
 
-        // Business logic validation - check if redemption is allowed
+        // Use validateRedemptionRequest for all other validation
+        // This includes: zero address checks, amount validation, system state, QC status, and balance checks
         if (!validateRedemptionRequest(user, qc, amount)) {
-            _logError(
-                ERR_BRP_REQUEST_VALIDATION_FAILED,
-                "requestRedemption",
-                msg.sender,
-                redemptionId,
-                string(
-                    abi.encodePacked(
-                        "requestRedemption: Validation failed - user: ",
-                        _addressToString(user),
-                        ", qc: ",
-                        _addressToString(qc),
-                        ", amount: ",
-                        _uintToString(amount)
-                    )
-                )
-            );
-            require(
-                false,
-                "BRP-1207: requestRedemption failed - Validation failed, check QC status and user eligibility"
-            );
+            revert ValidationFailed(user, qc, amount);
         }
 
         // Record the redemption request to prevent ID collisions
@@ -341,144 +225,43 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
     ) external override returns (bool success) {
-        // Input validation - check redemption exists and is in correct state with detailed error context
+        // Input validation
         if (redemptionId == bytes32(0)) {
-            _logError(
-                ERR_BRP_FULFILL_INVALID_ID,
-                "recordFulfillment",
-                msg.sender,
-                bytes32(0),
-                "recordFulfillment: Invalid redemption ID - cannot be zero bytes32"
-            );
-            require(
-                false,
-                "BRP-1301: recordFulfillment failed - Invalid redemption ID (zero bytes32)"
-            );
+            revert InvalidRedemptionId();
         }
 
         if (!requestedRedemptions[redemptionId]) {
-            _logError(
-                ERR_BRP_FULFILL_NOT_REQUESTED,
-                "recordFulfillment",
-                msg.sender,
-                redemptionId,
-                "recordFulfillment: Redemption not requested - ID not found in system"
-            );
-            require(
-                false,
-                "BRP-1302: recordFulfillment failed - Redemption not requested, verify redemption ID"
-            );
+            revert RedemptionNotRequested(redemptionId);
         }
 
         if (bytes(userBtcAddress).length == 0) {
-            _logError(
-                ERR_BRP_FULFILL_INVALID_BTC_ADDR,
-                "recordFulfillment",
-                msg.sender,
-                redemptionId,
-                "recordFulfillment: Invalid Bitcoin address - cannot be empty string"
-            );
-            require(
-                false,
-                "BRP-1303: recordFulfillment failed - Invalid Bitcoin address (empty string)"
-            );
+            revert InvalidBitcoinAddress(userBtcAddress);
         }
 
         if (expectedAmount == 0) {
-            _logError(
-                ERR_BRP_FULFILL_INVALID_AMOUNT,
-                "recordFulfillment",
-                msg.sender,
-                redemptionId,
-                string(
-                    abi.encodePacked(
-                        "recordFulfillment: Invalid amount (",
-                        _uintToString(expectedAmount),
-                        ") - must be greater than zero"
-                    )
-                )
-            );
-            require(
-                false,
-                "BRP-1304: recordFulfillment failed - Invalid amount (must be greater than zero)"
-            );
+            revert InvalidAmount(expectedAmount);
         }
 
-        // State validation - prevent double processing with clear explanations
+        // State validation - prevent double processing
         if (fulfilledRedemptions[redemptionId]) {
-            _logError(
-                ERR_BRP_FULFILL_ALREADY_FULFILLED,
-                "recordFulfillment",
-                msg.sender,
-                redemptionId,
-                "recordFulfillment: Already fulfilled - redemption has been processed"
-            );
-            require(
-                false,
-                "BRP-1305: recordFulfillment failed - Redemption already fulfilled, cannot process twice"
-            );
+            revert RedemptionAlreadyFulfilled(redemptionId);
         }
 
         if (defaultedRedemptions[redemptionId] != bytes32(0)) {
-            _logError(
-                ERR_BRP_FULFILL_ALREADY_DEFAULTED,
-                "recordFulfillment",
-                msg.sender,
-                redemptionId,
-                "recordFulfillment: Already defaulted - redemption marked as failed"
-            );
-            require(
-                false,
-                "BRP-1306: recordFulfillment failed - Redemption already defaulted, cannot fulfill"
-            );
+            revert RedemptionAlreadyDefaulted(redemptionId);
         }
 
-        // System state validation with context
+        // System state validation
         SystemState systemState = SystemState(
             protocolRegistry.getService(SYSTEM_STATE_KEY)
         );
         if (systemState.isRedemptionPaused()) {
-            _logError(
-                ERR_BRP_FULFILL_SYSTEM_PAUSED,
-                "recordFulfillment",
-                msg.sender,
-                redemptionId,
-                "recordFulfillment: System paused - redemptions temporarily disabled"
-            );
-            require(
-                false,
-                "BRP-1307: recordFulfillment failed - Redemptions are paused by system administrator"
-            );
+            revert RedemptionsArePaused();
         }
 
-        // SPV proof verification with enhanced error context
-        if (
-            !_verifySPVProof(
-                redemptionId,
-                userBtcAddress,
-                expectedAmount,
-                txInfo,
-                proof
-            )
-        ) {
-            _logError(
-                ERR_BRP_FULFILL_SPV_FAILED,
-                "recordFulfillment",
-                msg.sender,
-                redemptionId,
-                string(
-                    abi.encodePacked(
-                        "recordFulfillment: SPV verification failed - address: ",
-                        userBtcAddress,
-                        ", amount: ",
-                        _uintToString(expectedAmount)
-                    )
-                )
-            );
-            require(
-                false,
-                "BRP-1308: recordFulfillment failed - SPV proof verification failed, verify transaction data"
-            );
+        // SPV proof verification
+        if (!_verifySPVProof(redemptionId, userBtcAddress, expectedAmount, txInfo, proof)) {
+            revert SPVVerificationFailed(redemptionId);
         }
 
         // State update - mark as fulfilled (no reentrancy risk due to external call placement)
@@ -506,76 +289,26 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         onlyRole(ARBITER_ROLE)
         returns (bool success)
     {
-        // Input validation with detailed error context
+        // Input validation
         if (redemptionId == bytes32(0)) {
-            _logError(
-                ERR_BRP_DEFAULT_INVALID_ID,
-                "flagDefault",
-                msg.sender,
-                bytes32(0),
-                "flagDefault: Invalid redemption ID - cannot be zero bytes32"
-            );
-            require(
-                false,
-                "BRP-1401: flagDefault failed - Invalid redemption ID (zero bytes32)"
-            );
+            revert InvalidRedemptionId();
         }
 
         if (!requestedRedemptions[redemptionId]) {
-            _logError(
-                ERR_BRP_DEFAULT_NOT_REQUESTED,
-                "flagDefault",
-                msg.sender,
-                redemptionId,
-                "flagDefault: Redemption not requested - ID not found in system"
-            );
-            require(
-                false,
-                "BRP-1402: flagDefault failed - Redemption not requested, verify redemption ID"
-            );
+            revert RedemptionNotRequested(redemptionId);
         }
 
         if (reason == bytes32(0)) {
-            _logError(
-                ERR_BRP_DEFAULT_INVALID_REASON,
-                "flagDefault",
-                msg.sender,
-                redemptionId,
-                "flagDefault: Invalid reason - cannot be zero bytes32, audit trail required"
-            );
-            require(
-                false,
-                "BRP-1403: flagDefault failed - Reason required for audit trail (cannot be zero bytes32)"
-            );
+            revert InvalidReason();
         }
 
-        // State validation - prevent double processing with clear explanations
+        // State validation - prevent double processing
         if (fulfilledRedemptions[redemptionId]) {
-            _logError(
-                ERR_BRP_DEFAULT_ALREADY_FULFILLED,
-                "flagDefault",
-                msg.sender,
-                redemptionId,
-                "flagDefault: Already fulfilled - cannot default completed redemption"
-            );
-            require(
-                false,
-                "BRP-1404: flagDefault failed - Redemption already fulfilled, cannot mark as defaulted"
-            );
+            revert RedemptionAlreadyFulfilled(redemptionId);
         }
 
         if (defaultedRedemptions[redemptionId] != bytes32(0)) {
-            _logError(
-                ERR_BRP_DEFAULT_ALREADY_DEFAULTED,
-                "flagDefault",
-                msg.sender,
-                redemptionId,
-                "flagDefault: Already defaulted - redemption already marked as failed"
-            );
-            require(
-                false,
-                "BRP-1405: flagDefault failed - Redemption already defaulted, cannot process twice"
-            );
+            revert RedemptionAlreadyDefaulted(redemptionId);
         }
 
         // State update - record the default with reason for audit trail
@@ -696,37 +429,11 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         bytes32 reason
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (redemptionIds.length == 0) {
-            _logError(
-                ERR_BRP_BULK_NO_REDEMPTIONS,
-                "bulkHandleRedemptions",
-                msg.sender,
-                bytes32(0),
-                "bulkHandleRedemptions: No redemptions provided - array cannot be empty"
-            );
-            require(
-                false,
-                "BRP-1501: bulkHandleRedemptions failed - No redemptions provided in array"
-            );
+            revert NoRedemptionsProvided();
         }
 
         if (action == BulkAction.DEFAULT && reason == bytes32(0)) {
-            _logError(
-                ERR_BRP_BULK_REASON_REQUIRED,
-                "bulkHandleRedemptions",
-                msg.sender,
-                bytes32(uint256(redemptionIds.length)),
-                string(
-                    abi.encodePacked(
-                        "bulkHandleRedemptions: Reason required for DEFAULT action on ",
-                        _uintToString(redemptionIds.length),
-                        " redemptions"
-                    )
-                )
-            );
-            require(
-                false,
-                "BRP-1502: bulkHandleRedemptions failed - Reason required for DEFAULT action (cannot be zero bytes32)"
-            );
+            revert ReasonRequiredForDefault();
         }
 
         for (uint256 i = 0; i < redemptionIds.length; i++) {
@@ -758,50 +465,4 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         }
     }
 
-    // Helper functions for enhanced error messages and logging
-    function _logError(
-        uint16 errorCode,
-        string memory functionName,
-        address caller,
-        bytes32 contextHash,
-        string memory message
-    ) private {
-        emit ErrorLogged(errorCode, functionName, caller, contextHash, message);
-    }
-
-    function _addressToString(address addr)
-        private
-        pure
-        returns (string memory)
-    {
-        bytes memory data = abi.encodePacked(addr);
-        bytes memory alphabet = "0123456789abcdef";
-        bytes memory str = new bytes(2 + data.length * 2);
-        str[0] = "0";
-        str[1] = "x";
-        for (uint256 i = 0; i < data.length; i++) {
-            str[2 + i * 2] = alphabet[uint256(uint8(data[i] >> 4))];
-            str[3 + i * 2] = alphabet[uint256(uint8(data[i] & 0x0f))];
-        }
-        return string(str);
-    }
-
-    function _uintToString(uint256 value) private pure returns (string memory) {
-        if (value == 0) {
-            return "0";
-        }
-        uint256 temp = value;
-        uint256 digits;
-        while (temp != 0) {
-            digits++;
-            temp /= 10;
-        }
-        bytes memory buffer = new bytes(digits);
-        while (value != 0) {
-            digits -= 1;
-            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
-            value /= 10;
-        }
-        return string(buffer);
-    }
 }
