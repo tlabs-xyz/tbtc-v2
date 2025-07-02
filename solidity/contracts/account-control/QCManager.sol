@@ -21,27 +21,29 @@ contract QCManager is AccessControl {
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
 
-    // Error codes for systematic error tracking
-    // Format: CCFF where CC=contract(12=QCManager), FF=function
-    uint16 public constant ERR_QCM_REGISTER_INVALID_QC = 1201;
-    uint16 public constant ERR_QCM_REGISTER_INVALID_CAPACITY = 1202;
-    uint16 public constant ERR_QCM_REGISTER_ALREADY_REGISTERED = 1203;
-    uint16 public constant ERR_QCM_REGISTER_ACTION_QUEUED = 1204;
-    uint16 public constant ERR_QCM_WALLET_INVALID_ADDRESS = 1301;
-    uint16 public constant ERR_QCM_WALLET_QC_NOT_REGISTERED = 1302;
-    uint16 public constant ERR_QCM_WALLET_QC_NOT_ACTIVE = 1303;
-    uint16 public constant ERR_QCM_WALLET_SPV_FAILED = 1304;
-    uint16 public constant ERR_QCM_SOLVENCY_NOT_AUTHORIZED = 1401;
-    uint16 public constant ERR_QCM_SOLVENCY_QC_NOT_REGISTERED = 1402;
-
-    /// @dev Enhanced error event for logging failed transaction attempts
-    event ErrorLogged(
-        uint16 indexed errorCode,
-        string indexed functionName,
-        address indexed caller,
-        bytes32 contextHash,
-        string message
-    );
+    // Custom errors for gas-efficient reverts
+    error InvalidQCAddress();
+    error InvalidMintingCapacity();
+    error QCAlreadyRegistered(address qc);
+    error ActionAlreadyQueued(bytes32 actionHash);
+    error InvalidWalletAddress();
+    error QCNotRegistered(address qc);
+    error QCNotActive(address qc);
+    error SPVVerificationFailed();
+    error NotAuthorizedForSolvency(address caller);
+    error QCNotRegisteredForSolvency(address qc);
+    error ActionNotQueued(bytes32 actionHash);
+    error DelayPeriodNotElapsed(uint256 executeAfter, uint256 currentTime);
+    error ActionAlreadyExecuted(bytes32 actionHash);
+    error ReasonRequired();
+    error InvalidStatusTransition(QCData.QCStatus oldStatus, QCData.QCStatus newStatus);
+    error NewCapMustBeHigher(uint256 currentCap, uint256 newCap);
+    error WalletNotRegistered(string btcAddress);
+    error NotAuthorizedForWalletDeregistration(address caller);
+    error WalletNotActive(string btcAddress);
+    error WalletNotPendingDeregistration(string btcAddress);
+    error QCWouldBecomeInsolvent(uint256 newBalance, uint256 mintedAmount);
+    error QCReserveLedgerNotAvailable();
     bytes32 public constant TIME_LOCKED_ADMIN_ROLE =
         keccak256("TIME_LOCKED_ADMIN_ROLE");
 
@@ -186,19 +188,24 @@ contract QCManager is AccessControl {
         external
         onlyRole(TIME_LOCKED_ADMIN_ROLE)
     {
-        require(qc != address(0), "Invalid QC address");
-        require(maxMintingCap > 0, "Invalid minting capacity");
+        if (qc == address(0)) {
+            revert InvalidQCAddress();
+        }
+        if (maxMintingCap == 0) {
+            revert InvalidMintingCapacity();
+        }
 
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        require(!qcData.isQCRegistered(qc), "QC already registered");
+        if (qcData.isQCRegistered(qc)) {
+            revert QCAlreadyRegistered(qc);
+        }
 
         bytes32 actionHash = keccak256(
             abi.encodePacked("QC_ONBOARDING", qc, maxMintingCap)
         );
-        require(
-            pendingActions[actionHash].executeAfter == 0,
-            "Action already queued"
-        );
+        if (pendingActions[actionHash].executeAfter != 0) {
+            revert ActionAlreadyQueued(actionHash);
+        }
 
         uint256 executeAfter = block.timestamp + GOVERNANCE_DELAY;
 
@@ -229,12 +236,15 @@ contract QCManager is AccessControl {
         );
         PendingAction storage action = pendingActions[actionHash];
 
-        require(action.executeAfter != 0, "Action not queued");
-        require(
-            block.timestamp >= action.executeAfter,
-            "Delay period not elapsed"
-        );
-        require(!action.executed, "Action already executed");
+        if (action.executeAfter == 0) {
+            revert ActionNotQueued(actionHash);
+        }
+        if (block.timestamp < action.executeAfter) {
+            revert DelayPeriodNotElapsed(action.executeAfter, block.timestamp);
+        }
+        if (action.executed) {
+            revert ActionAlreadyExecuted(actionHash);
+        }
 
         // Mark as executed before external calls
         action.executed = true;
@@ -258,22 +268,29 @@ contract QCManager is AccessControl {
         external
         onlyRole(TIME_LOCKED_ADMIN_ROLE)
     {
-        require(qc != address(0), "Invalid QC address");
-        require(newCap > 0, "Invalid minting capacity");
+        if (qc == address(0)) {
+            revert InvalidQCAddress();
+        }
+        if (newCap == 0) {
+            revert InvalidMintingCapacity();
+        }
 
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        require(qcData.isQCRegistered(qc), "QC not registered");
+        if (!qcData.isQCRegistered(qc)) {
+            revert QCNotRegistered(qc);
+        }
 
         uint256 currentCap = qcData.getMaxMintingCapacity(qc);
-        require(newCap > currentCap, "New cap must be higher than current");
+        if (newCap <= currentCap) {
+            revert NewCapMustBeHigher(currentCap, newCap);
+        }
 
         bytes32 actionHash = keccak256(
             abi.encodePacked("MINTING_CAP_INCREASE", qc, newCap)
         );
-        require(
-            pendingActions[actionHash].executeAfter == 0,
-            "Action already queued"
-        );
+        if (pendingActions[actionHash].executeAfter != 0) {
+            revert ActionAlreadyQueued(actionHash);
+        }
 
         uint256 executeAfter = block.timestamp + GOVERNANCE_DELAY;
 
@@ -304,12 +321,15 @@ contract QCManager is AccessControl {
         );
         PendingAction storage action = pendingActions[actionHash];
 
-        require(action.executeAfter != 0, "Action not queued");
-        require(
-            block.timestamp >= action.executeAfter,
-            "Delay period not elapsed"
-        );
-        require(!action.executed, "Action already executed");
+        if (action.executeAfter == 0) {
+            revert ActionNotQueued(actionHash);
+        }
+        if (block.timestamp < action.executeAfter) {
+            revert DelayPeriodNotElapsed(action.executeAfter, block.timestamp);
+        }
+        if (action.executed) {
+            revert ActionAlreadyExecuted(actionHash);
+        }
 
         // Mark as executed before external calls
         action.executed = true;
@@ -344,11 +364,17 @@ contract QCManager is AccessControl {
         onlyRole(ARBITER_ROLE)
         onlyWhenNotPaused("registry")
     {
-        require(qc != address(0), "Invalid QC address");
-        require(reason != bytes32(0), "Reason required");
+        if (qc == address(0)) {
+            revert InvalidQCAddress();
+        }
+        if (reason == bytes32(0)) {
+            revert ReasonRequired();
+        }
 
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        require(qcData.isQCRegistered(qc), "QC not registered");
+        if (!qcData.isQCRegistered(qc)) {
+            revert QCNotRegistered(qc);
+        }
 
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
 
@@ -378,11 +404,17 @@ contract QCManager is AccessControl {
     /// @param qc The address of the QC to register
     /// @param maxMintingCap The maximum minting capacity for the QC
     function _registerQC(address qc, uint256 maxMintingCap) internal {
-        require(qc != address(0), "Invalid QC address");
-        require(maxMintingCap > 0, "Invalid minting capacity");
+        if (qc == address(0)) {
+            revert InvalidQCAddress();
+        }
+        if (maxMintingCap == 0) {
+            revert InvalidMintingCapacity();
+        }
 
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        require(!qcData.isQCRegistered(qc), "QC already registered");
+        if (qcData.isQCRegistered(qc)) {
+            revert QCAlreadyRegistered(qc);
+        }
 
         // Register QC with provided minting capacity
         qcData.registerQC(qc, maxMintingCap);
@@ -413,15 +445,16 @@ contract QCManager is AccessControl {
         bytes32 reason
     ) external onlyRole(ARBITER_ROLE) onlyWhenNotPaused("registry") {
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        require(qcData.isQCRegistered(qc), "QC not registered");
+        if (!qcData.isQCRegistered(qc)) {
+            revert QCNotRegistered(qc);
+        }
 
         QCData.QCStatus oldStatus = qcData.getQCStatus(qc);
 
         // Validate status transitions
-        require(
-            _isValidStatusTransition(oldStatus, newStatus),
-            "Invalid status transition"
-        );
+        if (!_isValidStatusTransition(oldStatus, newStatus)) {
+            revert InvalidStatusTransition(oldStatus, newStatus);
+        }
 
         qcData.setQCStatus(qc, newStatus, reason);
 
@@ -452,21 +485,23 @@ contract QCManager is AccessControl {
         onlyRole(REGISTRAR_ROLE)
         onlyWhenNotPaused("wallet_registration")
     {
-        require(bytes(btcAddress).length > 0, "Invalid wallet address");
+        if (bytes(btcAddress).length == 0) {
+            revert InvalidWalletAddress();
+        }
 
         // Cache QCData service to avoid redundant SLOAD operations
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        require(qcData.isQCRegistered(qc), "QC not registered");
-        require(
-            qcData.getQCStatus(qc) == QCData.QCStatus.Active,
-            "QC not active"
-        );
+        if (!qcData.isQCRegistered(qc)) {
+            revert QCNotRegistered(qc);
+        }
+        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
+            revert QCNotActive(qc);
+        }
 
         // Verify wallet control using SPV client
-        require(
-            _verifyWalletControl(qc, btcAddress, challenge, txInfo, proof),
-            "SPV verification failed"
-        );
+        if (!_verifyWalletControl(qc, btcAddress, challenge, txInfo, proof)) {
+            revert SPVVerificationFailed();
+        }
 
         qcData.registerWallet(qc, btcAddress);
 
@@ -488,15 +523,15 @@ contract QCManager is AccessControl {
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
         address qc = qcData.getWalletOwner(btcAddress);
 
-        require(qc != address(0), "Wallet not registered");
-        require(
-            msg.sender == qc || hasRole(QC_ADMIN_ROLE, msg.sender),
-            "Not authorized"
-        );
-        require(
-            qcData.getWalletStatus(btcAddress) == QCData.WalletStatus.Active,
-            "Wallet not active"
-        );
+        if (qc == address(0)) {
+            revert WalletNotRegistered(btcAddress);
+        }
+        if (msg.sender != qc && !hasRole(QC_ADMIN_ROLE, msg.sender)) {
+            revert NotAuthorizedForWalletDeregistration(msg.sender);
+        }
+        if (qcData.getWalletStatus(btcAddress) != QCData.WalletStatus.Active) {
+            revert WalletNotActive(btcAddress);
+        }
 
         qcData.requestWalletDeRegistration(btcAddress);
     }
@@ -516,12 +551,12 @@ contract QCManager is AccessControl {
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
         address qc = qcData.getWalletOwner(btcAddress);
 
-        require(qc != address(0), "Wallet not registered");
-        require(
-            qcData.getWalletStatus(btcAddress) ==
-                QCData.WalletStatus.PendingDeRegistration,
-            "Wallet not pending deregistration"
-        );
+        if (qc == address(0)) {
+            revert WalletNotRegistered(btcAddress);
+        }
+        if (qcData.getWalletStatus(btcAddress) != QCData.WalletStatus.PendingDeRegistration) {
+            revert WalletNotPendingDeregistration(btcAddress);
+        }
 
         // Update reserve balance and perform solvency check
         _updateReserveBalanceAndCheckSolvency(qc, newReserveBalance);
@@ -568,45 +603,13 @@ contract QCManager is AccessControl {
     /// @return solvent True if QC is solvent
     function verifyQCSolvency(address qc) external returns (bool solvent) {
         if (!hasRole(ARBITER_ROLE, msg.sender)) {
-            _logError(
-                ERR_QCM_SOLVENCY_NOT_AUTHORIZED,
-                "verifyQCSolvency",
-                msg.sender,
-                keccak256(abi.encodePacked(qc)),
-                string(
-                    abi.encodePacked(
-                        "verifyQCSolvency: Not authorized - caller ",
-                        _addressToString(msg.sender),
-                        " lacks ARBITER_ROLE"
-                    )
-                )
-            );
-            require(
-                false,
-                "QCM-1401: verifyQCSolvency failed - Only arbiter can verify solvency, check role permissions"
-            );
+            revert NotAuthorizedForSolvency(msg.sender);
         }
 
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
 
         if (!qcData.isQCRegistered(qc)) {
-            _logError(
-                ERR_QCM_SOLVENCY_QC_NOT_REGISTERED,
-                "verifyQCSolvency",
-                msg.sender,
-                keccak256(abi.encodePacked(qc)),
-                string(
-                    abi.encodePacked(
-                        "verifyQCSolvency: QC not registered - ",
-                        _addressToString(qc),
-                        " must be registered before solvency verification"
-                    )
-                )
-            );
-            require(
-                false,
-                "QCM-1402: verifyQCSolvency failed - QC not registered, register QC first"
-            );
+            revert QCNotRegisteredForSolvency(qc);
         }
 
         (uint256 reserveBalance, ) = _getReserveBalanceAndStaleness(qc);
@@ -648,7 +651,9 @@ contract QCManager is AccessControl {
         onlyRole(QC_ADMIN_ROLE)
     {
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        require(qcData.isQCRegistered(qc), "QC not registered");
+        if (!qcData.isQCRegistered(qc)) {
+            revert QCNotRegistered(qc);
+        }
 
         qcData.updateQCMintedAmount(qc, newAmount);
     }
@@ -771,7 +776,9 @@ contract QCManager is AccessControl {
         (uint256 oldBalance, ) = _getReserveBalanceAndStaleness(qc);
 
         // Check solvency before updating
-        require(newBalance >= mintedAmount, "QC would become insolvent");
+        if (newBalance < mintedAmount) {
+            revert QCWouldBecomeInsolvent(newBalance, mintedAmount);
+        }
 
         // Update reserve ledger with new balance
         try protocolRegistry.getService(QC_RESERVE_LEDGER_KEY) returns (
@@ -781,7 +788,7 @@ contract QCManager is AccessControl {
             reserveLedger.submitReserveAttestation(qc, newBalance);
         } catch {
             // If QCReserveLedger not registered yet, skip update but still check solvency
-            revert("QC Reserve Ledger not available");
+            revert QCReserveLedgerNotAvailable();
         }
 
         emit ReserveBalanceUpdated(
@@ -793,46 +800,4 @@ contract QCManager is AccessControl {
         );
     }
 
-    // Helper functions for enhanced error messages and logging
-    function _logError(
-        uint16 errorCode,
-        string memory functionName,
-        address caller,
-        bytes32 contextHash,
-        string memory message
-    ) private {
-        emit ErrorLogged(errorCode, functionName, caller, contextHash, message);
-    }
-
-    function _addressToString(address addr)
-        private
-        pure
-        returns (string memory)
-    {
-        bytes memory data = abi.encodePacked(addr);
-        bytes memory alphabet = "0123456789abcdef";
-        bytes memory str = new bytes(2 + data.length * 2);
-        str[0] = "0";
-        str[1] = "x";
-        for (uint256 i = 0; i < data.length; i++) {
-            str[2 + i * 2] = alphabet[uint256(uint8(data[i] >> 4))];
-            str[3 + i * 2] = alphabet[uint256(uint8(data[i] & 0x0f))];
-        }
-        return string(str);
-    }
-
-    function _statusToString(QCData.QCStatus status)
-        private
-        pure
-        returns (string memory)
-    {
-        if (status == QCData.QCStatus.Active) {
-            return "Active";
-        } else if (status == QCData.QCStatus.UnderReview) {
-            return "UnderReview";
-        } else if (status == QCData.QCStatus.Revoked) {
-            return "Revoked";
-        }
-        return "Unknown";
-    }
 }

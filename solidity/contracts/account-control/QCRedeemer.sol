@@ -58,6 +58,7 @@ contract QCRedeemer is AccessControl {
         uint256 amount;
         uint256 requestedAt;
         RedemptionStatus status;
+        string userBtcAddress;
     }
 
     ProtocolRegistry public immutable protocolRegistry;
@@ -76,6 +77,7 @@ contract QCRedeemer is AccessControl {
         address indexed user,
         address indexed qc,
         uint256 amount,
+        string userBtcAddress,
         address requestedBy,
         uint256 timestamp
     );
@@ -119,46 +121,48 @@ contract QCRedeemer is AccessControl {
     /// @notice Initiate a redemption request
     /// @param qc The address of the Qualified Custodian
     /// @param amount The amount of tBTC to redeem
+    /// @param userBtcAddress The user's Bitcoin address
     /// @return redemptionId Unique identifier for this redemption request
-    function initiateRedemption(address qc, uint256 amount)
+    function initiateRedemption(address qc, uint256 amount, string calldata userBtcAddress)
         external
         returns (bytes32 redemptionId)
     {
         require(qc != address(0), ERROR_INVALID_QC);
         require(amount > 0, ERROR_INVALID_AMOUNT);
+        require(bytes(userBtcAddress).length > 0, "Bitcoin address required");
+        bytes memory addr = bytes(userBtcAddress);
+        require(
+            addr[0] == '1' || addr[0] == '3' || (addr[0] == 'b' && addr.length > 1 && addr[1] == 'c'),
+            "Invalid Bitcoin address format"
+        );
 
-        // Cache services to avoid redundant SLOAD operations
         IRedemptionPolicy policy = IRedemptionPolicy(
             protocolRegistry.getService(REDEMPTION_POLICY_KEY)
         );
 
-        // Generate unique redemption ID
         redemptionId = _generateRedemptionId(msg.sender, qc, amount);
 
-        // Request redemption through policy (includes validation and collision detection)
-        // Note: Using placeholder Bitcoin address for now - this should be provided by the user in a real implementation
         require(
             policy.requestRedemption(
                 redemptionId,
                 qc,
                 msg.sender,
                 amount,
-                PLACEHOLDER_BTC_ADDRESS
+                userBtcAddress
             ),
             ERROR_REDEMPTION_FAILED
         );
 
-        // Burn the user's tBTC tokens
         TBTC tbtcToken = TBTC(protocolRegistry.getService(TBTC_TOKEN_KEY));
         tbtcToken.burnFrom(msg.sender, amount);
 
-        // Store redemption data
         redemptions[redemptionId] = Redemption({
             user: msg.sender,
             qc: qc,
             amount: amount,
             requestedAt: block.timestamp,
-            status: RedemptionStatus.Pending
+            status: RedemptionStatus.Pending,
+            userBtcAddress: userBtcAddress
         });
 
         emit RedemptionRequested(
@@ -166,6 +170,7 @@ contract QCRedeemer is AccessControl {
             msg.sender,
             qc,
             amount,
+            userBtcAddress,
             msg.sender,
             block.timestamp
         );
