@@ -44,6 +44,7 @@ contract QCManager is AccessControl {
     error WalletNotPendingDeregistration(string btcAddress);
     error QCWouldBecomeInsolvent(uint256 newBalance, uint256 mintedAmount);
     error QCReserveLedgerNotAvailable();
+    error SPVValidatorNotAvailable();
     bytes32 public constant TIME_LOCKED_ADMIN_ROLE =
         keccak256("TIME_LOCKED_ADMIN_ROLE");
 
@@ -722,22 +723,21 @@ contract QCManager is AccessControl {
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
     ) private view returns (bool verified) {
-        try protocolRegistry.getService(SPV_VALIDATOR_KEY) returns (
-            address validatorAddress
-        ) {
-            ISPVValidator spvValidator = ISPVValidator(validatorAddress);
-            return
-                spvValidator.verifyWalletControl(
-                    qc,
-                    btcAddress,
-                    challenge,
-                    txInfo,
-                    proof
-                );
-        } catch {
-            // If SPV validator not available, reject verification
-            return false;
+        // Check if SPV validator service is available
+        if (!protocolRegistry.hasService(SPV_VALIDATOR_KEY)) {
+            revert SPVValidatorNotAvailable();
         }
+        
+        address validatorAddress = protocolRegistry.getService(SPV_VALIDATOR_KEY);
+        ISPVValidator spvValidator = ISPVValidator(validatorAddress);
+        return
+            spvValidator.verifyWalletControl(
+                qc,
+                btcAddress,
+                challenge,
+                txInfo,
+                proof
+            );
     }
 
     /// @dev Get reserve balance and check staleness
@@ -749,16 +749,14 @@ contract QCManager is AccessControl {
         view
         returns (uint256 balance, bool isStale)
     {
-        // Get from QCReserveLedger
-        try protocolRegistry.getService(QC_RESERVE_LEDGER_KEY) returns (
-            address ledgerAddress
-        ) {
-            QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
-            return reserveLedger.getReserveBalanceAndStaleness(qc);
-        } catch {
-            // If QCReserveLedger not registered yet, return stale
-            return (0, true);
+        // Check if QCReserveLedger service is available
+        if (!protocolRegistry.hasService(QC_RESERVE_LEDGER_KEY)) {
+            revert QCReserveLedgerNotAvailable();
         }
+        
+        address ledgerAddress = protocolRegistry.getService(QC_RESERVE_LEDGER_KEY);
+        QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
+        return reserveLedger.getReserveBalanceAndStaleness(qc);
     }
 
     /// @dev Update reserve balance and check solvency
@@ -780,16 +778,15 @@ contract QCManager is AccessControl {
             revert QCWouldBecomeInsolvent(newBalance, mintedAmount);
         }
 
-        // Update reserve ledger with new balance
-        try protocolRegistry.getService(QC_RESERVE_LEDGER_KEY) returns (
-            address ledgerAddress
-        ) {
-            QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
-            reserveLedger.submitReserveAttestation(qc, newBalance);
-        } catch {
-            // If QCReserveLedger not registered yet, skip update but still check solvency
+        // Check if QCReserveLedger service is available
+        if (!protocolRegistry.hasService(QC_RESERVE_LEDGER_KEY)) {
             revert QCReserveLedgerNotAvailable();
         }
+        
+        // Update reserve ledger with new balance
+        address ledgerAddress = protocolRegistry.getService(QC_RESERVE_LEDGER_KEY);
+        QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
+        reserveLedger.submitReserveAttestation(qc, newBalance);
 
         emit ReserveBalanceUpdated(
             qc,

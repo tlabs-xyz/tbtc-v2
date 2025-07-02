@@ -177,7 +177,7 @@ describe("QCReserveLedger", () => {
               ethers.constants.AddressZero,
               reserveBalance
             )
-        ).to.be.revertedWith("Invalid QC address")
+        ).to.be.revertedWith("InvalidQCAddress")
       })
     })
 
@@ -364,7 +364,7 @@ describe("QCReserveLedger", () => {
             thirdParty.address,
             ethers.utils.formatBytes32String("test")
           )
-        ).to.be.revertedWith("No attestation exists")
+        ).to.be.revertedWith("NoAttestationExists")
       })
 
       it("should revert with empty reason", async () => {
@@ -373,7 +373,7 @@ describe("QCReserveLedger", () => {
             qcAddress.address,
             ethers.constants.HashZero
           )
-        ).to.be.revertedWith("Reason required")
+        ).to.be.revertedWith("ReasonRequired")
       })
     })
 

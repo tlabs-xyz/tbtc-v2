@@ -18,6 +18,17 @@ contract SingleWatchdog is AccessControl {
     bytes32 public constant WATCHDOG_OPERATOR_ROLE =
         keccak256("WATCHDOG_OPERATOR_ROLE");
 
+    // Custom errors for gas-efficient reverts
+    error InvalidQCAddress();
+    error ReasonRequired();
+    error InvalidWalletAddress();
+    error SPVProofRequired();
+    error ChallengeHashRequired();
+    error InvalidRedemptionId();
+    error BitcoinAddressRequired();
+    error InvalidStrategicCondition();
+    error NoRedemptionsProvided();
+
     // Service keys for ProtocolRegistry
     bytes32 public constant QC_MANAGER_KEY = keccak256("QC_MANAGER");
     bytes32 public constant QC_DATA_KEY = keccak256("QC_DATA");
@@ -84,7 +95,7 @@ contract SingleWatchdog is AccessControl {
         onlyRole(WATCHDOG_OPERATOR_ROLE)
         returns (bool solvent)
     {
-        require(qc != address(0), "Invalid QC address");
+        if (qc == address(0)) revert InvalidQCAddress();
 
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
@@ -102,8 +113,8 @@ contract SingleWatchdog is AccessControl {
         uint256 status,
         bytes32 reason
     ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
-        require(qc != address(0), "Invalid QC address");
-        require(reason != bytes32(0), "Reason required");
+        if (qc == address(0)) revert InvalidQCAddress();
+        if (reason == bytes32(0)) revert ReasonRequired();
 
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
@@ -139,7 +150,7 @@ contract SingleWatchdog is AccessControl {
         external
         onlyRole(WATCHDOG_OPERATOR_ROLE)
     {
-        require(qc != address(0), "Invalid QC address");
+        if (qc == address(0)) revert InvalidQCAddress();
 
         QCReserveLedger reserveLedger = QCReserveLedger(
             protocolRegistry.getService(QC_RESERVE_LEDGER_KEY)
@@ -170,10 +181,10 @@ contract SingleWatchdog is AccessControl {
         bytes calldata spvProof,
         bytes32 challengeHash
     ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
-        require(qc != address(0), "Invalid QC address");
-        require(bytes(btcAddress).length > 0, "Invalid wallet address");
-        require(spvProof.length > 0, "SPV proof required");
-        require(challengeHash != bytes32(0), "Challenge hash required");
+        if (qc == address(0)) revert InvalidQCAddress();
+        if (bytes(btcAddress).length == 0) revert InvalidWalletAddress();
+        if (spvProof.length == 0) revert SPVProofRequired();
+        if (challengeHash == bytes32(0)) revert ChallengeHashRequired();
 
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
@@ -222,8 +233,8 @@ contract SingleWatchdog is AccessControl {
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
     ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
-        require(redemptionId != bytes32(0), "Invalid redemption ID");
-        require(bytes(userBtcAddress).length > 0, "Bitcoin address required");
+        if (redemptionId == bytes32(0)) revert InvalidRedemptionId();
+        if (bytes(userBtcAddress).length == 0) revert BitcoinAddressRequired();
 
         QCRedeemer redeemer = QCRedeemer(
             protocolRegistry.getService(QC_REDEEMER_KEY)
@@ -255,8 +266,8 @@ contract SingleWatchdog is AccessControl {
         external
         onlyRole(WATCHDOG_OPERATOR_ROLE)
     {
-        require(redemptionId != bytes32(0), "Invalid redemption ID");
-        require(reason != bytes32(0), "Reason required");
+        if (redemptionId == bytes32(0)) revert InvalidRedemptionId();
+        if (reason == bytes32(0)) revert ReasonRequired();
 
         QCRedeemer redeemer = QCRedeemer(
             protocolRegistry.getService(QC_REDEEMER_KEY)
@@ -284,8 +295,8 @@ contract SingleWatchdog is AccessControl {
         QCData.QCStatus newStatus,
         bytes32 reason
     ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
-        require(qc != address(0), "Invalid QC address");
-        require(reason != bytes32(0), "Reason required");
+        if (qc == address(0)) revert InvalidQCAddress();
+        if (reason == bytes32(0)) revert ReasonRequired();
 
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
@@ -310,7 +321,7 @@ contract SingleWatchdog is AccessControl {
         onlyRole(WATCHDOG_OPERATOR_ROLE)
         returns (bool solvent)
     {
-        require(qc != address(0), "Invalid QC address");
+        if (qc == address(0)) revert InvalidQCAddress();
 
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
@@ -347,12 +358,13 @@ contract SingleWatchdog is AccessControl {
 
         bytes32 conditionHash = keccak256(abi.encodePacked(condition));
 
-        require(
-            conditionHash == keccak256("INSOLVENCY") ||
-                conditionHash == keccak256("STALENESS") ||
-                conditionHash == keccak256("DEREGISTRATION"),
-            "Invalid strategic condition"
-        );
+        if (
+            conditionHash != keccak256("INSOLVENCY") &&
+            conditionHash != keccak256("STALENESS") &&
+            conditionHash != keccak256("DEREGISTRATION")
+        ) {
+            revert InvalidStrategicCondition();
+        }
 
         this.attestReserves(qc, balance);
     }
@@ -366,8 +378,8 @@ contract SingleWatchdog is AccessControl {
         bool fulfill,
         bytes32 reason
     ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
-        require(redemptionIds.length > 0, "No redemptions provided");
-        require(reason != bytes32(0), "Reason required");
+        if (redemptionIds.length == 0) revert NoRedemptionsProvided();
+        if (reason == bytes32(0)) revert ReasonRequired();
 
         QCRedeemer redeemer = QCRedeemer(
             protocolRegistry.getService(QC_REDEEMER_KEY)
@@ -442,44 +454,42 @@ contract SingleWatchdog is AccessControl {
     /// @return operational True if Watchdog has necessary roles
     function isWatchdogOperational() external view returns (bool operational) {
         // Check if this contract has been granted the necessary roles
-        try protocolRegistry.getService(QC_RESERVE_LEDGER_KEY) returns (
-            address ledgerAddress
-        ) {
-            QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
-            if (
-                !reserveLedger.hasRole(
-                    reserveLedger.ATTESTER_ROLE(),
-                    address(this)
-                )
-            ) {
-                return false;
-            }
-        } catch {
+        // Note: This function intentionally returns false rather than reverting
+        // when services are missing, as it's checking operational readiness
+        
+        // Check QCReserveLedger service and role
+        if (!protocolRegistry.hasService(QC_RESERVE_LEDGER_KEY)) {
+            return false; // Service not available - watchdog not operational
+        }
+        
+        address ledgerAddress = protocolRegistry.getService(QC_RESERVE_LEDGER_KEY);
+        QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
+        if (!reserveLedger.hasRole(reserveLedger.ATTESTER_ROLE(), address(this))) {
             return false;
         }
 
-        try protocolRegistry.getService(QC_MANAGER_KEY) returns (
-            address managerAddress
-        ) {
-            QCManager qcManager = QCManager(managerAddress);
-            if (!qcManager.hasRole(qcManager.REGISTRAR_ROLE(), address(this))) {
-                return false;
-            }
-            if (!qcManager.hasRole(qcManager.ARBITER_ROLE(), address(this))) {
-                return false;
-            }
-        } catch {
+        // Check QCManager service and roles
+        if (!protocolRegistry.hasService(QC_MANAGER_KEY)) {
+            return false; // Service not available - watchdog not operational
+        }
+        
+        address managerAddress = protocolRegistry.getService(QC_MANAGER_KEY);
+        QCManager qcManager = QCManager(managerAddress);
+        if (!qcManager.hasRole(qcManager.REGISTRAR_ROLE(), address(this))) {
+            return false;
+        }
+        if (!qcManager.hasRole(qcManager.ARBITER_ROLE(), address(this))) {
             return false;
         }
 
-        try protocolRegistry.getService(QC_REDEEMER_KEY) returns (
-            address redeemerAddress
-        ) {
-            QCRedeemer redeemer = QCRedeemer(redeemerAddress);
-            if (!redeemer.hasRole(redeemer.ARBITER_ROLE(), address(this))) {
-                return false;
-            }
-        } catch {
+        // Check QCRedeemer service and role
+        if (!protocolRegistry.hasService(QC_REDEEMER_KEY)) {
+            return false; // Service not available - watchdog not operational
+        }
+        
+        address redeemerAddress = protocolRegistry.getService(QC_REDEEMER_KEY);
+        QCRedeemer redeemer = QCRedeemer(redeemerAddress);
+        if (!redeemer.hasRole(redeemer.ARBITER_ROLE(), address(this))) {
             return false;
         }
 
