@@ -13,6 +13,31 @@ contract SystemState is AccessControl {
         keccak256("PARAMETER_ADMIN_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
+    // Custom errors for gas-efficient reverts
+    error MintingAlreadyPaused();
+    error MintingNotPaused();
+    error RedemptionAlreadyPaused();
+    error RedemptionNotPaused();
+    error RegistryAlreadyPaused();
+    error RegistryNotPaused();
+    error WalletRegistrationAlreadyPaused();
+    error WalletRegistrationNotPaused();
+    error InvalidAmount();
+    error MinAmountExceedsMax(uint256 minAmount, uint256 maxAmount);
+    error MaxAmountBelowMin(uint256 maxAmount, uint256 minAmount);
+    error InvalidTimeout();
+    error TimeoutTooLong(uint256 timeout, uint256 maxTimeout);
+    error InvalidThreshold();
+    error ThresholdTooLong(uint256 threshold, uint256 maxThreshold);
+    error DelayTooLong(uint256 delay, uint256 maxDelay);
+    error InvalidDuration();
+    error DurationTooLong(uint256 duration, uint256 maxDuration);
+    error InvalidCouncilAddress();
+    error MintingIsPaused();
+    error RedemptionIsPaused();
+    error RegistryOperationsArePaused();
+    error WalletRegistrationIsPaused();
+
     /// @dev Global pause flags for granular emergency controls
     bool public isMintingPaused;
     bool public isRedemptionPaused;
@@ -122,16 +147,13 @@ contract SystemState is AccessControl {
     modifier notPaused(string memory functionName) {
         bytes32 pauseKey = keccak256(abi.encodePacked(functionName));
         if (pauseKey == keccak256("minting")) {
-            require(!isMintingPaused, "Minting is paused");
+            if (isMintingPaused) revert MintingIsPaused();
         } else if (pauseKey == keccak256("redemption")) {
-            require(!isRedemptionPaused, "Redemption is paused");
+            if (isRedemptionPaused) revert RedemptionIsPaused();
         } else if (pauseKey == keccak256("registry")) {
-            require(!isRegistryPaused, "Registry operations are paused");
+            if (isRegistryPaused) revert RegistryOperationsArePaused();
         } else if (pauseKey == keccak256("wallet_registration")) {
-            require(
-                !isWalletRegistrationPaused,
-                "Wallet registration is paused"
-            );
+            if (isWalletRegistrationPaused) revert WalletRegistrationIsPaused();
         }
         _;
     }
@@ -154,7 +176,7 @@ contract SystemState is AccessControl {
 
     /// @notice Pause minting operations
     function pauseMinting() external onlyRole(PAUSER_ROLE) {
-        require(!isMintingPaused, "Minting already paused");
+        if (isMintingPaused) revert MintingAlreadyPaused();
         isMintingPaused = true;
         pauseTimestamps[keccak256("minting")] = block.timestamp;
         emit MintingPaused(msg.sender, block.timestamp);
@@ -162,7 +184,7 @@ contract SystemState is AccessControl {
 
     /// @notice Unpause minting operations
     function unpauseMinting() external onlyRole(PAUSER_ROLE) {
-        require(isMintingPaused, "Minting not paused");
+        if (!isMintingPaused) revert MintingNotPaused();
         isMintingPaused = false;
         delete pauseTimestamps[keccak256("minting")];
         emit MintingUnpaused(msg.sender, block.timestamp);
@@ -170,7 +192,7 @@ contract SystemState is AccessControl {
 
     /// @notice Pause redemption operations
     function pauseRedemption() external onlyRole(PAUSER_ROLE) {
-        require(!isRedemptionPaused, "Redemption already paused");
+        if (isRedemptionPaused) revert RedemptionAlreadyPaused();
         isRedemptionPaused = true;
         pauseTimestamps[keccak256("redemption")] = block.timestamp;
         emit RedemptionPaused(msg.sender, block.timestamp);
@@ -178,7 +200,7 @@ contract SystemState is AccessControl {
 
     /// @notice Unpause redemption operations
     function unpauseRedemption() external onlyRole(PAUSER_ROLE) {
-        require(isRedemptionPaused, "Redemption not paused");
+        if (!isRedemptionPaused) revert RedemptionNotPaused();
         isRedemptionPaused = false;
         delete pauseTimestamps[keccak256("redemption")];
         emit RedemptionUnpaused(msg.sender, block.timestamp);
@@ -186,7 +208,7 @@ contract SystemState is AccessControl {
 
     /// @notice Pause registry operations
     function pauseRegistry() external onlyRole(PAUSER_ROLE) {
-        require(!isRegistryPaused, "Registry already paused");
+        if (isRegistryPaused) revert RegistryAlreadyPaused();
         isRegistryPaused = true;
         pauseTimestamps[keccak256("registry")] = block.timestamp;
         emit RegistryPaused(msg.sender, block.timestamp);
@@ -194,7 +216,7 @@ contract SystemState is AccessControl {
 
     /// @notice Unpause registry operations
     function unpauseRegistry() external onlyRole(PAUSER_ROLE) {
-        require(isRegistryPaused, "Registry not paused");
+        if (!isRegistryPaused) revert RegistryNotPaused();
         isRegistryPaused = false;
         delete pauseTimestamps[keccak256("registry")];
         emit RegistryUnpaused(msg.sender, block.timestamp);
@@ -202,10 +224,7 @@ contract SystemState is AccessControl {
 
     /// @notice Pause wallet registration operations
     function pauseWalletRegistration() external onlyRole(PAUSER_ROLE) {
-        require(
-            !isWalletRegistrationPaused,
-            "Wallet registration already paused"
-        );
+        if (isWalletRegistrationPaused) revert WalletRegistrationAlreadyPaused();
         isWalletRegistrationPaused = true;
         pauseTimestamps[keccak256("wallet_registration")] = block.timestamp;
         emit WalletRegistrationPaused(msg.sender, block.timestamp);
@@ -213,7 +232,7 @@ contract SystemState is AccessControl {
 
     /// @notice Unpause wallet registration operations
     function unpauseWalletRegistration() external onlyRole(PAUSER_ROLE) {
-        require(isWalletRegistrationPaused, "Wallet registration not paused");
+        if (!isWalletRegistrationPaused) revert WalletRegistrationNotPaused();
         isWalletRegistrationPaused = false;
         delete pauseTimestamps[keccak256("wallet_registration")];
         emit WalletRegistrationUnpaused(msg.sender, block.timestamp);
@@ -227,11 +246,8 @@ contract SystemState is AccessControl {
         external
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
-        require(newAmount > 0, "Invalid amount");
-        require(
-            newAmount <= maxMintAmount,
-            "Min amount cannot exceed max amount"
-        );
+        if (newAmount == 0) revert InvalidAmount();
+        if (newAmount > maxMintAmount) revert MinAmountExceedsMax(newAmount, maxMintAmount);
 
         uint256 oldAmount = minMintAmount;
         minMintAmount = newAmount;
@@ -245,10 +261,7 @@ contract SystemState is AccessControl {
         external
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
-        require(
-            newAmount >= minMintAmount,
-            "Max amount cannot be less than min amount"
-        );
+        if (newAmount < minMintAmount) revert MaxAmountBelowMin(newAmount, minMintAmount);
 
         uint256 oldAmount = maxMintAmount;
         maxMintAmount = newAmount;
@@ -262,8 +275,8 @@ contract SystemState is AccessControl {
         external
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
-        require(newTimeout > 0, "Invalid timeout");
-        require(newTimeout <= 30 days, "Timeout too long");
+        if (newTimeout == 0) revert InvalidTimeout();
+        if (newTimeout > 30 days) revert TimeoutTooLong(newTimeout, 30 days);
 
         uint256 oldTimeout = redemptionTimeout;
         redemptionTimeout = newTimeout;
@@ -277,8 +290,8 @@ contract SystemState is AccessControl {
         external
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
-        require(newThreshold > 0, "Invalid threshold");
-        require(newThreshold <= 7 days, "Threshold too long");
+        if (newThreshold == 0) revert InvalidThreshold();
+        if (newThreshold > 7 days) revert ThresholdTooLong(newThreshold, 7 days);
 
         uint256 oldThreshold = staleThreshold;
         staleThreshold = newThreshold;
@@ -292,7 +305,7 @@ contract SystemState is AccessControl {
         external
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
-        require(newDelay <= 24 hours, "Delay too long");
+        if (newDelay > 24 hours) revert DelayTooLong(newDelay, 24 hours);
 
         uint256 oldDelay = walletRegistrationDelay;
         walletRegistrationDelay = newDelay;
@@ -306,8 +319,8 @@ contract SystemState is AccessControl {
         external
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
-        require(newDuration > 0, "Invalid duration");
-        require(newDuration <= 30 days, "Duration too long");
+        if (newDuration == 0) revert InvalidDuration();
+        if (newDuration > 30 days) revert DurationTooLong(newDuration, 30 days);
 
         uint256 oldDuration = emergencyPauseDuration;
         emergencyPauseDuration = newDuration;
@@ -325,7 +338,7 @@ contract SystemState is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newCouncil != address(0), "Invalid council address");
+        if (newCouncil == address(0)) revert InvalidCouncilAddress();
 
         address oldCouncil = emergencyCouncil;
         emergencyCouncil = newCouncil;

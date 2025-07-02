@@ -11,6 +11,10 @@ import "./ProtocolRegistry.sol";
 /// logic to a pluggable "Minting Policy" contract, allowing minting rules
 /// to be upgraded without changing the core minter contract.
 contract QCMinter is AccessControl {
+    // Custom errors for gas-efficient reverts
+    error InvalidQCAddress();
+    error InvalidAmount();
+
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant MINTING_POLICY_KEY = keccak256("MINTING_POLICY");
 
@@ -51,8 +55,8 @@ contract QCMinter is AccessControl {
         onlyRole(MINTER_ROLE)
         returns (bytes32 mintId)
     {
-        require(qc != address(0), "Invalid QC address");
-        require(amount > 0, "Amount must be greater than zero");
+        if (qc == address(0)) revert InvalidQCAddress();
+        if (amount == 0) revert InvalidAmount();
 
         // Get active minting policy from registry
         IMintingPolicy policy = IMintingPolicy(
@@ -110,14 +114,14 @@ contract QCMinter is AccessControl {
     /// @dev This is called automatically when ProtocolRegistry is updated
     function updateMintingPolicy() external onlyRole(DEFAULT_ADMIN_ROLE) {
         address oldPolicy = address(0);
-        try protocolRegistry.getService(MINTING_POLICY_KEY) returns (
-            address current
-        ) {
-            oldPolicy = current;
-        } catch {
-            // Policy not yet registered
+        
+        // Check if old policy exists
+        if (protocolRegistry.hasService(MINTING_POLICY_KEY)) {
+            oldPolicy = protocolRegistry.getService(MINTING_POLICY_KEY);
         }
-
+        
+        // Note: The new policy should already be set in the registry before calling this
+        // The caller is responsible for ensuring the new policy is registered
         address newPolicy = protocolRegistry.getService(MINTING_POLICY_KEY);
 
         emit MintingPolicyUpdated(

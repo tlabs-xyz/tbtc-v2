@@ -184,6 +184,11 @@ describe("BasicRedemptionPolicy", () => {
       })
 
       it("should emit RedemptionRequested event", async () => {
+        const receipt = await tx.wait()
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
+        )
+
         await expect(tx)
           .to.emit(basicRedemptionPolicy, "RedemptionRequested")
           .withArgs(
@@ -191,7 +196,9 @@ describe("BasicRedemptionPolicy", () => {
             qcAddress.address,
             user.address,
             redemptionAmount,
-            bitcoinAddress
+            bitcoinAddress,
+            deployer.address, // requestedBy (the caller)
+            timestamp
           )
       })
     })
@@ -206,7 +213,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionAmount,
             bitcoinAddress
           )
-        ).to.be.revertedWith("Invalid redemption ID")
+        ).to.be.revertedWith("InvalidRedemptionId")
       })
 
       it("should revert with zero QC address", async () => {
@@ -218,7 +225,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionAmount,
             bitcoinAddress
           )
-        ).to.be.revertedWith("Invalid QC address")
+        ).to.be.revertedWith("ValidationFailed")
       })
 
       it("should revert with zero user address", async () => {
@@ -230,7 +237,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionAmount,
             bitcoinAddress
           )
-        ).to.be.revertedWith("Invalid user address")
+        ).to.be.revertedWith("ValidationFailed")
       })
 
       it("should revert with zero amount", async () => {
@@ -242,7 +249,7 @@ describe("BasicRedemptionPolicy", () => {
             0,
             bitcoinAddress
           )
-        ).to.be.revertedWith("Amount must be greater than zero")
+        ).to.be.revertedWith("ValidationFailed")
       })
 
       it("should revert with empty Bitcoin address", async () => {
@@ -254,7 +261,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionAmount,
             ""
           )
-        ).to.be.revertedWith("Invalid Bitcoin address")
+        ).to.be.revertedWith("InvalidBitcoinAddress")
       })
     })
 
@@ -270,7 +277,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionAmount,
             bitcoinAddress
           )
-        ).to.be.revertedWith("Redemption request validation failed")
+        ).to.be.revertedWith("ValidationFailed")
       })
 
       it("should revert when QC is revoked", async () => {
@@ -284,7 +291,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionAmount,
             bitcoinAddress
           )
-        ).to.be.revertedWith("Redemption request validation failed")
+        ).to.be.revertedWith("ValidationFailed")
       })
 
       it("should allow redemption when QC is active", async () => {
@@ -331,7 +338,7 @@ describe("BasicRedemptionPolicy", () => {
               redemptionAmount,
               bitcoinAddress
             )
-        ).to.be.revertedWith("Redemption request validation failed")
+        ).to.be.revertedWith("ValidationFailed")
       })
     })
 
@@ -356,7 +363,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionAmount,
             bitcoinAddress
           )
-        ).to.be.revertedWith("Redemption ID already used")
+        ).to.be.revertedWith("RedemptionIdAlreadyUsed")
       })
     })
   })
@@ -390,9 +397,14 @@ describe("BasicRedemptionPolicy", () => {
       })
 
       it("should emit RedemptionFulfilledByPolicy event", async () => {
+        const receipt = await tx.wait()
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
+        )
+
         await expect(tx)
           .to.emit(basicRedemptionPolicy, "RedemptionFulfilledByPolicy")
-          .withArgs(redemptionId, deployer.address)
+          .withArgs(redemptionId, deployer.address, timestamp)
       })
     })
 
@@ -417,7 +429,7 @@ describe("BasicRedemptionPolicy", () => {
             mockSpvData.txInfo,
             mockSpvData.proof
           )
-        ).to.be.revertedWith("Invalid redemption ID")
+        ).to.be.revertedWith("InvalidRedemptionId")
       })
 
       it("should revert with empty SPV proof", async () => {
@@ -435,7 +447,7 @@ describe("BasicRedemptionPolicy", () => {
             mockSpvData.txInfo,
             mockSpvData.proof
           )
-        ).to.be.revertedWith("SPV proof verification failed")
+        ).to.be.revertedWith("SPVVerificationFailed")
       })
     })
 
@@ -463,7 +475,7 @@ describe("BasicRedemptionPolicy", () => {
           ethers.utils.formatBytes32String("Timeout exceeded")
         await expect(
           basicRedemptionPolicy.flagDefault(redemptionId, defaultReason)
-        ).to.be.revertedWith("Already fulfilled")
+        ).to.be.revertedWith("RedemptionAlreadyFulfilled")
       })
     })
 
@@ -492,7 +504,7 @@ describe("BasicRedemptionPolicy", () => {
             mockSpvData.txInfo,
             mockSpvData.proof
           )
-        ).to.be.revertedWith("Already defaulted")
+        ).to.be.revertedWith("RedemptionAlreadyDefaulted")
       })
     })
   })
@@ -525,9 +537,14 @@ describe("BasicRedemptionPolicy", () => {
       })
 
       it("should emit RedemptionDefaultedByPolicy event", async () => {
+        const receipt = await tx.wait()
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
+        )
+
         await expect(tx)
           .to.emit(basicRedemptionPolicy, "RedemptionDefaultedByPolicy")
-          .withArgs(redemptionId, defaultReason, deployer.address)
+          .withArgs(redemptionId, defaultReason, deployer.address, timestamp)
       })
     })
 
@@ -547,7 +564,7 @@ describe("BasicRedemptionPolicy", () => {
             ethers.constants.HashZero,
             defaultReason
           )
-        ).to.be.revertedWith("Invalid redemption ID")
+        ).to.be.revertedWith("InvalidRedemptionId")
       })
 
       it("should revert with empty reason", async () => {
@@ -556,7 +573,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionId,
             ethers.constants.HashZero
           )
-        ).to.be.revertedWith("Reason required")
+        ).to.be.revertedWith("InvalidReason")
       })
     })
 
@@ -584,7 +601,7 @@ describe("BasicRedemptionPolicy", () => {
           ethers.utils.formatBytes32String("Timeout exceeded")
         await expect(
           basicRedemptionPolicy.flagDefault(redemptionId, defaultReason)
-        ).to.be.revertedWith("Already fulfilled")
+        ).to.be.revertedWith("RedemptionAlreadyFulfilled")
       })
     })
 
@@ -606,7 +623,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionId,
             ethers.utils.formatBytes32String("Another reason")
           )
-        ).to.be.revertedWith("Already defaulted")
+        ).to.be.revertedWith("RedemptionAlreadyDefaulted")
       })
     })
   })
@@ -794,7 +811,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionAmount,
             bitcoinAddress
           )
-        ).to.be.revertedWith("Redemption request validation failed")
+        ).to.be.revertedWith("ValidationFailed")
       })
 
       it("should handle QCData status changes", async () => {
@@ -820,7 +837,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionAmount,
             bitcoinAddress
           )
-        ).to.be.revertedWith("Redemption request validation failed")
+        ).to.be.revertedWith("ValidationFailed")
       })
     })
 
@@ -888,7 +905,7 @@ describe("BasicRedemptionPolicy", () => {
             redemptionAmount,
             bitcoinAddress
           )
-        ).to.be.revertedWith("Redemption request validation failed")
+        ).to.be.revertedWith("ValidationFailed")
       })
     })
 
@@ -1154,12 +1171,18 @@ describe("BasicRedemptionPolicy", () => {
           .to.be.true
         expect(await basicRedemptionPolicy.isRedemptionFulfilled(redemptionId2))
           .to.be.true
+
+        const receipt = await tx.wait()
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
+        )
+
         await expect(tx)
           .to.emit(basicRedemptionPolicy, "RedemptionFulfilledByPolicy")
-          .withArgs(redemptionId1, deployer.address)
+          .withArgs(redemptionId1, deployer.address, timestamp)
         await expect(tx)
           .to.emit(basicRedemptionPolicy, "RedemptionFulfilledByPolicy")
-          .withArgs(redemptionId2, deployer.address)
+          .withArgs(redemptionId2, deployer.address, timestamp)
       })
 
       it("should bulk default redemptions", async () => {
@@ -1195,12 +1218,17 @@ describe("BasicRedemptionPolicy", () => {
         expect(defaulted2).to.be.true
         expect(reason2).to.equal(reason)
 
+        const receipt = await tx.wait()
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
+        )
+
         await expect(tx)
           .to.emit(basicRedemptionPolicy, "RedemptionDefaultedByPolicy")
-          .withArgs(redemptionId1, reason, deployer.address)
+          .withArgs(redemptionId1, reason, deployer.address, timestamp)
         await expect(tx)
           .to.emit(basicRedemptionPolicy, "RedemptionDefaultedByPolicy")
-          .withArgs(redemptionId2, reason, deployer.address)
+          .withArgs(redemptionId2, reason, deployer.address, timestamp)
       })
 
       it("should skip already processed redemptions", async () => {
@@ -1246,12 +1274,16 @@ describe("BasicRedemptionPolicy", () => {
         expect(reason2).to.equal(reason)
 
         // Should only emit event for the newly processed redemption
+        const receipt = await tx.wait()
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
+        )
+
         await expect(tx)
           .to.emit(basicRedemptionPolicy, "RedemptionDefaultedByPolicy")
-          .withArgs(redemptionId2, reason, deployer.address)
+          .withArgs(redemptionId2, reason, deployer.address, timestamp)
 
         // Verify only one event was emitted (for redemptionId2, not redemptionId1)
-        const receipt = await tx.wait()
         const events =
           receipt.events?.filter(
             (e) => e.event === "RedemptionDefaultedByPolicy"

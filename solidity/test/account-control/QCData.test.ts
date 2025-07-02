@@ -73,7 +73,9 @@ describe("QCData", () => {
             qcAddress.address,
             qcManager.address,
             ethers.utils.parseEther("1000"),
-            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+            await ethers.provider
+              .getBlock(tx.blockNumber!)
+              .then((b) => b.timestamp)
           )
       })
 
@@ -86,7 +88,7 @@ describe("QCData", () => {
           qcData
             .connect(qcManager)
             .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
-        ).to.be.revertedWith("QC already registered")
+        ).to.be.revertedWith("QCAlreadyRegistered")
       })
 
       it("should revert with zero address", async () => {
@@ -97,7 +99,13 @@ describe("QCData", () => {
               ethers.constants.AddressZero,
               ethers.utils.parseEther("1000")
             )
-        ).to.be.revertedWith("Invalid QC address")
+        ).to.be.revertedWith("InvalidQCAddress")
+      })
+
+      it("should revert with zero minting capacity", async () => {
+        await expect(
+          qcData.connect(qcManager).registerQC(qcAddress.address, 0)
+        ).to.be.revertedWith("InvalidMintingCapacity")
       })
     })
 
@@ -138,7 +146,9 @@ describe("QCData", () => {
             1,
             testReason,
             qcManager.address,
-            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+            await ethers.provider
+              .getBlock(tx.blockNumber!)
+              .then((b) => b.timestamp)
           )
       })
 
@@ -164,7 +174,7 @@ describe("QCData", () => {
           qcData
             .connect(qcManager)
             .setQCStatus(thirdParty.address, 1, testReason)
-        ).to.be.revertedWith("QC not registered")
+        ).to.be.revertedWith("QCNotRegistered")
       })
 
       it("should revert with invalid status", async () => {
@@ -214,7 +224,9 @@ describe("QCData", () => {
             0,
             mintedAmount,
             qcManager.address,
-            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+            await ethers.provider
+              .getBlock(tx.blockNumber!)
+              .then((b) => b.timestamp)
           )
       })
 
@@ -245,7 +257,7 @@ describe("QCData", () => {
           qcData
             .connect(qcManager)
             .updateQCMintedAmount(thirdParty.address, mintedAmount)
-        ).to.be.revertedWith("QC not registered")
+        ).to.be.revertedWith("QCNotRegistered")
       })
     })
 
@@ -290,7 +302,9 @@ describe("QCData", () => {
             qcAddress.address,
             testBtcAddress,
             qcManager.address,
-            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+            await ethers.provider
+              .getBlock(tx.blockNumber!)
+              .then((b) => b.timestamp)
           )
       })
 
@@ -317,7 +331,7 @@ describe("QCData", () => {
           qcData
             .connect(qcManager)
             .registerWallet(qcAddress.address, testBtcAddress)
-        ).to.be.revertedWith("Wallet already registered")
+        ).to.be.revertedWith("WalletAlreadyRegistered")
       })
 
       it("should revert when QC not registered", async () => {
@@ -325,13 +339,13 @@ describe("QCData", () => {
           qcData
             .connect(qcManager)
             .registerWallet(thirdParty.address, testBtcAddress)
-        ).to.be.revertedWith("QC not registered")
+        ).to.be.revertedWith("QCNotRegistered")
       })
 
       it("should revert with empty wallet address", async () => {
         await expect(
           qcData.connect(qcManager).registerWallet(qcAddress.address, "")
-        ).to.be.revertedWith("Invalid wallet address")
+        ).to.be.revertedWith("InvalidWalletAddress")
       })
     })
 
@@ -373,14 +387,16 @@ describe("QCData", () => {
             qcAddress.address,
             testBtcAddress,
             qcManager.address,
-            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+            await ethers.provider
+              .getBlock(tx.blockNumber!)
+              .then((b) => b.timestamp)
           )
       })
 
       it("should revert when wallet not registered", async () => {
         await expect(
           qcData.connect(qcManager).requestWalletDeRegistration(testBtcAddress2)
-        ).to.be.revertedWith("Wallet not registered")
+        ).to.be.revertedWith("WalletNotRegistered")
       })
 
       it("should revert when wallet not active", async () => {
@@ -390,7 +406,7 @@ describe("QCData", () => {
 
         await expect(
           qcData.connect(qcManager).requestWalletDeRegistration(testBtcAddress)
-        ).to.be.revertedWith("Wallet not active")
+        ).to.be.revertedWith("WalletNotActive")
       })
     })
 
@@ -420,7 +436,9 @@ describe("QCData", () => {
             qcAddress.address,
             testBtcAddress,
             qcManager.address,
-            await ethers.provider.getBlock(tx.blockNumber!).then(b => b.timestamp)
+            await ethers.provider
+              .getBlock(tx.blockNumber!)
+              .then((b) => b.timestamp)
           )
       })
 
@@ -429,7 +447,7 @@ describe("QCData", () => {
           qcData
             .connect(qcManager)
             .finalizeWalletDeRegistration(testBtcAddress2)
-        ).to.be.revertedWith("Wallet not registered")
+        ).to.be.revertedWith("WalletNotRegistered")
       })
 
       it("should revert when wallet not pending deregistration", async () => {
@@ -439,7 +457,7 @@ describe("QCData", () => {
 
         await expect(
           qcData.connect(qcManager).finalizeWalletDeRegistration(testBtcAddress)
-        ).to.be.revertedWith("Wallet not pending deregistration")
+        ).to.be.revertedWith("WalletNotPendingDeregistration")
       })
     })
   })
@@ -627,7 +645,7 @@ describe("QCData", () => {
 
         await expect(
           qcData.connect(qcManager).registerWallet(qc2, testBtcAddress)
-        ).to.be.revertedWith("Wallet already registered")
+        ).to.be.revertedWith("WalletAlreadyRegistered")
       })
     })
 
@@ -815,7 +833,7 @@ describe("QCData", () => {
           qcData
             .connect(qcManager)
             .registerWallet(qcAddress.address, testBtcAddress)
-        ).to.be.revertedWith("Wallet already registered")
+        ).to.be.revertedWith("WalletAlreadyRegistered")
       })
 
       it("should prevent double deregistration request", async () => {
@@ -825,13 +843,13 @@ describe("QCData", () => {
 
         await expect(
           qcData.connect(qcManager).requestWalletDeRegistration(testBtcAddress)
-        ).to.be.revertedWith("Wallet not active")
+        ).to.be.revertedWith("WalletNotActive")
       })
 
       it("should prevent direct finalization without request", async () => {
         await expect(
           qcData.connect(qcManager).finalizeWalletDeRegistration(testBtcAddress)
-        ).to.be.revertedWith("Wallet not pending deregistration")
+        ).to.be.revertedWith("WalletNotPendingDeregistration")
       })
     })
 

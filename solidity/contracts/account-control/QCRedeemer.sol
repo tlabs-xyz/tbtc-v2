@@ -20,6 +20,16 @@ import "../bridge/BitcoinTx.sol";
 /// - Role-based access control for sensitive operations
 /// - Integration with tBTC v2 token burning mechanism
 contract QCRedeemer is AccessControl {
+    // Custom errors for gas-efficient reverts
+    error InvalidQCAddress();
+    error InvalidAmount();
+    error BitcoinAddressRequired();
+    error InvalidBitcoinAddressFormat();
+    error RedemptionRequestFailed();
+    error RedemptionNotPending();
+    error FulfillmentVerificationFailed();
+    error DefaultFlaggingFailed();
+
     // Role definitions for access control
     bytes32 public constant REDEEMER_ROLE = keccak256("REDEEMER_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
@@ -28,17 +38,6 @@ contract QCRedeemer is AccessControl {
     bytes32 public constant REDEMPTION_POLICY_KEY =
         keccak256("REDEMPTION_POLICY");
     bytes32 public constant TBTC_TOKEN_KEY = keccak256("TBTC_TOKEN");
-
-    // Error messages for better debugging and user experience
-    string private constant ERROR_INVALID_QC = "Invalid QC address";
-    string private constant ERROR_INVALID_AMOUNT =
-        "Amount must be greater than zero";
-    string private constant ERROR_REDEMPTION_FAILED =
-        "Redemption request failed";
-    string private constant ERROR_NOT_PENDING = "Redemption not pending";
-    string private constant ERROR_FULFILLMENT_FAILED =
-        "Fulfillment verification failed";
-    string private constant ERROR_DEFAULT_FAILED = "Default flagging failed";
 
     // Bitcoin address placeholder - in production this should be user-provided
     string private constant PLACEHOLDER_BTC_ADDRESS = "placeholder_btc_address";
@@ -127,14 +126,13 @@ contract QCRedeemer is AccessControl {
         external
         returns (bytes32 redemptionId)
     {
-        require(qc != address(0), ERROR_INVALID_QC);
-        require(amount > 0, ERROR_INVALID_AMOUNT);
-        require(bytes(userBtcAddress).length > 0, "Bitcoin address required");
+        if (qc == address(0)) revert InvalidQCAddress();
+        if (amount == 0) revert InvalidAmount();
+        if (bytes(userBtcAddress).length == 0) revert BitcoinAddressRequired();
         bytes memory addr = bytes(userBtcAddress);
-        require(
-            addr[0] == '1' || addr[0] == '3' || (addr[0] == 'b' && addr.length > 1 && addr[1] == 'c'),
-            "Invalid Bitcoin address format"
-        );
+        if (!(addr[0] == 0x31 || addr[0] == 0x33 || (addr[0] == 0x62 && addr.length > 1 && addr[1] == 0x63))) {
+            revert InvalidBitcoinAddressFormat();
+        }
 
         IRedemptionPolicy policy = IRedemptionPolicy(
             protocolRegistry.getService(REDEMPTION_POLICY_KEY)
@@ -142,16 +140,15 @@ contract QCRedeemer is AccessControl {
 
         redemptionId = _generateRedemptionId(msg.sender, qc, amount);
 
-        require(
-            policy.requestRedemption(
+        if (!policy.requestRedemption(
                 redemptionId,
                 qc,
                 msg.sender,
                 amount,
                 userBtcAddress
-            ),
-            ERROR_REDEMPTION_FAILED
-        );
+            )) {
+            revert RedemptionRequestFailed();
+        }
 
         TBTC tbtcToken = TBTC(protocolRegistry.getService(TBTC_TOKEN_KEY));
         tbtcToken.burnFrom(msg.sender, amount);
@@ -191,10 +188,9 @@ contract QCRedeemer is AccessControl {
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
     ) external onlyRole(ARBITER_ROLE) {
-        require(
-            redemptions[redemptionId].status == RedemptionStatus.Pending,
-            ERROR_NOT_PENDING
-        );
+        if (redemptions[redemptionId].status != RedemptionStatus.Pending) {
+            revert RedemptionNotPending();
+        }
 
         // Cache redemption policy service to avoid redundant SLOAD operations
         IRedemptionPolicy policy = IRedemptionPolicy(
@@ -202,16 +198,15 @@ contract QCRedeemer is AccessControl {
         );
 
         // Delegate verification to policy contract
-        require(
-            policy.recordFulfillment(
+        if (!policy.recordFulfillment(
                 redemptionId,
                 userBtcAddress,
                 expectedAmount,
                 txInfo,
                 proof
-            ),
-            ERROR_FULFILLMENT_FAILED
-        );
+            )) {
+            revert FulfillmentVerificationFailed();
+        }
 
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Fulfilled;
@@ -234,10 +229,9 @@ contract QCRedeemer is AccessControl {
         external
         onlyRole(ARBITER_ROLE)
     {
-        require(
-            redemptions[redemptionId].status == RedemptionStatus.Pending,
-            ERROR_NOT_PENDING
-        );
+        if (redemptions[redemptionId].status != RedemptionStatus.Pending) {
+            revert RedemptionNotPending();
+        }
 
         // Get active redemption policy from registry
         IRedemptionPolicy policy = IRedemptionPolicy(
@@ -245,7 +239,9 @@ contract QCRedeemer is AccessControl {
         );
 
         // Delegate default handling to policy contract
-        require(policy.flagDefault(redemptionId, reason), ERROR_DEFAULT_FAILED);
+        if (!policy.flagDefault(redemptionId, reason)) {
+            revert DefaultFlaggingFailed();
+        }
 
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Defaulted;
@@ -298,14 +294,14 @@ contract QCRedeemer is AccessControl {
     /// @dev This is called automatically when ProtocolRegistry is updated
     function updateRedemptionPolicy() external onlyRole(DEFAULT_ADMIN_ROLE) {
         address oldPolicy = address(0);
-        try protocolRegistry.getService(REDEMPTION_POLICY_KEY) returns (
-            address current
-        ) {
-            oldPolicy = current;
-        } catch {
-            // Policy not yet registered
+        
+        // Check if old policy exists
+        if (protocolRegistry.hasService(REDEMPTION_POLICY_KEY)) {
+            oldPolicy = protocolRegistry.getService(REDEMPTION_POLICY_KEY);
         }
-
+        
+        // Note: The new policy should already be set in the registry before calling this
+        // The caller is responsible for ensuring the new policy is registered
         address newPolicy = protocolRegistry.getService(REDEMPTION_POLICY_KEY);
 
         emit RedemptionPolicyUpdated(
