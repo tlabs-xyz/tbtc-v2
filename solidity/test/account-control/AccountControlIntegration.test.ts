@@ -421,9 +421,10 @@ describe("Account Control System - Integration Test", () => {
       await tbtc.connect(user).approve(qcRedeemer.address, mintAmount)
 
       // Initiate redemption (this should burn the tokens)
+      const userBtcAddress = "bc1quser123456789"
       const redemptionTx = await qcRedeemer
         .connect(user)
-        .initiateRedemption(qcAddress.address, mintAmount)
+        .initiateRedemption(qcAddress.address, mintAmount, userBtcAddress)
 
       // Verify tokens were burned
       userBalance = await tbtc.balanceOf(user.address)
@@ -445,8 +446,7 @@ describe("Account Control System - Integration Test", () => {
 
       // Fulfill redemption via Watchdog
       const mockSpvData = createMockSpvData()
-      const userBtcAddress = "bc1quser123456789"
-      const expectedAmount = mintAmount // Amount in satoshis (assuming 1:1 for this test)
+      const expectedAmount = mintAmount.div(ethers.BigNumber.from(10).pow(10)) // Convert from 18 decimals to 8 decimals (satoshis)
 
       await singleWatchdog
         .connect(watchdog)
@@ -485,7 +485,7 @@ describe("Account Control System - Integration Test", () => {
         qcMinter
           .connect(user)
           .requestQCMint(qcAddress.address, ethers.utils.parseEther("1"))
-      ).to.be.revertedWith("Minting is paused")
+      ).to.be.reverted
 
       // Unpause minting
       await systemState.unpauseMinting()

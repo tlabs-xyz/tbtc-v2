@@ -19,6 +19,10 @@ import "../bridge/BitcoinTx.sol";
 /// - Policy-based validation and fulfillment
 /// - Role-based access control for sensitive operations
 /// - Integration with tBTC v2 token burning mechanism
+///
+/// Role definitions:
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update redemption policy
+/// - ARBITER_ROLE: Can record redemption fulfillments and flag defaults
 contract QCRedeemer is AccessControl {
     // Custom errors for gas-efficient reverts
     error InvalidQCAddress();
@@ -31,7 +35,6 @@ contract QCRedeemer is AccessControl {
     error DefaultFlaggingFailed();
 
     // Role definitions for access control
-    bytes32 public constant REDEEMER_ROLE = keccak256("REDEEMER_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
 
     // Service keys for ProtocolRegistry lookups
@@ -113,7 +116,6 @@ contract QCRedeemer is AccessControl {
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(REDEEMER_ROLE, msg.sender);
         _grantRole(ARBITER_ROLE, msg.sender);
     }
 
@@ -175,7 +177,7 @@ contract QCRedeemer is AccessControl {
         return redemptionId;
     }
 
-    /// @notice Record fulfillment of a redemption (Watchdog only)
+    /// @notice Record fulfillment of a redemption (ARBITER_ROLE)
     /// @param redemptionId The unique identifier of the redemption
     /// @param userBtcAddress The user's Bitcoin address
     /// @param expectedAmount The expected payment amount in satoshis
@@ -222,7 +224,7 @@ contract QCRedeemer is AccessControl {
         );
     }
 
-    /// @notice Flag a redemption as defaulted (Watchdog only)
+    /// @notice Flag a redemption as defaulted (ARBITER_ROLE)
     /// @param redemptionId The unique identifier of the redemption
     /// @param reason The reason for the default
     function flagDefaultedRedemption(bytes32 redemptionId, bytes32 reason)

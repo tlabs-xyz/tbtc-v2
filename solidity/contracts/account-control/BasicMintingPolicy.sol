@@ -14,6 +14,10 @@ import "../token/TBTC.sol";
 /// This policy validates QC status, reserve freshness, and capacity
 /// before calling tBTC.mint() directly after validation.
 /// Demonstrates the Policy contract pattern for upgradeable business logic.
+///
+/// Role definitions:
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
+/// - MINTER_ROLE: Can request minting of tBTC tokens (typically granted to QCMinter contract)
 contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     // Custom errors for gas-efficient reverts
     error InvalidQCAddress();
@@ -24,7 +28,6 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     error QCNotActive();
     error InsufficientMintingCapacity();
 
-    bytes32 public constant POLICY_ADMIN_ROLE = keccak256("POLICY_ADMIN_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant MINTING_POLICY_KEY = keccak256("MINTING_POLICY");
 
@@ -69,7 +72,6 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(POLICY_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
     }
 

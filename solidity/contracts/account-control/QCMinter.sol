@@ -10,6 +10,10 @@ import "./ProtocolRegistry.sol";
 /// Acts as a focused contract that delegates core validation and minting
 /// logic to a pluggable "Minting Policy" contract, allowing minting rules
 /// to be upgraded without changing the core minter contract.
+///
+/// Role definitions:
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update minting policy
+/// - MINTER_ROLE: Can request QC mints
 contract QCMinter is AccessControl {
     // Custom errors for gas-efficient reverts
     error InvalidQCAddress();

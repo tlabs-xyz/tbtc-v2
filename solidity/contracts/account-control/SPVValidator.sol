@@ -48,6 +48,9 @@ import "../bridge/IRelay.sol";
 ///      4. Provides a clean interface for Account Control system needs
 ///
 ///      The validator acts as a "bridge" to Bridge's proven SPV infrastructure,
+///
+///      Role definitions:
+///      - DEFAULT_ADMIN_ROLE: Can grant/revoke roles (no other functions require roles)
 ///      giving Account Control access to production-grade SPV verification
 ///      without touching the core Bridge contract.
 contract SPVValidator is AccessControl {
@@ -75,9 +78,6 @@ contract SPVValidator is AccessControl {
 
     /// @notice The difficulty factor required for SPV proofs
     uint96 public immutable txProofDifficultyFactor;
-
-    /// @notice Role for updating configuration
-    bytes32 public constant CONFIG_ROLE = keccak256("CONFIG_ROLE");
 
     /// @notice Events
     event SPVProofValidated(
@@ -112,7 +112,6 @@ contract SPVValidator is AccessControl {
         txProofDifficultyFactor = _txProofDifficultyFactor;
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(CONFIG_ROLE, msg.sender);
     }
 
     /// @notice Validate SPV proof using the same logic as Bridge
@@ -267,6 +266,7 @@ contract SPVValidator is AccessControl {
                 if (scriptLength >= 34 && output[9] == 0x6a && output[10] == 0x20) {
                     // Extract the 32-byte data after OP_RETURN
                     bytes32 challengeData;
+                    // solhint-disable-next-line no-inline-assembly
                     assembly {
                         challengeData := mload(add(output, 43)) // 32 bytes + 8 value + 1 script_len + 1 OP_RETURN + 1 data_len
                     }
