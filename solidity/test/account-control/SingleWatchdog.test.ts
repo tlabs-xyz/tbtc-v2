@@ -9,6 +9,7 @@ import {
   QCReserveLedger,
   QCRedeemer,
   QCData,
+  SPVValidator,
 } from "../../typechain"
 import { createMockSpvData } from "./AccountControlTestHelpers"
 
@@ -28,12 +29,14 @@ describe("SingleWatchdog", () => {
   let mockQcReserveLedger: FakeContract<QCReserveLedger>
   let mockQcRedeemer: FakeContract<QCRedeemer>
   let mockQcData: FakeContract<QCData>
+  let mockSpvValidator: FakeContract<SPVValidator>
 
   // Service keys
   let QC_MANAGER_KEY: string
   let QC_RESERVE_LEDGER_KEY: string
   let QC_REDEEMER_KEY: string
   let QC_DATA_KEY: string
+  let SPV_VALIDATOR_KEY: string
 
   // Roles
   let WATCHDOG_OPERATOR_ROLE: string
@@ -41,11 +44,22 @@ describe("SingleWatchdog", () => {
   // Test data
   const reserveBalance = ethers.utils.parseEther("10")
   const btcAddress = "bc1qtest123456789"
-  const spvProof = ethers.utils.toUtf8Bytes("mock_spv_proof")
   const condition = "Regular attestation"
   const defaultReason = "Redemption timeout exceeded"
   const defaultReasonBytes32 = ethers.utils.formatBytes32String(defaultReason)
   const challengeHash = ethers.utils.id("challenge")
+
+  // Create properly encoded SPV proof data for new implementation
+  const createEncodedSpvProof = () => {
+    const mockSpvData = createMockSpvData()
+    return ethers.utils.defaultAbiCoder.encode(
+      [
+        "tuple(bytes4 version, bytes inputVector, bytes outputVector, bytes4 locktime)",
+        "tuple(bytes merkleProof, uint256 txIndexInBlock, bytes bitcoinHeaders, bytes32 coinbasePreimage, bytes coinbaseProof)"
+      ],
+      [mockSpvData.txInfo, mockSpvData.proof]
+    )
+  }
 
   before(async () => {
     // eslint-disable-next-line @typescript-eslint/no-extra-semi
@@ -56,6 +70,7 @@ describe("SingleWatchdog", () => {
     QC_RESERVE_LEDGER_KEY = ethers.utils.id("QC_RESERVE_LEDGER")
     QC_REDEEMER_KEY = ethers.utils.id("QC_REDEEMER")
     QC_DATA_KEY = ethers.utils.id("QC_DATA")
+    SPV_VALIDATOR_KEY = ethers.utils.id("SPV_VALIDATOR")
 
     // Generate role hashes
     WATCHDOG_OPERATOR_ROLE = ethers.utils.id("WATCHDOG_OPERATOR_ROLE")
@@ -85,6 +100,7 @@ describe("SingleWatchdog", () => {
     mockQcReserveLedger = await smock.fake<QCReserveLedger>("QCReserveLedger")
     mockQcRedeemer = await smock.fake<QCRedeemer>("QCRedeemer")
     mockQcData = await smock.fake<QCData>("QCData")
+    mockSpvValidator = await smock.fake<SPVValidator>("SPVValidator")
 
     // Register services
     await protocolRegistry.setService(QC_MANAGER_KEY, mockQcManager.address)
@@ -94,6 +110,7 @@ describe("SingleWatchdog", () => {
     )
     await protocolRegistry.setService(QC_REDEEMER_KEY, mockQcRedeemer.address)
     await protocolRegistry.setService(QC_DATA_KEY, mockQcData.address)
+    await protocolRegistry.setService(SPV_VALIDATOR_KEY, mockSpvValidator.address)
 
     // Grant roles
     await singleWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
@@ -187,42 +204,101 @@ describe("SingleWatchdog", () => {
   describe("registerWalletWithProof", () => {
     context("when called by an operator", () => {
       it("should register wallet successfully", async () => {
+        // Ensure SPV validator returns true for this test
+        mockSpvValidator.verifyWalletControl.returns(true)
+        
+        const encodedSpvProof = createEncodedSpvProof()
+        
         const tx = await singleWatchdog.registerWalletWithProof(
           qcAddress.address,
           btcAddress,
-          spvProof,
+          encodedSpvProof,
           challengeHash
         )
+
+        // Verify SPV validation was called (with all 5 parameters)
+        expect(mockSpvValidator.verifyWalletControl).to.have.been.called
 
         expect(mockQcManager.registerWallet).to.have.been.called
         const [qc, wallet, challenge, txInfo, proof] =
           mockQcManager.registerWallet.getCall(0).args
         expect(qc).to.equal(qcAddress.address)
         expect(wallet).to.equal(btcAddress)
-
-        // The challenge should be keccak256(qc, btcAddress, challengeHash)
-        const expectedChallenge = ethers.utils.keccak256(
-          ethers.utils.solidityPack(
-            ["address", "string", "bytes32"],
-            [qcAddress.address, btcAddress, challengeHash]
-          )
-        )
-        expect(ethers.utils.hexlify(challenge)).to.equal(expectedChallenge)
-
+        expect(challenge).to.equal(challengeHash)
+        
         await expect(tx)
           .to.emit(singleWatchdog, "WatchdogWalletRegistration")
           .withArgs(qcAddress.address, btcAddress, challengeHash)
       })
 
       it("should revert with empty btc address", async () => {
+        const encodedSpvProof = createEncodedSpvProof()
+        
         await expect(
           singleWatchdog.registerWalletWithProof(
             qcAddress.address,
             "",
-            spvProof,
+            encodedSpvProof,
             challengeHash
           )
         ).to.be.revertedWith("InvalidWalletAddress")
+      })
+
+      it("should revert when SPV validator is not available", async () => {
+        const encodedSpvProof = createEncodedSpvProof()
+        
+        // Deploy a new registry without SPV validator to test the hasService check
+        const ProtocolRegistryFactory = await ethers.getContractFactory(
+          "ProtocolRegistry"
+        )
+        const newRegistry = await ProtocolRegistryFactory.deploy()
+        
+        const SingleWatchdogFactory = await ethers.getContractFactory(
+          "SingleWatchdog"
+        )
+        const newWatchdog = await SingleWatchdogFactory.deploy(
+          newRegistry.address
+        )
+        
+        await newWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
+        
+        await expect(
+          newWatchdog.registerWalletWithProof(
+            qcAddress.address,
+            btcAddress,
+            encodedSpvProof,
+            challengeHash
+          )
+        ).to.be.revertedWith("ServiceNotRegistered")
+      })
+
+      it("should revert when SPV verification fails", async () => {
+        const encodedSpvProof = createEncodedSpvProof()
+        
+        // Configure SPV validator to return false (verification failed)
+        mockSpvValidator.verifyWalletControl.returns(false)
+        
+        await expect(
+          singleWatchdog.registerWalletWithProof(
+            qcAddress.address,
+            btcAddress,
+            encodedSpvProof,
+            challengeHash
+          )
+        ).to.be.revertedWith("SPVVerificationFailed")
+      })
+
+      it("should revert with invalid SPV proof data", async () => {
+        const invalidProofData = ethers.utils.toUtf8Bytes("invalid_proof_data")
+        
+        await expect(
+          singleWatchdog.registerWalletWithProof(
+            qcAddress.address,
+            btcAddress,
+            invalidProofData,
+            challengeHash
+          )
+        ).to.be.revertedWith("InvalidSPVProofData")
       })
     })
   })
@@ -439,11 +515,16 @@ describe("SingleWatchdog", () => {
       })
 
       it("should use updated services", async () => {
+        // Ensure SPV validator returns true for this test
+        mockSpvValidator.verifyWalletControl.returns(true)
+        
         await singleWatchdog.attestReserves(qcAddress.address, reserveBalance)
+        const encodedSpvProof = createEncodedSpvProof()
+        
         await singleWatchdog.registerWalletWithProof(
           qcAddress.address,
           btcAddress,
-          spvProof,
+          encodedSpvProof,
           challengeHash
         )
 
@@ -455,15 +536,7 @@ describe("SingleWatchdog", () => {
           newQcManager.registerWallet.getCall(0).args
         expect(qc).to.equal(qcAddress.address)
         expect(wallet).to.equal(btcAddress)
-
-        // The challenge should be keccak256(qc, btcAddress, challengeHash)
-        const expectedChallenge = ethers.utils.keccak256(
-          ethers.utils.solidityPack(
-            ["address", "string", "bytes32"],
-            [qcAddress.address, btcAddress, challengeHash]
-          )
-        )
-        expect(ethers.utils.hexlify(challenge)).to.equal(expectedChallenge)
+        expect(challenge).to.equal(challengeHash)
 
         // Old services should not be called
         expect(mockQcReserveLedger.submitReserveAttestation).to.not.have.been
@@ -477,12 +550,13 @@ describe("SingleWatchdog", () => {
     context("error propagation", () => {
       it("should propagate QC Manager errors", async () => {
         mockQcManager.registerWallet.reverts("QC Manager error")
+        const encodedSpvProof = createEncodedSpvProof()
 
         await expect(
           singleWatchdog.registerWalletWithProof(
             qcAddress.address,
             btcAddress,
-            spvProof,
+            encodedSpvProof,
             challengeHash
           )
         ).to.be.reverted

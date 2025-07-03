@@ -7,6 +7,7 @@ import "./QCManager.sol";
 import "./QCData.sol";
 import "./QCReserveLedger.sol";
 import "./QCRedeemer.sol";
+import "./interfaces/ISPVValidator.sol";
 import "../bridge/BitcoinTx.sol";
 
 /// @title SingleWatchdog
@@ -41,6 +42,9 @@ contract SingleWatchdog is AccessControl {
     error BitcoinAddressRequired();
     error InvalidStrategicCondition();
     error NoRedemptionsProvided();
+    error SPVValidatorNotAvailable();
+    error SPVVerificationFailed();
+    error InvalidSPVProofData();
 
     // Service keys for ProtocolRegistry
     bytes32 public constant QC_MANAGER_KEY = keccak256("QC_MANAGER");
@@ -48,6 +52,7 @@ contract SingleWatchdog is AccessControl {
     bytes32 public constant QC_RESERVE_LEDGER_KEY =
         keccak256("QC_RESERVE_LEDGER");
     bytes32 public constant QC_REDEEMER_KEY = keccak256("QC_REDEEMER");
+    bytes32 public constant SPV_VALIDATOR_KEY = keccak256("SPV_VALIDATOR");
 
     ProtocolRegistry public immutable protocolRegistry;
 
@@ -207,30 +212,15 @@ contract SingleWatchdog is AccessControl {
             protocolRegistry.getService(QC_MANAGER_KEY)
         );
 
-        // Create placeholder SPV data structures for the new interface
-        // In production, this would be constructed from actual SPV proof data
-        bytes32 challenge = keccak256(
-            abi.encodePacked(qc, btcAddress, challengeHash)
-        );
+        // Parse SPV proof data and verify wallet control
+        (BitcoinTx.Info memory txInfo, BitcoinTx.Proof memory proof) = _parseSPVProof(spvProof);
+        
+        // Verify wallet control using SPV validator
+        if (!_verifyWalletControl(qc, btcAddress, challengeHash, txInfo, proof)) {
+            revert SPVVerificationFailed();
+        }
 
-        // Create minimal transaction info structure
-        BitcoinTx.Info memory txInfo = BitcoinTx.Info({
-            version: bytes4(0x01000000),
-            inputVector: spvProof, // Placeholder - use proof data as input vector
-            outputVector: spvProof, // Placeholder - use proof data as output vector
-            locktime: bytes4(0x00000000)
-        });
-
-        // Create minimal proof structure
-        BitcoinTx.Proof memory proof = BitcoinTx.Proof({
-            merkleProof: spvProof, // Placeholder - use proof data as merkle proof
-            txIndexInBlock: 0,
-            bitcoinHeaders: spvProof, // Placeholder - use proof data as headers
-            coinbasePreimage: bytes32(0), // Placeholder coinbase preimage
-            coinbaseProof: spvProof // Placeholder - use proof data as coinbase proof
-        });
-
-        qcManager.registerWallet(qc, btcAddress, challenge, txInfo, proof);
+        qcManager.registerWallet(qc, btcAddress, challengeHash, txInfo, proof);
 
         walletRegistrationTime[btcAddress] = block.timestamp;
 
@@ -538,5 +528,68 @@ contract SingleWatchdog is AccessControl {
             protocolRegistry.getService(QC_REDEEMER_KEY)
         );
         redeemer.grantRole(redeemer.ARBITER_ROLE(), address(this));
+    }
+
+    /// @dev Parse SPV proof data from bytes into BitcoinTx structures
+    /// @param spvProofData The encoded SPV proof data
+    /// @return txInfo Bitcoin transaction information
+    /// @return proof SPV proof of transaction inclusion
+    function _parseSPVProof(bytes calldata spvProofData) 
+        private 
+        view 
+        returns (BitcoinTx.Info memory txInfo, BitcoinTx.Proof memory proof) 
+    {
+        // Decode the SPV proof data expecting ABI-encoded BitcoinTx.Info and BitcoinTx.Proof
+        // The spvProofData should contain both structures encoded together
+        try this._decodeSPVProof(spvProofData) returns (
+            BitcoinTx.Info memory decodedTxInfo,
+            BitcoinTx.Proof memory decodedProof
+        ) {
+            return (decodedTxInfo, decodedProof);
+        } catch {
+            revert InvalidSPVProofData();
+        }
+    }
+
+    /// @dev External function to decode SPV proof data (allows try/catch)
+    /// @param spvProofData The encoded SPV proof data
+    /// @return txInfo Bitcoin transaction information
+    /// @return proof SPV proof of transaction inclusion
+    function _decodeSPVProof(bytes calldata spvProofData)
+        external
+        pure
+        returns (BitcoinTx.Info memory txInfo, BitcoinTx.Proof memory proof)
+    {
+        (txInfo, proof) = abi.decode(spvProofData, (BitcoinTx.Info, BitcoinTx.Proof));
+    }
+
+    /// @dev Verify wallet control via SPV proof using SPV validator
+    /// @param qc The QC address claiming wallet control
+    /// @param btcAddress The Bitcoin address being claimed
+    /// @param challenge The expected challenge hash
+    /// @param txInfo Bitcoin transaction information
+    /// @param proof SPV proof of transaction inclusion
+    /// @return verified True if verification successful
+    function _verifyWalletControl(
+        address qc,
+        string calldata btcAddress,
+        bytes32 challenge,
+        BitcoinTx.Info memory txInfo,
+        BitcoinTx.Proof memory proof
+    ) private view returns (bool verified) {
+        // Check if SPV validator service is available
+        if (!protocolRegistry.hasService(SPV_VALIDATOR_KEY)) {
+            revert SPVValidatorNotAvailable();
+        }
+        
+        address validatorAddress = protocolRegistry.getService(SPV_VALIDATOR_KEY);
+        ISPVValidator spvValidator = ISPVValidator(validatorAddress);
+        return spvValidator.verifyWalletControl(
+            qc,
+            btcAddress,
+            challenge,
+            txInfo,
+            proof
+        );
     }
 }
