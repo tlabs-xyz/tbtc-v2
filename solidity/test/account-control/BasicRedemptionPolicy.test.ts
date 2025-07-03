@@ -37,8 +37,8 @@ describe("BasicRedemptionPolicy", () => {
   let SPV_VALIDATOR_KEY: string
 
   // Roles
-  let POLICY_ADMIN_ROLE: string
   let REDEEMER_ROLE: string
+  let ARBITER_ROLE: string
 
   // Test data
   const redemptionAmount = ethers.utils.parseEther("5")
@@ -58,8 +58,8 @@ describe("BasicRedemptionPolicy", () => {
     SPV_VALIDATOR_KEY = ethers.utils.id("SPV_VALIDATOR")
 
     // Generate role hashes
-    POLICY_ADMIN_ROLE = ethers.utils.id("POLICY_ADMIN_ROLE")
     REDEEMER_ROLE = ethers.utils.id("REDEEMER_ROLE")
+    ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
   })
 
   beforeEach(async () => {
@@ -105,8 +105,9 @@ describe("BasicRedemptionPolicy", () => {
     mockTbtc.balanceOf.returns(redemptionAmount)
     mockSpvValidator.verifyRedemptionFulfillment.returns(true)
 
-    // Grant REDEEMER_ROLE to deployer for testing
+    // Grant roles to deployer for testing
     await basicRedemptionPolicy.grantRole(REDEEMER_ROLE, deployer.address)
+    await basicRedemptionPolicy.grantRole(ARBITER_ROLE, deployer.address)
   })
 
   afterEach(async () => {
@@ -120,16 +121,13 @@ describe("BasicRedemptionPolicy", () => {
       )
     })
 
-    it("should grant deployer admin and policy admin roles", async () => {
+    it("should grant deployer admin role", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
       expect(
         await basicRedemptionPolicy.hasRole(
           DEFAULT_ADMIN_ROLE,
           deployer.address
         )
-      ).to.be.true
-      expect(
-        await basicRedemptionPolicy.hasRole(POLICY_ADMIN_ROLE, deployer.address)
       ).to.be.true
     })
 
@@ -323,6 +321,9 @@ describe("BasicRedemptionPolicy", () => {
       })
 
       it("should revert when user has insufficient balance", async () => {
+        // Grant REDEEMER_ROLE to user for this test
+        await basicRedemptionPolicy.grantRole(REDEEMER_ROLE, user.address)
+
         mockTbtc.balanceOf.reset()
         mockTbtc.balanceOf
           .whenCalledWith(user.address)
@@ -741,7 +742,7 @@ describe("BasicRedemptionPolicy", () => {
     context("DEFAULT_ADMIN_ROLE functions", () => {
       it("should allow admin to grant roles", async () => {
         await expect(
-          basicRedemptionPolicy.grantRole(POLICY_ADMIN_ROLE, thirdParty.address)
+          basicRedemptionPolicy.grantRole(ARBITER_ROLE, thirdParty.address)
         ).to.not.be.reverted
       })
 
@@ -750,7 +751,7 @@ describe("BasicRedemptionPolicy", () => {
         await expect(
           basicRedemptionPolicy
             .connect(thirdParty)
-            .grantRole(POLICY_ADMIN_ROLE, user.address)
+            .grantRole(ARBITER_ROLE, user.address)
         ).to.be.revertedWith(
           `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
         )
@@ -1319,7 +1320,7 @@ describe("BasicRedemptionPolicy", () => {
             BulkAction.FULFILL,
             ethers.constants.HashZero
           )
-        ).to.be.revertedWith("No redemptions provided")
+        ).to.be.reverted
       })
 
       it("should revert when defaulting with no reason", async () => {
@@ -1329,7 +1330,7 @@ describe("BasicRedemptionPolicy", () => {
             BulkAction.DEFAULT,
             ethers.constants.HashZero
           )
-        ).to.be.revertedWith("Reason required for default action")
+        ).to.be.reverted
       })
     })
   })

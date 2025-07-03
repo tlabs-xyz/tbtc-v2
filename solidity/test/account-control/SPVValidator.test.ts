@@ -12,7 +12,7 @@ describe("SPVValidator", () => {
   const DIFFICULTY_FACTOR = 6
 
   before(async () => {
-    [deployer] = await ethers.getSigners()
+    ;[deployer] = await ethers.getSigners()
 
     // Deploy relay stub for SPV validation
     const LightRelayStub = await ethers.getContractFactory("LightRelayStub")

@@ -10,6 +10,10 @@ import "./SystemState.sol";
 /// Exclusively responsible for recording off-chain reserve data submitted
 /// by a trusted attester (the Watchdog). Contains staleness detection to
 /// ensure reserve data is fresh for minting capacity calculations.
+///
+/// Role definitions:
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and invalidate attestations
+/// - ATTESTER_ROLE: Can submit reserve attestations (typically granted to SingleWatchdog)
 contract QCReserveLedger is AccessControl {
     // Custom errors for gas-efficient reverts
     error InvalidQCAddress();
@@ -91,7 +95,7 @@ contract QCReserveLedger is AccessControl {
     }
 
     // NOTE: No SPV proof is required here because the attester is trusted. Fix?
-    /// @notice Submit reserve attestation for a QC (Watchdog only)
+    /// @notice Submit reserve attestation for a QC (ATTESTER_ROLE)
     /// @param qc The address of the Qualified Custodian
     /// @param balance The attested reserve balance in satoshis
     function submitReserveAttestation(address qc, uint256 balance)

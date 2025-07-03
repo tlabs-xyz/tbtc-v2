@@ -8,13 +8,13 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// Acts as the cornerstone of the architecture's modularity by decoupling
 /// all system contracts and enabling upgrades to individual components
 /// without requiring full-system redeployment.
+///
+/// Role definitions:
+/// - DEFAULT_ADMIN_ROLE: Can update service addresses
 contract ProtocolRegistry is AccessControl {
     // Custom errors for gas-efficient reverts
     error InvalidServiceAddress();
     error ServiceNotRegistered();
-
-    bytes32 public constant PARAMETER_ADMIN_ROLE =
-        keccak256("PARAMETER_ADMIN_ROLE");
 
     /// @dev Maps service identifiers to contract addresses
     mapping(bytes32 => address) public services;
@@ -30,7 +30,6 @@ contract ProtocolRegistry is AccessControl {
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(PARAMETER_ADMIN_ROLE, msg.sender);
     }
 
     /// @notice Update service address (DAO only)

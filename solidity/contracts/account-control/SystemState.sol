@@ -8,6 +8,11 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// Holds global parameters and emergency controls (e.g., pause flags),
 /// providing a single, auditable location for system-wide state.
 /// Implements granular pause mechanisms for surgical response to threats.
+///
+/// Role definitions:
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and set emergency council
+/// - PARAMETER_ADMIN_ROLE: Can update all system parameters
+/// - PAUSER_ROLE: Can pause/unpause system functions
 contract SystemState is AccessControl {
     bytes32 public constant PARAMETER_ADMIN_ROLE =
         keccak256("PARAMETER_ADMIN_ROLE");
