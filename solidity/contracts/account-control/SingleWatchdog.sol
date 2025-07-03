@@ -10,10 +10,23 @@ import "./QCRedeemer.sol";
 import "../bridge/BitcoinTx.sol";
 
 /// @title SingleWatchdog
-/// @dev Demonstration of single Watchdog service with multiple roles.
-/// A DAO-appointed entity responsible for objective Proof-of-Reserves
-/// attestations, wallet registration, and redemption arbitration.
-/// Integrates with all system components through ProtocolRegistry.
+/// @dev Proxy contract implementing the single Watchdog model for tBTC v2.
+/// 
+/// This contract acts as a proxy that consolidates multiple system roles under
+/// a single WATCHDOG_OPERATOR_ROLE for operational efficiency. While all functions
+/// in this contract require WATCHDOG_OPERATOR_ROLE, the SingleWatchdog contract
+/// itself must be granted specific roles in other system contracts:
+/// - ARBITER_ROLE in QCManager and QCRedeemer
+/// - ATTESTER_ROLE in QCReserveLedger  
+/// - REGISTRAR_ROLE in QCManager
+/// 
+/// The proxy pattern allows a single operator to perform:
+/// - Proof-of-Reserves attestations
+/// - Wallet registration with SPV verification
+/// - Redemption arbitration and fulfillment
+/// - QC status management
+/// 
+/// Use setupWatchdogRoles() to grant this contract the necessary roles in system contracts.
 contract SingleWatchdog is AccessControl {
     bytes32 public constant WATCHDOG_OPERATOR_ROLE =
         keccak256("WATCHDOG_OPERATOR_ROLE");
@@ -87,7 +100,8 @@ contract SingleWatchdog is AccessControl {
         _grantRole(WATCHDOG_OPERATOR_ROLE, msg.sender);
     }
 
-    /// @notice Verify QC solvency (ARBITER_ROLE)
+    /// @notice Verify QC solvency (requires WATCHDOG_OPERATOR_ROLE)
+    /// @dev Calls QCManager.verifyQCSolvency() which requires this contract to have ARBITER_ROLE
     /// @param qc The QC address
     /// @return solvent True if QC is solvent
     function verifyQCSolvency(address qc)
@@ -104,7 +118,8 @@ contract SingleWatchdog is AccessControl {
         return qcManager.verifyQCSolvency(qc);
     }
 
-    /// @notice Set QC status (ARBITER_ROLE)
+    /// @notice Set QC status (requires WATCHDOG_OPERATOR_ROLE)
+    /// @dev Calls QCManager.setQCStatus() which requires this contract to have ARBITER_ROLE
     /// @param qc The QC address
     /// @param status The new status (as uint256)
     /// @param reason The reason for change
@@ -143,7 +158,8 @@ contract SingleWatchdog is AccessControl {
         );
     }
 
-    /// @notice Submit reserve attestation (ATTESTER_ROLE)
+    /// @notice Submit reserve attestation (requires WATCHDOG_OPERATOR_ROLE)
+    /// @dev Calls QCReserveLedger.submitReserveAttestation() which requires this contract to have ATTESTER_ROLE
     /// @param qc The QC address
     /// @param balance The attested balance
     function attestReserves(address qc, uint256 balance)
@@ -170,7 +186,8 @@ contract SingleWatchdog is AccessControl {
         );
     }
 
-    /// @notice Register wallet with SPV proof (REGISTRAR_ROLE)
+    /// @notice Register wallet with SPV proof (requires WATCHDOG_OPERATOR_ROLE)
+    /// @dev Calls QCManager.registerWallet() which requires this contract to have REGISTRAR_ROLE
     /// @param qc The QC address
     /// @param btcAddress The Bitcoin address
     /// @param spvProof The SPV proof of control
@@ -220,7 +237,8 @@ contract SingleWatchdog is AccessControl {
         emit WatchdogWalletRegistration(qc, btcAddress, challengeHash);
     }
 
-    /// @notice Record redemption fulfillment (ARBITER_ROLE)
+    /// @notice Record redemption fulfillment (requires WATCHDOG_OPERATOR_ROLE)
+    /// @dev Calls QCRedeemer.recordRedemptionFulfillment() which requires this contract to have ARBITER_ROLE
     /// @param redemptionId The redemption identifier
     /// @param userBtcAddress The user's Bitcoin address
     /// @param expectedAmount The expected payment amount in satoshis
@@ -259,7 +277,8 @@ contract SingleWatchdog is AccessControl {
         );
     }
 
-    /// @notice Flag redemption as defaulted (ARBITER_ROLE)
+    /// @notice Flag redemption as defaulted (requires WATCHDOG_OPERATOR_ROLE)
+    /// @dev Calls QCRedeemer.flagDefaultedRedemption() which requires this contract to have ARBITER_ROLE
     /// @param redemptionId The redemption identifier
     /// @param reason The reason for default
     function flagRedemptionDefault(bytes32 redemptionId, bytes32 reason)
@@ -286,7 +305,8 @@ contract SingleWatchdog is AccessControl {
         );
     }
 
-    /// @notice Change QC status (ARBITER_ROLE)
+    /// @notice Change QC status (requires WATCHDOG_OPERATOR_ROLE)
+    /// @dev Calls QCManager.setQCStatus() which requires this contract to have ARBITER_ROLE
     /// @param qc The QC address
     /// @param newStatus The new status
     /// @param reason The reason for change
@@ -313,7 +333,8 @@ contract SingleWatchdog is AccessControl {
         );
     }
 
-    /// @notice Verify QC solvency and take action if needed (ARBITER_ROLE)
+    /// @notice Verify QC solvency and take action if needed (requires WATCHDOG_OPERATOR_ROLE)
+    /// @dev Calls QCManager.verifyQCSolvency() which requires this contract to have ARBITER_ROLE
     /// @param qc The QC address
     /// @return solvent True if QC is solvent
     function verifySolvencyAndAct(address qc)

@@ -13,9 +13,16 @@ import "./interfaces/ISPVValidator.sol";
 /// @dev Stateless business logic controller for QC management.
 /// Contains all business logic for managing QCs, reading from and writing to
 /// QCData and SystemState via the central ProtocolRegistry. Manages QC status
-/// changes, wallet registration flows, and integrates with single Watchdog model.
+/// changes, wallet registration flows, and integrates with role-based access control.
 /// V1.1: Enhanced with time-locked governance for critical actions while preserving
 /// instant emergency response capabilities.
+/// 
+/// Role definitions:
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update system configurations
+/// - QC_ADMIN_ROLE: Can register QCs (legacy), update minting amounts, request wallet deregistration
+/// - REGISTRAR_ROLE: Can register/deregister wallets with SPV verification
+/// - ARBITER_ROLE: Can pause QCs, change status, verify solvency (emergency response)
+/// - TIME_LOCKED_ADMIN_ROLE: Can queue/execute governance actions with time delay
 contract QCManager is AccessControl {
     bytes32 public constant QC_ADMIN_ROLE = keccak256("QC_ADMIN_ROLE");
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
@@ -469,7 +476,7 @@ contract QCManager is AccessControl {
         );
     }
 
-    /// @notice Register a wallet for a QC (Watchdog only)
+    /// @notice Register a wallet for a QC (REGISTRAR_ROLE)
     /// @param qc The address of the QC
     /// @param btcAddress The Bitcoin address to register
     /// @param challenge The challenge bytes that should be in OP_RETURN

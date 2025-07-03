@@ -40,7 +40,7 @@ describe("Service Lookup Error Handling", () => {
   const TBTC_TOKEN_KEY = ethers.utils.id("TBTC_TOKEN")
 
   beforeEach(async () => {
-    [deployer, watchdog, user, qcAddress] = await ethers.getSigners()
+    ;[deployer, watchdog, user, qcAddress] = await ethers.getSigners()
 
     // Deploy Protocol Registry
     const ProtocolRegistryFactory = await ethers.getContractFactory(

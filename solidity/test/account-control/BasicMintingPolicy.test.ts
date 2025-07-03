@@ -35,7 +35,6 @@ describe("BasicMintingPolicy", () => {
   let TBTC_TOKEN_KEY: string
 
   // Roles
-  let POLICY_ADMIN_ROLE: string
   let MINTER_ROLE: string
 
   // Test amounts
@@ -56,7 +55,6 @@ describe("BasicMintingPolicy", () => {
     TBTC_TOKEN_KEY = ethers.utils.id("TBTC_TOKEN")
 
     // Generate role hashes
-    POLICY_ADMIN_ROLE = ethers.utils.id("POLICY_ADMIN_ROLE")
     MINTER_ROLE = ethers.utils.id("MINTER_ROLE")
   })
 
@@ -114,13 +112,10 @@ describe("BasicMintingPolicy", () => {
       )
     })
 
-    it("should grant deployer admin and policy admin roles", async () => {
+    it("should grant deployer admin role", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
       expect(
         await basicMintingPolicy.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)
-      ).to.be.true
-      expect(
-        await basicMintingPolicy.hasRole(POLICY_ADMIN_ROLE, deployer.address)
       ).to.be.true
     })
   })
