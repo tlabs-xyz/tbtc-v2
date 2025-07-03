@@ -15,6 +15,11 @@ import "./interfaces/ISPVValidator.sol";
 /// @dev Basic implementation of IRedemptionPolicy interface.
 /// Handles fulfillment verification with SPV proofs and default detection.
 /// Demonstrates the Policy contract pattern for upgradeable redemption logic.
+///
+/// Role definitions:
+/// - DEFAULT_ADMIN_ROLE: Can perform bulk operations on redemptions
+/// - ARBITER_ROLE: Can record fulfillments and flag defaults
+/// - REDEEMER_ROLE: Can request redemptions (typically granted to QCRedeemer contract)
 contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
     enum BulkAction {
         FULFILL,
@@ -38,7 +43,6 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
     error ReasonRequiredForDefault();
     error SPVValidatorNotAvailable();
 
-    bytes32 public constant POLICY_ADMIN_ROLE = keccak256("POLICY_ADMIN_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
     bytes32 public constant REDEEMER_ROLE = keccak256("REDEEMER_ROLE");
 
@@ -89,7 +93,6 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(POLICY_ADMIN_ROLE, msg.sender);
         _grantRole(ARBITER_ROLE, msg.sender);
         _grantRole(REDEEMER_ROLE, msg.sender);
     }
@@ -225,7 +228,7 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         uint64 expectedAmount,
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
-    ) external override returns (bool success) {
+    ) external override onlyRole(ARBITER_ROLE) returns (bool success) {
         // Input validation
         if (redemptionId == bytes32(0)) {
             revert InvalidRedemptionId();
