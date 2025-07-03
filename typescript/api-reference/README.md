@@ -76,6 +76,8 @@
 - [EthereumContractConfig](interfaces/EthereumContractConfig.md)
 - [ExtraDataEncoder](interfaces/ExtraDataEncoder.md)
 - [L1BitcoinDepositor](interfaces/L1BitcoinDepositor.md)
+- [L1BitcoinRedeemer](interfaces/L1BitcoinRedeemer.md)
+- [L2BitcoinRedeemer](interfaces/L2BitcoinRedeemer.md)
 - [RedeemerProxy](interfaces/RedeemerProxy.md)
 - [RedemptionRequest](interfaces/RedemptionRequest.md)
 - [RedemptionWallet](interfaces/RedemptionWallet.md)
@@ -228,7 +230,7 @@ Use CrossChainInterfaces instead
 
 #### Defined in
 
-[lib/contracts/cross-chain.ts:197](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L197)
+[lib/contracts/cross-chain.ts:256](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L256)
 
 ___
 
@@ -259,7 +261,7 @@ Use ExtraDataEncoder instead
 
 #### Defined in
 
-[lib/contracts/cross-chain.ts:217](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L217)
+[lib/contracts/cross-chain.ts:276](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L276)
 
 ___
 
@@ -300,6 +302,7 @@ Aggregates destination chain-specific TBTC cross-chain contracts.
 | :------ | :------ |
 | `destinationChainBitcoinDepositor` | [`BitcoinDepositor`](interfaces/BitcoinDepositor.md) |
 | `destinationChainTbtcToken` | [`DestinationChainTBTCToken`](interfaces/DestinationChainTBTCToken.md) |
+| `l2BitcoinRedeemer?` | [`L2BitcoinRedeemer`](interfaces/L2BitcoinRedeemer.md) |
 
 #### Defined in
 
@@ -405,7 +408,7 @@ or a Provider that works only in the read-only mode.
 
 #### Defined in
 
-[lib/ethereum/index.ts:34](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L34)
+[lib/ethereum/index.ts:35](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L35)
 
 ___
 
@@ -446,10 +449,11 @@ Aggregates L1-specific TBTC cross-chain contracts.
 | Name | Type |
 | :------ | :------ |
 | `l1BitcoinDepositor` | [`L1BitcoinDepositor`](interfaces/L1BitcoinDepositor.md) |
+| `l1BitcoinRedeemer` | [`L1BitcoinRedeemer`](interfaces/L1BitcoinRedeemer.md) \| ``null`` |
 
 #### Defined in
 
-[lib/contracts/cross-chain.ts:27](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L27)
+[lib/contracts/cross-chain.ts:28](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L28)
 
 ___
 
@@ -463,7 +467,7 @@ Use BitcoinDepositor instead
 
 #### Defined in
 
-[lib/contracts/cross-chain.ts:212](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L212)
+[lib/contracts/cross-chain.ts:271](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L271)
 
 ___
 
@@ -491,7 +495,7 @@ Use DestinationChainInterfaces instead
 
 #### Defined in
 
-[lib/contracts/cross-chain.ts:202](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L202)
+[lib/contracts/cross-chain.ts:261](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L261)
 
 ___
 
@@ -505,7 +509,7 @@ Use DestinationChainTBTCToken instead
 
 #### Defined in
 
-[lib/contracts/cross-chain.ts:207](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L207)
+[lib/contracts/cross-chain.ts:266](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L266)
 
 ___
 
@@ -1108,7 +1112,7 @@ Chain ID as a string.
 
 #### Defined in
 
-[lib/ethereum/index.ts:41](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L41)
+[lib/ethereum/index.ts:42](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L42)
 
 ___
 
@@ -1163,7 +1167,7 @@ Throws an error if the address of the signer is not a proper
 
 #### Defined in
 
-[lib/ethereum/index.ts:63](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L63)
+[lib/ethereum/index.ts:64](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L64)
 
 ___
 
@@ -1196,7 +1200,7 @@ Throws an error if the signer's Ethereum chain ID is other than
 
 #### Defined in
 
-[lib/ethereum/index.ts:118](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L118)
+[lib/ethereum/index.ts:119](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L119)
 
 ___
 
@@ -1246,7 +1250,7 @@ Use loadArbitrumCrossChainInterfaces instead
 
 #### Defined in
 
-[lib/arbitrum/index.ts:55](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/index.ts#L55)
+[lib/arbitrum/index.ts:63](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/index.ts#L63)
 
 ___
 
@@ -1277,7 +1281,7 @@ Throws an error if the signer's Arbitrum chain ID is other than
 
 #### Defined in
 
-[lib/arbitrum/index.ts:22](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/index.ts#L22)
+[lib/arbitrum/index.ts:24](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/index.ts#L24)
 
 ___
 
@@ -1302,7 +1306,7 @@ Use loadBaseCrossChainInterfaces instead
 
 #### Defined in
 
-[lib/base/index.ts:56](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/base/index.ts#L56)
+[lib/base/index.ts:63](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/base/index.ts#L63)
 
 ___
 
@@ -1333,7 +1337,7 @@ Throws an error if the signer's Base chain ID is other than
 
 #### Defined in
 
-[lib/base/index.ts:22](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/base/index.ts#L22)
+[lib/base/index.ts:23](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/base/index.ts#L23)
 
 ___
 
@@ -1364,7 +1368,7 @@ Throws an error if the signer's Ethereum chain ID is other than
 
 #### Defined in
 
-[lib/ethereum/index.ts:82](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L82)
+[lib/ethereum/index.ts:83](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L83)
 
 ___
 
