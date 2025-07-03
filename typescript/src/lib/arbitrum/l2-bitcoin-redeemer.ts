@@ -11,6 +11,7 @@ import { BigNumber, Contract } from "ethers"
 
 import ArbitrumSepoliaL2BitcoinRedeemerDeployment from "./artifacts/arbitrumSepolia/ArbitrumL2BitcoinRedeemer.json"
 import ArbitrumSepoliaWormholeCoreDeployment from "./artifacts/arbitrumSepolia/WormholeCore.json"
+import { WORMHOLE_CHAIN_IDS } from "../utils/wormhole"
 // TODO: Uncomment when Arbitrum L2BitcoinRedeemer is deployed
 // import ArbitrumWormholeCoreDeployment from "./artifacts/arbitrum/WormholeCore.json"
 
@@ -34,7 +35,7 @@ export class ArbitrumL2BitcoinRedeemer
       case Chains.Arbitrum.ArbitrumSepolia:
         deployment = ArbitrumSepoliaL2BitcoinRedeemerDeployment
         wormholeCoreDeployment = ArbitrumSepoliaWormholeCoreDeployment
-        recipientChain = 10002 // Ethereum Sepolia
+        recipientChain = WORMHOLE_CHAIN_IDS[Chains.Ethereum.Sepolia] // Ethereum Sepolia
         break
       // TODO: Uncomment when Arbitrum L2BitcoinRedeemer is deployed
       // case Chains.Arbitrum.Arbitrum:
