@@ -59,7 +59,7 @@ const config: HardhatUserConfig = {
   external: {
     deployments: {
       sepolia: ["./external/sepolia", "./external/suiTestnet"],
-      mainnet: ["./external/mainnet"],
+      mainnet: ["./external/mainnet", "./external/suiMainnet"],
     },
   },
 
@@ -80,7 +80,7 @@ const config: HardhatUserConfig = {
     deployer: {
       default: 1,
       sepolia: 0,
-      mainnet: "0x353C5c3DE81EDb53FFB398f6416f962b90ae8611",
+      mainnet: "0x5BFA07bCb65bbDa13Fc87400DB9b6A5685bDA329",
     },
     governance: {
       default: 2,
