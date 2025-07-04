@@ -8,26 +8,25 @@
 import { SuiArtifacts } from "./index"
 
 /**
- * Placeholder mainnet configuration.
- * DO NOT USE IN PRODUCTION until official deployment.
+ * Mainnet configuration for SUI tBTC integration.
  */
 export const MAINNET_CONFIG: SuiArtifacts = {
-  // Package ID will be provided after mainnet deployment
+  // Package ID for mainnet deployment
   packageId:
-    "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "0x77045f1b9f811a7a8fb9ebd085b5b0c55c5cb0d1520ff55f7037f89b5da9f5f1",
 
   // tBTC coin type on mainnet
-  // Format: {package_id}::tbtc::TBTC
+  // Format: {package_id}::TBTC::TBTC
   tbtcCoinType:
-    "0x0000000000000000000000000000000000000000000000000000000000000000::tbtc::TBTC",
+    "0x77045f1b9f811a7a8fb9ebd085b5b0c55c5cb0d1520ff55f7037f89b5da9f5f1::TBTC::TBTC",
 
   // Shared object IDs for mainnet
   receiverStateId:
-    "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "0x164f463fdc60bbbff19c30ad9597ea7123c643d3671e9719cd982e3912176d94",
   gatewayStateId:
-    "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "0x76eb72899418719b2db5fbc12f5fb42e93bb75f67116420f5dbf971dd31fe7f7",
   tokenStateId:
-    "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "0x2ff31492339e06859132b8db199f640ca37a5dc8ab1713782c4372c678f2f85c",
 }
 
 /**
@@ -35,8 +34,8 @@ export const MAINNET_CONFIG: SuiArtifacts = {
  */
 export const MAINNET_L1_CONFIG = {
   // Ethereum mainnet L1 Bitcoin Depositor for SUI
-  // This will be deployed as BTCDepositorWormhole
-  depositorAddress: "0x0000000000000000000000000000000000000000",
+  // Deployed as BTCDepositorWormhole
+  depositorAddress: "0xb810AbD43d8FCFD812d6FEB14fefc236E92a341A",
 
   // Wormhole configuration
   wormholeChainId: 21, // SUI chain ID in Wormhole
@@ -54,33 +53,3 @@ export function isMainnetConfigured(): boolean {
     "0x0000000000000000000000000000000000000000000000000000000000000000"
   )
 }
-
-/**
- * Configuration checklist for mainnet deployment:
- *
- * 1. Deploy Move contracts on SUI mainnet
- *    - BitcoinDepositor module
- *    - TBTC coin module
- *    - Gateway and receiver modules
- *
- * 2. Deploy L1 Bitcoin Depositor on Ethereum mainnet
- *    - BTCDepositorWormhole contract
- *    - Configure with SUI gateway address
- *    - Set Wormhole chain ID to 21
- *
- * 3. Update this file with:
- *    - Package ID from SUI deployment
- *    - Shared object IDs
- *    - L1 depositor address
- *
- * 4. Test the complete flow on mainnet
- *    - Generate deposit address
- *    - Initialize deposit on SUI
- *    - Verify relayer processing
- *    - Confirm tBTC delivery
- *
- * 5. Update documentation
- *    - Add mainnet addresses to README
- *    - Update integration guide
- *    - Add mainnet examples
- */
