@@ -6,7 +6,7 @@ This document verifies the SDK's integration with the SUI Move contracts for tBT
 
 ### Contract Location
 
-- Package: `0x1db1fcdaada7c286d77f3347e593e06d8f33b8255e0861033a0a9f321f4eade7`
+- Package: `0x3d78316ce8ee3fe48d7ff85cdc2d0df9d459f43d802d96f58f7b59984c2dd3ae`
 - Module: `BitcoinDepositor`
 - Function: `initialize_deposit`
 
