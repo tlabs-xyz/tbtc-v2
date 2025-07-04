@@ -66,13 +66,14 @@ describe("SUI Module Index", () => {
       expect(consoleWarnStub.getCall(0).args[0]).to.include("rate-limited")
     })
 
-    it("should throw for mainnet (not supported yet)", async () => {
-      await expect(
-        loadSuiCrossChainInterfaces(mockSigner, Chains.Sui.Mainnet)
-      ).to.be.rejectedWith(
-        "SUI mainnet configuration not available yet. " +
-          "Please use testnet or wait for mainnet deployment."
+    it("should load mainnet configuration successfully", async () => {
+      const result = await loadSuiCrossChainInterfaces(
+        mockSigner,
+        Chains.Sui.Mainnet
       )
+
+      expect(result).to.have.property("destinationChainBitcoinDepositor")
+      expect(result).to.have.property("destinationChainTbtcToken")
     })
 
     it.skip("should handle keypair signer", async () => {
