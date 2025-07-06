@@ -20,11 +20,12 @@ import { Hex } from "../utils"
 import MainnetBaseL1BitcoinDepositorDeployment from "./artifacts/mainnet/BaseL1BitcoinDepositor.json"
 import MainnetArbitrumL1BitcoinDepositorDeployment from "./artifacts/mainnet/ArbitrumOneL1BitcoinDepositor.json"
 import MainnetStarkNetL1BitcoinDepositorDeployment from "./artifacts/mainnet/StarkNetBitcoinDepositor.json"
+import MainnetSuiBTCDepositorWormholeDeployment from "./artifacts/mainnet/SuiBTCDepositorWormhole.json"
 
 import SepoliaBaseL1BitcoinDepositorDeployment from "./artifacts/sepolia/BaseL1BitcoinDepositor.json"
 import SepoliaArbitrumL1BitcoinDepositorDeployment from "./artifacts/sepolia/ArbitrumL1BitcoinDepositor.json"
 import SepoliaStarkNetL1BitcoinDepositorDeployment from "./artifacts/sepolia/StarkNetBitcoinDepositor.json"
-import SepoliaSuiL1BitcoinDepositorDeployment from "./artifacts/sepolia/SuiL1BitcoinDepositor.json"
+import SepoliaSuiBTCDepositorWormholeDeployment from "./artifacts/sepolia/SuiBTCDepositorWormhole.json"
 
 const artifactLoader = {
   getMainnet: (destinationChainName: DestinationChainName) => {
@@ -35,6 +36,8 @@ const artifactLoader = {
         return MainnetArbitrumL1BitcoinDepositorDeployment
       case "StarkNet":
         return MainnetStarkNetL1BitcoinDepositorDeployment
+      case "Sui":
+        return MainnetSuiBTCDepositorWormholeDeployment
       default:
         throw new Error("Unsupported destination chain")
     }
@@ -49,7 +52,7 @@ const artifactLoader = {
       case "StarkNet":
         return SepoliaStarkNetL1BitcoinDepositorDeployment
       case "Sui":
-        return SepoliaSuiL1BitcoinDepositorDeployment
+        return SepoliaSuiBTCDepositorWormholeDeployment
       default:
         throw new Error("Unsupported destination chain")
     }

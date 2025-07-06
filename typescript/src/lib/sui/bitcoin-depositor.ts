@@ -205,10 +205,10 @@ export class SuiBitcoinDepositor implements BitcoinDepositor {
   private serializeFundingTx(tx: BitcoinRawTxVectors): Uint8Array {
     // The Move contract expects raw concatenated bytes of Bitcoin transaction components
     return Buffer.concat([
-      Buffer.from(tx.version.toString().slice(2), "hex"), // Remove 0x prefix
-      Buffer.from(tx.inputs.toString().slice(2), "hex"), // Remove 0x prefix
-      Buffer.from(tx.outputs.toString().slice(2), "hex"), // Remove 0x prefix
-      Buffer.from(tx.locktime.toString().slice(2), "hex"), // Remove 0x prefix
+      Buffer.from(tx.version.toString(), "hex"), // Hex.toString() returns unprefixed hex
+      Buffer.from(tx.inputs.toString(), "hex"), // Hex.toString() returns unprefixed hex
+      Buffer.from(tx.outputs.toString(), "hex"), // Hex.toString() returns unprefixed hex
+      Buffer.from(tx.locktime.toString(), "hex"), // Hex.toString() returns unprefixed hex
     ])
   }
 
@@ -226,13 +226,15 @@ export class SuiBitcoinDepositor implements BitcoinDepositor {
     const outputIndexBuffer = Buffer.alloc(4)
     outputIndexBuffer.writeUInt32BE(depositOutputIndex, 0)
 
-    return Buffer.concat([
+    const parts = [
       outputIndexBuffer, // 4 bytes
-      Buffer.from(deposit.blindingFactor.toString().slice(2), "hex"), // 8 bytes
-      Buffer.from(deposit.walletPublicKeyHash.toString().slice(2), "hex"), // 20 bytes
-      Buffer.from(deposit.refundPublicKeyHash.toString().slice(2), "hex"), // 20 bytes
-      Buffer.from(deposit.refundLocktime.toString().slice(2), "hex"), // 4 bytes
-      // No vault field for SUI - deposits go directly to user
-    ])
+      Buffer.from(deposit.blindingFactor.toString(), "hex"), // 8 bytes
+      Buffer.from(deposit.walletPublicKeyHash.toString(), "hex"), // 20 bytes
+      Buffer.from(deposit.refundPublicKeyHash.toString(), "hex"), // 20 bytes
+      Buffer.from(deposit.refundLocktime.toString(), "hex"), // 4 bytes
+    ]
+
+    const result = Buffer.concat(parts)
+    return result
   }
 }

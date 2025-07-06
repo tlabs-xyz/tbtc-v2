@@ -946,7 +946,7 @@ Use EthereumExtraDataEncoder instead
 
 #### Defined in
 
-[lib/ethereum/l1-bitcoin-depositor.ts:196](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/l1-bitcoin-depositor.ts#L196)
+[lib/ethereum/l1-bitcoin-depositor.ts:199](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/l1-bitcoin-depositor.ts#L199)
 
 ___
 
