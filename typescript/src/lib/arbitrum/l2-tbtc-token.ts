@@ -16,10 +16,10 @@ import ArbitrumL2TBTCTokenDeployment from "./artifacts/arbitrumOne/ArbitrumTBTC.
 import ArbitrumSepoliaL2TBTCTokenDeployment from "./artifacts/arbitrumSepolia/ArbitrumTBTC.json"
 
 /**
- * Implementation of the Arbitrum L2TBTCToken handle.
+ * Implementation of the Arbitrum DestinationChainTBTCToken handle.
  * @see {DestinationChainTBTCToken} for reference.
  */
-export class ArbitrumL2TBTCToken
+export class ArbitrumTBTCToken
   extends EthersContractHandle<L2TBTCTypechain>
   implements DestinationChainTBTCToken
 {
@@ -56,3 +56,8 @@ export class ArbitrumL2TBTCToken
     return this._instance.balanceOf(`0x${identifier.identifierHex}`)
   }
 }
+
+/**
+ * @deprecated Use ArbitrumTBTCToken instead
+ */
+export const ArbitrumL2TBTCToken = ArbitrumTBTCToken

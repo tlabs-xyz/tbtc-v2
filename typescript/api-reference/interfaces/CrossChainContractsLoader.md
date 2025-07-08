@@ -17,11 +17,11 @@ on.
 
 • **loadChainMapping**: () => `undefined` \| [`ChainMapping`](../README.md#chainmapping)
 
+Loads the chain mapping based on underlying L1 chain.
+
 #### Type declaration
 
 ▸ (): `undefined` \| [`ChainMapping`](../README.md#chainmapping)
-
-Loads the chain mapping based on underlying L1 chain.
 
 ##### Returns
 

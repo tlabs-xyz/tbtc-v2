@@ -5,8 +5,9 @@ deployed on the given destination chain.
 
 ## Implemented by
 
-- [`ArbitrumL2BitcoinDepositor`](../classes/ArbitrumL2BitcoinDepositor.md)
-- [`BaseL2BitcoinDepositor`](../classes/BaseL2BitcoinDepositor.md)
+- [`ArbitrumBitcoinDepositor`](../classes/ArbitrumBitcoinDepositor.md)
+- [`BaseBitcoinDepositor`](../classes/BaseBitcoinDepositor.md)
+- [`StarkNetBitcoinDepositor`](../classes/StarkNetBitcoinDepositor.md)
 
 ## Table of contents
 
@@ -42,6 +43,7 @@ ___
 ▸ **getChainIdentifier**(): [`ChainIdentifier`](ChainIdentifier.md)
 
 Gets the chain-specific identifier of this contract.
+Optional method - may not be available for off-chain implementations.
 
 #### Returns
 
@@ -76,7 +78,7 @@ ___
 
 ▸ **initializeDeposit**(`depositTx`, `depositOutputIndex`, `deposit`, `vault?`): `Promise`\<[`Hex`](../classes/Hex.md) \| `TransactionReceipt`\>
 
-Initializes the cross-chain deposit indirectly through the given L2 chain.
+Initializes the cross-chain deposit indirectly through the given destination chain.
 
 #### Parameters
 
@@ -91,7 +93,7 @@ Initializes the cross-chain deposit indirectly through the given L2 chain.
 
 `Promise`\<[`Hex`](../classes/Hex.md) \| `TransactionReceipt`\>
 
-Transaction hash of the reveal deposit transaction.
+Transaction hash of the reveal deposit transaction or full transaction receipt.
 
 #### Defined in
 

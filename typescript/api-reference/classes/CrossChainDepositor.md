@@ -96,13 +96,13 @@ ___
 [`Hex`](Hex.md)
 
 Extra data for the cross-chain deposit script. Actually, this is
-         the L2 deposit owner identifier took from the L2BitcoinDepositor
+         the destination chain deposit owner identifier took from the BitcoinDepositor
          contract.
 
 **`Throws`**
 
-Throws if the L2 deposit owner cannot be resolved. This
-        typically happens if the L2BitcoinDepositor operates with
+Throws if the destination chain deposit owner cannot be resolved. This
+        typically happens if the BitcoinDepositor operates with
         a read-only signer whose address cannot be resolved.
 
 #### Defined in

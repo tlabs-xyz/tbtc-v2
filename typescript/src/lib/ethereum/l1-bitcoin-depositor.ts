@@ -17,15 +17,23 @@ import { EthereumAddress, packRevealDepositParameters } from "./index"
 import { BitcoinRawTxVectors } from "../bitcoin"
 import { Hex } from "../utils"
 
+
 import MainnetBaseL1BitcoinDepositorDeployment from "./artifacts/mainnet/BaseL1BitcoinDepositor.json"
 import MainnetArbitrumL1BitcoinDepositorDeployment from "./artifacts/mainnet/ArbitrumOneL1BitcoinDepositor.json"
+
 import MainnetSolanaL1BitcoinDepositorDeployment from "./artifacts/mainnet/SolanaL1BitcoinDepositor.json"
+import MainnetStarkNetL1BitcoinDepositorDeployment from "./artifacts/mainnet/StarkNetBitcoinDepositor.json"
+import MainnetSuiBTCDepositorWormholeDeployment from "./artifacts/mainnet/SuiBTCDepositorWormhole.json"
 
 import SepoliaBaseL1BitcoinDepositorDeployment from "./artifacts/sepolia/BaseL1BitcoinDepositor.json"
 import SepoliaArbitrumL1BitcoinDepositorDeployment from "./artifacts/sepolia/ArbitrumL1BitcoinDepositor.json"
+import SepoliaStarkNetL1BitcoinDepositorDeployment from "./artifacts/sepolia/StarkNetBitcoinDepositor.json"
+import SepoliaSuiBTCDepositorWormholeDeployment from "./artifacts/sepolia/SuiBTCDepositorWormhole.json"
 
 import SepoliaSolanaL1BitcoinDepositorDeployment from "./artifacts/sepolia/SolanaL1BitcoinDepositor.json"
-import { SolanaAddress } from "../solana/address"
+import { SuiExtraDataEncoder } from "../sui"
+import { StarkNetExtraDataEncoder } from "../starknet"
+import { SolanaExtraDataEncoder } from "../solana"
 
 const artifactLoader = {
   getMainnet: (destinationChainName: DestinationChainName) => {
@@ -36,8 +44,12 @@ const artifactLoader = {
         return MainnetArbitrumL1BitcoinDepositorDeployment
       case "Solana":
         return MainnetSolanaL1BitcoinDepositorDeployment
+      case "StarkNet":
+        return MainnetStarkNetL1BitcoinDepositorDeployment
+      case "Sui":
+        return MainnetSuiBTCDepositorWormholeDeployment
       default:
-        throw new Error("Unsupported L2 chain")
+        throw new Error("Unsupported destination chain")
     }
   },
 
@@ -49,8 +61,12 @@ const artifactLoader = {
         return SepoliaArbitrumL1BitcoinDepositorDeployment
       case "Solana":
         return SepoliaSolanaL1BitcoinDepositorDeployment
+      case "StarkNet":
+        return SepoliaStarkNetL1BitcoinDepositorDeployment
+      case "Sui":
+        return SepoliaSuiBTCDepositorWormholeDeployment
       default:
-        throw new Error("Unsupported L2 chain")
+        throw new Error("Unsupported destination chain")
     }
   },
 }
@@ -64,7 +80,7 @@ export class EthereumL1BitcoinDepositor
   extends EthersContractHandle<L1BitcoinDepositorTypechain>
   implements L1BitcoinDepositor
 {
-  readonly #extraDataEncoder: CrossChainExtraDataEncoder
+  readonly #extraDataEncoder: ExtraDataEncoder
   #depositOwner: ChainIdentifier | undefined
 
   constructor(
@@ -87,7 +103,20 @@ export class EthereumL1BitcoinDepositor
 
     super(config, deployment)
 
-    this.#extraDataEncoder = new CrossChainExtraDataEncoder()
+    switch (destinationChainName) {
+      case "StarkNet":
+        this.#extraDataEncoder = new StarkNetExtraDataEncoder()
+        break
+      case "Sui":
+        this.#extraDataEncoder = new SuiExtraDataEncoder()
+        break
+      case "Solana":
+        this.#extraDataEncoder = new SolanaExtraDataEncoder()
+        break
+      default:
+        this.#extraDataEncoder = new EthereumExtraDataEncoder()
+        break
+    }
   }
 
   // eslint-disable-next-line valid-jsdoc
@@ -113,7 +142,6 @@ export class EthereumL1BitcoinDepositor
   getDepositState(depositId: string): Promise<DepositState> {
     return this._instance.deposits(depositId)
   }
-
   // eslint-disable-next-line valid-jsdoc
   /**
    * @see {L1BitcoinDepositor#getChainIdentifier}
@@ -126,7 +154,7 @@ export class EthereumL1BitcoinDepositor
   /**
    * @see {L1BitcoinDepositor#extraDataEncoder}
    */
-  extraDataEncoder(): CrossChainExtraDataEncoder {
+  extraDataEncoder(): ExtraDataEncoder {
     return this.#extraDataEncoder
   }
 
@@ -166,46 +194,42 @@ export class EthereumL1BitcoinDepositor
 }
 
 /**
- * Implementation of the CrossChainExtraDataEncoder
- * that handles both Ethereum (20-byte) and Solana (32-byte) addresses.
+ * Implementation of the Ethereum ExtraDataEncoder.
+ * @see {ExtraDataEncoder} for reference.
  */
-export class CrossChainExtraDataEncoder implements ExtraDataEncoder {
+/**
+ * Implementation of the Ethereum ExtraDataEncoder.
+ * @see {ExtraDataEncoder} for reference.
+ */
+export class EthereumExtraDataEncoder implements ExtraDataEncoder {
   // eslint-disable-next-line valid-jsdoc
   /**
-   * @see {CrossChainExtraDataEncoder#encodeDepositOwner}
+   * @see {ExtraDataEncoder#encodeDepositOwner}
    */
   encodeDepositOwner(depositOwner: ChainIdentifier): Hex {
-    const buffer = Hex.from(depositOwner.identifierHex).toBuffer()
+    // Make sure we are dealing with an Ethereum address. If not, this
+    // call will throw.
+    const address = EthereumAddress.from(depositOwner.identifierHex)
 
-    if (buffer.length === 20) {
-      return Hex.from(`000000000000000000000000${Hex.from(buffer).toString()}`)
-    } else if (buffer.length === 32) {
-      return Hex.from(buffer)
-    } else {
-      throw new Error(`Unsupported address length: ${buffer.length}`)
-    }
+    // Extra data must be 32-byte so prefix the 20-byte address with
+    // 12 zero bytes.
+    return Hex.from(`000000000000000000000000${address.identifierHex}`)
   }
 
   // eslint-disable-next-line valid-jsdoc
   /**
-   * @see {CrossChainExtraDataEncoder#decodeDepositOwner}
+   * @see {ExtraDataEncoder#decodeDepositOwner}
    */
   decodeDepositOwner(extraData: Hex): ChainIdentifier {
-    const buffer = extraData.toBuffer()
-
-    // This should always be 32 bytes if our system is consistent
-    if (buffer.length !== 32) {
-      throw new Error(`Extra data must be 32 bytes. Got ${buffer.length}.`)
-    }
-
-    // If the first 12 bytes are zero, this is (most likely) an Ethereum address
-    const isEthereum = buffer.subarray(0, 12).every((b) => b === 0)
-
-    if (isEthereum) {
-      const ethAddr = buffer.subarray(12)
-      return EthereumAddress.from(Hex.from(ethAddr).toString())
-    } else {
-      return SolanaAddress.from(Hex.from(buffer).toString())
-    }
+    // Cut the first 12 zero bytes of the extra data and convert the rest to
+    // an Ethereum address.
+    return EthereumAddress.from(
+      Hex.from(extraData.toBuffer().subarray(12)).toString()
+    )
   }
 }
+
+/**
+ * @deprecated Use EthereumExtraDataEncoder instead
+ */
+export const EthereumCrossChainExtraDataEncoder = EthereumExtraDataEncoder

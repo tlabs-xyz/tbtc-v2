@@ -50,7 +50,7 @@ Encodes the given deposit owner identifier into the extra data.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `depositOwner` | [`ChainIdentifier`](ChainIdentifier.md) | Identifier of the deposit owner to encode. For cross-chain deposits, the deposit owner is typically an identifier on the L2 chain. |
+| `depositOwner` | [`ChainIdentifier`](ChainIdentifier.md) | Identifier of the deposit owner to encode. For cross-chain deposits, the deposit owner is typically an identifier on the destination chain. |
 
 #### Returns
 

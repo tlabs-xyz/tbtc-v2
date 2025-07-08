@@ -8,6 +8,7 @@ import {
 import { BitcoinRawTxVectors } from "../../lib/bitcoin"
 import { Hex } from "../../lib/utils"
 import { TransactionReceipt } from "@ethersproject/providers"
+import { SuiTransactionBlockResponse } from "@mysten/sui/client"
 
 /**
  * Mode of operation for the cross-chain depositor proxy:
@@ -53,10 +54,10 @@ export class CrossChainDepositor implements DepositorProxy {
 
   /**
    * @returns Extra data for the cross-chain deposit script. Actually, this is
-   *          the L2 deposit owner identifier took from the L2BitcoinDepositor
+   *          the destination chain deposit owner identifier took from the BitcoinDepositor
    *          contract.
-   * @throws Throws if the L2 deposit owner cannot be resolved. This
-   *         typically happens if the L2BitcoinDepositor operates with
+   * @throws Throws if the destination chain deposit owner cannot be resolved. This
+   *         typically happens if the BitcoinDepositor operates with
    *         a read-only signer whose address cannot be resolved.
    */
   extraData(): Hex {
@@ -85,27 +86,47 @@ export class CrossChainDepositor implements DepositorProxy {
    * @see {CrossChainDepositorMode} for reveal modes description.
    * @see {DepositorProxy#revealDeposit}
    */
-  revealDeposit(
+  async revealDeposit(
     depositTx: BitcoinRawTxVectors,
     depositOutputIndex: number,
     deposit: DepositReceipt,
     vault?: ChainIdentifier
-  ): Promise<Hex | TransactionReceipt> {
+  ): Promise<Hex> {
+    let result: Hex | TransactionReceipt | SuiTransactionBlockResponse
+
     switch (this.#revealMode) {
       case "L2Transaction":
-        return this.#crossChainContracts.destinationChainBitcoinDepositor.initializeDeposit(
-          depositTx,
-          depositOutputIndex,
-          deposit,
-          vault
-        )
+        result =
+          await this.#crossChainContracts.destinationChainBitcoinDepositor.initializeDeposit(
+            depositTx,
+            depositOutputIndex,
+            deposit,
+            vault
+          )
+        break
       case "L1Transaction":
-        return this.#crossChainContracts.l1BitcoinDepositor.initializeDeposit(
-          depositTx,
-          depositOutputIndex,
-          deposit,
-          vault
-        )
+        result =
+          await this.#crossChainContracts.l1BitcoinDepositor.initializeDeposit(
+            depositTx,
+            depositOutputIndex,
+            deposit,
+            vault
+          )
+        break
+    }
+
+    // If result is a TransactionReceipt, extract the transaction hash
+    if (result instanceof Hex) {
+      console.log("Hex: ", result)
+      return result
+    } else if ((result as unknown as SuiTransactionBlockResponse).digest) {
+      const digestBuffer = Buffer.from(
+        (result as unknown as SuiTransactionBlockResponse).digest,
+        "utf8"
+      )
+      return Hex.from(digestBuffer)
+    } else {
+      return Hex.from((result as unknown as TransactionReceipt).transactionHash)
     }
   }
 }

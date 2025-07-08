@@ -12,6 +12,7 @@ import { EthereumTBTCToken } from "./tbtc-token"
 import { EthereumTBTCVault } from "./tbtc-vault"
 import { EthereumAddress } from "./address"
 import { EthereumL1BitcoinDepositor } from "./l1-bitcoin-depositor"
+import { EthereumL1BitcoinRedeemer } from "./l1-bitcoin-redeemer"
 
 export * from "./address"
 export * from "./bridge"
@@ -109,17 +110,17 @@ export async function loadEthereumCoreContracts(
  * The provided signer is attached to loaded L1 contracts. The given
  * Ethereum chain ID is used to load the L1 contracts and resolve the chain
  * mapping that provides corresponding L2 chains IDs.
- * @param signerOrProvider Ethereum L1 signer or provider.
+ * @param signer Ethereum L1 signer.
  * @param chainId Ethereum L1 chain ID.
  * @returns Loader for tBTC cross-chain contracts.
  * @throws Throws an error if the signer's Ethereum chain ID is other than
  *         the one used to construct the loader.
  */
 export async function ethereumCrossChainContractsLoader(
-  signerOrProvider: EthereumSigner | providers.Provider,
+  signer: EthereumSigner,
   chainId: Chains.Ethereum
 ): Promise<CrossChainContractsLoader> {
-  const signerChainId = await chainIdFromSigner(signerOrProvider)
+  const signerChainId = await chainIdFromSigner(signer)
   if (signerChainId !== chainId) {
     throw new Error(
       "Signer uses different chain than Ethereum cross-chain contracts"
@@ -131,13 +132,28 @@ export async function ethereumCrossChainContractsLoader(
 
   const loadL1Contracts = async (
     destinationChainName: DestinationChainName
-  ) => ({
-    l1BitcoinDepositor: new EthereumL1BitcoinDepositor(
-      { signerOrProvider },
-      chainId,
-      destinationChainName
-    ),
-  })
+  ) => {
+    let l1BitcoinRedeemer: EthereumL1BitcoinRedeemer | null = null
+    if (
+      destinationChainName === "Base" ||
+      destinationChainName === "Arbitrum"
+    ) {
+      l1BitcoinRedeemer = new EthereumL1BitcoinRedeemer(
+        { signerOrProvider: signer },
+        chainId,
+        destinationChainName
+      )
+    }
+
+    return {
+      l1BitcoinDepositor: new EthereumL1BitcoinDepositor(
+        { signerOrProvider: signer },
+        chainId,
+        destinationChainName
+      ),
+      l1BitcoinRedeemer,
+    }
+  }
 
   return {
     loadChainMapping,

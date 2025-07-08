@@ -18,15 +18,16 @@ import {
 } from "../ethereum"
 import { Hex } from "../utils"
 import { BitcoinRawTxVectors } from "../bitcoin"
+import { TransactionReceipt } from "@ethersproject/providers"
 
 import BaseL2BitcoinDepositorDeployment from "./artifacts/base/BaseL2BitcoinDepositor.json"
 import BaseSepoliaL2BitcoinDepositorDeployment from "./artifacts/baseSepolia/BaseL2BitcoinDepositor.json"
 
 /**
- * Implementation of the Base L2BitcoinDepositor handle.
- * @see {L2BitcoinDepositor} for reference.
+ * Implementation of the Base BitcoinDepositor handle.
+ * @see {BitcoinDepositor} for reference.
  */
-export class BaseL2BitcoinDepositor
+export class BaseBitcoinDepositor
   extends EthersContractHandle<L2BitcoinDepositorTypechain>
   implements BitcoinDepositor
 {
@@ -80,7 +81,7 @@ export class BaseL2BitcoinDepositor
   /**
    * @see {BitcoinDepositor#extraDataEncoder}
    */
-  extraDataEncoder(): CrossChainExtraDataEncoder {
+  extraDataEncoder(): ExtraDataEncoder {
     return this.#extraDataEncoder
   }
 
@@ -93,7 +94,7 @@ export class BaseL2BitcoinDepositor
     depositOutputIndex: number,
     deposit: DepositReceipt,
     vault?: ChainIdentifier
-  ): Promise<Hex> {
+  ): Promise<Hex | TransactionReceipt> {
     const { fundingTx, reveal } = packRevealDepositParameters(
       depositTx,
       depositOutputIndex,
@@ -118,3 +119,9 @@ export class BaseL2BitcoinDepositor
     return Hex.from(tx.hash)
   }
 }
+
+// Backward compatibility alias
+/**
+ * @deprecated Use BaseBitcoinDepositor instead
+ */
+export const BaseL2BitcoinDepositor = BaseBitcoinDepositor

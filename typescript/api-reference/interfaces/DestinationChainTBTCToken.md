@@ -5,8 +5,9 @@ canonical destination chain tBTC token.
 
 ## Implemented by
 
-- [`ArbitrumL2TBTCToken`](../classes/ArbitrumL2TBTCToken.md)
-- [`BaseL2TBTCToken`](../classes/BaseL2TBTCToken.md)
+- [`ArbitrumTBTCToken`](../classes/ArbitrumTBTCToken.md)
+- [`BaseTBTCToken`](../classes/BaseTBTCToken.md)
+- [`StarkNetTBTCToken`](../classes/StarkNetTBTCToken.md)
 
 ## Table of contents
 

@@ -19,7 +19,7 @@ import BaseSepoliaL2TBTCTokenDeployment from "./artifacts/baseSepolia/BaseTBTC.j
  * Implementation of the Base DestinationChainTBTCToken handle.
  * @see {DestinationChainTBTCToken} for reference.
  */
-export class BaseL2TBTCToken
+export class BaseTBTCToken
   extends EthersContractHandle<L2TBTCTypechain>
   implements DestinationChainTBTCToken
 {
@@ -56,3 +56,9 @@ export class BaseL2TBTCToken
     return this._instance.balanceOf(`0x${identifier.identifierHex}`)
   }
 }
+
+// Backward compatibility alias
+/**
+ * @deprecated Use BaseTBTCToken instead
+ */
+export const BaseL2TBTCToken = BaseTBTCToken

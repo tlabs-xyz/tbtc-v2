@@ -12,6 +12,7 @@ Entrypoint component of the tBTC v2 SDK.
 
 - [#crossChainContracts](TBTC.md##crosschaincontracts)
 - [#crossChainContractsLoader](TBTC.md##crosschaincontractsloader)
+- [\_l2Signer](TBTC.md#_l2signer)
 - [bitcoinClient](TBTC.md#bitcoinclient)
 - [deposits](TBTC.md#deposits)
 - [maintenance](TBTC.md#maintenance)
@@ -22,6 +23,7 @@ Entrypoint component of the tBTC v2 SDK.
 
 - [crossChainContracts](TBTC.md#crosschaincontracts)
 - [initializeCrossChain](TBTC.md#initializecrosschain)
+- [extractStarkNetAddress](TBTC.md#extractstarknetaddress)
 - [initializeCustom](TBTC.md#initializecustom)
 - [initializeEthereum](TBTC.md#initializeethereum)
 - [initializeMainnet](TBTC.md#initializemainnet)
@@ -174,8 +176,22 @@ ___
 
 ▸ **initializeCrossChain**(`destinationChainName`, `ethereumChainSigner`, `nonEvmProvider`): `Promise`\<`void`\>
 
-Initializes cross-chain contracts for the given L2 chain, using the
-given signer. Updates the signer on subsequent calls.
+Initializes cross-chain contracts for the given L2 chain.
+
+For StarkNet, use single-parameter initialization:
+```
+await tbtc.initializeCrossChain("StarkNet", starknetProvider)
+```
+
+For SUI, use single-parameter initialization:
+```
+await tbtc.initializeCrossChain("Sui", suiSigner)
+```
+
+For other L2 chains, use the standard pattern:
+```
+await tbtc.initializeCrossChain("Base", ethereumSigner)
+```
 
  THIS IS EXPERIMENTAL CODE THAT CAN BE CHANGED OR REMOVED
               IN FUTURE RELEASES. IT SHOULD BE USED ONLY FOR INTERNAL
@@ -194,20 +210,27 @@ given signer. Updates the signer on subsequent calls.
 
 `Promise`\<`void`\>
 
-Void promise.
+Void promise
 
 **`Throws`**
 
 Throws an error if:
-        - Cross-chain contracts loader is not available for this TBTC SDK instance,
-        - Chain mapping between the L1 and the given L2 chain is not defined.
+        - Cross-chain contracts loader not available
+        - Invalid provider type for StarkNet or SUI
+        - No connected account in StarkNet provider
+        - Two-parameter mode is used for StarkNet or SUI (no longer supported)
 
-**`Dev`**
+**`Example`**
 
-In case this function needs to support non-EVM L2 chains that can't
-     use EthereumSigner as a signer type, the l2Signer parameter should
-     probably be turned into a union of multiple supported types or
-     generalized in some other way.
+```ts
+// StarkNet with single parameter
+const starknetAccount = await starknet.connect();
+await tbtc.initializeCrossChain("StarkNet", starknetAccount);
+
+// SUI with single parameter
+const suiWallet = await wallet.connect();
+await tbtc.initializeCrossChain("Sui", suiWallet);
+```
 
 #### Defined in
 

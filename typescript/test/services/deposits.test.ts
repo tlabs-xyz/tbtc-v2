@@ -28,6 +28,7 @@ import {
   CrossChainInterfaces,
   ChainIdentifier,
   BitcoinRawTxVectors,
+  CrossChainContracts,
 } from "../../src"
 import { MockBitcoinClient } from "../utils/mock-bitcoin-client"
 import { MockTBTCContracts } from "../utils/mock-tbtc-contracts"
@@ -42,8 +43,11 @@ import { MockDepositorProxy } from "../utils/mock-depositor-proxy"
 import {
   MockCrossChainExtraDataEncoder,
   MockL1BitcoinDepositor,
+  MockBitcoinDepositor,
   MockL2BitcoinDepositor,
   MockL2TBTCToken,
+  MockL2BitcoinRedeemer,
+  MockL1BitcoinRedeemer,
 } from "../utils/mock-cross-chain"
 
 describe("Deposits", () => {
@@ -2018,9 +2022,11 @@ describe("Deposits", () => {
       })
 
       context("when cross-chain contracts are initialized", () => {
-        let l2BitcoinDepositor: MockL2BitcoinDepositor
+        let l2BitcoinDepositor: MockBitcoinDepositor
         let l1BitcoinDepositor: MockL1BitcoinDepositor
-        let crossChainContracts: CrossChainInterfaces
+        let l2BitcoinRedeemer: MockL2BitcoinRedeemer
+        let l1BitcoinRedeemer: MockL1BitcoinRedeemer
+        let crossChainContracts: CrossChainContracts
 
         beforeEach(async () => {
           const l2BitcoinDepositorEncoder = new MockCrossChainExtraDataEncoder()
@@ -2040,15 +2046,25 @@ describe("Deposits", () => {
             new MockCrossChainExtraDataEncoder()
           )
 
+          l1BitcoinRedeemer = new MockL1BitcoinRedeemer(
+            EthereumAddress.from("0x1111111111111111111111111111111111111111")
+          )
+
+          l2BitcoinRedeemer = new MockL2BitcoinRedeemer(
+            EthereumAddress.from("0x2222222222222222222222222222222222222222")
+          )
+
           crossChainContracts = {
             destinationChainTbtcToken: new MockL2TBTCToken(),
             destinationChainBitcoinDepositor: l2BitcoinDepositor,
             l1BitcoinDepositor: l1BitcoinDepositor,
+            l1BitcoinRedeemer: l1BitcoinRedeemer,
+            l2BitcoinRedeemer: l2BitcoinRedeemer,
           }
 
           const crossChainContractsResolver = (
             l2ChainName: DestinationChainName
-          ): CrossChainInterfaces | undefined => {
+          ): CrossChainContracts | undefined => {
             if (l2ChainName === "Base") {
               return crossChainContracts
             }
@@ -2225,9 +2241,11 @@ describe("Deposits", () => {
     })
 
     context("when cross-chain contracts are initialized", () => {
-      let l2BitcoinDepositor: MockL2BitcoinDepositor
+      let l2BitcoinDepositor: MockBitcoinDepositor
       let l1BitcoinDepositor: MockL1BitcoinDepositor
-      let crossChainContracts: CrossChainInterfaces
+      let l1BitcoinRedeemer: MockL1BitcoinRedeemer
+      let l2BitcoinRedeemer: MockL2BitcoinRedeemer
+      let crossChainContracts: CrossChainContracts
 
       beforeEach(async () => {
         const l2BitcoinDepositorEncoder = new MockCrossChainExtraDataEncoder()
@@ -2247,15 +2265,25 @@ describe("Deposits", () => {
           new MockCrossChainExtraDataEncoder()
         )
 
+        l1BitcoinRedeemer = new MockL1BitcoinRedeemer(
+          EthereumAddress.from("0x1111111111111111111111111111111111111111")
+        )
+
+        l2BitcoinRedeemer = new MockL2BitcoinRedeemer(
+          EthereumAddress.from("0x2222222222222222222222222222222222222222")
+        )
+
         crossChainContracts = {
           destinationChainTbtcToken: new MockL2TBTCToken(),
           destinationChainBitcoinDepositor: l2BitcoinDepositor,
           l1BitcoinDepositor: l1BitcoinDepositor,
+          l1BitcoinRedeemer: l1BitcoinRedeemer,
+          l2BitcoinRedeemer: l2BitcoinRedeemer,
         }
 
         const crossChainContractsResolver = (
           l2ChainName: DestinationChainName
-        ): CrossChainInterfaces | undefined => {
+        ): CrossChainContracts | undefined => {
           if (l2ChainName === "Arbitrum") {
             return crossChainContracts
           }
@@ -2769,9 +2797,11 @@ describe("Deposits", () => {
       "a7C94958CDC477feE1F7D78705275238134699F5"
     )
 
-    let l2BitcoinDepositor: MockL2BitcoinDepositor
+    let l2BitcoinDepositor: MockBitcoinDepositor
     let l1BitcoinDepositor: MockL1BitcoinDepositor
-    let crossChainContracts: CrossChainInterfaces
+    let l1BitcoinRedeemer: MockL1BitcoinRedeemer
+    let l2BitcoinRedeemer: MockL2BitcoinRedeemer
+    let crossChainContracts: CrossChainContracts
     let depositor: CrossChainDepositor
 
     beforeEach(async () => {
@@ -2795,10 +2825,19 @@ describe("Deposits", () => {
         l1BitcoinDepositorEncoder
       )
 
+      l1BitcoinRedeemer = new MockL1BitcoinRedeemer(
+        EthereumAddress.from("0x1111111111111111111111111111111111111111")
+      )
+      l2BitcoinRedeemer = new MockL2BitcoinRedeemer(
+        EthereumAddress.from("0x2222222222222222222222222222222222222222")
+      )
+
       crossChainContracts = {
         destinationChainTbtcToken: new MockL2TBTCToken(),
         destinationChainBitcoinDepositor: l2BitcoinDepositor,
         l1BitcoinDepositor: l1BitcoinDepositor,
+        l1BitcoinRedeemer: l1BitcoinRedeemer,
+        l2BitcoinRedeemer: l2BitcoinRedeemer,
       }
 
       depositor = new CrossChainDepositor(crossChainContracts)
