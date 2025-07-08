@@ -42,9 +42,6 @@ contract QCRedeemer is AccessControl {
         keccak256("REDEMPTION_POLICY");
     bytes32 public constant TBTC_TOKEN_KEY = keccak256("TBTC_TOKEN");
 
-    // Bitcoin address placeholder - in production this should be user-provided
-    string private constant PLACEHOLDER_BTC_ADDRESS = "placeholder_btc_address";
-
     /// @dev Redemption status enumeration
     enum RedemptionStatus {
         NeverInitiated,

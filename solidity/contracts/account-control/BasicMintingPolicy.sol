@@ -116,6 +116,7 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         // NOTE: Direct minting is correct for Account Control system.
         // Unlike the main Bridge/Bank/Vault system which uses Bank balances,
         // Account Control operates independently with QC-backed reserves.
+        // TODO: Use TBTCVault.mint() instead of TBTC.mint()?
         // The policy validates QC capacity and directly mints against verified reserves.
         TBTC tbtcToken = TBTC(protocolRegistry.getService(TBTC_TOKEN_KEY));
         tbtcToken.mint(user, amount);
