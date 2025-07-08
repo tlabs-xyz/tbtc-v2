@@ -55,7 +55,7 @@ for reference.
 
 #### Defined in
 
-[lib/ethereum/l1-bitcoin-depositor.ts:223](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/l1-bitcoin-depositor.ts#L223)
+[lib/ethereum/l1-bitcoin-depositor.ts:222](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/l1-bitcoin-depositor.ts#L222)
 
 ___
 
@@ -81,4 +81,4 @@ ___
 
 #### Defined in
 
-[lib/ethereum/l1-bitcoin-depositor.ts:209](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/l1-bitcoin-depositor.ts#L209)
+[lib/ethereum/l1-bitcoin-depositor.ts:208](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/l1-bitcoin-depositor.ts#L208)

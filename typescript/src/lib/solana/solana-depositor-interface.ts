@@ -1,8 +1,6 @@
 import axios from "axios"
 import { ChainIdentifier, BitcoinDepositor, DepositReceipt } from "../contracts"
-import {
-  packRevealDepositParameters,
-} from "../ethereum"
+import { packRevealDepositParameters } from "../ethereum"
 import { BitcoinRawTxVectors } from "../bitcoin"
 import { TransactionReceipt } from "@ethersproject/providers"
 import { SolanaExtraDataEncoder } from "./extra-data-encoder"

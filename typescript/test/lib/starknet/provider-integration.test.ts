@@ -9,7 +9,6 @@ import {
 import { MockBitcoinClient } from "../../utils/mock-bitcoin-client"
 import { MockTBTCContracts } from "../../utils/mock-tbtc-contracts"
 import { MockCrossChainContractsLoader } from "../../utils/mock-cross-chain-contracts-loader"
-import { Wallet } from "ethers"
 import { BigNumber } from "ethers"
 
 describe("StarkNet Provider Integration", () => {
@@ -17,11 +16,9 @@ describe("StarkNet Provider Integration", () => {
   let mockBitcoinClient: MockBitcoinClient
   let mockTBTCContracts: MockTBTCContracts
   let mockCrossChainContractsLoader: MockCrossChainContractsLoader
-  let ethereumSigner: Wallet
 
   beforeEach(async () => {
     mockBitcoinClient = new MockBitcoinClient()
-    ethereumSigner = Wallet.createRandom()
     mockTBTCContracts = new MockTBTCContracts()
     mockCrossChainContractsLoader = new MockCrossChainContractsLoader()
 

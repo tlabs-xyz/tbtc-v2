@@ -236,7 +236,7 @@ export class TBTC {
     if (!address) {
       throw new Error(
         "StarkNet provider must be an Account object or Provider with connected account. " +
-        "Ensure your StarkNet wallet is connected."
+          "Ensure your StarkNet wallet is connected."
       )
     }
 
@@ -255,7 +255,11 @@ export class TBTC {
    * @internal
    * @deprecated Will be removed in next major version.
    */
-  _l2Signer?: EthereumSigner | StarkNetProvider | SuiSignerWithAddress | AnchorProvider
+  _l2Signer?:
+    | EthereumSigner
+    | StarkNetProvider
+    | SuiSignerWithAddress
+    | AnchorProvider
 
   /**
    * Initializes cross-chain contracts for the given L2 chain.
@@ -307,7 +311,7 @@ export class TBTC {
     signerOrEthereumSigner:
       | EthereumSigner
       | StarkNetProvider
-      | SuiSignerWithAddress,
+      | SuiSignerWithAddress
   ): Promise<void> {
     if (!this.#crossChainContractsLoader) {
       throw new Error(
@@ -317,9 +321,7 @@ export class TBTC {
 
     const chainMapping = this.#crossChainContractsLoader.loadChainMapping()
     if (!chainMapping) {
-      throw new Error(
-        "Chain mapping between L1 and L2 chains not defined"
-      )
+      throw new Error("Chain mapping between L1 and L2 chains not defined")
     }
 
     const l1CrossChainContracts: L1CrossChainContracts =

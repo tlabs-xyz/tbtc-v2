@@ -184,7 +184,7 @@ Cross-chain contracts for the given L2 chain or
 
 #### Defined in
 
-[services/tbtc.ts:435](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L435)
+[services/tbtc.ts:437](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L437)
 
 ___
 
@@ -249,7 +249,7 @@ await tbtc.initializeCrossChain("Sui", suiWallet);
 
 #### Defined in
 
-[services/tbtc.ts:305](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L305)
+[services/tbtc.ts:309](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/services/tbtc.ts#L309)
 
 ___
 

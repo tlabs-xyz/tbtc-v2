@@ -17,7 +17,6 @@ import { EthereumAddress, packRevealDepositParameters } from "./index"
 import { BitcoinRawTxVectors } from "../bitcoin"
 import { Hex } from "../utils"
 
-
 import MainnetBaseL1BitcoinDepositorDeployment from "./artifacts/mainnet/BaseL1BitcoinDepositor.json"
 import MainnetArbitrumL1BitcoinDepositorDeployment from "./artifacts/mainnet/ArbitrumOneL1BitcoinDepositor.json"
 

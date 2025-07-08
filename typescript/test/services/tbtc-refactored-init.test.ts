@@ -1,6 +1,5 @@
 import { expect } from "chai"
 import { RpcProvider } from "starknet"
-import { Wallet } from "ethers"
 import { TBTC } from "../../src/services/tbtc"
 import { MockTBTCContracts } from "../utils/mock-tbtc-contracts"
 import { MockBitcoinClient } from "../utils/mock-bitcoin-client"
@@ -11,7 +10,6 @@ describe("Refactored initializeCrossChain", () => {
   let mockTBTCContracts: MockTBTCContracts
   let mockBitcoinClient: MockBitcoinClient
   let mockCrossChainContractsLoader: MockCrossChainContractsLoader
-  let ethereumSigner: Wallet
   let starknetProvider: RpcProvider
   let consoleWarnStub: any
 
@@ -28,9 +26,6 @@ describe("Refactored initializeCrossChain", () => {
       mockCrossChainContractsLoader
     )
 
-    // Mock Ethereum signer
-    ethereumSigner = Wallet.createRandom()
-
     // Mock StarkNet provider
     starknetProvider = new RpcProvider({
       nodeUrl: "https://starknet-testnet.public.blastapi.io/rpc/v0_6",
@@ -43,5 +38,12 @@ describe("Refactored initializeCrossChain", () => {
 
   afterEach(() => {
     console.warn = consoleWarnStub
+  })
+
+  it("should accept single-parameter initialization", async () => {
+    // With mocked contracts, single-parameter mode succeeds
+    // In real implementation, this would fail with Ethereum signer
+    await expect(tbtc.initializeCrossChain("StarkNet", starknetProvider)).to.not
+      .be.rejected
   })
 })
