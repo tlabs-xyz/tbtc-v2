@@ -58,7 +58,7 @@ EthersContractHandle\&lt;L2TBTCTypechain\&gt;.constructor
 
 #### Defined in
 
-[lib/arbitrum/l2-tbtc-token.ts:26](https://github.com/keep-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/l2-tbtc-token.ts#L26)
+[lib/arbitrum/l2-tbtc-token.ts:26](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/l2-tbtc-token.ts#L26)
 
 ## Properties
 
@@ -134,7 +134,7 @@ EthersContractHandle.\_totalRetryAttempts
 
 #### Defined in
 
-[lib/arbitrum/l2-tbtc-token.ts:55](https://github.com/keep-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/l2-tbtc-token.ts#L55)
+[lib/arbitrum/l2-tbtc-token.ts:55](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/l2-tbtc-token.ts#L55)
 
 ___
 
@@ -176,7 +176,7 @@ ___
 
 #### Defined in
 
-[lib/arbitrum/l2-tbtc-token.ts:47](https://github.com/keep-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/l2-tbtc-token.ts#L47)
+[lib/arbitrum/l2-tbtc-token.ts:47](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/l2-tbtc-token.ts#L47)
 
 ___
 

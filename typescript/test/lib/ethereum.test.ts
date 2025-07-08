@@ -905,7 +905,7 @@ describe("Ethereum", () => {
           }
 
           expect(() => encoder.encodeDepositOwner(depositOwner)).to.throw(
-            "Unsupported address length: 2"
+            "Invalid Ethereum address"
           )
         })
       })
@@ -926,16 +926,19 @@ describe("Ethereum", () => {
         })
       })
 
-      context("when the extra data isn't a proper bytes32 address", () => {
-        it("should throw", () => {
-          // Build crap extra data.
-          const extraData = Hex.from("0000000000000000000000001234")
+      context(
+        "when the extra data doesn't hold a proper Ethereum address",
+        () => {
+          it("should throw", () => {
+            // Build crap extra data.
+            const extraData = Hex.from("0000000000000000000000001234")
 
-          expect(() => encoder.decodeDepositOwner(extraData)).to.throw(
-            "Extra data must be 32 bytes. Got 14."
-          )
-        })
-      })
+            expect(() => encoder.decodeDepositOwner(extraData)).to.throw(
+              "Invalid Ethereum address"
+            )
+          })
+        }
+      )
     })
   })
 

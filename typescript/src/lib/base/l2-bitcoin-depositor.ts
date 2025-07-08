@@ -13,7 +13,7 @@ import {
 } from "../contracts"
 import {
   EthereumAddress,
-  CrossChainExtraDataEncoder,
+  EthereumCrossChainExtraDataEncoder,
   packRevealDepositParameters,
 } from "../ethereum"
 import { Hex } from "../utils"
@@ -50,7 +50,7 @@ export class BaseBitcoinDepositor
 
     super(config, deployment)
 
-    this.#extraDataEncoder = new CrossChainExtraDataEncoder()
+    this.#extraDataEncoder = new EthereumCrossChainExtraDataEncoder()
   }
 
   // eslint-disable-next-line valid-jsdoc

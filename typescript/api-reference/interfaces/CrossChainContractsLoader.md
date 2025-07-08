@@ -29,7 +29,7 @@ Loads the chain mapping based on underlying L1 chain.
 
 #### Defined in
 
-[lib/contracts/cross-chain.ts:40](https://github.com/keep-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L40)
+[lib/contracts/cross-chain.ts:42](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L42)
 
 ___
 
@@ -37,11 +37,11 @@ ___
 
 • **loadL1Contracts**: (`destinationChainName`: [`DestinationChainName`](../README.md#destinationchainname)) => `Promise`\<[`L1CrossChainContracts`](../README.md#l1crosschaincontracts)\>
 
+Loads L1-specific TBTC cross-chain contracts for the given destination chain.
+
 #### Type declaration
 
 ▸ (`destinationChainName`): `Promise`\<[`L1CrossChainContracts`](../README.md#l1crosschaincontracts)\>
-
-Loads L1-specific TBTC cross-chain contracts for the given destination chain.
 
 ##### Parameters
 
@@ -55,4 +55,4 @@ Loads L1-specific TBTC cross-chain contracts for the given destination chain.
 
 #### Defined in
 
-[lib/contracts/cross-chain.ts:45](https://github.com/keep-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L45)
+[lib/contracts/cross-chain.ts:47](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/contracts/cross-chain.ts#L47)

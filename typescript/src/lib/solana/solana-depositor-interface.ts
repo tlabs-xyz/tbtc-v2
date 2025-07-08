@@ -1,22 +1,22 @@
 import axios from "axios"
 import { ChainIdentifier, BitcoinDepositor, DepositReceipt } from "../contracts"
 import {
-  CrossChainExtraDataEncoder,
   packRevealDepositParameters,
 } from "../ethereum"
 import { BitcoinRawTxVectors } from "../bitcoin"
 import { TransactionReceipt } from "@ethersproject/providers"
+import { SolanaExtraDataEncoder } from "./extra-data-encoder"
 
 /**
  * Implementation of the Solana Depositor Interface handle.
  * @see {BitcoinDepositor} for reference.
  */
 export class SolanaDepositorInterface implements BitcoinDepositor {
-  readonly #extraDataEncoder: CrossChainExtraDataEncoder
+  readonly #extraDataEncoder: SolanaExtraDataEncoder
   #depositOwner: ChainIdentifier | undefined
 
   constructor() {
-    this.#extraDataEncoder = new CrossChainExtraDataEncoder()
+    this.#extraDataEncoder = new SolanaExtraDataEncoder()
   }
 
   // eslint-disable-next-line valid-jsdoc
@@ -39,7 +39,7 @@ export class SolanaDepositorInterface implements BitcoinDepositor {
   /**
    * @see {BitcoinDepositor#extraDataEncoder}
    */
-  extraDataEncoder(): CrossChainExtraDataEncoder {
+  extraDataEncoder(): SolanaExtraDataEncoder {
     return this.#extraDataEncoder
   }
 

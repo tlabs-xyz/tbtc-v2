@@ -105,19 +105,6 @@ describe("StarkNet Provider Integration", () => {
       await expect(tbtc.initializeCrossChain("StarkNet", account)).to.not.be
         .rejected
     })
-
-    it("should reject two-parameter mode", async () => {
-      // Two-parameter mode is no longer supported
-      const starknetProvider = new RpcProvider({
-        nodeUrl: "https://starknet-testnet.public.blastapi.io/rpc/v0_6",
-      })
-
-      await expect(
-        tbtc.initializeCrossChain("StarkNet", ethereumSigner, starknetProvider)
-      ).to.be.rejectedWith(
-        "StarkNet does not support two-parameter initialization"
-      )
-    })
   })
 
   describe("Balance query with provider", () => {

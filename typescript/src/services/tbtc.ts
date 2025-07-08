@@ -255,7 +255,7 @@ export class TBTC {
    * @internal
    * @deprecated Will be removed in next major version.
    */
-  _l2Signer?: EthereumSigner | StarkNetProvider | SuiSignerWithAddress
+  _l2Signer?: EthereumSigner | StarkNetProvider | SuiSignerWithAddress | AnchorProvider
 
   /**
    * Initializes cross-chain contracts for the given L2 chain.
@@ -318,7 +318,7 @@ export class TBTC {
     const chainMapping = this.#crossChainContractsLoader.loadChainMapping()
     if (!chainMapping) {
       throw new Error(
-        "Chain mapping between Ethereum L1 and destination chains not defined"
+        "Chain mapping between L1 and L2 chains not defined"
       )
     }
 

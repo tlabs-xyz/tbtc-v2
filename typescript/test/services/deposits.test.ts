@@ -2453,7 +2453,7 @@ describe("Deposits", () => {
     })
 
     context("when cross-chain contracts are initialized", () => {
-      let l2BitcoinDepositor: MockL2BitcoinDepositor
+      let l2BitcoinDepositor: MockBitcoinDepositor
       let l1BitcoinDepositor: MockL1BitcoinDepositor
       let crossChainContracts: CrossChainInterfaces
 
@@ -2479,6 +2479,9 @@ describe("Deposits", () => {
           destinationChainTbtcToken: new MockL2TBTCToken(),
           destinationChainBitcoinDepositor: l2BitcoinDepositor,
           l1BitcoinDepositor: l1BitcoinDepositor,
+          l1BitcoinRedeemer: new MockL1BitcoinRedeemer(
+            EthereumAddress.from("0x1111111111111111111111111111111111111111")
+          ),
         }
 
         const crossChainContractsResolver = (
