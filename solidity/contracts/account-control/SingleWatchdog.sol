@@ -353,7 +353,7 @@ contract SingleWatchdog is AccessControl {
         return solvent;
     }
 
-    /// @notice Strategic attestation for critical conditions
+    /// @notice Strategic attestation for critical conditions (requires WATCHDOG_OPERATOR_ROLE)
     /// @param qc The QC address
     /// @param balance The attested balance
     /// @param condition The critical condition triggering attestation
@@ -380,7 +380,7 @@ contract SingleWatchdog is AccessControl {
         this.attestReserves(qc, balance);
     }
 
-    /// @notice Bulk handle multiple redemptions (emergency use)
+    /// @notice Bulk handle multiple redemptions (emergency use) (requires WATCHDOG_OPERATOR_ROLE)
     /// @param redemptionIds Array of redemption IDs
     /// @param fulfill True to fulfill, false to default
     /// @param reason Reason for bulk action

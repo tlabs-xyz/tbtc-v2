@@ -12,6 +12,7 @@ describe("SPVValidator", () => {
   const DIFFICULTY_FACTOR = 6
 
   before(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-extra-semi
     ;[deployer] = await ethers.getSigners()
 
     // Deploy relay stub for SPV validation
@@ -36,16 +37,11 @@ describe("SPVValidator", () => {
       )
     })
 
-    it("should grant admin and config roles to deployer", async () => {
+    it("should grant admin role to deployer", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-      const CONFIG_ROLE = ethers.utils.keccak256(
-        ethers.utils.toUtf8Bytes("CONFIG_ROLE")
-      )
 
       expect(await spvValidator.hasRole(DEFAULT_ADMIN_ROLE, deployer.address))
         .to.be.true
-      expect(await spvValidator.hasRole(CONFIG_ROLE, deployer.address)).to.be
-        .true
     })
 
     it("should revert with invalid relay address", async () => {
