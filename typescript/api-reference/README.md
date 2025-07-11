@@ -44,6 +44,8 @@
 - [MaintenanceService](classes/MaintenanceService.md)
 - [OptimisticMinting](classes/OptimisticMinting.md)
 - [RedemptionsService](classes/RedemptionsService.md)
+- [SolanaAddress](classes/SolanaAddress.md)
+- [SolanaExtraDataEncoder](classes/SolanaExtraDataEncoder.md)
 - [Spv](classes/Spv.md)
 - [StarkNetAddress](classes/StarkNetAddress.md)
 - [StarkNetBitcoinDepositor](classes/StarkNetBitcoinDepositor.md)
@@ -143,6 +145,7 @@
 - [BitcoinTargetConverter](README.md#bitcointargetconverter)
 - [ChainMappings](README.md#chainmappings)
 - [EthereumCrossChainExtraDataEncoder](README.md#ethereumcrosschainextradataencoder)
+- [SolanaCrossChainExtraDataEncoder](README.md#solanacrosschainextradataencoder)
 - [StarkNetCrossChainExtraDataEncoder](README.md#starknetcrosschainextradataencoder)
 - [StarkNetDepositor](README.md#starknetdepositor)
 - [tbtcABI](README.md#tbtcabi)
@@ -162,6 +165,7 @@
 - [loadBaseCrossChainContracts](README.md#loadbasecrosschaincontracts)
 - [loadBaseCrossChainInterfaces](README.md#loadbasecrosschaininterfaces)
 - [loadEthereumCoreContracts](README.md#loadethereumcorecontracts)
+- [loadSolanaCrossChainInterfaces](README.md#loadsolanacrosschaininterfaces)
 - [loadStarkNetCrossChainContracts](README.md#loadstarknetcrosschaincontracts)
 - [loadStarkNetCrossChainInterfaces](README.md#loadstarknetcrosschaininterfaces)
 - [packRevealDepositParameters](README.md#packrevealdepositparameters)
@@ -964,6 +968,20 @@ Use EthereumExtraDataEncoder instead
 
 ___
 
+### SolanaCrossChainExtraDataEncoder
+
+• `Const` **SolanaCrossChainExtraDataEncoder**: typeof [`SolanaExtraDataEncoder`](classes/SolanaExtraDataEncoder.md) = `SolanaExtraDataEncoder`
+
+**`Deprecated`**
+
+Use SolanaExtraDataEncoder instead
+
+#### Defined in
+
+[lib/solana/extra-data-encoder.ts:60](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/solana/extra-data-encoder.ts#L60)
+
+___
+
 ### StarkNetCrossChainExtraDataEncoder
 
 • `Const` **StarkNetCrossChainExtraDataEncoder**: typeof [`StarkNetExtraDataEncoder`](classes/StarkNetExtraDataEncoder.md) = `StarkNetExtraDataEncoder`
@@ -1383,6 +1401,35 @@ Throws an error if the signer's Ethereum chain ID is other than
 #### Defined in
 
 [lib/ethereum/index.ts:83](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/ethereum/index.ts#L83)
+
+___
+
+### loadSolanaCrossChainInterfaces
+
+▸ **loadSolanaCrossChainInterfaces**(`solanaProvider`): `Promise`\<[`DestinationChainInterfaces`](README.md#destinationchaininterfaces)\>
+
+Loads Solana implementation of tBTC cross-chain interfaces using
+an AnchorProvider (which includes the connection and the wallet).
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `solanaProvider` | `AnchorProvider` | Anchor provider for Solana. Must include both `connection` and `wallet`. |
+
+#### Returns
+
+`Promise`\<[`DestinationChainInterfaces`](README.md#destinationchaininterfaces)\>
+
+Handle to the cross-chain interfaces for the TBTC interface on Solana.
+
+**`Throws`**
+
+If the connection's genesis hash does not match the expected `genesisHash`.
+
+#### Defined in
+
+[lib/solana/index.ts:20](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/solana/index.ts#L20)
 
 ___
 
