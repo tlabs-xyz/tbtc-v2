@@ -1264,7 +1264,7 @@ Use loadArbitrumCrossChainInterfaces instead
 
 #### Defined in
 
-[lib/arbitrum/index.ts:62](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/index.ts#L62)
+[lib/arbitrum/index.ts:63](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/arbitrum/index.ts#L63)
 
 ___
 
@@ -1320,7 +1320,7 @@ Use loadBaseCrossChainInterfaces instead
 
 #### Defined in
 
-[lib/base/index.ts:63](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/base/index.ts#L63)
+[lib/base/index.ts:64](https://github.com/threshold-network/tbtc-v2/blob/main/typescript/src/lib/base/index.ts#L64)
 
 ___
 

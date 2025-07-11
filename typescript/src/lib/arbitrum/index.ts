@@ -6,7 +6,7 @@ import {
 import { ArbitrumBitcoinDepositor } from "./l2-bitcoin-depositor"
 import { ArbitrumTBTCToken } from "./l2-tbtc-token"
 import { Chains, DestinationChainInterfaces } from "../contracts"
-import { ArbitrumL2BitcoinRedeemer } from "./l2-bitcoin-redeemer"
+// import { ArbitrumL2BitcoinRedeemer } from "./l2-bitcoin-redeemer"
 
 export * from "./l2-bitcoin-depositor"
 export * from "./l2-tbtc-token"
@@ -39,10 +39,11 @@ export async function loadArbitrumCrossChainInterfaces(
     await ethereumAddressFromSigner(signer)
   )
 
-  const l2BitcoinRedeemer = new ArbitrumL2BitcoinRedeemer(
-    { signerOrProvider: signer },
-    chainId
-  )
+  // TODO: Uncomment when Arbitrum L2BitcoinRedeemer is deployed
+  // const l2BitcoinRedeemer = new ArbitrumL2BitcoinRedeemer(
+  //   { signerOrProvider: signer },
+  //   chainId
+  // )
 
   const destinationChainTbtcToken = new ArbitrumTBTCToken(
     { signerOrProvider: signer },
@@ -50,9 +51,9 @@ export async function loadArbitrumCrossChainInterfaces(
   )
 
   return {
-    l2BitcoinRedeemer,
     destinationChainBitcoinDepositor,
     destinationChainTbtcToken,
+    // l2BitcoinRedeemer,
   }
 }
 
