@@ -78,6 +78,11 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
     error ZeroAddress();
     error InsufficientBalance();
 
+    /// @notice Emitted when tBTC tokens are rescued from the contract.
+    /// @param recipient The address that received the rescued tBTC tokens.
+    /// @param amount The amount of tBTC rescued.
+    event TbtcRescued(address indexed recipient, uint256 amount);
+
     /// @notice Multiplier to convert satoshi to TBTC token units.
     uint256 public constant SATOSHI_MULTIPLIER = 10**10;
 
@@ -253,5 +258,6 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
         }
 
         tbtcToken.safeTransfer(recipient, amount);
+        emit TbtcRescued(recipient, amount);
     }
 }
