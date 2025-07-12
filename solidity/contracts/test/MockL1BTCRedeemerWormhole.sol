@@ -20,6 +20,7 @@ contract MockL1BTCRedeemerWormhole is
     IWormholeTokenBridge public wormholeTokenBridge;
     uint256 public requestRedemptionGasOffset;
     mapping(address => bool) public reimbursementAuthorizations;
+    mapping(bytes32 => bool) public allowedSenders;
 
     // Mock-specific state
     uint256 public mockRedemptionAmountTBTC;
@@ -39,6 +40,8 @@ contract MockL1BTCRedeemerWormhole is
         address indexed _address,
         bool authorization
     );
+
+    event AllowedSenderUpdated(bytes32 indexed sender, bool allowed);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -90,6 +93,14 @@ contract MockL1BTCRedeemerWormhole is
         reimbursementAuthorizations[_address] = authorization;
     }
 
+    function updateAllowedSender(bytes32 _sender, bool _allowed)
+        external
+        onlyOwner
+    {
+        allowedSenders[_sender] = _allowed;
+        emit AllowedSenderUpdated(_sender, _allowed);
+    }
+
     // Mock implementation of requestRedemption
     function requestRedemption(
         bytes20 walletPubKeyHash,
@@ -98,10 +109,23 @@ contract MockL1BTCRedeemerWormhole is
     ) external nonReentrant {
         uint256 gasStart = gasleft();
 
-        // In tests, wormholeTokenBridge.completeTransferWithPayload is mocked
-        // to return the redemption output script directly
-        bytes memory redemptionOutputScriptToUse = wormholeTokenBridge
-            .completeTransferWithPayload(encodedVm);
+        // In the real implementation, completeTransferWithPayload returns encoded data
+        // that needs to be parsed. For the mock, we'll simulate this behavior.
+        bytes memory encoded = wormholeTokenBridge.completeTransferWithPayload(
+            encodedVm
+        );
+
+        // Parse the transfer data to validate the source
+        IWormholeTokenBridge.TransferWithPayload
+            memory transfer = wormholeTokenBridge.parseTransferWithPayload(
+                encoded
+            );
+
+        // Validate that the message came from an authorized sender
+        bytes32 sender = transfer.fromAddress;
+        if (!allowedSenders[sender]) revert SourceAddressNotAuthorized();
+
+        bytes memory redemptionOutputScriptToUse = transfer.payload;
 
         // Use the mock-specific redemption amount
         uint256 amountToUse = mockRedemptionAmountTBTC;

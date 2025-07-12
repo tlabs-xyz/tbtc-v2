@@ -78,6 +78,10 @@ contract L1BTCRedeemerWormhole is
     ///         for relaying redemption requests. The authorization is
     ///         granted by the contract owner.
     mapping(address => bool) public reimbursementAuthorizations;
+    /// @notice Maps sender addresses to their authorization status. Only messages
+    ///         from authorized senders will be accepted. The addresses are stored
+    ///         in Wormhole format (bytes32).
+    mapping(bytes32 => bool) public allowedSenders;
 
     event RedemptionRequested(
         uint256 indexed redemptionKey,
@@ -93,6 +97,8 @@ contract L1BTCRedeemerWormhole is
         address indexed _address,
         bool authorization
     );
+
+    event AllowedSenderUpdated(bytes32 indexed sender, bool allowed);
 
     /// @dev This modifier comes from the `Reimbursable` base contract and
     ///      must be overridden to protect the `updateReimbursementPool` call.
@@ -153,6 +159,19 @@ contract L1BTCRedeemerWormhole is
         reimbursementAuthorizations[_address] = authorization;
     }
 
+    /// @notice Updates the allowed sender status for a given Wormhole sender address.
+    /// @param _sender The Wormhole sender address (in bytes32 format).
+    /// @param _allowed New allowed status.
+    /// @dev Requirements:
+    ///      - Can be called only by the contract owner.
+    function updateAllowedSender(bytes32 _sender, bool _allowed)
+        external
+        onlyOwner
+    {
+        allowedSenders[_sender] = _allowed;
+        emit AllowedSenderUpdated(_sender, _allowed);
+    }
+
     /// @notice Initiates a redemption on L1 using tBTC received from another chain (e.g., L2)
     ///         via a Wormhole VAA. The tBTC is then used to request a Bitcoin redemption
     ///         from the main tBTC Bridge.
@@ -166,6 +185,7 @@ contract L1BTCRedeemerWormhole is
     ///        with the payload containing the user's destination Bitcoin output script.
     /// @dev Requirements:
     ///      - The Wormhole VAA must be valid and correctly transfer tBTC to this contract.
+    ///      - The VAA must originate from an allowed sender address.
     ///      - The payload of the VAA must be the user's Bitcoin `redemptionOutputScript`.
     ///      - `walletPubKeyHash` and `mainUtxo` must correspond to a live, funded tBTC wallet.
     ///      - All requirements of tBTC `Bridge.requestRedemption` must be met.
@@ -203,9 +223,17 @@ contract L1BTCRedeemerWormhole is
 
         uint256 amount = balanceAfter - balanceBefore;
 
-        bytes memory redemptionOutputScript = wormholeTokenBridge
-            .parseTransferWithPayload(encoded)
-            .payload;
+        // Parse the full transfer data to validate the source
+        IWormholeTokenBridge.TransferWithPayload
+            memory transfer = wormholeTokenBridge.parseTransferWithPayload(
+                encoded
+            );
+
+        // Validate that the message came from an authorized sender
+        bytes32 sender = transfer.fromAddress;
+        if (!allowedSenders[sender]) revert SourceAddressNotAuthorized();
+
+        bytes memory redemptionOutputScript = transfer.payload;
 
         // Convert the received ERC20 amount (1e18) to satoshi equivalent (1e8) for Bridge operations.
         uint64 amountInSatoshis = uint64(amount / SATOSHI_MULTIPLIER);
