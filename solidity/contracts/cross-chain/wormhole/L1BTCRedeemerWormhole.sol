@@ -51,13 +51,6 @@ contract L1BTCRedeemerWormhole is
     Reimbursable,
     ReentrancyGuardUpgradeable
 {
-    /// @notice Holds information about a deferred gas reimbursement.
-    struct GasReimbursement {
-        /// @notice Receiver that is supposed to receive the reimbursement.
-        address receiver;
-        /// @notice Gas expenditure that is meant to be reimbursed.
-        uint96 gasSpent;
-    }
     // Custom errors
     error CallerNotOwner();
     error SourceAddressNotAuthorized();
@@ -65,11 +58,6 @@ contract L1BTCRedeemerWormhole is
 
     /// @notice Reference to the Wormhole Token Bridge contract.
     IWormholeTokenBridge public wormholeTokenBridge;
-    /// @notice Holds deferred gas reimbursements for redemption requests
-    ///         (indexed by redemption key). Reimbursement for redemption
-    ///         is typically paid out after the request is successfully relayed and processed.
-    ///         The specifics depend on the reimbursement strategy.
-    mapping(uint256 => GasReimbursement) public gasReimbursements;
     /// @notice Gas that is meant to balance the overall cost of processing a redemption request via L1.
     ///         Can be updated by the owner based on the current market conditions.
     uint256 public requestRedemptionGasOffset;
