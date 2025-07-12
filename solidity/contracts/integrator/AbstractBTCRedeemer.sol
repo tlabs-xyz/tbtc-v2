@@ -90,7 +90,7 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
     // Reserved storage space that allows adding more variables without affecting
     // the storage layout of the child contracts. The convention from OpenZeppelin
     // suggests the storage space should add up to 50 slots. If more variables are
-    // added in the upcoming versions one need to reduce the array size accordingly.
+    // added in the upcoming versions one needs to reduce the array size accordingly.
     // See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
     // slither-disable-next-line unused-state
     uint256[46] private __gap;

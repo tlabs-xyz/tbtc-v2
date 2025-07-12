@@ -123,7 +123,7 @@ contract L1BTCRedeemerWormhole is
     /// @notice Updates the values of gas offset parameters for redemption processing.
     /// @dev Can be called only by the contract owner. The caller is responsible
     ///      for validating parameters.
-    /// @param _requestRedemptionGasOffset New initialize redemption gas offset.
+    /// @param _requestRedemptionGasOffset New redemption gas offset.
     function updateGasOffsetParameters(uint256 _requestRedemptionGasOffset)
         external
         onlyOwner

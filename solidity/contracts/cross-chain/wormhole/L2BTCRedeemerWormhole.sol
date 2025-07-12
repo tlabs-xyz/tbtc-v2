@@ -38,7 +38,7 @@ import "../../integrator/IL2WormholeGateway.sol";
 ///         3. The user calls the `requestRedemption` function on this contract, providing:
 ///            - The amount of L2TBTC to redeem.
 ///            - Their Bitcoin output script (e.g., P2PKH, P2WPKH) for receiving BTC on Bitcoin network.
-///            - A unique identifier for the transaction..
+///            - A unique identifier for the transaction.
 ///         4. This L2BTCRedeemerWormhole contract:
 ///            a. Takes custody of the specified amount of L2TBTC from the user.
 ///            b. Calls the `sendTbtcWithPayloadToNativeChain` function on the
