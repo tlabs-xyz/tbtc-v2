@@ -65,6 +65,12 @@ contract L2BTCRedeemerWormhole is
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    // Custom errors
+    error ZeroAddress();
+    error InvalidRedeemerOutputScript();
+    error AmountTooLowToRedeem();
+    error MinimumRedemptionAmountZero();
+
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using BTCUtils for bytes;
 
@@ -100,18 +106,9 @@ contract L2BTCRedeemerWormhole is
         __Ownable_init();
         __ReentrancyGuard_init();
 
-        require(
-            address(_tbtc) != address(0),
-            "L2TBTC token address must not be 0x0"
-        );
-        require(
-            address(_gateway) != address(0),
-            "Gateway address must not be 0x0"
-        );
-        require(
-            _l1BtcRedeemerWormholeAddress != bytes32(0),
-            "L1 BTC redeemer Wormhole address must not be 0x0"
-        );
+        if (address(_tbtc) == address(0)) revert ZeroAddress();
+        if (address(_gateway) == address(0)) revert ZeroAddress();
+        if (_l1BtcRedeemerWormholeAddress == bytes32(0)) revert ZeroAddress();
 
         tbtc = IERC20Upgradeable(_tbtc);
         gateway = IL2WormholeGateway(_gateway);
@@ -152,15 +149,14 @@ contract L2BTCRedeemerWormhole is
         bytes memory redeemerOutputScriptPayload = redeemerOutputScriptMem
             .extractHashAt(0, redeemerOutputScriptMem.length);
 
-        require(
-            redeemerOutputScriptPayload.length > 0,
-            "Redeemer output script must be a standard type"
-        );
+        if (redeemerOutputScriptPayload.length == 0) {
+            revert InvalidRedeemerOutputScript();
+        }
 
         // Normalize the amount to bridge. The dust can not be bridged due to
         // the decimal shift in the Wormhole Bridge contract.
         amount = WormholeUtils.normalize(amount);
-        require(amount >= minimumRedemptionAmount, "Amount too low to redeem");
+        if (amount < minimumRedemptionAmount) revert AmountTooLowToRedeem();
 
         redeemedAmount += amount;
 
@@ -192,10 +188,9 @@ contract L2BTCRedeemerWormhole is
         external
         onlyOwner
     {
-        require(
-            _newMinimumRedemptionAmount != 0,
-            "Minimum redemption amount must not be 0"
-        );
+        if (_newMinimumRedemptionAmount == 0) {
+            revert MinimumRedemptionAmountZero();
+        }
         minimumRedemptionAmount = _newMinimumRedemptionAmount;
         emit MinimumRedemptionAmountUpdated(_newMinimumRedemptionAmount);
     }

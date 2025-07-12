@@ -59,6 +59,10 @@ contract L1BTCRedeemerWormhole is
         /// @notice Gas expenditure that is meant to be reimbursed.
         uint96 gasSpent;
     }
+    // Custom errors
+    error CallerNotOwner();
+    error SourceAddressNotAuthorized();
+    error WormholeTokenBridgeAlreadySet();
 
     /// @notice Reference to the Wormhole Token Bridge contract.
     IWormholeTokenBridge public wormholeTokenBridge;
@@ -93,7 +97,7 @@ contract L1BTCRedeemerWormhole is
     /// @dev This modifier comes from the `Reimbursable` base contract and
     ///      must be overridden to protect the `updateReimbursementPool` call.
     modifier onlyReimbursableAdmin() override {
-        require(msg.sender == owner(), "Caller is not the owner");
+        if (msg.sender != owner()) revert CallerNotOwner();
         _;
     }
 
@@ -111,15 +115,13 @@ contract L1BTCRedeemerWormhole is
         __AbstractBTCRedeemer_initialize(_thresholdBridge, _tbtcToken, _bank);
         __Ownable_init();
 
-        require(
-            address(wormholeTokenBridge) == address(0),
-            "L1BTCRedeemerWormhole already initialized"
-        );
+        if (address(wormholeTokenBridge) != address(0)) {
+            revert WormholeTokenBridgeAlreadySet();
+        }
 
-        require(
-            _wormholeTokenBridge != address(0),
-            "Wormhole Token Bridge address cannot be zero"
-        );
+        if (_wormholeTokenBridge == address(0)) {
+            revert ZeroAddress();
+        }
 
         wormholeTokenBridge = IWormholeTokenBridge(_wormholeTokenBridge);
         requestRedemptionGasOffset = 60_000;

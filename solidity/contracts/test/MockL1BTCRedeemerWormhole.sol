@@ -12,6 +12,10 @@ contract MockL1BTCRedeemerWormhole is
     Reimbursable,
     ReentrancyGuardUpgradeable
 {
+    // Custom errors
+    error CallerNotOwner();
+    error SourceAddressNotAuthorized();
+
     // State variables from L1BTCRedeemerWormhole
     IWormholeTokenBridge public wormholeTokenBridge;
     uint256 public requestRedemptionGasOffset;
@@ -42,7 +46,7 @@ contract MockL1BTCRedeemerWormhole is
     }
 
     modifier onlyReimbursableAdmin() override {
-        require(msg.sender == owner(), "Caller is not the owner");
+        if (msg.sender != owner()) revert CallerNotOwner();
         _;
     }
 
@@ -57,10 +61,9 @@ contract MockL1BTCRedeemerWormhole is
         __ReentrancyGuard_init();
         __Ownable_init();
 
-        require(
-            _wormholeTokenBridge != address(0),
-            "Wormhole Token Bridge address cannot be zero"
-        );
+        if (_wormholeTokenBridge == address(0)) {
+            revert ZeroAddress();
+        }
 
         wormholeTokenBridge = IWormholeTokenBridge(_wormholeTokenBridge);
         requestRedemptionGasOffset = 60_000;

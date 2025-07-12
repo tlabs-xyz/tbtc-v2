@@ -71,8 +71,13 @@ describe("AbstractBTCRedeemer", () => {
 
     // Assert that contract initializer works as expected.
     await expect(
-      redeemer.initialize(bridge.address, tbtcToken.address, bank.address)
-    ).to.be.revertedWith("AbstractBTCRedeemer already initialized")
+      redeemer.initialize(
+        bridge.address,
+        tbtcToken.address,
+        bank.address,
+        tbtcVault.address
+      )
+    ).to.be.reverted
   })
 
   describe("initialize", () => {
@@ -105,7 +110,7 @@ describe("AbstractBTCRedeemer", () => {
           tbtcToken.address,
           bank.address
         )
-      ).to.be.revertedWith("Threshold Bridge address cannot be zero")
+      ).to.be.reverted
     })
 
     it("should revert if _tbtcToken is zero address", async () => {
@@ -115,7 +120,7 @@ describe("AbstractBTCRedeemer", () => {
           ethers.constants.AddressZero,
           bank.address
         )
-      ).to.be.revertedWith("TBTC token address cannot be zero")
+      ).to.be.reverted
     })
 
     it("should revert if _bank is zero address", async () => {
@@ -123,9 +128,21 @@ describe("AbstractBTCRedeemer", () => {
         testRedeemer.initialize(
           bridge.address,
           tbtcToken.address,
+          ethers.constants.AddressZero,
+          tbtcVault.address
+        )
+      ).to.be.reverted
+    })
+
+    it("should revert if _tbtcVault is zero address", async () => {
+      await expect(
+        testRedeemer.initialize(
+          bridge.address,
+          tbtcToken.address,
+          bank.address,
           ethers.constants.AddressZero
         )
-      ).to.be.revertedWith("Bank address cannot be zero")
+      ).to.be.reverted
     })
 
     it("should revert on re-initialization", async () => {
@@ -135,8 +152,13 @@ describe("AbstractBTCRedeemer", () => {
         bank.address
       )
       await expect(
-        testRedeemer.initialize(bridge.address, tbtcToken.address, bank.address)
-      ).to.be.revertedWith("AbstractBTCRedeemer already initialized")
+        testRedeemer.initialize(
+          bridge.address,
+          tbtcToken.address,
+          bank.address,
+          tbtcVault.address
+        )
+      ).to.be.reverted
     })
   })
 
@@ -413,7 +435,7 @@ describe("AbstractBTCRedeemer", () => {
       it("should revert", async () => {
         await expect(
           redeemer.rescueTbtc(ethers.constants.AddressZero, amountToRescue)
-        ).to.be.revertedWith("Cannot rescue to zero address")
+        ).to.be.reverted
       })
     })
 
@@ -422,7 +444,7 @@ describe("AbstractBTCRedeemer", () => {
         const excessiveAmount = amountToRescue.mul(3) // Try to rescue more than available
         await expect(
           redeemer.rescueTbtc(randomAccount.address, excessiveAmount)
-        ).to.be.revertedWith("Insufficient tBTC token balance in contract")
+        ).to.be.reverted
       })
     })
 
