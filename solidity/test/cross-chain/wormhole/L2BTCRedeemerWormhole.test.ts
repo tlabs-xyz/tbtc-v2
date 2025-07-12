@@ -195,7 +195,7 @@ describe("L2BTCRedeemerWormhole", () => {
               exampleRedeemerOutputScript,
               exampleNonce
             )
-        ).to.be.reverted
+        ).to.be.revertedWith("ERC20: transfer amount exceeds balance")
       })
     })
   })
@@ -219,7 +219,7 @@ describe("L2BTCRedeemerWormhole", () => {
           l2BtcRedeemer
             .connect(governance)
             .updateMinimumRedemptionAmount(ethers.constants.Zero)
-        ).to.be.reverted
+        ).to.be.revertedWith("MinimumRedemptionAmountZero")
       })
     })
 
@@ -543,7 +543,7 @@ describe("L2BTCRedeemerWormhole", () => {
               invalidScript,
               exampleNonce
             )
-        ).to.be.reverted
+        ).to.be.revertedWith("InvalidRedeemerOutputScript")
       })
     })
 
@@ -563,7 +563,7 @@ describe("L2BTCRedeemerWormhole", () => {
               exampleRedeemerOutputScript,
               exampleNonce
             )
-        ).to.be.reverted
+        ).to.be.revertedWith("AmountTooLowToRedeem")
       })
     })
 
@@ -579,7 +579,7 @@ describe("L2BTCRedeemerWormhole", () => {
               exampleRedeemerOutputScript,
               exampleNonce
             )
-        ).to.be.reverted
+        ).to.be.revertedWith("AmountTooLowToRedeem")
       })
     })
 
@@ -595,7 +595,7 @@ describe("L2BTCRedeemerWormhole", () => {
               exampleRedeemerOutputScript,
               exampleNonce
             )
-        ).to.be.reverted // ERC20: transfer amount exceeds allowance
+        ).to.be.revertedWith("ERC20: insufficient allowance")
       })
     })
 

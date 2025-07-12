@@ -412,7 +412,7 @@ describe("AbstractBTCRedeemer", () => {
 
         await expect(
           redeemer.calculateTbtcAmountPublic(amountSat, treasuryFeeSat)
-        ).to.be.reverted // Default Hardhat revert for underflow/overflow
+        ).to.be.reverted // Arithmetic underflow
       })
 
       it("should revert if amount barely covers treasuryFee but not txMaxFee", async () => {
@@ -424,7 +424,7 @@ describe("AbstractBTCRedeemer", () => {
 
         await expect(
           redeemer.calculateTbtcAmountPublic(amountSat, treasuryFeeSat)
-        ).to.be.reverted
+        ).to.be.reverted // Arithmetic underflow
       })
 
       it("should return 0 if (amount - treasuryFee) == txMaxFee", async () => {
@@ -471,7 +471,7 @@ describe("AbstractBTCRedeemer", () => {
       it("should revert", async () => {
         await expect(
           redeemer.rescueTbtc(ethers.constants.AddressZero, amountToRescue)
-        ).to.be.reverted
+        ).to.be.revertedWith("ZeroAddress")
       })
     })
 
@@ -480,7 +480,7 @@ describe("AbstractBTCRedeemer", () => {
         const excessiveAmount = amountToRescue.mul(3) // Try to rescue more than available
         await expect(
           redeemer.rescueTbtc(randomAccount.address, excessiveAmount)
-        ).to.be.reverted
+        ).to.be.revertedWith("InsufficientBalance")
       })
     })
 

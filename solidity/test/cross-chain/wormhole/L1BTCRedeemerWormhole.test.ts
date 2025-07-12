@@ -682,7 +682,7 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
               exampleMainUtxo,
               encodedVm
             )
-        ).to.be.reverted
+        ).to.be.revertedWith("SourceAddressNotAuthorized")
       })
     })
 
@@ -719,7 +719,7 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
               exampleMainUtxo,
               encodedVm
             )
-        ).to.be.reverted
+        ).to.be.revertedWith("SourceAddressNotAuthorized")
       })
 
       it("should accept after authorization", async () => {
@@ -772,7 +772,7 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
               exampleMainUtxo,
               encodedVm
             )
-        ).to.be.reverted
+        ).to.be.revertedWith("SourceAddressNotAuthorized")
       })
     })
 
