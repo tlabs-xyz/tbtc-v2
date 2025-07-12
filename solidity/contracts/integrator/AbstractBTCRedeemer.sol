@@ -258,6 +258,8 @@ abstract contract AbstractBTCRedeemer is OwnableUpgradeable {
         }
 
         tbtcToken.safeTransfer(recipient, amount);
+
+        // slither-disable-next-line reentrancy-events
         emit TbtcRescued(recipient, amount);
     }
 }
