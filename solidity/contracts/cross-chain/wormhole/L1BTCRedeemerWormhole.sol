@@ -21,7 +21,6 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import "./Wormhole.sol";
 import "../../integrator/AbstractBTCRedeemer.sol";
-import "../utils/Crosschain.sol";
 
 /// @title L1BTCRedeemerWormhole
 /// @notice This contract is part of the direct bridging mechanism allowing
