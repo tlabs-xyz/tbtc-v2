@@ -13,7 +13,8 @@ contract WormholeBridgeStub is IWormholeTokenBridge {
 
     uint256 public transferAmount;
     bytes32 public receiverAddress;
-    bytes32 public fromAddress = 0x7000000000000000000000000000000000000000000000000000000000000000; // Default value
+    bytes32 public fromAddress =
+        0x7000000000000000000000000000000000000000000000000000000000000000; // Default value
     uint16 public tokenChain = 4; // Default value
 
     // Two simple events allowing to assert Wormhole bridge functions are
