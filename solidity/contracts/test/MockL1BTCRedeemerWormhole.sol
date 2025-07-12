@@ -14,7 +14,6 @@ contract MockL1BTCRedeemerWormhole is
     ReentrancyGuardUpgradeable
 {
     // Custom errors
-    error CallerNotOwner();
     error SourceAddressNotAuthorized();
 
     // State variables from L1BTCRedeemerWormhole
@@ -50,7 +49,7 @@ contract MockL1BTCRedeemerWormhole is
     }
 
     modifier onlyReimbursableAdmin() override {
-        if (msg.sender != owner()) revert CallerNotOwner();
+        if (msg.sender != owner()) revert("Caller is not the owner");
         _;
     }
 

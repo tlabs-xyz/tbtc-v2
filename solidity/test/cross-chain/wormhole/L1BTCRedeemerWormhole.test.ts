@@ -604,8 +604,8 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
         tokenChain: 4,
         to: ethers.utils.hexZeroPad("0x5000", 32),
         toChain: 6,
-        fromAddress: fromAddress,
-        payload: payload,
+        fromAddress,
+        payload,
       }
       return ethers.utils.defaultAbiCoder.encode(
         [
@@ -1467,8 +1467,8 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
         tokenChain: 4,
         to: ethers.utils.hexZeroPad("0x5000", 32),
         toChain: 6,
-        fromAddress: fromAddress,
-        payload: payload,
+        fromAddress,
+        payload,
       }
       return ethers.utils.defaultAbiCoder.encode(
         [
@@ -1636,8 +1636,8 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
         tokenChain: 4,
         to: ethers.utils.hexZeroPad("0x5000", 32),
         toChain: 6,
-        fromAddress: fromAddress,
-        payload: payload,
+        fromAddress,
+        payload,
       }
       return ethers.utils.defaultAbiCoder.encode(
         [

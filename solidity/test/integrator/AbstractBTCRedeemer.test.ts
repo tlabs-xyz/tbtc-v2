@@ -129,7 +129,7 @@ describe("AbstractBTCRedeemer", () => {
           bank.address,
           tbtcVault.address
         )
-      ).to.be.reverted
+      ).to.be.revertedWith("ZeroAddress")
     })
 
     it("should revert if _tbtcToken is zero address", async () => {
@@ -140,7 +140,7 @@ describe("AbstractBTCRedeemer", () => {
           bank.address,
           tbtcVault.address
         )
-      ).to.be.reverted
+      ).to.be.revertedWith("ZeroAddress")
     })
 
     it("should revert if _bank is zero address", async () => {
@@ -151,7 +151,7 @@ describe("AbstractBTCRedeemer", () => {
           ethers.constants.AddressZero,
           tbtcVault.address
         )
-      ).to.be.reverted
+      ).to.be.revertedWith("ZeroAddress")
     })
 
     it("should revert if _tbtcVault is zero address", async () => {
@@ -162,18 +162,7 @@ describe("AbstractBTCRedeemer", () => {
           bank.address,
           ethers.constants.AddressZero
         )
-      ).to.be.reverted
-    })
-
-    it("should revert if _tbtcVault is zero address", async () => {
-      await expect(
-        testRedeemer.initialize(
-          bridge.address,
-          tbtcToken.address,
-          bank.address,
-          ethers.constants.AddressZero
-        )
-      ).to.be.revertedWith("TBTC vault address cannot be zero")
+      ).to.be.revertedWith("ZeroAddress")
     })
 
     it("should revert on re-initialization", async () => {
@@ -190,7 +179,7 @@ describe("AbstractBTCRedeemer", () => {
           bank.address,
           tbtcVault.address
         )
-      ).to.be.reverted
+      ).to.be.revertedWith("AlreadyInitialized")
     })
   })
 
