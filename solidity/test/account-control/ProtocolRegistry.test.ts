@@ -48,22 +48,20 @@ describe("ProtocolRegistry", () => {
   })
 
   describe("Deployment", () => {
-    it("should grant deployer admin and parameter admin roles", async () => {
+    it("should grant deployer admin role", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
       expect(
         await protocolRegistry.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)
-      ).to.be.true
-      expect(
-        await protocolRegistry.hasRole(PARAMETER_ADMIN_ROLE, deployer.address)
       ).to.be.true
     })
   })
 
   describe("Role Constants", () => {
-    it("should have correct role constants", async () => {
-      expect(await protocolRegistry.PARAMETER_ADMIN_ROLE()).to.equal(
-        PARAMETER_ADMIN_ROLE
-      )
+    it("should have correct default admin role", async () => {
+      const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
+      expect(
+        await protocolRegistry.DEFAULT_ADMIN_ROLE()
+      ).to.equal(DEFAULT_ADMIN_ROLE)
     })
   })
 
@@ -85,13 +83,13 @@ describe("ProtocolRegistry", () => {
       })
 
       it("should emit ServiceUpdated event", async () => {
-        await expect(tx)
-          .to.emit(protocolRegistry, "ServiceUpdated")
-          .withArgs(
-            TEST_SERVICE_KEY,
-            ethers.constants.AddressZero,
-            mockService.address
-          )
+        const receipt = await tx.wait()
+        const event = receipt.events?.find((e: any) => e.event === "ServiceUpdated")
+        expect(event).to.not.be.undefined
+        expect(event.args.serviceId).to.equal(TEST_SERVICE_KEY)
+        expect(event.args.oldAddress).to.equal(ethers.constants.AddressZero)
+        expect(event.args.newAddress).to.equal(mockService.address)
+        expect(event.args.updatedBy).to.equal(deployer.address)
       })
 
       it("should make hasService return true", async () => {
@@ -128,9 +126,13 @@ describe("ProtocolRegistry", () => {
       })
 
       it("should emit ServiceUpdated event with old and new addresses", async () => {
-        await expect(tx)
-          .to.emit(protocolRegistry, "ServiceUpdated")
-          .withArgs(TEST_SERVICE_KEY, oldAddress, newAddress)
+        const receipt = await tx.wait()
+        const event = receipt.events?.find((e: any) => e.event === "ServiceUpdated")
+        expect(event).to.not.be.undefined
+        expect(event.args.serviceId).to.equal(TEST_SERVICE_KEY)
+        expect(event.args.oldAddress).to.equal(oldAddress)
+        expect(event.args.newAddress).to.equal(newAddress)
+        expect(event.args.updatedBy).to.equal(deployer.address)
       })
 
       it("should return updated address from getService", async () => {
@@ -147,7 +149,7 @@ describe("ProtocolRegistry", () => {
             TEST_SERVICE_KEY,
             ethers.constants.AddressZero
           )
-        ).to.be.revertedWith("Invalid service address")
+        ).to.be.revertedWith("InvalidServiceAddress")
       })
     })
 
@@ -182,7 +184,7 @@ describe("ProtocolRegistry", () => {
       it("should revert", async () => {
         await expect(
           protocolRegistry.getService(TEST_SERVICE_KEY)
-        ).to.be.revertedWith("Service not registered")
+        ).to.be.revertedWith("ServiceNotRegistered")
       })
     })
   })
@@ -261,31 +263,33 @@ describe("ProtocolRegistry", () => {
     })
 
     context("role management", () => {
-      it("should allow admin to grant parameter admin role", async () => {
+      it("should allow admin to grant admin role", async () => {
+        const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
         await protocolRegistry.grantRole(
-          PARAMETER_ADMIN_ROLE,
+          DEFAULT_ADMIN_ROLE,
           governance.address
         )
         expect(
           await protocolRegistry.hasRole(
-            PARAMETER_ADMIN_ROLE,
+            DEFAULT_ADMIN_ROLE,
             governance.address
           )
         ).to.be.true
       })
 
-      it("should allow admin to revoke parameter admin role", async () => {
+      it("should allow admin to revoke admin role", async () => {
+        const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
         await protocolRegistry.grantRole(
-          PARAMETER_ADMIN_ROLE,
+          DEFAULT_ADMIN_ROLE,
           governance.address
         )
         await protocolRegistry.revokeRole(
-          PARAMETER_ADMIN_ROLE,
+          DEFAULT_ADMIN_ROLE,
           governance.address
         )
         expect(
           await protocolRegistry.hasRole(
-            PARAMETER_ADMIN_ROLE,
+            DEFAULT_ADMIN_ROLE,
             governance.address
           )
         ).to.be.false

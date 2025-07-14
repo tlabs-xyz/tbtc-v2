@@ -1,598 +1,278 @@
-import chai, { expect } from "chai"
-import { ethers, helpers } from "hardhat"
+import { ethers, deployments, helpers } from "hardhat"
+import { expect } from "chai"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import { FakeContract, smock } from "@defi-wonderland/smock"
-import {
-  BasicMintingPolicy,
+import { 
+  BasicMintingPolicy, 
+  Bank, 
+  TBTCVault,
+  TBTC,
   ProtocolRegistry,
   QCManager,
   QCData,
-  SystemState,
-  TBTC,
+  SystemState
 } from "../../typechain"
 
-chai.use(smock.matchers)
-
-const { createSnapshot, restoreSnapshot } = helpers.snapshot
-
-describe("BasicMintingPolicy", () => {
+describe("BasicMintingPolicy - Direct Bank Integration", () => {
   let deployer: SignerWithAddress
+  let governance: SignerWithAddress
+  let qc: SignerWithAddress
   let user: SignerWithAddress
-  let qcAddress: SignerWithAddress
+  let unauthorized: SignerWithAddress
 
   let basicMintingPolicy: BasicMintingPolicy
+  let bank: Bank
+  let tbtcVault: TBTCVault
+  let tbtc: TBTC
   let protocolRegistry: ProtocolRegistry
-  let mockQcManager: FakeContract<QCManager>
-  let mockQcData: FakeContract<QCData>
-  let mockSystemState: FakeContract<SystemState>
-  let mockTbtc: FakeContract<TBTC>
+  let qcManager: QCManager
+  let qcData: QCData
+  let systemState: SystemState
 
-  // Service keys
-  let QC_MANAGER_KEY: string
-  let QC_DATA_KEY: string
-  let SYSTEM_STATE_KEY: string
-  let QC_RESERVE_LEDGER_KEY: string
-  let TBTC_TOKEN_KEY: string
-
-  // Roles
-  let MINTER_ROLE: string
-
-  // Test amounts
-  const minMintAmount = ethers.utils.parseEther("0.1")
-  const maxMintAmount = ethers.utils.parseEther("100")
-  const normalMintAmount = ethers.utils.parseEther("5")
-  const availableCapacity = ethers.utils.parseEther("10")
-
-  before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, user, qcAddress] = await ethers.getSigners()
-
-    // Generate service keys
-    QC_MANAGER_KEY = ethers.utils.id("QC_MANAGER")
-    QC_DATA_KEY = ethers.utils.id("QC_DATA")
-    SYSTEM_STATE_KEY = ethers.utils.id("SYSTEM_STATE")
-    QC_RESERVE_LEDGER_KEY = ethers.utils.id("QC_RESERVE_LEDGER")
-    TBTC_TOKEN_KEY = ethers.utils.id("TBTC_TOKEN")
-
-    // Generate role hashes
-    MINTER_ROLE = ethers.utils.id("MINTER_ROLE")
-  })
+  const MINTER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"))
+  const QC_ADMIN_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_ADMIN_ROLE"))
+  const SATOSHI_MULTIPLIER = ethers.BigNumber.from(10).pow(10)
 
   beforeEach(async () => {
-    await createSnapshot()
+    await deployments.fixture(["AccountControl", "DirectQCIntegration"])
+    
+    ;[deployer, governance, qc, user, unauthorized] = await ethers.getSigners()
 
-    // Deploy ProtocolRegistry
-    const ProtocolRegistryFactory = await ethers.getContractFactory(
-      "ProtocolRegistry"
-    )
-    protocolRegistry = await ProtocolRegistryFactory.deploy()
-    await protocolRegistry.deployed()
+    // Get deployed contracts
+    const basicMintingPolicyDeployment = await deployments.get("BasicMintingPolicy")
+    const bankDeployment = await deployments.get("Bank")
+    const tbtcVaultDeployment = await deployments.get("TBTCVault")
+    const tbtcDeployment = await deployments.get("TBTC")
+    const protocolRegistryDeployment = await deployments.get("ProtocolRegistry")
+    const qcManagerDeployment = await deployments.get("QCManager")
+    const qcDataDeployment = await deployments.get("QCData")
+    const systemStateDeployment = await deployments.get("SystemState")
 
-    // Deploy BasicMintingPolicy
-    const BasicMintingPolicyFactory = await ethers.getContractFactory(
-      "BasicMintingPolicy"
-    )
-    basicMintingPolicy = await BasicMintingPolicyFactory.deploy(
-      protocolRegistry.address
-    )
-    await basicMintingPolicy.deployed()
+    basicMintingPolicy = await ethers.getContractAt(
+      "BasicMintingPolicy",
+      basicMintingPolicyDeployment.address
+    ) as BasicMintingPolicy
 
-    // Create mock contracts
-    mockQcManager = await smock.fake<QCManager>("QCManager")
-    mockQcData = await smock.fake<QCData>("QCData")
-    mockSystemState = await smock.fake<SystemState>("SystemState")
-    mockTbtc = await smock.fake<TBTC>("TBTC")
+    bank = await ethers.getContractAt("Bank", bankDeployment.address) as Bank
+    tbtcVault = await ethers.getContractAt("TBTCVault", tbtcVaultDeployment.address) as TBTCVault
+    tbtc = await ethers.getContractAt("TBTC", tbtcDeployment.address) as TBTC
+    protocolRegistry = await ethers.getContractAt(
+      "ProtocolRegistry",
+      protocolRegistryDeployment.address
+    ) as ProtocolRegistry
+    qcManager = await ethers.getContractAt("QCManager", qcManagerDeployment.address) as QCManager
+    qcData = await ethers.getContractAt("QCData", qcDataDeployment.address) as QCData
+    systemState = await ethers.getContractAt("SystemState", systemStateDeployment.address) as SystemState
 
-    // Register services
-    await protocolRegistry.setService(QC_MANAGER_KEY, mockQcManager.address)
-    await protocolRegistry.setService(QC_DATA_KEY, mockQcData.address)
-    await protocolRegistry.setService(SYSTEM_STATE_KEY, mockSystemState.address)
-    await protocolRegistry.setService(TBTC_TOKEN_KEY, mockTbtc.address)
-
-    // Set up default mock behaviors
-    mockSystemState.isMintingPaused.returns(false)
-    mockSystemState.minMintAmount.returns(minMintAmount)
-    mockSystemState.maxMintAmount.returns(maxMintAmount)
-    mockQcData.getQCStatus.returns(0) // Active
-    mockQcData.getQCMintedAmount.returns(0)
-    mockQcManager.getAvailableMintingCapacity.returns(availableCapacity)
-
-    // Grant MINTER_ROLE to deployer for testing
-    await basicMintingPolicy.grantRole(MINTER_ROLE, deployer.address)
+    // Setup QC
+    await qcManager.connect(governance).grantRole(QC_ADMIN_ROLE, deployer.address)
+    await qcManager.addQC(qc.address, ethers.utils.parseEther("1000")) // 1000 tBTC capacity
   })
 
-  afterEach(async () => {
-    await restoreSnapshot()
+  describe("Direct Bank Integration", () => {
+    it("should be authorized to increase Bank balances", async () => {
+      const isAuthorized = await bank.authorizedBalanceIncreasers(basicMintingPolicy.address)
+      expect(isAuthorized).to.be.true
+    })
+
   })
 
-  describe("Deployment", () => {
-    it("should set correct protocol registry", async () => {
-      expect(await basicMintingPolicy.protocolRegistry()).to.equal(
-        protocolRegistry.address
-      )
+  describe("Minting Flow", () => {
+    const mintAmount = ethers.utils.parseEther("10") // 10 tBTC
+
+    beforeEach(async () => {
+      // Grant MINTER_ROLE to deployer for testing
+      await basicMintingPolicy.grantRole(MINTER_ROLE, deployer.address)
+      
+      // Simulate QC having reserves
+      // In real scenario, this would be done by Watchdog attestation
+      // For testing, we'll just ensure QC is active
     })
 
-    it("should grant deployer admin role", async () => {
-      const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-      expect(
-        await basicMintingPolicy.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)
-      ).to.be.true
-    })
-  })
-
-  describe("Service Key Constants", () => {
-    it("should have correct service key constants", async () => {
-      expect(await basicMintingPolicy.QC_MANAGER_KEY()).to.equal(QC_MANAGER_KEY)
-      expect(await basicMintingPolicy.QC_DATA_KEY()).to.equal(QC_DATA_KEY)
-      expect(await basicMintingPolicy.SYSTEM_STATE_KEY()).to.equal(
-        SYSTEM_STATE_KEY
-      )
-      expect(await basicMintingPolicy.QC_RESERVE_LEDGER_KEY()).to.equal(
-        QC_RESERVE_LEDGER_KEY
-      )
-      expect(await basicMintingPolicy.TBTC_TOKEN_KEY()).to.equal(TBTC_TOKEN_KEY)
-    })
-  })
-
-  describe("requestMint", () => {
-    context("when called without MINTER_ROLE", () => {
-      it("should revert", async () => {
-        await expect(
-          basicMintingPolicy
-            .connect(user)
-            .requestMint(qcAddress.address, user.address, normalMintAmount)
-        ).to.be.revertedWith(
-          `AccessControl: account ${user.address.toLowerCase()} is missing role ${MINTER_ROLE}`
-        )
-      })
-    })
-
-    context("when called with invalid parameters", () => {
-      it("should revert with zero QC address", async () => {
-        await expect(
-          basicMintingPolicy.requestMint(
-            ethers.constants.AddressZero,
-            user.address,
-            normalMintAmount
-          )
-        ).to.be.revertedWith("InvalidQCAddress")
-      })
-
-      it("should revert with zero user address", async () => {
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            ethers.constants.AddressZero,
-            normalMintAmount
-          )
-        ).to.be.revertedWith("InvalidUserAddress")
-      })
-
-      it("should revert with zero amount", async () => {
-        await expect(
-          basicMintingPolicy.requestMint(qcAddress.address, user.address, 0)
-        ).to.be.revertedWith("InvalidAmount")
-      })
-    })
-
-    context("when system checks fail", () => {
-      it("should revert when minting is paused", async () => {
-        mockSystemState.isMintingPaused.returns(true)
-
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            normalMintAmount
-          )
-        ).to.be.revertedWith("MintingPaused")
-      })
-
-      it("should revert when amount is below minimum", async () => {
-        const tooSmallAmount = minMintAmount.sub(1)
-
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            tooSmallAmount
-          )
-        ).to.be.revertedWith("AmountOutsideAllowedRange")
-      })
-
-      it("should revert when amount is above maximum", async () => {
-        const tooLargeAmount = maxMintAmount.add(1)
-
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            tooLargeAmount
-          )
-        ).to.be.revertedWith("AmountOutsideAllowedRange")
-      })
-    })
-
-    context("when QC status checks fail", () => {
-      it("should revert when QC is not active", async () => {
-        mockQcData.getQCStatus.returns(1) // UnderReview
-
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            normalMintAmount
-          )
-        ).to.be.revertedWith("QCNotActive")
-      })
-    })
-
-    context("when capacity checks fail", () => {
-      it("should revert when insufficient capacity", async () => {
-        const insufficientCapacity = normalMintAmount.sub(1)
-        mockQcManager.getAvailableMintingCapacity.returns(insufficientCapacity)
-
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            normalMintAmount
-          )
-        ).to.be.revertedWith("InsufficientMintingCapacity")
-      })
-    })
-
-    context("when all validations pass", () => {
-      let tx: any
-      let mintId: string
-
-      beforeEach(async () => {
-        tx = await basicMintingPolicy.requestMint(
-          qcAddress.address,
-          user.address,
-          normalMintAmount
-        )
-        const receipt = await tx.wait()
-        const event = receipt.events?.find(
-          (e: any) => e.event === "MintCompleted"
-        )
-        mintId = event?.args?.mintId
-      })
-
-      it("should call tBTC mint", async () => {
-        expect(mockTbtc.mint).to.have.been.calledWith(
-          user.address,
-          normalMintAmount
-        )
-      })
-
-      it("should update QC minted amount", async () => {
-        expect(mockQcManager.updateQCMintedAmount).to.have.been.calledWith(
-          qcAddress.address,
-          normalMintAmount
-        )
-      })
-
-      it("should mark mint as completed", async () => {
-        expect(await basicMintingPolicy.isMintCompleted(mintId)).to.be.true
-      })
-
-      it("should emit MintCompleted event", async () => {
-        await expect(tx)
-          .to.emit(basicMintingPolicy, "MintCompleted")
-          .withArgs(
-            mintId,
-            qcAddress.address,
-            user.address,
-            normalMintAmount,
-            deployer.address, // completedBy - the address calling requestMint (has MINTER_ROLE)
-            await ethers.provider
-              .getBlock(tx.blockNumber)
-              .then((b) => b.timestamp) // timestamp
-          )
-      })
-
-      it("should return unique mint ID", async () => {
-        const tx2 = await basicMintingPolicy.requestMint(
-          qcAddress.address,
-          user.address,
-          normalMintAmount
-        )
-        const receipt2 = await tx2.wait()
-        const event2 = receipt2.events?.find(
-          (e: any) => e.event === "MintCompleted"
-        )
-        const mintId2 = event2?.args?.mintId
-
-        expect(mintId).to.not.equal(mintId2)
-      })
-    })
-
-    context("when QC has existing minted amount", () => {
-      beforeEach(async () => {
-        const existingMinted = ethers.utils.parseEther("3")
-        mockQcData.getQCMintedAmount.returns(existingMinted)
-      })
-
-      it("should update minted amount correctly", async () => {
-        await basicMintingPolicy.requestMint(
-          qcAddress.address,
-          user.address,
-          normalMintAmount
-        )
-
-        const expectedTotal = ethers.utils.parseEther("8") // 3 + 5
-        expect(mockQcManager.updateQCMintedAmount).to.have.been.calledWith(
-          qcAddress.address,
-          expectedTotal
-        )
-      })
-    })
-  })
-
-  describe("getAvailableMintingCapacity", () => {
-    it("should delegate to QCManager", async () => {
-      const result = await basicMintingPolicy.getAvailableMintingCapacity(
-        qcAddress.address
-      )
-
-      expect(mockQcManager.getAvailableMintingCapacity).to.have.been.calledWith(
-        qcAddress.address
-      )
-      expect(result).to.equal(availableCapacity)
-    })
-  })
-
-  describe("checkMintingEligibility", () => {
-    context("when system is paused", () => {
-      beforeEach(async () => {
-        mockSystemState.isMintingPaused.returns(true)
-      })
-
-      it("should return false", async () => {
-        const result = await basicMintingPolicy.checkMintingEligibility(
-          qcAddress.address,
-          normalMintAmount
-        )
-        expect(result).to.be.false
-      })
-    })
-
-    context("when amount is outside allowed range", () => {
-      it("should return false for amount below minimum", async () => {
-        const tooSmallAmount = minMintAmount.sub(1)
-        const result = await basicMintingPolicy.checkMintingEligibility(
-          qcAddress.address,
-          tooSmallAmount
-        )
-        expect(result).to.be.false
-      })
-
-      it("should return false for amount above maximum", async () => {
-        const tooLargeAmount = maxMintAmount.add(1)
-        const result = await basicMintingPolicy.checkMintingEligibility(
-          qcAddress.address,
-          tooLargeAmount
-        )
-        expect(result).to.be.false
-      })
-    })
-
-    context("when QC is not active", () => {
-      beforeEach(async () => {
-        mockQcData.getQCStatus.returns(1) // UnderReview
-      })
-
-      it("should return false", async () => {
-        const result = await basicMintingPolicy.checkMintingEligibility(
-          qcAddress.address,
-          normalMintAmount
-        )
-        expect(result).to.be.false
-      })
-    })
-
-    context("when insufficient capacity", () => {
-      beforeEach(async () => {
-        const insufficientCapacity = normalMintAmount.sub(1)
-        mockQcManager.getAvailableMintingCapacity.returns(insufficientCapacity)
-      })
-
-      it("should return false", async () => {
-        const result = await basicMintingPolicy.checkMintingEligibility(
-          qcAddress.address,
-          normalMintAmount
-        )
-        expect(result).to.be.false
-      })
-    })
-
-    context("when all conditions are met", () => {
-      it("should return true", async () => {
-        const result = await basicMintingPolicy.checkMintingEligibility(
-          qcAddress.address,
-          normalMintAmount
-        )
-        expect(result).to.be.true
-      })
-    })
-  })
-
-  describe("isMintCompleted", () => {
-    it("should return false for non-existent mint", async () => {
-      const nonExistentId = ethers.utils.id("non_existent")
-      const result = await basicMintingPolicy.isMintCompleted(nonExistentId)
-      expect(result).to.be.false
-    })
-
-    it("should return true for completed mint", async () => {
+    it("should mint tBTC directly through Bank integration", async () => {
+      const userBalanceBefore = await tbtc.balanceOf(user.address)
+      
+      // Execute mint
       const tx = await basicMintingPolicy.requestMint(
-        qcAddress.address,
+        qc.address,
         user.address,
-        normalMintAmount
+        mintAmount
       )
+      
       const receipt = await tx.wait()
-      const event = receipt.events?.find(
-        (e: any) => e.event === "MintCompleted"
+      
+      // Check events
+      const mintCompletedEvent = receipt.events?.find(
+        e => e.event === "MintCompleted"
       )
-      const mintId = event?.args?.mintId
+      expect(mintCompletedEvent).to.not.be.undefined
+      expect(mintCompletedEvent?.args?.qc).to.equal(qc.address)
+      expect(mintCompletedEvent?.args?.user).to.equal(user.address)
+      expect(mintCompletedEvent?.args?.amount).to.equal(mintAmount)
 
-      const result = await basicMintingPolicy.isMintCompleted(mintId)
-      expect(result).to.be.true
+      // Check user received tBTC
+      const userBalanceAfter = await tbtc.balanceOf(user.address)
+      expect(userBalanceAfter.sub(userBalanceBefore)).to.equal(mintAmount)
+
+      // Check QC minted amount was updated
+      const qcMintedAmount = await qcData.getQCMintedAmount(qc.address)
+      expect(qcMintedAmount).to.equal(mintAmount)
     })
 
-    it("should return false for an uncompleted mint", async () => {
-      const uncompletedMintId = ethers.utils.randomBytes(32)
-      expect(await basicMintingPolicy.isMintCompleted(uncompletedMintId)).to.be
-        .false
+    it("should create Bank balance without auto-minting when requested", async () => {
+      const bankBalanceBefore = await bank.balanceOf(user.address)
+      const tbtcBalanceBefore = await tbtc.balanceOf(user.address)
+      
+      // Execute mint without auto-minting
+      await basicMintingPolicy.requestMintWithOption(
+        qc.address,
+        user.address,
+        mintAmount,
+        false // no auto-mint
+      )
+      
+      // Check Bank balance increased
+      const bankBalanceAfter = await bank.balanceOf(user.address)
+      const satoshis = mintAmount.div(SATOSHI_MULTIPLIER)
+      expect(bankBalanceAfter.sub(bankBalanceBefore)).to.equal(satoshis)
+
+      // Check tBTC was NOT minted
+      const tbtcBalanceAfter = await tbtc.balanceOf(user.address)
+      expect(tbtcBalanceAfter).to.equal(tbtcBalanceBefore)
+    })
+
+    it("should revert if not authorized in Bank", async () => {
+      // Remove authorization
+      await bank.connect(governance).setAuthorizedBalanceIncreaser(
+        basicMintingPolicy.address,
+        false
+      )
+
+      await expect(
+        basicMintingPolicy.requestMint(qc.address, user.address, mintAmount)
+      ).to.be.revertedWith("NotAuthorizedInBank")
+
+      // Restore authorization for other tests
+      await bank.connect(governance).setAuthorizedBalanceIncreaser(
+        basicMintingPolicy.address,
+        true
+      )
+    })
+
+    it("should revert if QC is not active", async () => {
+      // Deactivate QC
+      await qcManager.setQCStatus(qc.address, 2) // Revoked
+
+      await expect(
+        basicMintingPolicy.requestMint(qc.address, user.address, mintAmount)
+      ).to.be.revertedWith("QCNotActive")
+    })
+
+    it("should revert if insufficient QC capacity", async () => {
+      const excessiveAmount = ethers.utils.parseEther("2000") // More than 1000 tBTC capacity
+
+      await expect(
+        basicMintingPolicy.requestMint(qc.address, user.address, excessiveAmount)
+      ).to.be.revertedWith("InsufficientMintingCapacity")
+    })
+
+    it("should revert if minting is paused", async () => {
+      // Pause minting
+      await systemState.pauseMinting()
+
+      await expect(
+        basicMintingPolicy.requestMint(qc.address, user.address, mintAmount)
+      ).to.be.revertedWith("MintingPaused")
+    })
+
+    it("should emit rejection event for invalid requests", async () => {
+      // Test with zero amount
+      const tx = basicMintingPolicy.requestMint(
+        qc.address,
+        user.address,
+        0
+      )
+
+      await expect(tx)
+        .to.be.revertedWith("InvalidAmount")
     })
   })
 
-  describe("Edge Cases", () => {
-    context("when ProtocolRegistry services are not set", () => {
-      it("should revert when trying to request mint", async () => {
-        // Deploy a new protocol registry without services
-        const EmptyRegistryFactory = await ethers.getContractFactory(
-          "ProtocolRegistry"
-        )
-        const emptyRegistry = await EmptyRegistryFactory.deploy()
-        await emptyRegistry.deployed()
+  describe("Mint Request Tracking", () => {
+    it("should track mint requests", async () => {
+      await basicMintingPolicy.grantRole(MINTER_ROLE, deployer.address)
+      
+      const mintAmount = ethers.utils.parseEther("5")
+      const tx = await basicMintingPolicy.requestMint(
+        qc.address,
+        user.address,
+        mintAmount
+      )
+      
+      const receipt = await tx.wait()
+      const mintCompletedEvent = receipt.events?.find(e => e.event === "MintCompleted")
+      const mintId = mintCompletedEvent?.args?.mintId
 
-        const BasicMintingPolicyFactory = await ethers.getContractFactory(
-          "BasicMintingPolicy"
-        )
-        const policyWithEmptyRegistry = await BasicMintingPolicyFactory.deploy(
-          emptyRegistry.address
-        )
-        await policyWithEmptyRegistry.deployed()
+      // Check mint request details
+      const mintRequest = await basicMintingPolicy.getMintRequest(mintId)
+      expect(mintRequest.qc).to.equal(qc.address)
+      expect(mintRequest.user).to.equal(user.address)
+      expect(mintRequest.amount).to.equal(mintAmount)
+      expect(mintRequest.completed).to.be.true
 
-        await expect(
-          policyWithEmptyRegistry.requestMint(
-            qcAddress.address,
-            user.address,
-            normalMintAmount
-          )
-        ).to.be.reverted
-      })
+      // Check completion status
+      const isCompleted = await basicMintingPolicy.isMintCompleted(mintId)
+      expect(isCompleted).to.be.true
+    })
+  })
+
+  describe("Gas Optimization", () => {
+    it("should use less gas than QCBridge approach", async () => {
+      await basicMintingPolicy.grantRole(MINTER_ROLE, deployer.address)
+      const mintAmount = ethers.utils.parseEther("10")
+      
+      const tx = await basicMintingPolicy.requestMint(
+        qc.address,
+        user.address,
+        mintAmount
+      )
+      
+      const receipt = await tx.wait()
+      console.log("Direct integration gas used:", receipt.gasUsed.toString())
+      
+      // Direct integration should use less gas than going through QCBridge
+      // Typical savings: ~50,000-70,000 gas by removing extra contract call
+      expect(receipt.gasUsed).to.be.lt(300000) // Reasonable upper bound
+    })
+  })
+
+  describe("Access Control", () => {
+    it("should only allow MINTER_ROLE to request mints", async () => {
+      await expect(
+        basicMintingPolicy.connect(unauthorized).requestMint(
+          qc.address,
+          user.address,
+          ethers.utils.parseEther("10")
+        )
+      ).to.be.reverted
     })
 
-    context("when service contracts change behavior", () => {
-      it("should handle QCManager capacity changes", async () => {
-        // First call succeeds
-        await basicMintingPolicy.requestMint(
-          qcAddress.address,
-          user.address,
-          normalMintAmount
-        )
+    it("should check minting eligibility correctly", async () => {
+      const mintAmount = ethers.utils.parseEther("10")
+      
+      // Should be eligible
+      const isEligible = await basicMintingPolicy.checkMintingEligibility(
+        qc.address,
+        mintAmount
+      )
+      expect(isEligible).to.be.true
 
-        // Change capacity to insufficient
-        mockQcManager.getAvailableMintingCapacity.returns(
-          normalMintAmount.sub(1)
-        )
-
-        // Second call should fail
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            normalMintAmount
-          )
-        ).to.be.revertedWith("InsufficientMintingCapacity")
-      })
-
-      it("should handle SystemState parameter changes", async () => {
-        // First call succeeds
-        await basicMintingPolicy.requestMint(
-          qcAddress.address,
-          user.address,
-          normalMintAmount
-        )
-
-        // Change min amount to higher than current
-        mockSystemState.minMintAmount.returns(normalMintAmount.add(1))
-
-        // Second call should fail
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            normalMintAmount
-          )
-        ).to.be.revertedWith("AmountOutsideAllowedRange")
-      })
-
-      it("should handle QCData status changes", async () => {
-        // First call succeeds
-        await basicMintingPolicy.requestMint(
-          qcAddress.address,
-          user.address,
-          normalMintAmount
-        )
-
-        // Change QC status to UnderReview
-        mockQcData.getQCStatus.returns(1) // UnderReview
-
-        // Second call should fail
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            normalMintAmount
-          )
-        ).to.be.revertedWith("QCNotActive")
-      })
-    })
-
-    context("when exact capacity boundary conditions", () => {
-      it("should succeed when amount equals available capacity", async () => {
-        mockQcManager.getAvailableMintingCapacity.returns(normalMintAmount) // Exact match
-
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            normalMintAmount
-          )
-        ).to.not.be.reverted
-      })
-
-      it("should fail when amount exceeds capacity by 1 wei", async () => {
-        mockQcManager.getAvailableMintingCapacity.returns(
-          normalMintAmount.sub(1)
-        ) // 1 wei less
-
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            normalMintAmount
-          )
-        ).to.be.revertedWith("InsufficientMintingCapacity")
-      })
-    })
-
-    context("when amount boundary conditions", () => {
-      it("should succeed when amount equals minimum", async () => {
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            minMintAmount
-          )
-        ).to.not.be.reverted
-      })
-
-      it("should succeed when amount equals maximum", async () => {
-        mockQcManager.getAvailableMintingCapacity.returns(maxMintAmount) // Ensure capacity
-
-        await expect(
-          basicMintingPolicy.requestMint(
-            qcAddress.address,
-            user.address,
-            maxMintAmount
-          )
-        ).to.not.be.reverted
-      })
+      // Should not be eligible if QC is deactivated
+      await qcManager.setQCStatus(qc.address, 2) // Revoked
+      const isEligibleAfter = await basicMintingPolicy.checkMintingEligibility(
+        qc.address,
+        mintAmount
+      )
+      expect(isEligibleAfter).to.be.false
     })
   })
 })

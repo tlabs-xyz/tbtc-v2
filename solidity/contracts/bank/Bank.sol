@@ -25,11 +25,14 @@ import "../vault/IVault.sol";
 ///         be transferred between balance owners, and balance owners can
 ///         approve their balances to be spent by others. Balances in the Bank
 ///         are updated for depositors who deposited their Bitcoin into the
-///         Bridge and only the Bridge can increase balances.
+///         Bridge and only the Bridge or authorized contracts can increase balances.
 /// @dev Bank is a governable contract and the Governance can upgrade the Bridge
-///      address.
+///      address and authorize additional balance increasers.
 contract Bank is Ownable {
     address public bridge;
+
+    /// @notice Authorized contracts that can increase balances in addition to Bridge
+    mapping(address => bool) public authorizedBalanceIncreasers;
 
     /// @notice The balance of the given account in the Bank. Zero by default.
     mapping(address => uint256) public balanceOf;
@@ -73,8 +76,13 @@ contract Bank is Ownable {
 
     event BridgeUpdated(address newBridge);
 
-    modifier onlyBridge() {
-        require(msg.sender == address(bridge), "Caller is not the bridge");
+    event AuthorizedBalanceIncreaserUpdated(address indexed increaser, bool authorized);
+
+    modifier onlyAuthorizedIncreaser() {
+        require(
+            msg.sender == address(bridge) || authorizedBalanceIncreasers[msg.sender],
+            "Unauthorized balance increaser"
+        );
         _;
     }
 
@@ -95,6 +103,19 @@ contract Bank is Ownable {
         require(_bridge != address(0), "Bridge address must not be 0x0");
         bridge = _bridge;
         emit BridgeUpdated(_bridge);
+    }
+
+    /// @notice Sets authorization for a contract to increase balances
+    /// @dev Only owner can authorize additional balance increasers beyond Bridge
+    /// @param increaser The contract address to authorize/deauthorize
+    /// @param authorized True to authorize, false to deauthorize
+    function setAuthorizedBalanceIncreaser(address increaser, bool authorized) 
+        external 
+        onlyOwner 
+    {
+        require(increaser != address(0), "Increaser address cannot be zero");
+        authorizedBalanceIncreasers[increaser] = authorized;
+        emit AuthorizedBalanceIncreaserUpdated(increaser, authorized);
     }
 
     /// @notice Moves the given `amount` of balance from the caller to
@@ -292,7 +313,7 @@ contract Bank is Ownable {
     }
 
     /// @notice Increases balances of the provided `recipients` by the provided
-    ///         `amounts`. Can only be called by the Bridge.
+    ///         `amounts`. Can only be called by the Bridge or authorized contracts.
     /// @dev Requirements:
     ///       - length of `recipients` and `amounts` must be the same,
     ///       - none of `recipients` addresses must point to the Bank.
@@ -301,7 +322,7 @@ contract Bank is Ownable {
     function increaseBalances(
         address[] calldata recipients,
         uint256[] calldata amounts
-    ) external onlyBridge {
+    ) external onlyAuthorizedIncreaser {
         require(
             recipients.length == amounts.length,
             "Arrays must have the same length"
@@ -312,14 +333,14 @@ contract Bank is Ownable {
     }
 
     /// @notice Increases balance of the provided `recipient` by the provided
-    ///         `amount`. Can only be called by the Bridge.
+    ///         `amount`. Can only be called by the Bridge or authorized contracts.
     /// @dev Requirements:
     ///      - `recipient` address must not point to the Bank.
     /// @param recipient Balance increase recipient.
     /// @param amount Amount by which the balance is increased.
     function increaseBalance(address recipient, uint256 amount)
         external
-        onlyBridge
+        onlyAuthorizedIncreaser
     {
         _increaseBalance(recipient, amount);
     }
@@ -337,7 +358,7 @@ contract Bank is Ownable {
         address vault,
         address[] calldata recipients,
         uint256[] calldata amounts
-    ) external onlyBridge {
+    ) external onlyAuthorizedIncreaser {
         require(
             recipients.length == amounts.length,
             "Arrays must have the same length"
