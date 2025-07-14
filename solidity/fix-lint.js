@@ -1,6 +1,9 @@
-import fs from "fs"
-import path from "path"
-import * as glob from "glob"
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const fs = require("fs")
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const path = require("path")
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const glob = require("glob")
 
 // Fix unnamed async functions in deploy files
 const deployFiles = glob.sync("deploy/*.ts")
@@ -28,6 +31,7 @@ testFiles.forEach((file) => {
   fs.writeFileSync(file, content)
 })
 
+// eslint-disable-next-line no-console
 console.log(
   "Basic lint fixes applied. Run npm run lint to see remaining issues."
 )
