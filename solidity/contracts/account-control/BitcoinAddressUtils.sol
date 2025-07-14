@@ -127,7 +127,7 @@ library BitcoinAddressUtils {
         
         // Convert from 5-bit to 8-bit, excluding version and checksum
         uint256 witnessVersion = values[0];
-        bytes memory witnessProgram = convertBits(values, 1, values.length - 7, 5, 8, false);
+        bytes memory witnessProgram = convertBits(values, 1, values.length - 6, 5, 8, false);
         
         // Determine script type based on witness program length
         if (witnessVersion == 0) {

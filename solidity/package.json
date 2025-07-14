@@ -26,6 +26,8 @@
     "lint:fix:sol": "solhint 'contracts/**/*.sol' --fix",
     "test": "USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test",
     "test:integration": "NODE_ENV=integration-test USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test ./test/integration/*.test.ts",
+    "test:integration:account-control": "NODE_ENV=integration-test USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true ts-node scripts/run-integration-tests.ts",
+    "setup:accounts": "hardhat setup-accounts --network sepolia --seed",
     "prepack": "tsc -p tsconfig.export.json && hardhat export-artifacts export/artifacts",
     "prepublishOnly": "./scripts/prepare-artifacts.sh --network $npm_config_network"
   },
