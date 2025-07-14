@@ -36,6 +36,9 @@ describe("QCRedeemer", () => {
   // Roles
   let REDEEMER_ROLE: string
   let ARBITER_ROLE: string
+  
+  // Bitcoin addresses for testing
+  const validLegacyBtc = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
 
   before(async () => {
     // eslint-disable-next-line @typescript-eslint/no-extra-semi
@@ -165,6 +168,24 @@ describe("QCRedeemer", () => {
             .initiateRedemption(qcAddress.address, redemptionAmount, invalidBtc)
         ).to.be.revertedWith("InvalidBitcoinAddressFormat")
       })
+
+      it("should revert if Bitcoin address starts with invalid character", async () => {
+        // Test addresses starting with '2' (invalid)
+        await expect(
+          qcRedeemer
+            .connect(user)
+            .initiateRedemption(qcAddress.address, redemptionAmount, "2A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
+        ).to.be.revertedWith("InvalidBitcoinAddressFormat")
+      })
+
+      it("should revert if Bech32 address is malformed", async () => {
+        // Test incomplete Bech32 (just 'b' instead of 'bc1')
+        await expect(
+          qcRedeemer
+            .connect(user)
+            .initiateRedemption(qcAddress.address, redemptionAmount, "b1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080")
+        ).to.be.revertedWith("InvalidBitcoinAddressFormat")
+      })
     })
 
     context("when policy validation fails", () => {
@@ -258,6 +279,30 @@ describe("QCRedeemer", () => {
         const redemptionId2 = event2?.args?.redemptionId
         expect(redemptionId).to.not.equal(redemptionId2)
       })
+
+      it("should accept P2PKH Bitcoin addresses (starting with '1')", async () => {
+        await expect(
+          qcRedeemer
+            .connect(user)
+            .initiateRedemption(qcAddress.address, redemptionAmount, "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2")
+        ).to.not.be.reverted
+      })
+
+      it("should accept P2SH Bitcoin addresses (starting with '3')", async () => {
+        await expect(
+          qcRedeemer
+            .connect(user)
+            .initiateRedemption(qcAddress.address, redemptionAmount, "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy")
+        ).to.not.be.reverted
+      })
+
+      it("should accept Bech32 Bitcoin addresses (starting with 'bc1')", async () => {
+        await expect(
+          qcRedeemer
+            .connect(user)
+            .initiateRedemption(qcAddress.address, redemptionAmount, validBech32Btc)
+        ).to.not.be.reverted
+      })
     })
   })
 
@@ -269,7 +314,7 @@ describe("QCRedeemer", () => {
       // Create a redemption first
       const tx = await qcRedeemer
         .connect(user)
-        .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"))
+        .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"), validLegacyBtc)
       const receipt = await tx.wait()
       const event = receipt.events?.find(
         (e: any) => e.event === "RedemptionRequested"
@@ -375,8 +420,8 @@ describe("QCRedeemer", () => {
             redemptionId,
             user.address,
             qcAddress.address,
-            redemptionAmount,
-            arbiter.address,
+            ethers.utils.parseEther("5"),
+            watchdog.address,
             currentBlock.timestamp
           )
       })
@@ -391,7 +436,7 @@ describe("QCRedeemer", () => {
       // Create a redemption first
       const tx = await qcRedeemer
         .connect(user)
-        .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"))
+        .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"), validLegacyBtc)
       const receipt = await tx.wait()
       const event = receipt.events?.find(
         (e: any) => e.event === "RedemptionRequested"
@@ -495,7 +540,7 @@ describe("QCRedeemer", () => {
       // Create a redemption first
       const tx = await qcRedeemer
         .connect(user)
-        .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"))
+        .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"), validLegacyBtc)
       const receipt = await tx.wait()
       const event = receipt.events?.find(
         (e: any) => e.event === "RedemptionRequested"
@@ -546,7 +591,7 @@ describe("QCRedeemer", () => {
       const redemptionAmount = ethers.utils.parseEther("5")
       const tx = await qcRedeemer
         .connect(user)
-        .initiateRedemption(qcAddress.address, redemptionAmount)
+        .initiateRedemption(qcAddress.address, redemptionAmount, validLegacyBtc)
       const receipt = await tx.wait()
       const event = receipt.events?.find(
         (e: any) => e.event === "RedemptionRequested"
@@ -605,7 +650,7 @@ describe("QCRedeemer", () => {
         // Create a redemption first
         const tx = await qcRedeemer
           .connect(user)
-          .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"))
+          .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"), validLegacyBtc)
         const receipt = await tx.wait()
         const event = receipt.events?.find(
           (e: any) => e.event === "RedemptionRequested"
@@ -684,7 +729,7 @@ describe("QCRedeemer", () => {
         await expect(
           redeemerWithEmptyRegistry
             .connect(user)
-            .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"))
+            .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"), validLegacyBtc)
         ).to.be.reverted
       })
     })
@@ -696,7 +741,7 @@ describe("QCRedeemer", () => {
         // Create a redemption first
         const tx = await qcRedeemer
           .connect(user)
-          .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"))
+          .initiateRedemption(qcAddress.address, ethers.utils.parseEther("5"), validLegacyBtc)
         const receipt = await tx.wait()
         const event = receipt.events?.find(
           (e: any) => e.event === "RedemptionRequested"

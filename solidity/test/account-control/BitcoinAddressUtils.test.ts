@@ -78,7 +78,7 @@ describe("BitcoinAddressUtils", () => {
 
   describe("P2WSH Address Decoding", () => {
     it("should decode valid P2WSH address", async () => {
-      const address = "bc1qrp33g0qq4aspd6gpgq2c5xqe8a9q3rq82l6j0pf3ywq5jjpzj5p6j5r2wjm" // Example P2WSH
+      const address = "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3" // Valid P2WSH from BIP173
       
       const result = await testContract.decodeAddress(address)
       expect(result.scriptType).to.equal(3) // P2WSH

@@ -22,6 +22,7 @@ import "../bridge/BitcoinTx.sol";
 ///
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update redemption policy
+/// - REDEEMER_ROLE: Reserved for future functionality (currently unused)
 /// - ARBITER_ROLE: Can record redemption fulfillments and flag defaults
 contract QCRedeemer is AccessControl {
     // Custom errors for gas-efficient reverts
@@ -35,6 +36,7 @@ contract QCRedeemer is AccessControl {
     error DefaultFlaggingFailed();
 
     // Role definitions for access control
+    bytes32 public constant REDEEMER_ROLE = keccak256("REDEEMER_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
 
     // Service keys for ProtocolRegistry lookups
@@ -113,6 +115,7 @@ contract QCRedeemer is AccessControl {
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(REDEEMER_ROLE, msg.sender);
         _grantRole(ARBITER_ROLE, msg.sender);
     }
 

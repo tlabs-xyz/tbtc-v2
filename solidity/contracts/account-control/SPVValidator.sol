@@ -24,6 +24,11 @@ pragma solidity 0.8.17;
  * - Same cryptographic verification as production Bridge
  * - Same relay and difficulty factor sources ensure consistency
  * - Role-based access control protects configuration changes
+ *
+ * ADDRESS DECODING: Bridge works directly with Bitcoin scripts (P2PKH, P2WPKH, etc.)
+ * and never decodes addresses. BitcoinAddressUtils fills this gap, enabling 
+ * Account Control to accept human-readable Bitcoin addresses and convert them
+ * to scripts for SPV validation - functionality Bridge never needed.
  */
 
 import "@keep-network/bitcoin-spv-sol/contracts/BTCUtils.sol";
