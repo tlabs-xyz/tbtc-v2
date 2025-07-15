@@ -3,6 +3,7 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/IOptimisticWatchdogConsensus.sol";
 import "./interfaces/IWatchdogOperation.sol";
 import "./ProtocolRegistry.sol";
@@ -12,7 +13,7 @@ import "./ProtocolRegistry.sol";
 /// @dev This contract enables multiple watchdogs to participate in consensus decisions
 ///      with optimistic execution and challenge mechanisms. It follows patterns from
 ///      TBTCOptimisticMinting and RedemptionWatchtower for proven security.
-contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessControl, Pausable {
+contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessControl, Pausable, ReentrancyGuard {
     // =================== CONSTANTS ===================
     
     /// @notice Role for emergency actions
@@ -55,6 +56,9 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
     
     /// @notice Array of active watchdog addresses
     address[] public activeWatchdogsList;
+    
+    /// @notice Mapping of watchdog address to its index in activeWatchdogsList
+    mapping(address => uint256) public watchdogIndex;
     
     /// @notice Mapping of operation ID to challenger addresses to challenges
     mapping(bytes32 => mapping(address => Challenge)) public operationChallenges;
@@ -208,6 +212,7 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
         override 
         operationExists(operationId) 
         whenNotPaused 
+        nonReentrant
     {
         WatchdogOperation storage operation = operations[operationId];
         
@@ -240,7 +245,7 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
     function emergencyOverride(
         bytes32 operationId,
         bytes32 reason
-    ) external override onlyRole(EMERGENCY_ROLE) operationExists(operationId) {
+    ) external override onlyRole(EMERGENCY_ROLE) operationExists(operationId) nonReentrant {
         WatchdogOperation storage operation = operations[operationId];
         
         if (operation.executed) revert OperationAlreadyExecuted();
@@ -288,6 +293,7 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
         require(activeWatchdogsList.length < MAX_WATCHDOGS, "Max watchdogs reached");
         
         isActiveWatchdog[watchdog] = true;
+        watchdogIndex[watchdog] = activeWatchdogsList.length;
         activeWatchdogsList.push(watchdog);
         consensusState.activeWatchdogs = uint8(activeWatchdogsList.length);
         
@@ -299,16 +305,22 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
         if (!isActiveWatchdog[watchdog]) revert NotActiveWatchdog();
         if (activeWatchdogsList.length <= MIN_WATCHDOGS) revert InsufficientWatchdogs();
         
-        isActiveWatchdog[watchdog] = false;
+        uint256 index = watchdogIndex[watchdog];
+        uint256 lastIndex = activeWatchdogsList.length - 1;
         
-        // Remove from array
-        for (uint i = 0; i < activeWatchdogsList.length; i++) {
-            if (activeWatchdogsList[i] == watchdog) {
-                activeWatchdogsList[i] = activeWatchdogsList[activeWatchdogsList.length - 1];
-                activeWatchdogsList.pop();
-                break;
-            }
+        // Move last element to the position of the removed element
+        if (index != lastIndex) {
+            address lastWatchdog = activeWatchdogsList[lastIndex];
+            activeWatchdogsList[index] = lastWatchdog;
+            watchdogIndex[lastWatchdog] = index;
         }
+        
+        // Remove the last element
+        activeWatchdogsList.pop();
+        
+        // Clean up mappings
+        delete watchdogIndex[watchdog];
+        isActiveWatchdog[watchdog] = false;
         
         consensusState.activeWatchdogs = uint8(activeWatchdogsList.length);
         
