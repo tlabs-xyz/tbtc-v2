@@ -24,7 +24,8 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const qcReserveLedger = await get("QCReserveLedger")
   const basicMintingPolicy = await get("BasicMintingPolicy")
   const basicRedemptionPolicy = await get("BasicRedemptionPolicy")
-  const singleWatchdog = await get("SingleWatchdog")
+  const optimisticConsensus = await get("OptimisticWatchdogConsensus")
+  const watchdogAdapter = await get("WatchdogAdapter")
   const tbtc = await get("TBTC")
 
   // Generate service keys (same as in contracts)
@@ -37,6 +38,9 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const QC_MINTER_KEY = ethers.utils.id("QC_MINTER")
   const QC_REDEEMER_KEY = ethers.utils.id("QC_REDEEMER")
   const TBTC_TOKEN_KEY = ethers.utils.id("TBTC_TOKEN")
+  // V1.1 Watchdog Quorum System keys
+  const WATCHDOG_CONSENSUS_KEY = ethers.utils.id("WATCHDOG_CONSENSUS")
+  const OPERATION_EXECUTOR_KEY = ethers.utils.id("OPERATION_EXECUTOR")
 
   log("Step 1: Registering all services in ProtocolRegistry...")
 
@@ -113,6 +117,23 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     tbtc.address
   )
 
+  // Register V1.1 Watchdog Quorum System services
+  await execute(
+    "ProtocolRegistry",
+    { from: deployer, log: true },
+    "setService",
+    WATCHDOG_CONSENSUS_KEY,
+    optimisticConsensus.address
+  )
+
+  await execute(
+    "ProtocolRegistry",
+    { from: deployer, log: true },
+    "setService",
+    OPERATION_EXECUTOR_KEY,
+    watchdogAdapter.address
+  )
+
   log("Step 2: Configuring access control roles...")
 
   // Grant DATA_MANAGER_ROLE to QCManager in QCData
@@ -169,40 +190,97 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     qcRedeemer.address
   )
 
-  log("Step 3: Setting up Single Watchdog roles...")
+  log("Step 3: Setting up V1.1 Watchdog Quorum System roles...")
 
-  // Grant roles to SingleWatchdog in other contracts manually
-  const watchdogDeployment = await deployments.get("SingleWatchdog")
+  // Grant roles to WatchdogAdapter in other contracts (maintains backward compatibility)
+  const watchdogAdapterDeployment = await deployments.get("WatchdogAdapter")
 
-  // Grant ATTESTER_ROLE to SingleWatchdog in QCReserveLedger
+  // Grant ATTESTER_ROLE to WatchdogAdapter in QCReserveLedger
   const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
   await execute(
     "QCReserveLedger",
     { from: deployer, log: true },
     "grantRole",
     ATTESTER_ROLE,
-    watchdogDeployment.address
+    watchdogAdapterDeployment.address
   )
 
-  // Grant REGISTRAR_ROLE to SingleWatchdog in QCManager
+  // Grant REGISTRAR_ROLE to WatchdogAdapter in QCManager
   const REGISTRAR_ROLE = ethers.utils.id("REGISTRAR_ROLE")
   await execute(
     "QCManager",
     { from: deployer, log: true },
     "grantRole",
     REGISTRAR_ROLE,
-    watchdogDeployment.address
+    watchdogAdapterDeployment.address
   )
 
-  // Grant ARBITER_ROLE to SingleWatchdog in QCManager
+  // Grant ARBITER_ROLE to WatchdogAdapter in QCManager
   const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
   await execute(
     "QCManager",
     { from: deployer, log: true },
     "grantRole",
     ARBITER_ROLE,
-    watchdogDeployment.address
+    watchdogAdapterDeployment.address
   )
+
+  // Grant ARBITER_ROLE to WatchdogAdapter in QCRedeemer
+  await execute(
+    "QCRedeemer",
+    { from: deployer, log: true },
+    "grantRole",
+    ARBITER_ROLE,
+    watchdogAdapterDeployment.address
+  )
+
+  // Configure consensus system roles
+  const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
+  const EMERGENCY_ROLE = ethers.utils.id("EMERGENCY_ROLE")
+  const MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")
+
+  // Grant emergency and manager roles to deployer (should be transferred to governance later)
+  await execute(
+    "OptimisticWatchdogConsensus",
+    { from: deployer, log: true },
+    "grantRole",
+    EMERGENCY_ROLE,
+    deployer
+  )
+
+  await execute(
+    "OptimisticWatchdogConsensus",
+    { from: deployer, log: true },
+    "grantRole",
+    MANAGER_ROLE,
+    deployer
+  )
+
+  log("Step 3.1: Setting up initial watchdog set...")
+  
+  // Add initial watchdogs to the consensus system
+  // These should be replaced with actual watchdog addresses in production
+  const { governance } = await getNamedAccounts()
+  
+  // Add deployer as initial watchdog for testing (remove in production)
+  await execute(
+    "OptimisticWatchdogConsensus",
+    { from: deployer, log: true },
+    "addWatchdog",
+    deployer
+  )
+
+  // Add governance as initial watchdog if different from deployer
+  if (governance && governance !== deployer) {
+    await execute(
+      "OptimisticWatchdogConsensus",
+      { from: deployer, log: true },
+      "addWatchdog",
+      governance
+    )
+  }
+
+  log("⚠️  Initial watchdog set configured for testing. Update with production watchdogs before mainnet deployment!")
 
   log("Step 4: Configuring system parameters...")
 
@@ -212,24 +290,39 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
   log("Step 5: Verifying system configuration...")
 
-  // Verify SingleWatchdog is operational
-  const watchdogContract = await ethers.getContractAt(
-    "SingleWatchdog",
-    watchdogDeployment.address
+  // Verify WatchdogAdapter is operational
+  const watchdogAdapterContract = await ethers.getContractAt(
+    "WatchdogAdapter",
+    watchdogAdapterDeployment.address
   )
-  const isOperational = await watchdogContract.isWatchdogOperational()
+  const isOperational = await watchdogAdapterContract.isWatchdogOperational()
 
   if (isOperational) {
-    log("✅ SingleWatchdog is operational with all required roles")
+    log("✅ WatchdogAdapter is operational with all required roles")
   } else {
     log(
-      "⚠️  SingleWatchdog may not have all required roles - check configuration"
+      "⚠️  WatchdogAdapter may not have all required roles - check configuration"
     )
   }
 
+  // Verify OptimisticWatchdogConsensus state
+  const consensusContract = await ethers.getContractAt(
+    "OptimisticWatchdogConsensus",
+    optimisticConsensus.address
+  )
+  const consensusState = await consensusContract.getConsensusState()
+  const activeWatchdogs = await consensusContract.getActiveWatchdogs()
+
+  log(`✅ OptimisticWatchdogConsensus state:`)
+  log(`   - Active watchdogs: ${consensusState.activeWatchdogs}`)
+  log(`   - Consensus threshold: ${consensusState.consensusThreshold}`)
+  log(`   - Base challenge period: ${consensusState.baseChallengePeriod}s`)
+  log(`   - Emergency pause: ${consensusState.emergencyPause}`)
+  log(`   - Watchdog addresses: ${activeWatchdogs.join(", ")}`)
+
   log("Phase 5 completed: Account Control system fully configured")
   log("")
-  log("=== ACCOUNT CONTROL SYSTEM DEPLOYMENT SUMMARY ===")
+  log("=== ACCOUNT CONTROL SYSTEM V1.1 DEPLOYMENT SUMMARY ===")
   log(`ProtocolRegistry: ${protocolRegistry.address}`)
   log(`QCMinter: ${qcMinter.address}`)
   log(`QCRedeemer: ${qcRedeemer.address}`)
@@ -239,15 +332,27 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log(`QCReserveLedger: ${qcReserveLedger.address}`)
   log(`BasicMintingPolicy: ${basicMintingPolicy.address}`)
   log(`BasicRedemptionPolicy: ${basicRedemptionPolicy.address}`)
-  log(`SingleWatchdog: ${singleWatchdog.address}`)
+  log("")
+  log("=== V1.1 WATCHDOG QUORUM SYSTEM ===")
+  log(`OptimisticWatchdogConsensus: ${optimisticConsensus.address}`)
+  log(`WatchdogAdapter: ${watchdogAdapter.address}`)
   log("")
   log("System is ready for:")
   log("1. QC registration via QCManager")
   log("2. Policy upgrades via ProtocolRegistry")
-  log("3. Single Watchdog operations")
-  log("4. Integration with existing tBTC v2")
+  log("3. V1.1 Optimistic Watchdog Quorum operations")
+  log("4. Backward compatibility with SingleWatchdog interface")
+  log("5. Integration with existing tBTC v2")
+  log("")
+  log("V1.1 Features:")
+  log("- Optimistic execution with challenge periods")
+  log("- MEV-resistant primary validator selection")
+  log("- Escalating consensus delays (1h→4h→12h→24h)")
+  log("- Approval mechanism for disputed operations")
+  log("- Emergency override capabilities")
+  log("- Comprehensive security protections")
 }
 
 export default func
-func.tags = ["AccountControlConfig", "SystemConfiguration"]
+func.tags = ["AccountControlConfig", "SystemConfiguration", "V1.1Configuration"]
 func.dependencies = ["AccountControlWatchdog"]

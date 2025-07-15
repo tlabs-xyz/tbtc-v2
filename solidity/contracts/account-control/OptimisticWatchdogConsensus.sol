@@ -77,6 +77,24 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
     
     /// @notice Nonce for operation ID generation
     uint256 private operationNonce;
+    
+    /// @notice Emergency action timelock delay (default 2 hours for additional safety)
+    uint32 public emergencyTimelockDelay = 2 hours;
+    
+    /// @notice Mapping of emergency action ID to scheduled execution time
+    mapping(bytes32 => uint256) public scheduledEmergencyActions;
+    
+    /// @notice Mapping of emergency action ID to action details
+    mapping(bytes32 => EmergencyAction) public emergencyActions;
+    
+    /// @notice Emergency action details for timelock
+    struct EmergencyAction {
+        bytes32 operationId;           // Operation to execute
+        bytes32 reason;               // Reason for emergency action
+        address proposer;             // Who proposed the action
+        uint256 scheduledTime;        // When action can be executed
+        bool executed;                // Whether action was executed
+    }
 
     // =================== CONSTRUCTOR ===================
     
@@ -123,18 +141,27 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
         // Validate operation type
         if (!_isValidOperationType(operationType)) revert InvalidOperationType();
         
+        // Validate operation data length (prevent excessively large data)
+        require(operationData.length <= 8192, "Operation data too large");
+        require(operationData.length > 0, "Operation data cannot be empty");
+        
         // Calculate primary validator for this operation
         address primaryValidator = calculatePrimaryValidator(operationType, operationData);
         
         // Ensure caller is the designated primary validator
         if (msg.sender != primaryValidator) revert NotPrimaryValidator();
         
-        // Generate unique operation ID
+        // Generate unique operation ID with enhanced entropy
         operationId = keccak256(abi.encode(
             operationType,
             operationData,
+            primaryValidator,
+            msg.sender,
             block.timestamp,
-            operationNonce++
+            block.number,
+            block.chainid,
+            operationNonce++,
+            address(this)  // Contract address for cross-deployment uniqueness
         ));
         
         // Create operation record
@@ -171,6 +198,13 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
         if (block.timestamp >= operation.finalizedAt) revert ChallengePeriodActive();
         if (hasObjected[operationId][msg.sender]) revert AlreadyObjected();
         
+        // Validate evidence (require non-empty evidence for challenges)
+        require(evidence.length > 0, "Challenge evidence required");
+        require(evidence.length <= 4096, "Evidence too large");
+        
+        // Prevent challenging operations too late in the process
+        require(operation.objectionCount < 10, "Too many objections");
+        
         // Record objection
         hasObjected[operationId][msg.sender] = true;
         operation.objectionCount++;
@@ -185,7 +219,14 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
         
         // Calculate new finalization time based on escalation
         uint8 escalationLevel = _getEscalationLevel(operation.objectionCount);
-        uint32 additionalDelay = escalationDelays[escalationLevel] - escalationDelays[escalationLevel - 1];
+        
+        // Prevent underflow in delay calculation
+        uint32 additionalDelay = escalationLevel > 0 ? 
+            escalationDelays[escalationLevel] - escalationDelays[escalationLevel - 1] : 
+            escalationDelays[0];
+            
+        // Prevent overflow in timestamp calculation
+        require(block.timestamp + escalationDelays[escalationLevel] <= type(uint64).max, "Timestamp overflow");
         operation.finalizedAt = uint64(block.timestamp + escalationDelays[escalationLevel]);
         
         emit OperationChallenged(
@@ -250,14 +291,82 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
         
         if (operation.executed) revert OperationAlreadyExecuted();
         
-        // Mark as executed to prevent normal execution
+        // Validate reason is provided for emergency actions
+        require(reason != bytes32(0), "Emergency reason required");
+        
+        // Generate emergency action ID with enhanced entropy
+        bytes32 emergencyActionId = keccak256(abi.encode(
+            operationId,
+            reason,
+            msg.sender,
+            block.timestamp,
+            block.number,
+            block.chainid,
+            address(this),
+            gasleft()  // Additional entropy from gas remaining
+        ));
+        
+        // Calculate scheduled execution time
+        uint256 scheduledTime = block.timestamp + emergencyTimelockDelay;
+        
+        // Store emergency action
+        emergencyActions[emergencyActionId] = EmergencyAction({
+            operationId: operationId,
+            reason: reason,
+            proposer: msg.sender,
+            scheduledTime: scheduledTime,
+            executed: false
+        });
+        
+        scheduledEmergencyActions[emergencyActionId] = scheduledTime;
+        
+        emit EmergencyActionScheduled(emergencyActionId, operationId, msg.sender, reason, scheduledTime);
+    }
+    
+    /// @notice Execute a scheduled emergency action after timelock expires
+    /// @param emergencyActionId The emergency action to execute
+    function executeScheduledEmergencyAction(bytes32 emergencyActionId) 
+        external 
+        onlyRole(EMERGENCY_ROLE) 
+        nonReentrant
+    {
+        EmergencyAction storage action = emergencyActions[emergencyActionId];
+        
+        require(action.proposer != address(0), "Emergency action not found");
+        require(!action.executed, "Already executed");
+        require(block.timestamp >= action.scheduledTime, "Timelock not expired");
+        
+        WatchdogOperation storage operation = operations[action.operationId];
+        require(!operation.executed, "Operation already executed");
+        
+        // Mark both as executed
+        action.executed = true;
         operation.executed = true;
         
-        // Execute immediately
+        // Execute the operation
         bool success = _executeOperationType(operation.operationType, operation.operationData);
         
-        emit EmergencyOverride(operationId, msg.sender, reason);
-        emit OperationExecuted(operationId, msg.sender, success);
+        emit EmergencyActionExecuted(emergencyActionId, action.operationId, msg.sender);
+        emit EmergencyOverride(action.operationId, msg.sender, action.reason);
+        emit OperationExecuted(action.operationId, msg.sender, success);
+    }
+    
+    /// @notice Cancel a scheduled emergency action before execution
+    /// @param emergencyActionId The emergency action to cancel
+    function cancelScheduledEmergencyAction(bytes32 emergencyActionId) 
+        external 
+        onlyRole(EMERGENCY_ROLE)
+    {
+        EmergencyAction storage action = emergencyActions[emergencyActionId];
+        
+        require(action.proposer != address(0), "Emergency action not found");
+        require(!action.executed, "Already executed");
+        
+        // Remove from mappings
+        delete emergencyActions[emergencyActionId];
+        delete scheduledEmergencyActions[emergencyActionId];
+        
+        emit EmergencyActionCancelled(emergencyActionId, action.operationId, msg.sender);
     }
     
     /// @inheritdoc IOptimisticWatchdogConsensus
@@ -289,6 +398,8 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
     /// @inheritdoc IOptimisticWatchdogConsensus
     function addWatchdog(address watchdog) external override onlyRole(MANAGER_ROLE) {
         require(watchdog != address(0), "Invalid address");
+        require(watchdog != address(this), "Cannot add self as watchdog");
+        require(watchdog.code.length == 0, "Watchdog must be EOA"); // Prevent contract addresses
         if (isActiveWatchdog[watchdog]) revert WatchdogAlreadyActive();
         require(activeWatchdogsList.length < MAX_WATCHDOGS, "Max watchdogs reached");
         
@@ -304,6 +415,9 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
     function removeWatchdog(address watchdog, bytes32 reason) external override onlyRole(MANAGER_ROLE) {
         if (!isActiveWatchdog[watchdog]) revert NotActiveWatchdog();
         if (activeWatchdogsList.length <= MIN_WATCHDOGS) revert InsufficientWatchdogs();
+        
+        // Require a reason for watchdog removal
+        require(reason != bytes32(0), "Removal reason required");
         
         uint256 index = watchdogIndex[watchdog];
         uint256 lastIndex = activeWatchdogsList.length - 1;
@@ -332,8 +446,12 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
         uint8 newThreshold,
         uint32 newChallengePeriod
     ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(activeWatchdogsList.length >= MIN_WATCHDOGS, "Insufficient active watchdogs");
         require(newThreshold >= 2 && newThreshold <= activeWatchdogsList.length, "Invalid threshold");
         require(newChallengePeriod >= 1 hours && newChallengePeriod <= 24 hours, "Invalid period");
+        
+        // Ensure threshold makes sense relative to watchdog count
+        require(newThreshold <= (activeWatchdogsList.length * 2) / 3, "Threshold too high for Byzantine tolerance");
         
         consensusState.consensusThreshold = newThreshold;
         consensusState.baseChallengePeriod = newChallengePeriod;
@@ -502,5 +620,50 @@ contract OptimisticWatchdogConsensus is IOptimisticWatchdogConsensus, AccessCont
     function unpause() external onlyRole(EMERGENCY_ROLE) {
         _unpause();
         consensusState.emergencyPause = false;
+    }
+    
+    /// @notice Update emergency timelock delay
+    /// @param newDelay New timelock delay in seconds
+    function updateEmergencyTimelockDelay(uint32 newDelay) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
+        require(newDelay >= 1 hours && newDelay <= 48 hours, "Invalid timelock delay");
+        
+        uint32 oldDelay = emergencyTimelockDelay;
+        emergencyTimelockDelay = newDelay;
+        
+        emit EmergencyTimelockDelayUpdated(oldDelay, newDelay, msg.sender);
+    }
+    
+    /// @notice Get emergency action details
+    /// @param emergencyActionId The emergency action to query
+    /// @return action The emergency action details
+    function getEmergencyAction(bytes32 emergencyActionId) 
+        external 
+        view 
+        returns (EmergencyAction memory action) 
+    {
+        return emergencyActions[emergencyActionId];
+    }
+    
+    /// @notice Check if emergency action can be executed
+    /// @param emergencyActionId The emergency action to check
+    /// @return canExecute Whether the action can be executed now
+    function canExecuteEmergencyAction(bytes32 emergencyActionId) 
+        external 
+        view 
+        returns (bool canExecute) 
+    {
+        EmergencyAction storage action = emergencyActions[emergencyActionId];
+        
+        if (action.proposer == address(0)) return false;
+        if (action.executed) return false;
+        if (block.timestamp < action.scheduledTime) return false;
+        
+        WatchdogOperation storage operation = operations[action.operationId];
+        if (operation.executed) return false;
+        
+        return true;
     }
 }
