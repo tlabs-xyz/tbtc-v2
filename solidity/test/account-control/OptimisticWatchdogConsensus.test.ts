@@ -646,13 +646,13 @@ describe("OptimisticWatchdogConsensus", () => {
   })
 
   describe("Primary Validator Selection", () => {
-    it("should select validators deterministically", async () => {
+    it("should select validators deterministically within same block", async () => {
       const operationData = ethers.utils.defaultAbiCoder.encode(
         ["address", "uint256"],
         [watchdog1.address, ethers.utils.parseEther("100")]
       )
 
-      // Same operation data should always select same validator
+      // Same operation data should always select same validator in same block
       const validator1 = await consensus.calculatePrimaryValidator(
         RESERVE_ATTESTATION,
         operationData
@@ -663,6 +663,16 @@ describe("OptimisticWatchdogConsensus", () => {
       )
       
       expect(validator1).to.equal(validator2)
+    })
+
+    it("should emit PrimaryValidatorSelected event", async () => {
+      const operationData = ethers.utils.defaultAbiCoder.encode(
+        ["address", "uint256"],
+        [watchdog1.address, ethers.utils.parseEther("100")]
+      )
+
+      await expect(consensus.calculatePrimaryValidator(RESERVE_ATTESTATION, operationData))
+        .to.emit(consensus, "PrimaryValidatorSelected")
     })
 
     it("should distribute selection across watchdogs", async () => {
