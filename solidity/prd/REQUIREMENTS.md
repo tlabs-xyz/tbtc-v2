@@ -176,21 +176,22 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 ### 3.4 Reserve Management
 
-#### 3.4.1 Single Watchdog Attestation (REQ-FUNC-RES-001)
+#### 3.4.1 Optimistic Watchdog Quorum Attestation (REQ-FUNC-RES-001)
+**Requirement**: The system MUST implement optimistic N-of-M watchdog quorum for reserve attestation
 
-**Requirement**: The system MUST implement single Watchdog reserve attestation
-
-- Strategic on-chain attestation (insolvency, staleness, deregistration only)
-- Continuous off-chain monitoring of all QC Bitcoin addresses
-- STALE_THRESHOLD prevents outdated reserve usage
-- Solvency verification: minted tBTC ≤ attested BTC reserves
+- **Optimistic Execution**: Primary validator submits attestations optimistically
+- **Challenge Period**: 1-24 hour window for other watchdogs to object
+- **Escalating Consensus**: Progressive delays based on objection count (1h→4h→12h→24h)
+- **MEV-Resistant Selection**: Primary validator selection using blockhash randomness
+- **Approval Mechanism**: Explicit approvals required for highly disputed operations (≥3 objections)
 
 **Acceptance Criteria**:
-
-- Only ATTESTER_ROLE (Watchdog) submits attestations
-- ReserveAttestation includes balance, timestamp, attester
+- Only active watchdogs can submit attestations as primary validators
+- Primary validator determined by MEV-resistant selection algorithm
+- Challenge period allows other watchdogs to object with evidence
+- Operations execute after challenge period expires (unless insufficient approvals)
 - Automatic QC status change to UnderReview if undercollateralized
-- Strategic attestation minimizes gas costs
+- ReentrancyGuard protection on all operation executions
 
 #### 3.4.2 Proof-of-Reserves Process (REQ-FUNC-POR-001)
 
