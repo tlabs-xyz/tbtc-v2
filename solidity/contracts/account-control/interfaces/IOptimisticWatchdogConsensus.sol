@@ -115,6 +115,28 @@ interface IOptimisticWatchdogConsensus {
         bytes32 reason
     );
 
+    /// @notice Emitted when primary validator is selected for an operation
+    /// @param operationType Type of operation
+    /// @param primaryValidator Selected validator address
+    /// @param blockNumber Block number used for selection
+    /// @param blockHash Block hash used for randomness
+    event PrimaryValidatorSelected(
+        bytes32 indexed operationType,
+        address indexed primaryValidator,
+        uint256 blockNumber,
+        bytes32 blockHash
+    );
+
+    /// @notice Emitted when a watchdog approves a disputed operation
+    /// @param operationId The operation being approved
+    /// @param approver Address of the approving watchdog
+    /// @param totalApprovals Total number of approvals after this approval
+    event OperationApproved(
+        bytes32 indexed operationId,
+        address indexed approver,
+        uint256 totalApprovals
+    );
+
     // =================== ERRORS ===================
 
     /// @notice Thrown when caller is not an active watchdog
@@ -180,6 +202,10 @@ interface IOptimisticWatchdogConsensus {
         bytes32 operationId,
         bytes32 reason
     ) external;
+
+    /// @notice Approve a disputed operation for execution
+    /// @param operationId The operation to approve
+    function approveOperation(bytes32 operationId) external;
 
     // =================== CONSENSUS MANAGEMENT ===================
 
