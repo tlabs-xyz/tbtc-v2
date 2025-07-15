@@ -137,6 +137,50 @@ interface IOptimisticWatchdogConsensus {
         uint256 totalApprovals
     );
 
+    /// @notice Emitted when an emergency action is scheduled with timelock
+    /// @param emergencyActionId Unique identifier for the emergency action
+    /// @param operationId The operation to be executed
+    /// @param proposer Address that scheduled the action
+    /// @param reason Reason for emergency action
+    /// @param scheduledTime When the action can be executed
+    event EmergencyActionScheduled(
+        bytes32 indexed emergencyActionId,
+        bytes32 indexed operationId,
+        address indexed proposer,
+        bytes32 reason,
+        uint256 scheduledTime
+    );
+
+    /// @notice Emitted when a scheduled emergency action is executed
+    /// @param emergencyActionId Unique identifier for the emergency action
+    /// @param operationId The operation that was executed
+    /// @param executor Address that executed the action
+    event EmergencyActionExecuted(
+        bytes32 indexed emergencyActionId,
+        bytes32 indexed operationId,
+        address indexed executor
+    );
+
+    /// @notice Emitted when a scheduled emergency action is cancelled
+    /// @param emergencyActionId Unique identifier for the emergency action
+    /// @param operationId The operation that was cancelled
+    /// @param canceller Address that cancelled the action
+    event EmergencyActionCancelled(
+        bytes32 indexed emergencyActionId,
+        bytes32 indexed operationId,
+        address indexed canceller
+    );
+
+    /// @notice Emitted when emergency timelock delay is updated
+    /// @param oldDelay Previous timelock delay
+    /// @param newDelay New timelock delay
+    /// @param updatedBy Address that updated the delay
+    event EmergencyTimelockDelayUpdated(
+        uint32 oldDelay,
+        uint32 newDelay,
+        address indexed updatedBy
+    );
+
     // =================== ERRORS ===================
 
     /// @notice Thrown when caller is not an active watchdog

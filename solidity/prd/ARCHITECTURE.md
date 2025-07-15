@@ -45,6 +45,18 @@ The Account Control architecture is built on four core principles:
                         │   TBTCVault     │◄───────────────────┘
                         │   (Existing)    │
                         └─────────────────┘
+                                 │
+                    ┌─────────────────────────────────────────────┐
+                    │         V1.1 Watchdog Quorum System          │
+                    │                                             │
+                    │  ┌─────────────────────┐ ┌─────────────────┐ │
+                    │  │OptimisticWatchdog   │ │  WatchdogAdapter │ │
+                    │  │     Consensus       │ │  (Compatibility) │ │
+                    │  │ (N-of-M Quorum)     │ │                 │ │
+                    │  └─────────────────────┘ └─────────────────┘ │
+                    │            │                       │        │
+                    │            └───────────────────────┘        │
+                    └─────────────────────────────────────────────┘
 ```
 
 ## 2. Smart Contract Architecture
@@ -150,7 +162,54 @@ direct BasicMintingPolicy integration while maintaining backward compatibility.
   - **Vault Integration**: Auto-minting uses `increaseBalanceAndCall()` to trigger `TBTCVault.receiveBalanceIncrease()`
   - **Shared Infrastructure**: Both regular Bridge and BasicMintingPolicy use the same Bank and TBTCVault infrastructure
 
-### 2.9 Gas Optimization Strategy
+### 2.9 V1.1 Watchdog Quorum Architecture
+
+**CORE COMPONENT**: The V1.1 system implements an optimistic N-of-M watchdog quorum
+that provides Byzantine fault tolerance while maintaining gas efficiency through
+proven optimistic execution patterns.
+
+#### 2.9.1 OptimisticWatchdogConsensus.sol
+
+**Primary Component**: Implements the core consensus mechanism with the following features:
+
+- **MEV-Resistant Validator Selection**: Uses blockhash-based randomness for primary validator selection
+- **Optimistic Execution**: Primary validators submit operations that execute after challenge periods
+- **Escalating Consensus**: Progressive delays (1h→4h→12h→24h) based on objection count
+- **Approval Mechanism**: Explicit approvals required for highly disputed operations (≥3 objections)
+- **Emergency Override**: Governance can execute operations immediately in extreme scenarios
+
+```solidity
+// Core consensus structure
+struct WatchdogOperation {
+    bytes32 operationType;      // ATTESTATION, REGISTRATION, STATUS_CHANGE, REDEMPTION
+    bytes operationData;        // Encoded operation parameters
+    address primaryValidator;   // Selected primary validator
+    uint64 submittedAt;        // Submission timestamp
+    uint64 finalizedAt;        // Execution timestamp
+    uint8 objectionCount;      // Number of challenges
+    bool executed;             // Execution status
+    bool challenged;           // Challenge status
+}
+```
+
+#### 2.9.2 WatchdogAdapter.sol
+
+**Compatibility Component**: Provides backward compatibility with the SingleWatchdog interface
+while routing operations through the consensus system:
+
+- **Dual Execution Path**: Consensus routing for active watchdogs, direct execution for operators
+- **Event Compatibility**: Maintains all SingleWatchdog events for monitoring systems
+- **Role-Based Access**: Supports existing WATCHDOG_OPERATOR_ROLE permissions
+- **Operation Encoding**: Handles all operation types (attestation, registration, status change, redemption)
+
+#### 2.9.3 Security Features
+
+- **Reentrancy Protection**: All execution functions protected by OpenZeppelin's ReentrancyGuard
+- **Access Control**: Role-based permissions with emergency and management roles
+- **Input Validation**: Comprehensive validation of operation parameters and states
+- **Byzantine Fault Tolerance**: Tolerates up to (N-1)/3 Byzantine failures
+
+### 2.10 Gas Optimization Strategy
 
 **Storage Layout Optimization**:
 
@@ -181,18 +240,19 @@ struct QCData {
 - Batch operations reduce transaction costs
 - Lazy evaluation for expensive calculations
 
-## 3. Off-chain Components: Watchdog Service
+## 3. Off-chain Components: Optimistic Watchdog Quorum
 
-The protocol relies on a single, DAO-appointed **Watchdog** for objective,
-on-chain reporting. It is a critical infrastructure component responsible for
-the Proof-of-Reserves mechanism.
+The protocol implements an **Optimistic N-of-M Watchdog Quorum** for decentralized,
+on-chain reporting. This system provides Byzantine fault tolerance while maintaining
+gas efficiency through optimistic execution patterns.
 
 - **Key Functions & Responsibilities:**
-  - **DAO-Appointed & Trusted:** A known entity granted the `ATTESTER_ROLE`,
-    `ARBITER_ROLE`, and `REGISTRAR_ROLE`.
+  - **Decentralized Quorum:** Multiple DAO-appointed watchdogs form an N-of-M consensus system
+  - **Optimistic Execution:** Primary validator submits operations optimistically with challenge periods
+  - **Progressive Consensus:** Escalating delays and approval thresholds based on objection levels
+  - **MEV-Resistant Selection:** Primary validator selection using blockhash-based randomness
   - **Proof-of-Reserves Attestation:** Continuously monitors all registered QC
-    Bitcoin addresses and calls `submitReserveAttestation` on
-    `QCReserveLedger.sol`.
+    Bitcoin addresses through distributed consensus on `OptimisticWatchdogConsensus.sol`
   - **Delinquency Arbitration:** Acts as the trusted on-chain arbiter for
     redemption failures. It monitors pending redemptions, investigates timeouts,
     and calls `recordRedemptionFulfillment` or `flagDefaultedRedemption` on
@@ -545,10 +605,12 @@ agreements.
 
 ### 4.3 Key Acknowledged Risks for V1
 
-- **Centralized Watchdog & Liveness (Critical):** The V1 protocol is critically
-  dependent on a single Watchdog, creating a single point of failure for
-  liveness and correctness. If it fails, minting and redemptions will halt.
-  Mitigation is DAO oversight and the power to replace it.
+- **Watchdog Quorum Resilience (Improved):** The V1.1 protocol implements an
+  optimistic N-of-M watchdog quorum, significantly reducing single points of
+  failure. The system can tolerate up to (N-1)/3 Byzantine failures while
+  maintaining liveness. MEV-resistant selection and escalating consensus
+  provide additional security. Emergency override capabilities ensure
+  governance can intervene in extreme scenarios.
 - **Socialized Default Risk (Critical):** The protocol merges the risk profiles
   of DKG-backed and QC-backed `tBTC`. A QC default will result in an immediate,
   socialized loss across _all_ `tBTC` holders. Recourse is limited to off-chain
