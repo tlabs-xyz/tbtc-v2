@@ -244,13 +244,13 @@ class ReserveAttestationIntegration extends BaseAccountControlIntegration {
     // Queue and execute QC onboarding
     await this.qcManager
       .connect(this.governance)
-      .queueQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+      .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
     
     await this.advanceTime(this.TEST_PARAMS.GOVERNANCE_DELAY)
     
     await this.qcManager
       .connect(this.governance)
-      .executeQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+      .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
 
     // Register multiple Bitcoin wallets
     const btcAddresses = [
