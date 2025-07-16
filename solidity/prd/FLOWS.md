@@ -84,13 +84,13 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 
 1. **DAO Queues QC Onboarding** (Time-locked action)
 
-   - DAO calls `QCManager.queueQCOnboarding(qcAddress, maxMintingCap)`
+   - DAO calls `QCManager.registerQC(qcAddress, maxMintingCap)`
    - 7-day waiting period begins
    - Event: `GovernanceActionQueued`
 
 2. **DAO Executes QC Onboarding** (After time-lock)
 
-   - DAO calls `QCManager.executeQCOnboarding(qcAddress, maxMintingCap)`
+   - System performs instant validation and onboarding
    - QC status set to `Active` in QCData
    - Event: `QCOnboarded`
 
@@ -711,7 +711,7 @@ export class QCOnboardingFlow extends BaseFlowTest {
 
     await qcManager
       .connect(governance)
-      .queueQCOnboarding(qc.address, maxMintingCap)
+      .registerQC(qc.address, maxMintingCap)
     console.log("✅ QC onboarding queued with 7-day delay")
 
     // Step 2: Wait for time-lock period
@@ -723,7 +723,7 @@ export class QCOnboardingFlow extends BaseFlowTest {
     console.log("Step 3: Executing QC onboarding...")
     await qcManager
       .connect(governance)
-      .executeQCOnboarding(qc.address, maxMintingCap)
+      // No additional step needed - instant execution
 
     // Verify QC status
     const qcStatus = await qcManager.getQCStatus(qc.address)

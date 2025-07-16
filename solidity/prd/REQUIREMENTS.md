@@ -488,9 +488,9 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - Policy contract upgrades requiring community oversight
 
 **Implementation**:
-- TIME_LOCKED_ADMIN_ROLE for governance requiring delays
-- GOVERNANCE_DELAY constant set to 7 days
-- queueQCOnboarding() and executeQCOnboarding() two-step process
+- QC_GOVERNANCE_ROLE for instant governance actions
+- Instant-by-default governance philosophy
+- registerQC() single-step process for QC onboarding
 - PendingAction struct tracks queued actions with execution timestamps
 
 #### 8.1.2 Emergency Response (REQ-GOV-EMERGENCY-001)
@@ -537,8 +537,8 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - Integration with off-chain compliance verification
 
 **Acceptance Criteria**:
-- queueQCOnboarding() with community review period
-- executeQCOnboarding() after governance delay
+- registerQC() with instant execution
+- Community review through role-based access control
 - QCOnboardingQueued and QCOnboardingExecuted events
 - Clear rejection paths with reason codes
 
