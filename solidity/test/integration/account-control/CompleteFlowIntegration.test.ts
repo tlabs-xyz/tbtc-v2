@@ -229,7 +229,7 @@ class CompleteFlowIntegration extends BaseAccountControlIntegration {
     // Queue QC onboarding
     await this.qcManager
       .connect(this.governance)
-      .queueQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+      .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
     
     // Wait for timelock
     await this.advanceTime(this.TEST_PARAMS.GOVERNANCE_DELAY)
@@ -237,7 +237,7 @@ class CompleteFlowIntegration extends BaseAccountControlIntegration {
     // Execute onboarding
     await this.qcManager
       .connect(this.governance)
-      .executeQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+      .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
     
     // Register Bitcoin wallet
     const btcAddress = this.generateBitcoinAddress()

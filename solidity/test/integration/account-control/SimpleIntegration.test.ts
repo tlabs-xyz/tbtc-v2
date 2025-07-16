@@ -12,7 +12,6 @@ import type {
   BasicMintingPolicy,
   QCReserveLedger,
   SingleWatchdog,
-  QCBridge,
   Bank,
   TBTCVault,
   TBTC
@@ -33,7 +32,6 @@ describe("Simple Account Control Integration Test", () => {
   let basicMintingPolicy: BasicMintingPolicy
   let qcReserveLedger: QCReserveLedger
   let singleWatchdog: SingleWatchdog
-  let qcBridge: QCBridge
 
   // Mock contracts
   let mockBank: FakeContract<Bank>
@@ -46,8 +44,7 @@ describe("Simple Account Control Integration Test", () => {
     QC_MANAGER: ethers.utils.id("QC_MANAGER"),
     MINTING_POLICY: ethers.utils.id("MINTING_POLICY"),
     QC_RESERVE_LEDGER: ethers.utils.id("QC_RESERVE_LEDGER"),
-    WATCHDOG: ethers.utils.id("WATCHDOG"),
-    QC_BRIDGE: ethers.utils.id("QC_BRIDGE")
+    WATCHDOG: ethers.utils.id("WATCHDOG")
   }
 
   const ROLES = {
@@ -55,7 +52,7 @@ describe("Simple Account Control Integration Test", () => {
     REGISTRAR_ROLE: ethers.utils.id("REGISTRAR_ROLE"),
     ARBITER_ROLE: ethers.utils.id("ARBITER_ROLE"),
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
-    TIME_LOCKED_ADMIN_ROLE: ethers.utils.id("TIME_LOCKED_ADMIN_ROLE")
+    QC_GOVERNANCE_ROLE: ethers.utils.id("QC_GOVERNANCE_ROLE")
   }
 
   beforeEach(async () => {
@@ -106,14 +103,6 @@ describe("Simple Account Control Integration Test", () => {
     singleWatchdog = await SingleWatchdog.deploy(protocolRegistry.address)
     await singleWatchdog.deployed()
 
-    const QCBridge = await ethers.getContractFactory("QCBridge")
-    qcBridge = await QCBridge.deploy(
-      mockBank.address,
-      mockTbtcVault.address,
-      protocolRegistry.address
-    )
-    await qcBridge.deployed()
-
     // Register services
     await protocolRegistry.setService(SERVICE_KEYS.QC_DATA, qcData.address)
     await protocolRegistry.setService(SERVICE_KEYS.SYSTEM_STATE, systemState.address)
@@ -121,14 +110,16 @@ describe("Simple Account Control Integration Test", () => {
     await protocolRegistry.setService(SERVICE_KEYS.MINTING_POLICY, basicMintingPolicy.address)
     await protocolRegistry.setService(SERVICE_KEYS.QC_RESERVE_LEDGER, qcReserveLedger.address)
     await protocolRegistry.setService(SERVICE_KEYS.WATCHDOG, singleWatchdog.address)
-    await protocolRegistry.setService(SERVICE_KEYS.QC_BRIDGE, qcBridge.address)
 
     // Set up roles
     await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
     await qcManager.grantRole(ROLES.REGISTRAR_ROLE, watchdog.address)
     await qcManager.grantRole(ROLES.ARBITER_ROLE, watchdog.address)
     await qcManager.grantRole(ROLES.DEFAULT_ADMIN_ROLE, governance.address)
-    await qcManager.grantRole(ROLES.TIME_LOCKED_ADMIN_ROLE, governance.address)
+    await qcManager.grantRole(ROLES.QC_GOVERNANCE_ROLE, governance.address)
+    
+    // Grant QCManager access to QCData
+    await qcData.grantQCManagerRole(qcManager.address)
   })
 
   it("should deploy and configure all contracts correctly", async () => {
@@ -147,19 +138,12 @@ describe("Simple Account Control Integration Test", () => {
   it("should handle basic QC operations", async () => {
     const maxMintingCap = ethers.utils.parseEther("1000")
 
-    // Queue QC onboarding
-    await qcManager.connect(governance).queueQCOnboarding(qc.address, maxMintingCap)
+    // Register QC (instant operation)
+    await qcManager.connect(governance).registerQC(qc.address, maxMintingCap)
 
-    // Advance time (simplified - just mine a block)
-    await ethers.provider.send("evm_mine", [])
-
-    // Execute onboarding (this may fail due to timelock, but we're testing the setup)
-    try {
-      await qcManager.connect(governance).executeQCOnboarding(qc.address, maxMintingCap)
-      console.log("✅ QC onboarding executed successfully")
-    } catch (error) {
-      console.log("⚠️  QC onboarding timelock active (expected)")
-    }
+    // Verify QC is registered
+    const isRegistered = await qcData.isQCRegistered(qc.address)
+    expect(isRegistered).to.be.true
 
     console.log("✅ Basic QC operations test completed")
   })
@@ -167,14 +151,9 @@ describe("Simple Account Control Integration Test", () => {
   it("should handle reserve attestation", async () => {
     const reserves = ethers.utils.parseEther("100")
 
-    // Onboard QC first (if possible)
+    // Onboard QC first
     const maxMintingCap = ethers.utils.parseEther("1000")
-    try {
-      await qcManager.connect(governance).queueQCOnboarding(qc.address, maxMintingCap)
-      await qcManager.connect(governance).executeQCOnboarding(qc.address, maxMintingCap)
-    } catch (error) {
-      console.log("⚠️  QC onboarding timelock active")
-    }
+    await qcManager.connect(governance).registerQC(qc.address, maxMintingCap)
 
     // Submit attestation (correct method signature - only qc and balance)
     await qcReserveLedger.connect(watchdog).submitReserveAttestation(qc.address, reserves)
