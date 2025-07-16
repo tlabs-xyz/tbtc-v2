@@ -1,6 +1,7 @@
-import { ethers, deployments, helpers } from "hardhat"
+import { ethers } from "hardhat"
 import { expect } from "chai"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
+import { FakeContract, smock } from "@defi-wonderland/smock"
 import { 
   BasicMintingPolicy, 
   Bank, 
@@ -9,7 +10,8 @@ import {
   ProtocolRegistry,
   QCManager,
   QCData,
-  SystemState
+  SystemState,
+  QCReserveLedger
 } from "../../typechain"
 
 describe("BasicMintingPolicy - Direct Bank Integration", () => {
@@ -27,46 +29,98 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
   let qcManager: QCManager
   let qcData: QCData
   let systemState: SystemState
+  let qcReserveLedger: QCReserveLedger
 
   const MINTER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"))
   const QC_ADMIN_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_ADMIN_ROLE"))
   const SATOSHI_MULTIPLIER = ethers.BigNumber.from(10).pow(10)
 
   beforeEach(async () => {
-    await deployments.fixture(["AccountControl", "DirectQCIntegration"])
-    
     ;[deployer, governance, qc, user, unauthorized] = await ethers.getSigners()
 
-    // Get deployed contracts
-    const basicMintingPolicyDeployment = await deployments.get("BasicMintingPolicy")
-    const bankDeployment = await deployments.get("Bank")
-    const tbtcVaultDeployment = await deployments.get("TBTCVault")
-    const tbtcDeployment = await deployments.get("TBTC")
-    const protocolRegistryDeployment = await deployments.get("ProtocolRegistry")
-    const qcManagerDeployment = await deployments.get("QCManager")
-    const qcDataDeployment = await deployments.get("QCData")
-    const systemStateDeployment = await deployments.get("SystemState")
+    // Deploy TBTC token
+    const TBTCFactory = await ethers.getContractFactory("TBTC")
+    tbtc = await TBTCFactory.deploy()
+    await tbtc.deployed()
 
-    basicMintingPolicy = await ethers.getContractAt(
-      "BasicMintingPolicy",
-      basicMintingPolicyDeployment.address
-    ) as BasicMintingPolicy
+    // Deploy Bank
+    const BankFactory = await ethers.getContractFactory("Bank")
+    bank = await BankFactory.deploy()
+    await bank.deployed()
 
-    bank = await ethers.getContractAt("Bank", bankDeployment.address) as Bank
-    tbtcVault = await ethers.getContractAt("TBTCVault", tbtcVaultDeployment.address) as TBTCVault
-    tbtc = await ethers.getContractAt("TBTC", tbtcDeployment.address) as TBTC
-    protocolRegistry = await ethers.getContractAt(
-      "ProtocolRegistry",
-      protocolRegistryDeployment.address
-    ) as ProtocolRegistry
-    qcManager = await ethers.getContractAt("QCManager", qcManagerDeployment.address) as QCManager
-    qcData = await ethers.getContractAt("QCData", qcDataDeployment.address) as QCData
-    systemState = await ethers.getContractAt("SystemState", systemStateDeployment.address) as SystemState
+    // Deploy TBTCVault with mock bridge
+    const mockBridge = await smock.fake("Bridge")
+    const TBTCVaultFactory = await ethers.getContractFactory("TBTCVault")
+    tbtcVault = await TBTCVaultFactory.deploy(bank.address, tbtc.address, mockBridge.address)
+    await tbtcVault.deployed()
 
-    // Setup QC
-    await qcManager.connect(governance).grantRole(QC_ADMIN_ROLE, deployer.address)
-    await qcManager.addQC(qc.address, ethers.utils.parseEther("1000")) // 1000 tBTC capacity
+    // Deploy ProtocolRegistry
+    const ProtocolRegistryFactory = await ethers.getContractFactory("ProtocolRegistry")
+    protocolRegistry = await ProtocolRegistryFactory.deploy()
+    await protocolRegistry.deployed()
+
+    // Deploy QCData
+    const QCDataFactory = await ethers.getContractFactory("QCData")
+    qcData = await QCDataFactory.deploy()
+    await qcData.deployed()
+
+    // Deploy SystemState
+    const SystemStateFactory = await ethers.getContractFactory("SystemState")
+    systemState = await SystemStateFactory.deploy()
+    await systemState.deployed()
+
+    // Deploy QCManager
+    const QCManagerFactory = await ethers.getContractFactory("QCManager")
+    qcManager = await QCManagerFactory.deploy(protocolRegistry.address)
+    await qcManager.deployed()
+
+    // Deploy QCReserveLedger
+    const QCReserveLedgerFactory = await ethers.getContractFactory("QCReserveLedger")
+    qcReserveLedger = await QCReserveLedgerFactory.deploy(protocolRegistry.address)
+    await qcReserveLedger.deployed()
+
+    // Deploy BasicMintingPolicy
+    const BasicMintingPolicyFactory = await ethers.getContractFactory("BasicMintingPolicy")
+    basicMintingPolicy = await BasicMintingPolicyFactory.deploy(protocolRegistry.address)
+    await basicMintingPolicy.deployed()
+
+    // Configure system
+    await configureSystem()
   })
+
+  async function configureSystem() {
+    // Register services
+    const QC_DATA_KEY = ethers.utils.id("QC_DATA")
+    const SYSTEM_STATE_KEY = ethers.utils.id("SYSTEM_STATE")
+    const QC_MANAGER_KEY = ethers.utils.id("QC_MANAGER")
+    const QC_RESERVE_LEDGER_KEY = ethers.utils.id("QC_RESERVE_LEDGER")
+    const MINTING_POLICY_KEY = ethers.utils.id("MINTING_POLICY")
+    const BANK_KEY = ethers.utils.id("BANK")
+    const TBTC_VAULT_KEY = ethers.utils.id("TBTC_VAULT")
+    const TBTC_TOKEN_KEY = ethers.utils.id("TBTC_TOKEN")
+
+    await protocolRegistry.setService(QC_DATA_KEY, qcData.address)
+    await protocolRegistry.setService(SYSTEM_STATE_KEY, systemState.address)
+    await protocolRegistry.setService(QC_MANAGER_KEY, qcManager.address)
+    await protocolRegistry.setService(QC_RESERVE_LEDGER_KEY, qcReserveLedger.address)
+    await protocolRegistry.setService(MINTING_POLICY_KEY, basicMintingPolicy.address)
+    await protocolRegistry.setService(BANK_KEY, bank.address)
+    await protocolRegistry.setService(TBTC_VAULT_KEY, tbtcVault.address)
+    await protocolRegistry.setService(TBTC_TOKEN_KEY, tbtc.address)
+
+    // Configure access control
+    const QC_MANAGER_ROLE = ethers.utils.id("QC_MANAGER_ROLE")
+    await qcData.grantRole(QC_MANAGER_ROLE, qcManager.address)
+    await qcManager.grantRole(QC_ADMIN_ROLE, basicMintingPolicy.address)
+    await basicMintingPolicy.grantRole(MINTER_ROLE, deployer.address)
+
+    // Configure Bank and TBTCVault
+    await bank.setAuthorizedBalanceIncreaser(basicMintingPolicy.address, true)
+    await tbtc.transferOwnership(tbtcVault.address)
+
+    // Setup QC - register directly through QCData for testing
+    await qcData.registerQC(qc.address, ethers.utils.parseEther("1000")) // 1000 tBTC capacity
+  }
 
   describe("Direct Bank Integration", () => {
     it("should be authorized to increase Bank balances", async () => {
@@ -83,9 +137,11 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
       // Grant MINTER_ROLE to deployer for testing
       await basicMintingPolicy.grantRole(MINTER_ROLE, deployer.address)
       
-      // Simulate QC having reserves
-      // In real scenario, this would be done by Watchdog attestation
-      // For testing, we'll just ensure QC is active
+      // Simulate reserve attestation (QC has sufficient reserves)
+      const QC_RESERVE_LEDGER_KEY = ethers.utils.id("QC_RESERVE_LEDGER")
+      const reserveBalance = ethers.utils.parseEther("100") // 100 tBTC reserves
+      await qcReserveLedger.grantRole(ethers.utils.id("ATTESTER_ROLE"), deployer.address)
+      await qcReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
     })
 
     it("should mint tBTC directly through Bank integration", async () => {
@@ -142,7 +198,7 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
 
     it("should revert if not authorized in Bank", async () => {
       // Remove authorization
-      await bank.connect(governance).setAuthorizedBalanceIncreaser(
+      await bank.setAuthorizedBalanceIncreaser(
         basicMintingPolicy.address,
         false
       )
@@ -152,15 +208,19 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
       ).to.be.revertedWith("NotAuthorizedInBank")
 
       // Restore authorization for other tests
-      await bank.connect(governance).setAuthorizedBalanceIncreaser(
+      await bank.setAuthorizedBalanceIncreaser(
         basicMintingPolicy.address,
         true
       )
     })
 
     it("should revert if QC is not active", async () => {
+      // Grant ARBITER_ROLE to deployer to change QC status
+      const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
+      await qcManager.grantRole(ARBITER_ROLE, deployer.address)
+      
       // Deactivate QC
-      await qcManager.setQCStatus(qc.address, 2) // Revoked
+      await qcManager.setQCStatus(qc.address, 2, ethers.utils.id("TEST_REVOKE")) // Revoked
 
       await expect(
         basicMintingPolicy.requestMint(qc.address, user.address, mintAmount)
