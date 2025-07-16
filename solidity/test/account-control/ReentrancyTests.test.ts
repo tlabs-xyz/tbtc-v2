@@ -9,6 +9,7 @@ import {
   setupQCWithWallets,
   createMockSpvData,
   TEST_DATA,
+  SERVICE_KEYS,
 } from "./AccountControlTestHelpers"
 
 chai.use(smock.matchers)
@@ -71,7 +72,7 @@ describe("Advanced Reentrancy Tests", () => {
           protocolRegistry
             .connect(attacker)
             .setService(
-              await basicMintingPolicy.MINTING_POLICY_KEY(),
+              SERVICE_KEYS.MINTING_POLICY,
               maliciousPolicyAddress
             )
         ).to.be.revertedWith("AccessControl: account")
@@ -200,7 +201,7 @@ describe("Advanced Reentrancy Tests", () => {
             mockSpvData.proof
           )
         ).to.be.revertedWith(
-          "BRP-1305: recordFulfillment failed - Redemption already fulfilled, cannot process twice"
+          "RedemptionAlreadyFulfilled"
         )
       })
     })
