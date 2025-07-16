@@ -40,6 +40,7 @@ describe("QCManager", () => {
   let QC_ADMIN_ROLE: string
   let REGISTRAR_ROLE: string
   let ARBITER_ROLE: string
+  let QC_GOVERNANCE_ROLE: string
 
   // Test data
   const testBtcAddress = "bc1qtest123456789"
@@ -83,6 +84,7 @@ describe("QCManager", () => {
     QC_ADMIN_ROLE = ethers.utils.id("QC_ADMIN_ROLE")
     REGISTRAR_ROLE = ethers.utils.id("REGISTRAR_ROLE")
     ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
+    QC_GOVERNANCE_ROLE = ethers.utils.id("QC_GOVERNANCE_ROLE")
   })
 
   beforeEach(async () => {
@@ -122,6 +124,7 @@ describe("QCManager", () => {
     mockSystemState.isFunctionPaused.returns(false)
     mockQcData.isQCRegistered.returns(false)
     mockQcData.getQCStatus.returns(0) // Active
+    mockQcData.registerQC.returns() // Add mock return for registerQC
     mockQcData.getWalletStatus.returns(1) // Active
     mockQcData.getWalletOwner.returns(qcAddress.address)
     mockQcData.getQCMintedAmount.returns(mintedAmount)
@@ -135,6 +138,7 @@ describe("QCManager", () => {
     // Grant roles
     await qcManager.grantRole(REGISTRAR_ROLE, watchdog.address)
     await qcManager.grantRole(ARBITER_ROLE, watchdog.address)
+    await qcManager.grantRole(QC_GOVERNANCE_ROLE, deployer.address)
   })
 
   afterEach(async () => {
@@ -157,6 +161,7 @@ describe("QCManager", () => {
       expect(await qcManager.hasRole(REGISTRAR_ROLE, deployer.address)).to.be
         .true
       expect(await qcManager.hasRole(ARBITER_ROLE, deployer.address)).to.be.true
+      expect(await qcManager.hasRole(QC_GOVERNANCE_ROLE, deployer.address)).to.be.true
     })
   })
 
@@ -165,6 +170,7 @@ describe("QCManager", () => {
       expect(await qcManager.QC_ADMIN_ROLE()).to.equal(QC_ADMIN_ROLE)
       expect(await qcManager.REGISTRAR_ROLE()).to.equal(REGISTRAR_ROLE)
       expect(await qcManager.ARBITER_ROLE()).to.equal(ARBITER_ROLE)
+      expect(await qcManager.QC_GOVERNANCE_ROLE()).to.equal(QC_GOVERNANCE_ROLE)
     })
 
     it("should have correct service key constants", async () => {
@@ -182,7 +188,7 @@ describe("QCManager", () => {
       let tx: any
 
       beforeEach(async () => {
-        tx = await qcManager.registerQC(qcAddress.address)
+        tx = await qcManager.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
       })
 
       it("should call QCData registerQC", async () => {
@@ -203,15 +209,21 @@ describe("QCManager", () => {
     context("when called with invalid parameters", () => {
       it("should revert with zero address", async () => {
         await expect(
-          qcManager.registerQC(ethers.constants.AddressZero)
+          qcManager.registerQC(ethers.constants.AddressZero, ethers.utils.parseEther("1000"))
         ).to.be.revertedWith("InvalidQCAddress")
+      })
+
+      it("should revert with zero minting capacity", async () => {
+        await expect(
+          qcManager.registerQC(qcAddress.address, 0)
+        ).to.be.revertedWith("InvalidMintingCapacity")
       })
 
       it("should revert when QC already registered", async () => {
         mockQcData.isQCRegistered.returns(true)
 
         await expect(
-          qcManager.registerQC(qcAddress.address)
+          qcManager.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
         ).to.be.revertedWith("QCAlreadyRegistered")
       })
     })
@@ -225,7 +237,7 @@ describe("QCManager", () => {
 
       it("should revert", async () => {
         await expect(
-          qcManager.registerQC(qcAddress.address)
+          qcManager.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
         ).to.be.revertedWith("Function is paused")
       })
     })
@@ -233,9 +245,9 @@ describe("QCManager", () => {
     context("when called by non-admin", () => {
       it("should revert", async () => {
         await expect(
-          qcManager.connect(thirdParty).registerQC(qcAddress.address)
+          qcManager.connect(thirdParty).registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_ADMIN_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_GOVERNANCE_ROLE}`
         )
       })
     })
@@ -1039,7 +1051,7 @@ describe("QCManager", () => {
 
     context("boundary conditions for solvency", () => {
       beforeEach(async () => {
-        await qcManager.registerQC(qcAddress.address)
+        await qcManager.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
         mockQcData.isQCRegistered.returns(true)
         mockQcData.getQCMintedAmount.returns(ethers.utils.parseEther("10"))
       })
@@ -1083,7 +1095,7 @@ describe("QCManager", () => {
 
     context("when QC is already UnderReview due to insolvency", () => {
       beforeEach(async () => {
-        await qcManager.registerQC(qcAddress.address)
+        await qcManager.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
         mockQcData.isQCRegistered.returns(true)
         mockQcData.getQCStatus.returns(1) // UnderReview
         mockQcData.getQCMintedAmount.returns(ethers.utils.parseEther("10"))
@@ -1109,659 +1121,209 @@ describe("QCManager", () => {
     })
   })
 
-  // =================== TIME-LOCKED GOVERNANCE TESTS ===================
+  // =================== INSTANT GOVERNANCE TESTS ===================
 
-  describe("Time-Locked Governance", () => {
-    const TIME_LOCKED_ADMIN_ROLE = ethers.utils.id("TIME_LOCKED_ADMIN_ROLE")
-    const GOVERNANCE_DELAY = 7 * 24 * 60 * 60 // 7 days in seconds
-    const maxMintingCap = ethers.utils.parseEther("5000") // 5000 tBTC
-    let timeLockedAdmin: SignerWithAddress
+  describe("increaseMintingCapacity", () => {
+    const newCap = ethers.utils.parseEther("10000") // 10000 tBTC
+    const currentCap = ethers.utils.parseEther("5000") // 5000 tBTC
 
     beforeEach(async () => {
-      timeLockedAdmin = thirdParty
-      await qcManager.grantRole(TIME_LOCKED_ADMIN_ROLE, timeLockedAdmin.address)
+      mockQcData.isQCRegistered.returns(true)
+      mockQcData.getMaxMintingCapacity.returns(currentCap)
     })
 
-    describe("Role Constants", () => {
-      it("should have correct TIME_LOCKED_ADMIN_ROLE constant", async () => {
-        expect(await qcManager.TIME_LOCKED_ADMIN_ROLE()).to.equal(
-          TIME_LOCKED_ADMIN_ROLE
+    context("when called by governance with valid parameters", () => {
+      let tx: any
+
+      beforeEach(async () => {
+        tx = await qcManager.increaseMintingCapacity(qcAddress.address, newCap)
+      })
+
+      it("should call QCData updateMaxMintingCapacity", async () => {
+        expect(mockQcData.updateMaxMintingCapacity).to.have.been.calledWith(
+          qcAddress.address,
+          newCap
         )
       })
 
-      it("should have correct GOVERNANCE_DELAY constant", async () => {
-        expect(await qcManager.GOVERNANCE_DELAY()).to.equal(GOVERNANCE_DELAY)
-      })
-    })
-
-    describe("queueQCOnboarding", () => {
-      context("when called by authorized admin", () => {
-        let tx: any
-        let actionHash: string
-
-        beforeEach(async () => {
-          actionHash = ethers.utils.keccak256(
-            ethers.utils.solidityPack(
-              ["string", "address", "uint256"],
-              ["QC_ONBOARDING", qcAddress.address, maxMintingCap]
-            )
-          )
-          tx = await qcManager
-            .connect(timeLockedAdmin)
-            .queueQCOnboarding(qcAddress.address, maxMintingCap)
-        })
-
-        it("should store pending action with correct parameters", async () => {
-          const pendingAction = await qcManager.pendingActions(actionHash)
-          expect(pendingAction.actionHash).to.equal(actionHash)
-          expect(pendingAction.executed).to.be.false
-        })
-
-        it("should emit GovernanceActionQueued event", async () => {
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-          const expectedExecutionTime = ethers.BigNumber.from(
-            currentBlock.timestamp + GOVERNANCE_DELAY
-          )
-          await expect(tx)
-            .to.emit(qcManager, "GovernanceActionQueued")
-            .withArgs(
-              actionHash,
-              expectedExecutionTime,
-              "QC_ONBOARDING",
-              timeLockedAdmin.address,
-              currentBlock.timestamp
-            )
-        })
-
-        it("should set correct execution time", async () => {
-          const pendingAction = await qcManager.pendingActions(actionHash)
-          const currentBlock = await ethers.provider.getBlock("latest")
-          const expectedExecutionTime = ethers.BigNumber.from(
-            currentBlock.timestamp + GOVERNANCE_DELAY
-          )
-          expect(pendingAction.executeAfter).to.be.closeTo(
-            expectedExecutionTime,
-            10
-          )
-        })
-      })
-
-      context("when called with invalid parameters", () => {
-        it("should revert with zero address", async () => {
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .queueQCOnboarding(ethers.constants.AddressZero, maxMintingCap)
-          ).to.be.revertedWith("InvalidQCAddress")
-        })
-
-        it("should revert with zero minting capacity", async () => {
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .queueQCOnboarding(qcAddress.address, 0)
-          ).to.be.revertedWith("InvalidMintingCapacity")
-        })
-
-        it("should revert when QC already registered", async () => {
-          mockQcData.isQCRegistered.returns(true)
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .queueQCOnboarding(qcAddress.address, maxMintingCap)
-          ).to.be.revertedWith("QCAlreadyRegistered")
-        })
-
-        it("should revert when action already queued", async () => {
-          await qcManager
-            .connect(timeLockedAdmin)
-            .queueQCOnboarding(qcAddress.address, maxMintingCap)
-
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .queueQCOnboarding(qcAddress.address, maxMintingCap)
-          ).to.be.revertedWith("ActionAlreadyQueued")
-        })
-      })
-
-      context("when called by unauthorized account", () => {
-        it("should revert", async () => {
-          await expect(
-            qcManager
-              .connect(governance)
-              .queueQCOnboarding(qcAddress.address, maxMintingCap)
-          ).to.be.revertedWith(
-            `AccessControl: account ${governance.address.toLowerCase()} is missing role ${TIME_LOCKED_ADMIN_ROLE}`
-          )
-        })
-      })
-    })
-
-    describe("executeQCOnboarding", () => {
-      let actionHash: string
-
-      beforeEach(async () => {
-        actionHash = ethers.utils.keccak256(
-          ethers.utils.solidityPack(
-            ["string", "address", "uint256"],
-            ["QC_ONBOARDING", qcAddress.address, maxMintingCap]
-          )
-        )
-        await qcManager
-          .connect(timeLockedAdmin)
-          .queueQCOnboarding(qcAddress.address, maxMintingCap)
-      })
-
-      context("when delay period has elapsed", () => {
-        let tx: any
-
-        beforeEach(async () => {
-          // Fast forward time past governance delay
-          await network.provider.send("evm_increaseTime", [
-            GOVERNANCE_DELAY + 1,
-          ])
-          await network.provider.send("evm_mine")
-
-          tx = await qcManager
-            .connect(timeLockedAdmin)
-            .executeQCOnboarding(qcAddress.address, maxMintingCap)
-        })
-
-        it("should call QCData registerQC", async () => {
-          expect(mockQcData.registerQC).to.have.been.calledWith(
-            qcAddress.address,
-            maxMintingCap
-          )
-        })
-
-        it("should mark action as executed", async () => {
-          const pendingAction = await qcManager.pendingActions(actionHash)
-          expect(pendingAction.executed).to.be.true
-        })
-
-        it("should emit GovernanceActionExecuted event", async () => {
-          const receipt = await tx.wait()
-          const { timestamp } = await ethers.provider.getBlock(
-            receipt.blockNumber
-          )
-          await expect(tx)
-            .to.emit(qcManager, "GovernanceActionExecuted")
-            .withArgs(
-              actionHash,
-              "QC_ONBOARDING",
-              timeLockedAdmin.address,
-              timestamp
-            )
-        })
-
-        it("should emit QCOnboarded event", async () => {
-          const receipt = await tx.wait()
-          const { timestamp } = await ethers.provider.getBlock(
-            receipt.blockNumber
-          )
-          await expect(tx)
-            .to.emit(qcManager, "QCOnboarded")
-            .withArgs(
-              qcAddress.address,
-              maxMintingCap,
-              timeLockedAdmin.address,
-              timestamp
-            )
-        })
-
-        it("should emit QCRegistrationInitiated event", async () => {
-          const receipt = await tx.wait()
-          const { timestamp } = await ethers.provider.getBlock(
-            receipt.blockNumber
-          )
-          await expect(tx)
-            .to.emit(qcManager, "QCRegistrationInitiated")
-            .withArgs(qcAddress.address, timeLockedAdmin.address, timestamp)
-        })
-      })
-
-      context("when delay period has not elapsed", () => {
-        it("should revert", async () => {
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .executeQCOnboarding(qcAddress.address, maxMintingCap)
-          ).to.be.revertedWith("DelayPeriodNotElapsed")
-        })
-      })
-
-      context("when action not queued", () => {
-        it("should revert", async () => {
-          const differentActionHash = ethers.utils.keccak256(
-            ethers.utils.solidityPack(
-              ["string", "address", "uint256"],
-              ["QC_ONBOARDING", thirdParty.address, maxMintingCap] // Different QC address
-            )
-          )
-
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .executeQCOnboarding(thirdParty.address, maxMintingCap)
-          ).to.be.revertedWith("ActionNotQueued")
-        })
-      })
-
-      context("when action already executed", () => {
-        beforeEach(async () => {
-          await network.provider.send("evm_increaseTime", [
-            GOVERNANCE_DELAY + 1,
-          ])
-          await network.provider.send("evm_mine")
-          await qcManager
-            .connect(timeLockedAdmin)
-            .executeQCOnboarding(qcAddress.address, maxMintingCap)
-        })
-
-        it("should revert", async () => {
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .executeQCOnboarding(qcAddress.address, maxMintingCap)
-          ).to.be.revertedWith("ActionAlreadyExecuted")
-        })
-      })
-
-      context("when called by unauthorized account", () => {
-        it("should revert", async () => {
-          await network.provider.send("evm_increaseTime", [
-            GOVERNANCE_DELAY + 1,
-          ])
-          await network.provider.send("evm_mine")
-
-          await expect(
-            qcManager
-              .connect(governance)
-              .executeQCOnboarding(qcAddress.address, maxMintingCap)
-          ).to.be.revertedWith(
-            `AccessControl: account ${governance.address.toLowerCase()} is missing role ${TIME_LOCKED_ADMIN_ROLE}`
-          )
-        })
-      })
-    })
-
-    describe("queueMintingCapIncrease", () => {
-      const newCap = ethers.utils.parseEther("10000") // 10000 tBTC
-      const currentCap = ethers.utils.parseEther("5000") // 5000 tBTC
-
-      beforeEach(async () => {
-        mockQcData.isQCRegistered.returns(true)
-        mockQcData.getMaxMintingCapacity.returns(currentCap)
-      })
-
-      context("when called by authorized admin", () => {
-        let tx: any
-        let actionHash: string
-
-        beforeEach(async () => {
-          actionHash = ethers.utils.keccak256(
-            ethers.utils.solidityPack(
-              ["string", "address", "uint256"],
-              ["MINTING_CAP_INCREASE", qcAddress.address, newCap]
-            )
-          )
-          tx = await qcManager
-            .connect(timeLockedAdmin)
-            .queueMintingCapIncrease(qcAddress.address, newCap)
-        })
-
-        it("should store pending action with correct parameters", async () => {
-          const pendingAction = await qcManager.pendingActions(actionHash)
-          expect(pendingAction.actionHash).to.equal(actionHash)
-          expect(pendingAction.executed).to.be.false
-        })
-
-        it("should emit GovernanceActionQueued event", async () => {
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-          const expectedExecutionTime = ethers.BigNumber.from(
-            currentBlock.timestamp + GOVERNANCE_DELAY
-          )
-          await expect(tx)
-            .to.emit(qcManager, "GovernanceActionQueued")
-            .withArgs(
-              actionHash,
-              expectedExecutionTime,
-              "MINTING_CAP_INCREASE",
-              timeLockedAdmin.address,
-              currentBlock.timestamp
-            )
-        })
-      })
-
-      context("when called with invalid parameters", () => {
-        it("should revert with zero address", async () => {
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .queueMintingCapIncrease(ethers.constants.AddressZero, newCap)
-          ).to.be.revertedWith("InvalidQCAddress")
-        })
-
-        it("should revert with zero minting capacity", async () => {
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .queueMintingCapIncrease(qcAddress.address, 0)
-          ).to.be.revertedWith("InvalidMintingCapacity")
-        })
-
-        it("should revert when QC not registered", async () => {
-          mockQcData.isQCRegistered.returns(false)
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .queueMintingCapIncrease(qcAddress.address, newCap)
-          ).to.be.revertedWith("QCNotRegistered")
-        })
-
-        it("should revert when new cap is not higher than current", async () => {
-          const lowerCap = ethers.utils.parseEther("3000") // Lower than current 5000
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .queueMintingCapIncrease(qcAddress.address, lowerCap)
-          ).to.be.revertedWith("NewCapMustBeHigher")
-        })
-      })
-    })
-
-    describe("executeMintingCapIncrease", () => {
-      const newCap = ethers.utils.parseEther("10000") // 10000 tBTC
-      const currentCap = ethers.utils.parseEther("5000") // 5000 tBTC
-      let actionHash: string
-
-      beforeEach(async () => {
-        mockQcData.isQCRegistered.returns(true)
-        mockQcData.getMaxMintingCapacity.returns(currentCap)
-
-        actionHash = ethers.utils.keccak256(
-          ethers.utils.solidityPack(
-            ["string", "address", "uint256"],
-            ["MINTING_CAP_INCREASE", qcAddress.address, newCap]
-          )
-        )
-        await qcManager
-          .connect(timeLockedAdmin)
-          .queueMintingCapIncrease(qcAddress.address, newCap)
-      })
-
-      context("when delay period has elapsed", () => {
-        let tx: any
-
-        beforeEach(async () => {
-          await network.provider.send("evm_increaseTime", [
-            GOVERNANCE_DELAY + 1,
-          ])
-          await network.provider.send("evm_mine")
-
-          tx = await qcManager
-            .connect(timeLockedAdmin)
-            .executeMintingCapIncrease(qcAddress.address, newCap)
-        })
-
-        it("should call QCData updateMaxMintingCapacity", async () => {
-          expect(mockQcData.updateMaxMintingCapacity).to.have.been.calledWith(
-            qcAddress.address,
-            newCap
-          )
-        })
-
-        it("should mark action as executed", async () => {
-          const pendingAction = await qcManager.pendingActions(actionHash)
-          expect(pendingAction.executed).to.be.true
-        })
-
-        it("should emit GovernanceActionExecuted event", async () => {
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-          await expect(tx)
-            .to.emit(qcManager, "GovernanceActionExecuted")
-            .withArgs(
-              actionHash,
-              "MINTING_CAP_INCREASE",
-              timeLockedAdmin.address,
-              currentBlock.timestamp
-            )
-        })
-
-        it("should emit MintingCapIncreased event", async () => {
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-          await expect(tx)
-            .to.emit(qcManager, "MintingCapIncreased")
-            .withArgs(
-              qcAddress.address,
-              currentCap,
-              newCap,
-              timeLockedAdmin.address,
-              currentBlock.timestamp
-            )
-        })
-      })
-
-      context("when delay period has not elapsed", () => {
-        it("should revert", async () => {
-          await expect(
-            qcManager
-              .connect(timeLockedAdmin)
-              .executeMintingCapIncrease(qcAddress.address, newCap)
-          ).to.be.revertedWith("DelayPeriodNotElapsed")
-        })
-      })
-    })
-
-    describe("emergencyPauseQC", () => {
-      const emergencyReason = ethers.utils.id("SECURITY_BREACH")
-
-      beforeEach(async () => {
-        mockQcData.isQCRegistered.returns(true)
-        mockQcData.getQCStatus.returns(0) // Active
-      })
-
-      context("when called by arbiter", () => {
-        let tx: any
-
-        beforeEach(async () => {
-          tx = await qcManager
-            .connect(watchdog)
-            .emergencyPauseQC(qcAddress.address, emergencyReason)
-        })
-
-        it("should call QCData setQCStatus to UnderReview", async () => {
-          expect(mockQcData.setQCStatus).to.have.been.calledWith(
-            qcAddress.address,
-            1, // UnderReview
-            emergencyReason
-          )
-        })
-
-        it("should emit QCStatusChanged event", async () => {
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-          await expect(tx)
-            .to.emit(qcManager, "QCStatusChanged")
-            .withArgs(
-              qcAddress.address,
-              0,
-              1,
-              emergencyReason,
-              watchdog.address,
-              currentBlock.timestamp
-            )
-        })
-
-        it("should emit QCEmergencyPaused event", async () => {
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-          await expect(tx)
-            .to.emit(qcManager, "QCEmergencyPaused")
-            .withArgs(
-              qcAddress.address,
-              emergencyReason,
-              watchdog.address,
-              currentBlock.timestamp
-            )
-        })
-      })
-
-      context("when called with invalid parameters", () => {
-        it("should revert with zero address", async () => {
-          await expect(
-            qcManager
-              .connect(watchdog)
-              .emergencyPauseQC(ethers.constants.AddressZero, emergencyReason)
-          ).to.be.revertedWith("InvalidQCAddress")
-        })
-
-        it("should revert with empty reason", async () => {
-          await expect(
-            qcManager
-              .connect(watchdog)
-              .emergencyPauseQC(qcAddress.address, ethers.constants.HashZero)
-          ).to.be.revertedWith("ReasonRequired")
-        })
-
-        it("should revert when QC not registered", async () => {
-          mockQcData.isQCRegistered.returns(false)
-          await expect(
-            qcManager
-              .connect(watchdog)
-              .emergencyPauseQC(qcAddress.address, emergencyReason)
-          ).to.be.revertedWith("QCNotRegistered")
-        })
-      })
-
-      context("when QC is already Revoked", () => {
-        beforeEach(async () => {
-          mockQcData.getQCStatus.returns(2) // Revoked
-        })
-
-        it("should not change status", async () => {
-          await qcManager
-            .connect(watchdog)
-            .emergencyPauseQC(qcAddress.address, emergencyReason)
-
-          // Status change should not be called for Revoked QCs
-          expect(mockQcData.setQCStatus).to.not.have.been.called
-        })
-      })
-
-      context("when called by non-arbiter", () => {
-        it("should revert", async () => {
-          await expect(
-            qcManager
-              .connect(thirdParty)
-              .emergencyPauseQC(qcAddress.address, emergencyReason)
-          ).to.be.revertedWith(
-            `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
-          )
-        })
-      })
-
-      context("when function is paused", () => {
-        beforeEach(async () => {
-          mockSystemState.isFunctionPaused
-            .whenCalledWith("registry")
-            .returns(true)
-        })
-
-        it("should revert", async () => {
-          await expect(
-            qcManager
-              .connect(watchdog)
-              .emergencyPauseQC(qcAddress.address, emergencyReason)
-          ).to.be.revertedWith("Function is paused")
-        })
-      })
-    })
-
-    describe("Governance Workflow Integration", () => {
-      const newMintingCap = ethers.utils.parseEther("15000")
-
-      it("should complete full QC onboarding workflow", async () => {
-        // Step 1: Queue QC onboarding
-        const queueTx = await qcManager
-          .connect(timeLockedAdmin)
-          .queueQCOnboarding(qcAddress.address, newMintingCap)
-
-        await expect(queueTx).to.emit(qcManager, "GovernanceActionQueued")
-
-        // Step 2: Fast forward time
-        await network.provider.send("evm_increaseTime", [GOVERNANCE_DELAY + 1])
-        await network.provider.send("evm_mine")
-
-        // Step 3: Execute QC onboarding
-        const executeTx = await qcManager
-          .connect(timeLockedAdmin)
-          .executeQCOnboarding(qcAddress.address, newMintingCap)
-
-        await expect(executeTx)
-          .to.emit(qcManager, "GovernanceActionExecuted")
-          .and.to.emit(qcManager, "QCOnboarded")
-          .and.to.emit(qcManager, "QCRegistrationInitiated")
-      })
-
-      it("should complete full minting cap increase workflow", async () => {
-        const currentCap = ethers.utils.parseEther("5000")
-        const increasedCap = ethers.utils.parseEther("10000")
-
-        mockQcData.isQCRegistered.returns(true)
-        mockQcData.getMaxMintingCapacity.returns(currentCap)
-
-        // Step 1: Queue minting cap increase
-        const queueTx = await qcManager
-          .connect(timeLockedAdmin)
-          .queueMintingCapIncrease(qcAddress.address, increasedCap)
-
-        await expect(queueTx).to.emit(qcManager, "GovernanceActionQueued")
-
-        // Step 2: Fast forward time
-        await network.provider.send("evm_increaseTime", [GOVERNANCE_DELAY + 1])
-        await network.provider.send("evm_mine")
-
-        // Step 3: Execute minting cap increase
-        const executeTx = await qcManager
-          .connect(timeLockedAdmin)
-          .executeMintingCapIncrease(qcAddress.address, increasedCap)
-
-        const executeBlock = await ethers.provider.getBlock(
-          executeTx.blockNumber
-        )
-        await expect(executeTx)
-          .to.emit(qcManager, "GovernanceActionExecuted")
-          .and.to.emit(qcManager, "MintingCapIncreased")
+      it("should emit MintingCapIncreased event", async () => {
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+        await expect(tx)
+          .to.emit(qcManager, "MintingCapIncreased")
           .withArgs(
             qcAddress.address,
             currentCap,
-            increasedCap,
-            timeLockedAdmin.address,
-            executeBlock.timestamp
+            newCap,
+            deployer.address,
+            currentBlock.timestamp
+          )
+      })
+    })
+
+    context("when called with invalid parameters", () => {
+      it("should revert with zero address", async () => {
+        await expect(
+          qcManager.increaseMintingCapacity(ethers.constants.AddressZero, newCap)
+        ).to.be.revertedWith("InvalidQCAddress")
+      })
+
+      it("should revert with zero minting capacity", async () => {
+        await expect(
+          qcManager.increaseMintingCapacity(qcAddress.address, 0)
+        ).to.be.revertedWith("InvalidMintingCapacity")
+      })
+
+      it("should revert when QC not registered", async () => {
+        mockQcData.isQCRegistered.returns(false)
+        await expect(
+          qcManager.increaseMintingCapacity(qcAddress.address, newCap)
+        ).to.be.revertedWith("QCNotRegistered")
+      })
+
+      it("should revert when new cap is not higher than current", async () => {
+        const lowerCap = ethers.utils.parseEther("3000") // Lower than current 5000
+        await expect(
+          qcManager.increaseMintingCapacity(qcAddress.address, lowerCap)
+        ).to.be.revertedWith("NewCapMustBeHigher")
+      })
+
+      it("should revert when new cap equals current cap", async () => {
+        await expect(
+          qcManager.increaseMintingCapacity(qcAddress.address, currentCap)
+        ).to.be.revertedWith("NewCapMustBeHigher")
+      })
+    })
+
+    context("when called by non-governance", () => {
+      it("should revert", async () => {
+        await expect(
+          qcManager.connect(thirdParty).increaseMintingCapacity(qcAddress.address, newCap)
+        ).to.be.revertedWith(
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_GOVERNANCE_ROLE}`
+        )
+      })
+    })
+  })
+
+  describe("emergencyPauseQC", () => {
+    const emergencyReason = ethers.utils.id("SECURITY_BREACH")
+
+    beforeEach(async () => {
+      mockQcData.isQCRegistered.returns(true)
+      mockQcData.getQCStatus.returns(0) // Active
+    })
+
+    context("when called by arbiter", () => {
+      let tx: any
+
+      beforeEach(async () => {
+        tx = await qcManager
+          .connect(watchdog)
+          .emergencyPauseQC(qcAddress.address, emergencyReason)
+      })
+
+      it("should call QCData setQCStatus to UnderReview", async () => {
+        expect(mockQcData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          1, // UnderReview
+          emergencyReason
+        )
+      })
+
+      it("should emit QCStatusChanged event", async () => {
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+        await expect(tx)
+          .to.emit(qcManager, "QCStatusChanged")
+          .withArgs(
+            qcAddress.address,
+            0,
+            1,
+            emergencyReason,
+            watchdog.address,
+            currentBlock.timestamp
           )
       })
 
-      it("should allow emergency pause without delay", async () => {
-        const emergencyReason = ethers.utils.id("CRITICAL_SECURITY_ISSUE")
-        mockQcData.isQCRegistered.returns(true)
-        mockQcData.getQCStatus.returns(0) // Active
-
-        // Emergency pause should work immediately
-        const emergencyTx = await qcManager
-          .connect(watchdog)
-          .emergencyPauseQC(qcAddress.address, emergencyReason)
-
-        const emergencyBlock = await ethers.provider.getBlock(
-          emergencyTx.blockNumber
-        )
-        await expect(emergencyTx)
+      it("should emit QCEmergencyPaused event", async () => {
+        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+        await expect(tx)
           .to.emit(qcManager, "QCEmergencyPaused")
           .withArgs(
             qcAddress.address,
             emergencyReason,
             watchdog.address,
-            emergencyBlock.timestamp
+            currentBlock.timestamp
           )
+      })
+    })
+
+    context("when called with invalid parameters", () => {
+      it("should revert with zero address", async () => {
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .emergencyPauseQC(ethers.constants.AddressZero, emergencyReason)
+        ).to.be.revertedWith("InvalidQCAddress")
+      })
+
+      it("should revert with empty reason", async () => {
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .emergencyPauseQC(qcAddress.address, ethers.constants.HashZero)
+        ).to.be.revertedWith("ReasonRequired")
+      })
+
+      it("should revert when QC not registered", async () => {
+        mockQcData.isQCRegistered.returns(false)
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .emergencyPauseQC(qcAddress.address, emergencyReason)
+        ).to.be.revertedWith("QCNotRegistered")
+      })
+    })
+
+    context("when QC is already Revoked", () => {
+      beforeEach(async () => {
+        mockQcData.getQCStatus.returns(2) // Revoked
+      })
+
+      it("should not change status", async () => {
+        await qcManager
+          .connect(watchdog)
+          .emergencyPauseQC(qcAddress.address, emergencyReason)
+
+        // Status change should not be called for Revoked QCs
+        expect(mockQcData.setQCStatus).to.not.have.been.called
+      })
+    })
+
+    context("when called by non-arbiter", () => {
+      it("should revert", async () => {
+        await expect(
+          qcManager
+            .connect(thirdParty)
+            .emergencyPauseQC(qcAddress.address, emergencyReason)
+        ).to.be.revertedWith(
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
+        )
+      })
+    })
+
+    context("when function is paused", () => {
+      beforeEach(async () => {
+        mockSystemState.isFunctionPaused
+          .whenCalledWith("registry")
+          .returns(true)
+      })
+
+      it("should revert", async () => {
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .emergencyPauseQC(qcAddress.address, emergencyReason)
+        ).to.be.revertedWith("Function is paused")
       })
     })
   })
