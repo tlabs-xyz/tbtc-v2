@@ -829,4 +829,672 @@ Remove all time-locking from account control components. The system's RBAC model
 
 ---
 
+## Wallet Deregistration Access Control Analysis
+
+**Investigation Date**: 2025-01-16  
+**Function**: `requestWalletDeRegistration` in QCManager.sol  
+**Status**: ANALYZED AND APPROVED  
+
+### Access Control Question
+
+During code review, the question arose about who should be able to call `requestWalletDeRegistration(string calldata btcAddress)` and whether the current access control is appropriate.
+
+### Current Implementation Analysis
+
+**Access Control Logic** (QCManager.sol:357-358):
+```solidity
+if (msg.sender != qc && !hasRole(QC_ADMIN_ROLE, msg.sender)) {
+    revert NotAuthorizedForWalletDeregistration(msg.sender);
+}
+```
+
+### Who Can Call the Function
+
+#### ✅ 1. QC Owner (Self-Service)
+- **Condition**: `msg.sender == qc` (where `qc` is the wallet owner)
+- **Justification**: QCs should have autonomy over their own wallet operations
+- **Use Cases**:
+  - QC wants to deregister a wallet they no longer use
+  - QC is rotating their Bitcoin wallet infrastructure
+  - QC is reducing operational complexity by consolidating wallets
+- **Risk Level**: LOW - QC is voluntarily reducing their own operational capacity
+
+#### ✅ 2. QC_ADMIN_ROLE (Administrative Override)
+- **Condition**: `hasRole(QC_ADMIN_ROLE, msg.sender)`
+- **Justification**: System administrators need emergency powers for compliance and security
+- **Use Cases**:
+  - Force wallet deregistration for compliance violations
+  - Emergency response to compromised wallets
+  - System maintenance requiring wallet removal
+  - QC cooperation issues requiring administrative intervention
+- **Risk Level**: MEDIUM - Requires trusted administrative role
+
+### Security Analysis
+
+#### ✅ **Proper Access Control**
+- Only wallet owner or admin can initiate deregistration
+- Requires wallet to be in `Active` status
+- Respects system pause mechanism (`onlyWhenNotPaused` modifier)
+
+#### ✅ **Two-Step Process Protection**
+- `requestWalletDeRegistration` only sets status to `PendingDeRegistration`
+- Actual deregistration requires `finalizeWalletDeRegistration` with solvency checks
+- Prevents accidental or malicious instant wallet removal
+- Provides opportunity for review before finalization
+
+#### ✅ **Solvency Protection**
+- Finalization requires separate function with solvency verification
+- Prevents QC from becoming undercollateralized through wallet removal
+- Ensures system integrity is maintained
+
+### Design Principles Satisfied
+
+1. **Operational Autonomy**: QCs can manage their own infrastructure without external dependencies
+2. **Administrative Oversight**: Admins can handle compliance and security edge cases
+3. **Gradual Security**: Two-step process prevents hasty decisions
+4. **Least Privilege**: Only necessary parties can initiate deregistration
+
+### Comparison with Industry Standards
+
+**Traditional Custody Models**:
+- Custodians have full control over their own wallet infrastructure ✅
+- Regulatory oversight allows administrative intervention ✅
+
+**DeFi Protocol Patterns**:
+- Self-service for routine operations ✅
+- Admin roles for emergency/compliance situations ✅
+
+**Institutional Requirements**:
+- Operational independence for routine maintenance ✅
+- Clear audit trail for compliance purposes ✅
+
+### Alternative Approaches Considered
+
+#### ❌ **QC-Only Access**
+```solidity
+// Only QC can deregister their own wallets
+if (msg.sender != qc) {
+    revert NotAuthorizedForWalletDeregistration(msg.sender);
+}
+```
+**Rejected because**: 
+- Lacks administrative oversight for compliance violations
+- No emergency response capability for compromised QCs
+- Insufficient for regulatory requirements
+
+#### ❌ **Admin-Only Access**
+```solidity
+// Only admins can deregister wallets
+if (!hasRole(QC_ADMIN_ROLE, msg.sender)) {
+    revert NotAuthorizedForWalletDeregistration(msg.sender);
+}
+```
+**Rejected because**:
+- Removes QC operational autonomy
+- Creates unnecessary dependency on administrators
+- Doesn't align with custodial business model
+
+#### ❌ **Time-Locked Admin Access**
+```solidity
+// Admins can only deregister after time delay
+if (msg.sender != qc && !_canExecuteAfterDelay(msg.sender)) {
+    revert NotAuthorizedForWalletDeregistration(msg.sender);
+}
+```
+**Rejected because**:
+- Emergency situations require immediate response
+- QC operational needs don't justify bureaucratic delays
+- Two-step process already provides sufficient protection
+
+### Recommendation: KEEP CURRENT IMPLEMENTATION
+
+The current access control design is **optimal** and should **remain unchanged**:
+
+#### **Strengths**:
+1. **Balanced Approach**: Combines QC autonomy with administrative oversight
+2. **Security**: Two-step process prevents hasty decisions
+3. **Compliance**: Enables regulatory compliance through admin intervention
+4. **Operational Efficiency**: QCs can manage routine operations independently
+
+#### **Implementation Quality**:
+- Clear access control logic
+- Appropriate error messages
+- Proper integration with role-based access control
+- Consistent with system-wide security patterns
+
+### Operational Procedures
+
+**For QC-Initiated Deregistration**:
+1. QC calls `requestWalletDeRegistration(btcAddress)`
+2. System sets wallet status to `PendingDeRegistration`
+3. QC or admin calls `finalizeWalletDeRegistration` with updated balance
+4. System verifies solvency before completing deregistration
+
+**For Admin-Initiated Deregistration**:
+1. Admin investigates compliance/security issue
+2. Admin calls `requestWalletDeRegistration(btcAddress)`
+3. Admin coordinates with QC for balance update
+4. Admin calls `finalizeWalletDeRegistration` with verified balance
+5. System completes deregistration after solvency check
+
+### Conclusion
+
+The `requestWalletDeRegistration` access control is **well-designed** and reflects industry best practices for institutional custody systems. The dual access model (QC self-service + admin override) provides the right balance of operational autonomy and regulatory compliance.
+
+**Decision: Keep current implementation unchanged.**
+
+## Wallet Deregistration Finalization Access Control Analysis
+
+**Function**: `finalizeWalletDeRegistration` in QCManager.sol  
+**Status**: ANALYZED AND APPROVED  
+
+### Who Can Call `finalizeWalletDeRegistration`
+
+**Access Control** (QCManager.sol:375):
+```solidity
+function finalizeWalletDeRegistration(
+    string calldata btcAddress,
+    uint256 newReserveBalance
+)
+    external
+    onlyRole(REGISTRAR_ROLE)  // <-- Only REGISTRAR_ROLE can call
+    onlyWhenNotPaused("wallet_registration")
+```
+
+#### ✅ **REGISTRAR_ROLE (Watchdog/Trusted Verifier)**
+- **Condition**: `onlyRole(REGISTRAR_ROLE)`
+- **Typical Holder**: Watchdog operator or trusted system verifier
+- **Justification**: Requires external verification of Bitcoin balance changes
+
+### When and Why REGISTRAR_ROLE Calls This Function
+
+#### **When**:
+1. **After `requestWalletDeRegistration`** has been called (wallet status = `PendingDeRegistration`)
+2. **After Bitcoin balance verification** - REGISTRAR must verify the new reserve balance
+3. **During normal operations** - Not an emergency function, requires proper verification
+
+#### **Why REGISTRAR_ROLE**:
+1. **External Verification Required**: 
+   - Function requires `newReserveBalance` parameter
+   - REGISTRAR must verify Bitcoin reserves off-chain
+   - Similar to how REGISTRAR verifies wallet registrations with SPV proofs
+
+2. **Solvency Protection**:
+   - Function calls `_updateReserveBalanceAndCheckSolvency(qc, newReserveBalance)`
+   - Prevents QC from becoming undercollateralized
+   - Requires trusted party to provide accurate balance
+
+3. **System Integrity**:
+   - Ensures wallet removal doesn't compromise system security
+   - Maintains accurate reserve tracking
+   - Prevents manipulation of reserve balances
+
+### Operational Flow
+
+**Complete Two-Step Process**:
+1. **Step 1**: QC or Admin calls `requestWalletDeRegistration(btcAddress)`
+   - Sets wallet status to `PendingDeRegistration`
+   - Initiates deregistration process
+   
+2. **Step 2**: REGISTRAR calls `finalizeWalletDeRegistration(btcAddress, newReserveBalance)`
+   - Verifies new Bitcoin balance off-chain
+   - Updates reserve balance in system
+   - Performs solvency check
+   - Completes deregistration if QC remains solvent
+
+### Security Analysis
+
+#### ✅ **Proper Separation of Concerns**:
+- **Request**: QC/Admin can initiate (operational decision)
+- **Finalize**: REGISTRAR must verify (technical/security decision)
+- **Balance Update**: Only REGISTRAR can update reserves (prevents manipulation)
+
+#### ✅ **Trust Model**:
+- REGISTRAR_ROLE typically held by Watchdog
+- Watchdog has existing infrastructure for Bitcoin verification
+- Consistent with wallet registration flow (REGISTRAR verifies SPV proofs)
+
+#### ✅ **Solvency Protection**:
+- Automatic solvency check during finalization
+- Prevents QC from becoming undercollateralized
+- Maintains system integrity
+
+### Why Not Other Roles?
+
+#### ❌ **QC Cannot Finalize**:
+- QC could manipulate `newReserveBalance` parameter
+- Would allow QC to become undercollateralized
+- Lacks off-chain verification capability
+
+#### ❌ **Admin Cannot Finalize**:
+- Admin typically doesn't have Bitcoin verification infrastructure
+- Could lead to inaccurate reserve balance updates
+- Separates administrative decisions from technical verification
+
+#### ❌ **Anyone Can Finalize**:
+- Would allow balance manipulation attacks
+- No guarantee of accurate reserve verification
+- Compromises system security
+
+### Comparison with Related Functions
+
+| Function | Access Control | Rationale |
+|----------|---------------|-----------|
+| `requestWalletDeRegistration` | QC Owner + QC_ADMIN_ROLE | Operational decision |
+| `finalizeWalletDeRegistration` | REGISTRAR_ROLE | Technical verification |
+| `registerWallet` | REGISTRAR_ROLE | SPV verification required |
+
+**Pattern**: REGISTRAR_ROLE handles all functions requiring external Bitcoin verification
+
+### Recommendation: KEEP CURRENT IMPLEMENTATION
+
+The `finalizeWalletDeRegistration` access control is **appropriate** and should **remain unchanged**:
+
+#### **Strengths**:
+1. **Proper Separation**: Operational decisions vs technical verification
+2. **Security**: Prevents balance manipulation by QCs
+3. **Consistency**: Aligns with existing REGISTRAR_ROLE responsibilities
+4. **Solvency Protection**: Automatic undercollateralization prevention
+
+#### **Operational Clarity**:
+- Clear two-step process with defined roles
+- REGISTRAR has necessary infrastructure for Bitcoin verification
+- Maintains system integrity through trusted verification
+
+### Enhanced Operational Procedures
+
+**For QC-Initiated Deregistration**:
+1. QC calls `requestWalletDeRegistration(btcAddress)`
+2. **QC coordinates with REGISTRAR** to verify new balance
+3. REGISTRAR verifies Bitcoin reserves off-chain
+4. REGISTRAR calls `finalizeWalletDeRegistration(btcAddress, newReserveBalance)`
+5. System verifies solvency and completes deregistration
+
+**For Admin-Initiated Deregistration**:
+1. Admin calls `requestWalletDeRegistration(btcAddress)`
+2. **Admin coordinates with REGISTRAR** for balance verification
+3. REGISTRAR verifies Bitcoin reserves off-chain
+4. REGISTRAR calls `finalizeWalletDeRegistration(btcAddress, newReserveBalance)`
+5. System verifies solvency and completes deregistration
+
+**Decision: Keep current implementation unchanged.**
+
+## Security Analysis: Malicious Watchdog Attack Vector
+
+**Investigation Date**: 2025-01-16  
+**Vulnerability**: Malicious REGISTRAR_ROLE manipulation of `newReserveBalance`  
+**Status**: CRITICAL SECURITY CONCERN IDENTIFIED  
+**Severity**: HIGH  
+
+### Attack Vector Analysis
+
+#### **The Problem**
+A malicious watchdog (REGISTRAR_ROLE) can potentially manipulate the `newReserveBalance` parameter in `finalizeWalletDeRegistration()`, leading to several attack scenarios:
+
+```solidity
+function finalizeWalletDeRegistration(
+    string calldata btcAddress,
+    uint256 newReserveBalance  // <-- Malicious watchdog controls this
+)
+    external
+    onlyRole(REGISTRAR_ROLE)
+```
+
+### Potential Attack Scenarios
+
+#### **1. Artificially Inflate Reserve Balance**
+```solidity
+// Malicious watchdog sets inflated balance
+finalizeWalletDeRegistration(btcAddress, 1000000 ether); // Way higher than actual
+```
+
+**Impact**:
+- QC appears more solvent than reality
+- Enables QC to mint more tBTC than backed by actual Bitcoin
+- System becomes undercollateralized
+- Potential for bank run scenarios
+
+#### **2. Artificially Deflate Reserve Balance**  
+```solidity
+// Malicious watchdog sets deflated balance
+finalizeWalletDeRegistration(btcAddress, 0); // Lower than actual
+```
+
+**Impact**:
+- QC appears less solvent than reality
+- Might trigger unnecessary liquidations
+- QC loses legitimate minting capacity
+- Competitive disadvantage through false data
+
+#### **3. Coordinated Attack with Compromised QC**
+```solidity
+// 1. Compromised QC removes wallet with actual Bitcoin
+qc.requestWalletDeRegistration(btcAddress);
+
+// 2. Malicious watchdog reports false high balance
+watchdog.finalizeWalletDeRegistration(btcAddress, inflatedBalance);
+
+// 3. QC mints against non-existent reserves
+qc.mint(excessiveAmount);
+```
+
+### Current Protection Mechanisms
+
+#### ✅ **Solvency Check (Partial Protection)**
+```solidity
+// Only prevents balance < mintedAmount
+if (newBalance < mintedAmount) {
+    revert QCWouldBecomeInsolvent(newBalance, mintedAmount);
+}
+```
+
+**Limitation**: Only prevents obvious insolvency, doesn't verify actual Bitcoin reserves
+
+#### ✅ **Role-Based Access Control**
+- Only REGISTRAR_ROLE can call function
+- Requires trusted entity assumption
+
+**Limitation**: Single point of failure if watchdog is compromised
+
+#### ✅ **Event Logging**
+```solidity
+emit ReserveBalanceUpdated(qc, oldBalance, newBalance, msg.sender, block.timestamp);
+```
+
+**Limitation**: Reactive monitoring, doesn't prevent the attack
+
+### Missing Protection Mechanisms
+
+#### ❌ **No Sanity Checks**
+- No validation that `newBalance` is reasonable
+- No comparison with previous balance trends
+- No maximum change limits
+
+#### ❌ **No Multi-Signature Verification**
+- Single watchdog can manipulate entire system
+- No consensus mechanism for balance updates
+
+#### ❌ **No External Verification**
+- No cross-reference with actual Bitcoin blockchain
+- No independent reserve verification
+
+### Recommended Mitigations
+
+#### **1. Implement Sanity Checks**
+```solidity
+function _validateBalanceChange(
+    address qc,
+    uint256 oldBalance,
+    uint256 newBalance
+) private view {
+    // Maximum 50% change in single operation
+    uint256 maxChange = oldBalance / 2;
+    
+    if (newBalance > oldBalance + maxChange) {
+        revert BalanceChangeExceedsLimit(oldBalance, newBalance, maxChange);
+    }
+    
+    // Prevent zero balance unless QC has no minted tokens
+    uint256 mintedAmount = qcData.getQCMintedAmount(qc);
+    if (newBalance == 0 && mintedAmount > 0) {
+        revert InvalidZeroBalance(mintedAmount);
+    }
+}
+```
+
+#### **2. Multi-Signature Requirement**
+```solidity
+// Require multiple REGISTRAR signatures for large changes
+if (balanceChange > LARGE_CHANGE_THRESHOLD) {
+    require(
+        multiSigVerifier.verify(qc, newBalance, signatures),
+        "Multi-signature required for large balance changes"
+    );
+}
+```
+
+#### **3. Time-Locked Large Changes**
+```solidity
+// Large balance increases require time delay
+if (newBalance > oldBalance * 1.2) { // 20% increase
+    require(
+        block.timestamp >= lastBalanceUpdate[qc] + LARGE_CHANGE_DELAY,
+        "Large balance increase requires time delay"
+    );
+}
+```
+
+#### **4. Independent Verification Integration**
+```solidity
+// Integrate with external Bitcoin verification service
+interface IBitcoinVerifier {
+    function verifyWalletBalance(string memory btcAddress) external view returns (uint256);
+}
+
+// Cross-reference with independent verifier
+uint256 verifiedBalance = bitcoinVerifier.verifyWalletBalance(btcAddress);
+require(
+    newBalance <= verifiedBalance + VERIFICATION_TOLERANCE,
+    "Balance exceeds verified amount"
+);
+```
+
+### Risk Assessment
+
+#### **Likelihood**: MEDIUM-HIGH
+- Watchdog is trusted but single point of failure
+- Economic incentives for manipulation exist
+- No technical barriers to prevent manipulation
+
+#### **Impact**: HIGH
+- System-wide undercollateralization possible
+- Loss of user funds
+- Protocol reputation damage
+- Regulatory compliance issues
+
+#### **Overall Risk**: HIGH
+
+### Recommended Immediate Actions
+
+#### **1. Short-term (Critical)**
+- Implement basic sanity checks for balance changes
+- Add multi-signature requirement for large changes
+- Enhance monitoring and alerting for unusual balance updates
+
+#### **2. Medium-term (Important)**
+- Integrate with independent Bitcoin verification services
+- Implement time-locked governance for large balance changes
+- Add circuit breakers for excessive balance manipulations
+
+#### **3. Long-term (Strategic)**
+- Develop decentralized verification network
+- Implement automated Bitcoin blockchain monitoring
+- Create economic incentives for honest verification
+
+### Conclusion
+
+The current `finalizeWalletDeRegistration` function has a **significant security vulnerability** where a malicious watchdog can manipulate reserve balances. While the function has basic solvency protection, it lacks comprehensive validation against manipulation.
+
+**Recommendation**: Implement additional security measures before mainnet deployment, particularly sanity checks and multi-signature requirements for balance updates.
+
+**Risk Level**: HIGH - Requires immediate attention
+
+## Staleness Handling Analysis: verifyQCSolvency vs getAvailableMintingCapacity
+
+**Investigation Date**: 2025-01-16  
+**Functions**: `verifyQCSolvency` and `getAvailableMintingCapacity` in QCManager.sol  
+**Issue**: Inconsistent staleness handling between solvency checking and minting capacity  
+**Status**: DESIGN INCONSISTENCY IDENTIFIED  
+
+### The Inconsistency
+
+#### **`getAvailableMintingCapacity` (Considers Staleness)**
+```solidity
+function getAvailableMintingCapacity(address qc) external view returns (uint256) {
+    // Get reserve balance and check if stale
+    (uint256 reserveBalance, bool isStale) = _getReserveBalanceAndStaleness(qc);
+    if (isStale) {
+        return 0;  // <-- Returns 0 if reserves are stale
+    }
+    // ... rest of function
+}
+```
+
+#### **`verifyQCSolvency` (Ignores Staleness)**
+```solidity
+function verifyQCSolvency(address qc) external returns (bool solvent) {
+    (uint256 reserveBalance, ) = _getReserveBalanceAndStaleness(qc);
+    //                      ^ Staleness flag is ignored
+    uint256 mintedAmount = qcData.getQCMintedAmount(qc);
+    solvent = reserveBalance >= mintedAmount;  // <-- Uses potentially stale balance
+}
+```
+
+### Analysis: Is This Correct Behavior?
+
+#### **Arguments FOR Ignoring Staleness in Solvency Checks**
+
+**✅ Prevents False Insolvency Triggers**:
+- Temporary communication issues shouldn't mark solvent QCs as insolvent
+- Network outages or attestation delays would trigger unnecessary liquidations
+- Last known balance may still be accurate for solvency assessment
+
+**✅ Operational Stability**:
+- Avoids system disruption due to technical issues
+- Maintains QC operational status during temporary problems
+- Provides grace period for attestation system recovery
+
+**✅ Different Use Cases**:
+- **Minting**: Requires fresh data for new token creation
+- **Solvency**: Assesses existing obligations with historical data
+
+#### **Arguments AGAINST Ignoring Staleness in Solvency Checks**
+
+**❌ Security Risk**:
+- Stale data may not reflect current Bitcoin balance
+- QC could have moved/spent Bitcoin since last attestation
+- Creates window for manipulation
+
+**❌ Inconsistent System Behavior**:
+- Users can't mint (capacity = 0) but QC appears solvent
+- Confusing for monitoring and governance
+- Different parts of system have different "truth"
+
+**❌ Enables Staleness Attacks**:
+- Malicious QC could stop providing attestations after balance decrease
+- System would use old (higher) balance for solvency checks
+- Could delay detection of actual insolvency
+
+### Recommended Design Decision
+
+#### **Option 1: Keep Current Behavior (Recommended)**
+```solidity
+function verifyQCSolvency(address qc) external returns (bool solvent) {
+    (uint256 reserveBalance, bool isStale) = _getReserveBalanceAndStaleness(qc);
+    
+    // Use last known balance for solvency, but flag the issue
+    solvent = reserveBalance >= mintedAmount;
+    
+    // If using stale data, emit warning event
+    if (isStale && solvent) {
+        emit SolvencyCheckWithStaleData(qc, reserveBalance, mintedAmount, block.timestamp);
+    }
+}
+```
+
+**Rationale**: 
+- Operational stability is crucial for institutional QCs
+- Temporary technical issues shouldn't trigger liquidations
+- Warning events provide transparency about data staleness
+
+#### **Option 2: Stricter Staleness Handling**
+```solidity
+function verifyQCSolvency(address qc) external returns (bool solvent) {
+    (uint256 reserveBalance, bool isStale) = _getReserveBalanceAndStaleness(qc);
+    
+    // If data is stale, consider QC potentially insolvent
+    if (isStale) {
+        return false;  // Force fresh attestation
+    }
+    
+    solvent = reserveBalance >= mintedAmount;
+}
+```
+
+**Rationale**: 
+- Prioritizes security over operational convenience
+- Ensures solvency checks use fresh data
+- Consistent with minting capacity logic
+
+#### **Option 3: Configurable Staleness Tolerance**
+```solidity
+function verifyQCSolvency(address qc) external returns (bool solvent) {
+    (uint256 reserveBalance, bool isStale) = _getReserveBalanceAndStaleness(qc);
+    
+    // Allow staleness up to SOLVENCY_STALENESS_TOLERANCE (e.g., 1 hour)
+    if (isStale && block.timestamp - lastUpdate > SOLVENCY_STALENESS_TOLERANCE) {
+        return false;
+    }
+    
+    solvent = reserveBalance >= mintedAmount;
+}
+```
+
+### Current Implementation Assessment
+
+The current behavior where `verifyQCSolvency` ignores staleness is **reasonable but should be explicit**:
+
+#### **✅ Correct Aspects**:
+- Prevents false insolvency from technical issues
+- Maintains system stability
+- Appropriate for solvency assessment vs minting decisions
+
+#### **⚠️ Areas for Improvement**:
+- Should emit events when using stale data
+- Should document the design decision clearly
+- Should consider maximum staleness tolerance
+
+### Recommended Implementation
+
+**1. Add Staleness Warning Events**:
+```solidity
+event SolvencyCheckWithStaleData(
+    address indexed qc,
+    uint256 staleBalance,
+    uint256 mintedAmount,
+    uint256 timestamp
+);
+```
+
+**2. Document the Design Decision**:
+```solidity
+/// @dev NOTE: This function ignores staleness of reserve proofs, unlike getAvailableMintingCapacity.
+///      This means a QC with stale reserves can still be marked as solvent if their last known
+///      balance covers minted amount. This is intentional to avoid false insolvency triggers
+///      due to temporary communication issues, but creates potential for manipulation.
+```
+
+**3. Consider Maximum Staleness Limit**:
+```solidity
+// If reserves are extremely stale (e.g., >24 hours), treat as insolvent
+uint256 constant MAX_STALENESS_FOR_SOLVENCY = 24 hours;
+```
+
+### Conclusion
+
+The current design where `verifyQCSolvency` ignores staleness is **appropriate** for the following reasons:
+
+1. **Operational Stability**: Prevents false insolvency from technical issues
+2. **Different Use Cases**: Solvency assessment vs minting capacity have different requirements
+3. **Risk Management**: Temporary attestation issues shouldn't trigger liquidations
+
+However, the implementation should be **enhanced** with:
+- Clear documentation of the design decision
+- Warning events when using stale data
+- Optional maximum staleness tolerance
+
+**Recommendation**: Keep current behavior but add transparency and documentation improvements.
+
+---
+
 *This document serves as a record of the design review and decision-making process for future reference.*
