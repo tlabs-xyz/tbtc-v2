@@ -1250,7 +1250,7 @@ describe("Bank", () => {
       it("should revert", async () => {
         await expect(
           bank.connect(thirdParty).increaseBalance(recipient, amount)
-        ).to.be.revertedWith("Caller is not the bridge")
+        ).to.be.revertedWith("Unauthorized balance increaser")
       })
     })
 
@@ -1315,7 +1315,7 @@ describe("Bank", () => {
               [recipient1, recipient2, recipient3],
               [amount1, amount2, amount3]
             )
-        ).to.be.revertedWith("Caller is not the bridge")
+        ).to.be.revertedWith("Unauthorized balance increaser")
       })
     })
 
@@ -1433,7 +1433,7 @@ describe("Bank", () => {
               [depositor1, depositor2],
               [depositedAmount1, depositedAmount2]
             )
-        ).to.be.revertedWith("Caller is not the bridge")
+        ).to.be.revertedWith("Unauthorized balance increaser")
       })
     })
 
