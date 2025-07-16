@@ -440,9 +440,8 @@ describe("BasicMintingPolicy", () => {
 describe("Account Control Integration", () => {
   it("should handle complete QC lifecycle", async () => {
     // 1. QC Onboarding
-    await governance.queueQCOnboarding(qc.address, "Test QC", ethers.utils.parseEther("100"));
-    await time.increase(GOVERNANCE_DELAY);
-    await governance.executeQCOnboarding(qc.address);
+    await governance.registerQC(qc.address, ethers.utils.parseEther("100"));
+    // Instant execution - no time delay needed
 
     // 2. Wallet Registration with SPV proof
     const spvProof = await generateSPVProof(btcAddress, challengeHash);
@@ -474,7 +473,7 @@ contract AccountControlAccessControl is AccessControl {
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant TIME_LOCKED_ADMIN_ROLE = keccak256("TIME_LOCKED_ADMIN_ROLE");
+    bytes32 public constant QC_GOVERNANCE_ROLE = keccak256("QC_GOVERNANCE_ROLE");
 
     modifier onlyActiveQC(address qc) {
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
