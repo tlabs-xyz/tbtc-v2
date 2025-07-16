@@ -435,10 +435,10 @@ export async function setupQCWithWallets(
   walletAddresses: string[] = [TEST_DATA.BTC_ADDRESSES.TEST],
   reserveBalance: typeof ethers.BigNumber = TEST_DATA.AMOUNTS.RESERVE_BALANCE
 ) {
-  const { qcManager, qcReserveLedger, watchdog } = fixture
+  const { qcData, qcManager, qcReserveLedger, watchdog } = fixture
 
-  // Register QC
-  await qcManager.registerQC(qcAddress)
+  // Register QC directly via QCData for testing
+  await qcData.registerQC(qcAddress, ethers.utils.parseEther("1000"))
 
   // Register wallets
   await walletAddresses.reduce(async (prev, walletAddress) => {

@@ -9,6 +9,7 @@ import {
   createMockSpvData,
   TEST_DATA,
   QCStatus,
+  SERVICE_KEYS,
 } from "./AccountControlTestHelpers"
 
 chai.use(smock.matchers)
@@ -187,7 +188,7 @@ describe("Economic Attack Tests", () => {
           protocolRegistry
             .connect(attacker)
             .setService(
-              await basicMintingPolicy.MINTING_POLICY_KEY(),
+              SERVICE_KEYS.MINTING_POLICY,
               maliciousPolicyAddress
             )
         ).to.be.revertedWith("AccessControl: account") // Should require DEFAULT_ADMIN_ROLE
@@ -325,13 +326,13 @@ describe("Economic Attack Tests", () => {
      */
     context("QC Registration Front-Running", () => {
       it("should prevent front-running of QC registration", async () => {
-        const { qcManager } = fixture
+        const { qcData, qcManager } = fixture
 
         const newQC = ethers.Wallet.createRandom().address
 
         // Scenario: Legitimate QC tries to register, attacker front-runs
         // The legitimate registration should succeed
-        const legitimateRegistration = qcManager.registerQC(newQC)
+        const legitimateRegistration = qcData.registerQC(newQC, ethers.utils.parseEther("1000"))
         await expect(legitimateRegistration).to.not.be.reverted
 
         // The attacker should NOT be able to register without proper role
@@ -492,7 +493,7 @@ describe("Economic Attack Tests", () => {
           protocolRegistry
             .connect(attacker)
             .setService(
-              await basicMintingPolicy.MINTING_POLICY_KEY(),
+              SERVICE_KEYS.MINTING_POLICY,
               maliciousPolicyAddress
             )
         ).to.be.revertedWith("AccessControl: account")
