@@ -370,20 +370,6 @@ contract QCData is AccessControl {
         return custodians[qc].maxMintingCapacity;
     }
 
-    /// @notice Get QC minting data (capacity and current minted amount)
-    /// @param qc The address of the QC
-    /// @return maxCapacity The maximum minting capacity
-    /// @return currentMinted The current minted amount
-    function getMintingData(address qc)
-        external
-        view
-        returns (uint256 maxCapacity, uint256 currentMinted)
-    {
-        return (
-            custodians[qc].maxMintingCapacity,
-            custodians[qc].totalMintedAmount
-        );
-    }
 
     /// @notice Get wallet status
     /// @param btcAddress The Bitcoin address
@@ -407,11 +393,6 @@ contract QCData is AccessControl {
         return wallets[btcAddress].qc;
     }
 
-    /// @notice Get all registered QCs
-    /// @return qcs Array of all registered QC addresses
-    function getAllQCs() external view returns (address[] memory qcs) {
-        return registeredQCs;
-    }
 
     /// @notice Get QC wallet addresses
     /// @param qc The address of the QC

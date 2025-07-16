@@ -380,72 +380,6 @@ contract SingleWatchdog is AccessControl {
         this.attestReserves(qc, balance);
     }
 
-    /// @notice Bulk handle multiple redemptions (emergency use) (requires WATCHDOG_OPERATOR_ROLE)
-    /// @param redemptionIds Array of redemption IDs
-    /// @param fulfill True to fulfill, false to default
-    /// @param reason Reason for bulk action
-    function bulkHandleRedemptions(
-        bytes32[] calldata redemptionIds,
-        bool fulfill,
-        bytes32 reason
-    ) external onlyRole(WATCHDOG_OPERATOR_ROLE) {
-        if (redemptionIds.length == 0) revert NoRedemptionsProvided();
-        if (reason == bytes32(0)) revert ReasonRequired();
-
-        QCRedeemer redeemer = QCRedeemer(
-            protocolRegistry.getService(QC_REDEEMER_KEY)
-        );
-
-        for (uint256 i = 0; i < redemptionIds.length; i++) {
-            bytes32 redemptionId = redemptionIds[i];
-
-            if (fulfill) {
-                // Use empty SPV proof for bulk operations (emergency only)
-                // Create placeholder SPV data for bulk operations (emergency only)
-                BitcoinTx.Info memory txInfo = BitcoinTx.Info({
-                    version: bytes4(0),
-                    inputVector: "",
-                    outputVector: "",
-                    locktime: bytes4(0)
-                });
-
-                BitcoinTx.Proof memory proof = BitcoinTx.Proof({
-                    merkleProof: "",
-                    txIndexInBlock: 0,
-                    bitcoinHeaders: "",
-                    coinbasePreimage: bytes32(0),
-                    coinbaseProof: ""
-                });
-
-                redeemer.recordRedemptionFulfillment(
-                    redemptionId,
-                    "",
-                    0,
-                    txInfo,
-                    proof
-                );
-                emit WatchdogRedemptionAction(
-                    redemptionId,
-                    "BULK_FULFILLED",
-                    reason,
-                    msg.sender,
-                    block.timestamp
-                );
-            } else {
-                redeemer.flagDefaultedRedemption(redemptionId, reason);
-                emit WatchdogRedemptionAction(
-                    redemptionId,
-                    "BULK_DEFAULTED",
-                    reason,
-                    msg.sender,
-                    block.timestamp
-                );
-            }
-
-            redemptionHandlingTime[redemptionId] = block.timestamp;
-        }
-    }
-
     /// @notice Get Watchdog statistics
     /// @param qc The QC address
     /// @return stats Array containing [lastAttestationTime, attestationCount, isOperational]
@@ -509,17 +443,28 @@ contract SingleWatchdog is AccessControl {
 
     /// @notice Setup Watchdog roles (DAO only)
     /// @dev This function grants this contract the necessary roles in all system contracts
+    /// @dev Validates that this contract has admin privileges before attempting role grants
     function setupWatchdogRoles() external onlyRole(DEFAULT_ADMIN_ROLE) {
         // Grant ATTESTER_ROLE in QCReserveLedger
         QCReserveLedger reserveLedger = QCReserveLedger(
             protocolRegistry.getService(QC_RESERVE_LEDGER_KEY)
         );
+        
+        // Validate that this contract has admin privileges in QCReserveLedger
+        if (!reserveLedger.hasRole(reserveLedger.DEFAULT_ADMIN_ROLE(), address(this))) {
+            revert("SingleWatchdog: Missing admin role in QCReserveLedger");
+        }
         reserveLedger.grantRole(reserveLedger.ATTESTER_ROLE(), address(this));
 
         // Grant REGISTRAR_ROLE and ARBITER_ROLE in QCManager
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
         );
+        
+        // Validate that this contract has admin privileges in QCManager
+        if (!qcManager.hasRole(qcManager.DEFAULT_ADMIN_ROLE(), address(this))) {
+            revert("SingleWatchdog: Missing admin role in QCManager");
+        }
         qcManager.grantRole(qcManager.REGISTRAR_ROLE(), address(this));
         qcManager.grantRole(qcManager.ARBITER_ROLE(), address(this));
 
@@ -527,6 +472,11 @@ contract SingleWatchdog is AccessControl {
         QCRedeemer redeemer = QCRedeemer(
             protocolRegistry.getService(QC_REDEEMER_KEY)
         );
+        
+        // Validate that this contract has admin privileges in QCRedeemer
+        if (!redeemer.hasRole(redeemer.DEFAULT_ADMIN_ROLE(), address(this))) {
+            revert("SingleWatchdog: Missing admin role in QCRedeemer");
+        }
         redeemer.grantRole(redeemer.ARBITER_ROLE(), address(this));
     }
 
