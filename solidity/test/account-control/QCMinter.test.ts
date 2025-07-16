@@ -119,13 +119,13 @@ describe("QCMinter", () => {
           qcMinter
             .connect(user)
             .requestQCMint(ethers.constants.AddressZero, mintAmount)
-        ).to.be.revertedWith("Invalid QC address")
+        ).to.be.revertedWith("InvalidQCAddress")
       })
 
       it("should revert with zero amount", async () => {
         await expect(
           qcMinter.connect(user).requestQCMint(qcAddress.address, 0)
-        ).to.be.revertedWith("Amount must be greater than zero")
+        ).to.be.revertedWith("InvalidAmount")
       })
     })
 
@@ -154,7 +154,7 @@ describe("QCMinter", () => {
       it("should revert", async () => {
         await expect(
           qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
-        ).to.be.revertedWith("Service not registered")
+        ).to.be.revertedWith("ServiceNotRegistered")
       })
     })
 
@@ -212,7 +212,7 @@ describe("QCMinter", () => {
       it("should revert", async () => {
         await expect(
           qcMinter.getAvailableMintingCapacity(qcAddress.address)
-        ).to.be.revertedWith("Service not registered")
+        ).to.be.revertedWith("ServiceNotRegistered")
       })
     })
 
@@ -283,7 +283,7 @@ describe("QCMinter", () => {
       it("should revert", async () => {
         await expect(
           qcMinter.checkMintingEligibility(qcAddress.address, mintAmount)
-        ).to.be.revertedWith("Service not registered")
+        ).to.be.revertedWith("ServiceNotRegistered")
       })
     })
 

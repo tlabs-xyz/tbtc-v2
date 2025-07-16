@@ -56,6 +56,8 @@ describe("Account Control System - Integration Test", () => {
   let QC_REDEEMER_KEY: string
   let TBTC_TOKEN_KEY: string
   let SPV_VALIDATOR_KEY: string
+  let BANK_KEY: string
+  let TBTC_VAULT_KEY: string
 
   // Roles
   let DATA_MANAGER_ROLE: string
@@ -81,6 +83,8 @@ describe("Account Control System - Integration Test", () => {
     QC_REDEEMER_KEY = ethers.utils.id("QC_REDEEMER")
     TBTC_TOKEN_KEY = ethers.utils.id("TBTC_TOKEN")
     SPV_VALIDATOR_KEY = ethers.utils.id("SPV_VALIDATOR")
+    BANK_KEY = ethers.utils.id("BANK")
+    TBTC_VAULT_KEY = ethers.utils.id("TBTC_VAULT")
 
     // Generate role hashes
     DATA_MANAGER_ROLE = ethers.utils.id("DATA_MANAGER_ROLE")
@@ -108,6 +112,18 @@ describe("Account Control System - Integration Test", () => {
     )
     protocolRegistry = await ProtocolRegistryFactory.deploy()
     await protocolRegistry.deployed()
+
+    // Deploy Bank and TBTCVault (needed by BasicMintingPolicy)
+    const BankFactory = await ethers.getContractFactory("Bank")
+    bank = await BankFactory.deploy()
+    await bank.deployed()
+
+    // Create a mock Bridge for TBTCVault
+    const mockBridge = await smock.fake("Bridge")
+    
+    const TBTCVaultFactory = await ethers.getContractFactory("TBTCVault")
+    tbtcVault = await TBTCVaultFactory.deploy(bank.address, tbtc.address, mockBridge.address)
+    await tbtcVault.deployed()
 
     const QCMinterFactory = await ethers.getContractFactory("QCMinter")
     qcMinter = await QCMinterFactory.deploy(protocolRegistry.address)
@@ -192,6 +208,8 @@ describe("Account Control System - Integration Test", () => {
       SPV_VALIDATOR_KEY,
       mockSpvValidator.address
     )
+    await protocolRegistry.setService(BANK_KEY, bank.address)
+    await protocolRegistry.setService(TBTC_VAULT_KEY, tbtcVault.address)
 
     // Configure access control roles
     await qcData.grantRole(QC_MANAGER_ROLE, qcManager.address)
@@ -201,8 +219,11 @@ describe("Account Control System - Integration Test", () => {
     const MINTER_ROLE = await basicMintingPolicy.MINTER_ROLE()
     await basicMintingPolicy.grantRole(MINTER_ROLE, qcMinter.address)
 
-    // Transfer ownership of TBTC to the minting policy so it can mint
-    await tbtc.transferOwnership(basicMintingPolicy.address)
+    // Transfer ownership of TBTC to the TBTCVault so it can mint
+    await tbtc.transferOwnership(tbtcVault.address)
+
+    // Configure Bank to allow BasicMintingPolicy to increase balances
+    await bank.setAuthorizedBalanceIncreaser(basicMintingPolicy.address, true)
 
     // Setup Watchdog roles
     await qcReserveLedger.grantRole(ATTESTER_ROLE, singleWatchdog.address)
@@ -284,7 +305,9 @@ describe("Account Control System - Integration Test", () => {
     const testBtcAddress = "bc1qtest123456789"
 
     it("should allow QC registration", async () => {
-      await qcManager.registerQC(qcAddress.address)
+      // Register QC directly through QCData for testing
+      // In production, this would go through time-locked governance
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
 
       expect(await qcData.isQCRegistered(qcAddress.address)).to.be.true
       expect(await qcData.getQCStatus(qcAddress.address)).to.equal(0) // Active
@@ -292,19 +315,27 @@ describe("Account Control System - Integration Test", () => {
 
     it("should allow wallet registration via Watchdog", async () => {
       // First register QC
-      await qcManager.registerQC(qcAddress.address)
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
 
       // Register wallet via Watchdog
-      const spvProof = ethers.utils.toUtf8Bytes("mock_spv_proof")
-      const challengeHash = ethers.utils.id("challenge_data")
+      const { challenge, txInfo, proof } = createMockSpvData("wallet_reg_test")
+      
+      // Encode the SPV proof data as expected by SingleWatchdog
+      const spvProofData = ethers.utils.defaultAbiCoder.encode(
+        ["tuple(bytes4,bytes,bytes,bytes4)", "tuple(bytes,uint256,bytes,bytes,bytes)"],
+        [
+          [txInfo.version, txInfo.inputVector, txInfo.outputVector, txInfo.locktime],
+          [proof.merkleProof, proof.txIndexInBlock, proof.bitcoinHeaders, proof.coinbasePreimage, proof.coinbaseProof]
+        ]
+      )
 
       await singleWatchdog
         .connect(watchdog)
         .registerWalletWithProof(
           qcAddress.address,
           testBtcAddress,
-          spvProof,
-          challengeHash
+          spvProofData,
+          challenge
         )
 
       const walletStatus = await qcData.getWalletStatus(testBtcAddress)
@@ -319,7 +350,7 @@ describe("Account Control System - Integration Test", () => {
     const initialReserveBalance = ethers.utils.parseEther("10") // 10 tBTC equivalent
 
     it("should allow Watchdog to attest reserves", async () => {
-      await qcManager.registerQC(qcAddress.address)
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
 
       await singleWatchdog
         .connect(watchdog)
@@ -334,7 +365,7 @@ describe("Account Control System - Integration Test", () => {
     })
 
     it("should detect stale attestations", async () => {
-      await qcManager.registerQC(qcAddress.address)
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
 
       await singleWatchdog
         .connect(watchdog)
@@ -354,7 +385,7 @@ describe("Account Control System - Integration Test", () => {
 
     it("should allow minting with sufficient reserves", async () => {
       // Setup QC with reserves
-      await qcManager.registerQC(qcAddress.address)
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
       await singleWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
@@ -383,7 +414,7 @@ describe("Account Control System - Integration Test", () => {
 
     it("should prevent minting when QC is not active", async () => {
       // Register QC and set to UnderReview
-      await qcManager.registerQC(qcAddress.address)
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
       await qcManager.setQCStatus(
         qcAddress.address,
         1,
@@ -408,7 +439,7 @@ describe("Account Control System - Integration Test", () => {
 
     it("should handle redemption lifecycle", async () => {
       // Setup QC and mint tokens
-      await qcManager.registerQC(qcAddress.address)
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
       await singleWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
@@ -481,7 +512,7 @@ describe("Account Control System - Integration Test", () => {
       expect(await systemState.isMintingPaused()).to.be.true
 
       // Setup QC for testing
-      await qcManager.registerQC(qcAddress.address)
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
       await singleWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
@@ -521,29 +552,29 @@ describe("Account Control System - Integration Test", () => {
       await qcManager.grantRole(QC_ADMIN_ROLE, newMintingPolicy.address)
 
       // Transfer TBTC ownership to new policy using impersonation
-      // Since we removed transferTBTCOwnership from BasicMintingPolicy,
-      // we need to call tbtc.transferOwnership directly from the current owner
+      // The TBTC token is owned by TBTCVault, not BasicMintingPolicy
       await network.provider.request({
         method: "hardhat_impersonateAccount",
-        params: [basicMintingPolicy.address],
+        params: [tbtcVault.address],
       })
 
       // Set balance for the impersonated account to pay for gas
       await network.provider.send("hardhat_setBalance", [
-        basicMintingPolicy.address,
+        tbtcVault.address,
         "0x1000000000000000000", // 1 ETH in hex
       ])
 
       const impersonatedSigner = await ethers.getSigner(
-        basicMintingPolicy.address
+        tbtcVault.address
       )
-      await tbtc
-        .connect(impersonatedSigner)
-        .transferOwnership(newMintingPolicy.address)
+      // Keep TBTCVault as owner, no transfer needed
+      // await tbtc
+      //   .connect(impersonatedSigner)
+      //   .transferOwnership(tbtcVault.address)
 
       await network.provider.request({
         method: "hardhat_stopImpersonatingAccount",
-        params: [basicMintingPolicy.address],
+        params: [tbtcVault.address],
       })
 
       // Revoke role from old policy to complete the transition
@@ -565,12 +596,17 @@ describe("Account Control System - Integration Test", () => {
       const MINTER_ROLE_NEW = await newMintingPolicy.MINTER_ROLE()
       await newMintingPolicy.grantRole(MINTER_ROLE_NEW, qcMinter.address)
 
+      // Configure Bank to allow new policy to increase balances
+      await bank.setAuthorizedBalanceIncreaser(newMintingPolicy.address, true)
+      // Remove authorization for old policy
+      await bank.setAuthorizedBalanceIncreaser(basicMintingPolicy.address, false)
+
       // Grant MINTER_ROLE to user on QCMinter
       const QC_MINTER_ROLE = await qcMinter.MINTER_ROLE()
       await qcMinter.grantRole(QC_MINTER_ROLE, user.address)
 
       // Test that new policy works
-      await qcManager.registerQC(qcAddress.address)
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
       await singleWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
@@ -607,7 +643,7 @@ describe("Account Control System - Integration Test", () => {
       await qcMinter.grantRole(QC_MINTER_ROLE, user.address)
 
       // Setup QC and reserves
-      await qcManager.registerQC(qcAddress.address)
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
       await singleWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
@@ -640,7 +676,7 @@ describe("Account Control System - Integration Test", () => {
 
       // Test basic transfer functionality (TBTC is ERC20)
       // First mint some tokens to test transfer
-      await qcManager.registerQC(qcAddress.address)
+      await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
       await singleWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
