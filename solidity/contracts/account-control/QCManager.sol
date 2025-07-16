@@ -14,15 +14,14 @@ import "./interfaces/ISPVValidator.sol";
 /// Contains all business logic for managing QCs, reading from and writing to
 /// QCData and SystemState via the central ProtocolRegistry. Manages QC status
 /// changes, wallet registration flows, and integrates with role-based access control.
-/// V1.1: Enhanced with time-locked governance for critical actions while preserving
-/// instant emergency response capabilities.
+/// V1.1: Simplified with instant governance for all actions, relying on RBAC for security.
 /// 
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update system configurations
-/// - QC_ADMIN_ROLE: Can register QCs (legacy), update minting amounts, request wallet deregistration
+/// - QC_ADMIN_ROLE: Can update minting amounts, request wallet deregistration
 /// - REGISTRAR_ROLE: Can register/deregister wallets with SPV verification
 /// - ARBITER_ROLE: Can pause QCs, change status, verify solvency (emergency response)
-/// - TIME_LOCKED_ADMIN_ROLE: Can queue/execute governance actions with time delay
+/// - QC_GOVERNANCE_ROLE: Can register QCs and manage minting capacity (instant actions)
 contract QCManager is AccessControl {
     bytes32 public constant QC_ADMIN_ROLE = keccak256("QC_ADMIN_ROLE");
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
@@ -32,16 +31,12 @@ contract QCManager is AccessControl {
     error InvalidQCAddress();
     error InvalidMintingCapacity();
     error QCAlreadyRegistered(address qc);
-    error ActionAlreadyQueued(bytes32 actionHash);
     error InvalidWalletAddress();
     error QCNotRegistered(address qc);
     error QCNotActive(address qc);
     error SPVVerificationFailed();
     error NotAuthorizedForSolvency(address caller);
     error QCNotRegisteredForSolvency(address qc);
-    error ActionNotQueued(bytes32 actionHash);
-    error DelayPeriodNotElapsed(uint256 executeAfter, uint256 currentTime);
-    error ActionAlreadyExecuted(bytes32 actionHash);
     error ReasonRequired();
     error InvalidStatusTransition(QCData.QCStatus oldStatus, QCData.QCStatus newStatus);
     error NewCapMustBeHigher(uint256 currentCap, uint256 newCap);
@@ -52,8 +47,8 @@ contract QCManager is AccessControl {
     error QCWouldBecomeInsolvent(uint256 newBalance, uint256 mintedAmount);
     error QCReserveLedgerNotAvailable();
     error SPVValidatorNotAvailable();
-    bytes32 public constant TIME_LOCKED_ADMIN_ROLE =
-        keccak256("TIME_LOCKED_ADMIN_ROLE");
+    bytes32 public constant QC_GOVERNANCE_ROLE =
+        keccak256("QC_GOVERNANCE_ROLE");
 
     // Service keys for ProtocolRegistry
     bytes32 public constant QC_DATA_KEY = keccak256("QC_DATA");
@@ -62,20 +57,9 @@ contract QCManager is AccessControl {
         keccak256("QC_RESERVE_LEDGER");
     bytes32 public constant SPV_VALIDATOR_KEY = keccak256("SPV_VALIDATOR");
 
-    /// @dev Governance delay for critical actions (7 days)
-    uint256 public constant GOVERNANCE_DELAY = 7 days;
 
     ProtocolRegistry public immutable protocolRegistry;
 
-    /// @dev Structure for tracking pending governance actions
-    struct PendingAction {
-        bytes32 actionHash;
-        uint256 executeAfter;
-        bool executed;
-    }
-
-    /// @dev Mapping to track pending governance actions
-    mapping(bytes32 => PendingAction) public pendingActions;
 
     // =================== STANDARDIZED EVENTS ===================
 
@@ -114,24 +98,6 @@ contract QCManager is AccessControl {
         uint256 timestamp
     );
 
-    // =================== TIME-LOCKED GOVERNANCE EVENTS ===================
-
-    /// @dev Emitted when a governance action is queued
-    event GovernanceActionQueued(
-        bytes32 indexed actionHash,
-        uint256 indexed executeAfter,
-        string actionType,
-        address indexed queuedBy,
-        uint256 timestamp
-    );
-
-    /// @dev Emitted when a governance action is executed
-    event GovernanceActionExecuted(
-        bytes32 indexed actionHash,
-        string actionType,
-        address indexed executedBy,
-        uint256 indexed timestamp
-    );
 
     /// @dev Emitted when QC is onboarded through governance process
     event QCOnboarded(
@@ -184,17 +150,17 @@ contract QCManager is AccessControl {
         _grantRole(QC_ADMIN_ROLE, msg.sender);
         _grantRole(REGISTRAR_ROLE, msg.sender);
         _grantRole(ARBITER_ROLE, msg.sender);
-        _grantRole(TIME_LOCKED_ADMIN_ROLE, msg.sender);
+        _grantRole(QC_GOVERNANCE_ROLE, msg.sender);
     }
 
-    // =================== TIME-LOCKED GOVERNANCE FUNCTIONS ===================
+    // =================== INSTANT GOVERNANCE FUNCTIONS ===================
 
-    /// @notice Queue QC onboarding (requires 7-day delay)
-    /// @param qc QC address to onboard
+    /// @notice Register a new Qualified Custodian (instant action)
+    /// @param qc QC address to register
     /// @param maxMintingCap Maximum minting capacity for the QC
-    function queueQCOnboarding(address qc, uint256 maxMintingCap)
+    function registerQC(address qc, uint256 maxMintingCap)
         external
-        onlyRole(TIME_LOCKED_ADMIN_ROLE)
+        onlyRole(QC_GOVERNANCE_ROLE)
     {
         if (qc == address(0)) {
             revert InvalidQCAddress();
@@ -208,73 +174,19 @@ contract QCManager is AccessControl {
             revert QCAlreadyRegistered(qc);
         }
 
-        bytes32 actionHash = keccak256(
-            abi.encodePacked("QC_ONBOARDING", qc, maxMintingCap)
-        );
-        if (pendingActions[actionHash].executeAfter != 0) {
-            revert ActionAlreadyQueued(actionHash);
-        }
+        // Register QC with provided minting capacity
+        qcData.registerQC(qc, maxMintingCap);
 
-        uint256 executeAfter = block.timestamp + GOVERNANCE_DELAY;
-
-        pendingActions[actionHash] = PendingAction({
-            actionHash: actionHash,
-            executeAfter: executeAfter,
-            executed: false
-        });
-
-        emit GovernanceActionQueued(
-            actionHash,
-            executeAfter,
-            "QC_ONBOARDING",
-            msg.sender,
-            block.timestamp
-        );
-    }
-
-    /// @notice Execute QC onboarding after delay period
-    /// @param qc QC address to onboard
-    /// @param maxMintingCap Maximum minting capacity for the QC
-    function executeQCOnboarding(address qc, uint256 maxMintingCap)
-        external
-        onlyRole(TIME_LOCKED_ADMIN_ROLE)
-    {
-        bytes32 actionHash = keccak256(
-            abi.encodePacked("QC_ONBOARDING", qc, maxMintingCap)
-        );
-        PendingAction storage action = pendingActions[actionHash];
-
-        if (action.executeAfter == 0) {
-            revert ActionNotQueued(actionHash);
-        }
-        if (block.timestamp < action.executeAfter) {
-            revert DelayPeriodNotElapsed(action.executeAfter, block.timestamp);
-        }
-        if (action.executed) {
-            revert ActionAlreadyExecuted(actionHash);
-        }
-
-        // Mark as executed before external calls
-        action.executed = true;
-
-        // Execute QC registration
-        _registerQC(qc, maxMintingCap);
-
-        emit GovernanceActionExecuted(
-            actionHash,
-            "QC_ONBOARDING",
-            msg.sender,
-            block.timestamp
-        );
+        emit QCRegistrationInitiated(qc, msg.sender, block.timestamp);
         emit QCOnboarded(qc, maxMintingCap, msg.sender, block.timestamp);
     }
 
-    /// @notice Queue minting cap increase (requires 7-day delay)
+    /// @notice Increase minting capacity for existing QC (instant action)
     /// @param qc QC address
     /// @param newCap New minting capacity (must be higher than current)
-    function queueMintingCapIncrease(address qc, uint256 newCap)
+    function increaseMintingCapacity(address qc, uint256 newCap)
         external
-        onlyRole(TIME_LOCKED_ADMIN_ROLE)
+        onlyRole(QC_GOVERNANCE_ROLE)
     {
         if (qc == address(0)) {
             revert InvalidQCAddress();
@@ -293,69 +205,11 @@ contract QCManager is AccessControl {
             revert NewCapMustBeHigher(currentCap, newCap);
         }
 
-        bytes32 actionHash = keccak256(
-            abi.encodePacked("MINTING_CAP_INCREASE", qc, newCap)
-        );
-        if (pendingActions[actionHash].executeAfter != 0) {
-            revert ActionAlreadyQueued(actionHash);
-        }
-
-        uint256 executeAfter = block.timestamp + GOVERNANCE_DELAY;
-
-        pendingActions[actionHash] = PendingAction({
-            actionHash: actionHash,
-            executeAfter: executeAfter,
-            executed: false
-        });
-
-        emit GovernanceActionQueued(
-            actionHash,
-            executeAfter,
-            "MINTING_CAP_INCREASE",
-            msg.sender,
-            block.timestamp
-        );
-    }
-
-    /// @notice Execute minting cap increase after delay period
-    /// @param qc QC address
-    /// @param newCap New minting capacity
-    function executeMintingCapIncrease(address qc, uint256 newCap)
-        external
-        onlyRole(TIME_LOCKED_ADMIN_ROLE)
-    {
-        bytes32 actionHash = keccak256(
-            abi.encodePacked("MINTING_CAP_INCREASE", qc, newCap)
-        );
-        PendingAction storage action = pendingActions[actionHash];
-
-        if (action.executeAfter == 0) {
-            revert ActionNotQueued(actionHash);
-        }
-        if (block.timestamp < action.executeAfter) {
-            revert DelayPeriodNotElapsed(action.executeAfter, block.timestamp);
-        }
-        if (action.executed) {
-            revert ActionAlreadyExecuted(actionHash);
-        }
-
-        // Mark as executed before external calls
-        action.executed = true;
-
-        // Execute minting cap increase
-        QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        uint256 oldCap = qcData.getMaxMintingCapacity(qc);
         qcData.updateMaxMintingCapacity(qc, newCap);
 
-        emit GovernanceActionExecuted(
-            actionHash,
-            "MINTING_CAP_INCREASE",
-            msg.sender,
-            block.timestamp
-        );
         emit MintingCapIncreased(
             qc,
-            oldCap,
+            currentCap,
             newCap,
             msg.sender,
             block.timestamp
@@ -405,43 +259,9 @@ contract QCManager is AccessControl {
         }
     }
 
-    // =================== EXISTING FUNCTIONS (PRESERVED) ===================
+    // =================== OPERATIONAL FUNCTIONS ===================
 
-    /// @notice Register a new Qualified Custodian (legacy function - now internal)
-    /// @dev This function is now used internally by time-locked governance
-    /// @param qc The address of the QC to register
-    /// @param maxMintingCap The maximum minting capacity for the QC
-    function _registerQC(address qc, uint256 maxMintingCap) internal {
-        if (qc == address(0)) {
-            revert InvalidQCAddress();
-        }
-        if (maxMintingCap == 0) {
-            revert InvalidMintingCapacity();
-        }
 
-        QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        if (qcData.isQCRegistered(qc)) {
-            revert QCAlreadyRegistered(qc);
-        }
-
-        // Register QC with provided minting capacity
-        qcData.registerQC(qc, maxMintingCap);
-
-        emit QCRegistrationInitiated(qc, msg.sender, block.timestamp);
-    }
-
-    /// @notice Legacy registerQC function for backward compatibility
-    /// @dev Deprecated - use queueQCOnboarding for new registrations
-    /// @param qc The address of the QC to register
-    function registerQC(address qc)
-        external
-        onlyRole(QC_ADMIN_ROLE)
-        onlyWhenNotPaused("registry")
-    {
-        // For legacy compatibility, use a default minting capacity
-        // In production, this should be removed and replaced with time-locked governance
-        _registerQC(qc, 1000 ether); // Default 1000 tBTC capacity
-    }
 
     /// @notice Change QC status
     /// @param qc The address of the QC
