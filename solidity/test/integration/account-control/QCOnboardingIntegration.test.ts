@@ -32,7 +32,7 @@ class QCOnboardingIntegration extends BaseAccountControlIntegration {
     
     const queueTx = await this.qcManager
       .connect(this.governance)
-      .queueQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+      .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
     
     const queueReceipt = await queueTx.wait()
     console.log("✅ QC onboarding queued")
@@ -53,7 +53,7 @@ class QCOnboardingIntegration extends BaseAccountControlIntegration {
     
     const executeTx = await this.qcManager
       .connect(this.governance)
-      .executeQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+      .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
     
     const executeReceipt = await executeTx.wait()
     console.log("✅ QC onboarding executed")
@@ -166,24 +166,24 @@ class QCOnboardingIntegration extends BaseAccountControlIntegration {
     // Test 1: Attempt to execute before time-lock
     await this.qcManager
       .connect(this.governance)
-      .queueQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+      .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
 
     await expect(
       this.qcManager
         .connect(this.governance)
-        .executeQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+        .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
     ).to.be.revertedWith("Time-lock not expired")
 
     // Test 2: Attempt to onboard same QC twice
     await this.advanceTime(this.TEST_PARAMS.GOVERNANCE_DELAY)
     await this.qcManager
       .connect(this.governance)
-      .executeQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+      .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
 
     await expect(
       this.qcManager
         .connect(this.governance)
-        .queueQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+        .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
     ).to.be.revertedWith("QC already exists")
 
     // Test 3: Unauthorized wallet registration
@@ -212,13 +212,13 @@ class QCOnboardingIntegration extends BaseAccountControlIntegration {
     // Queue and execute QC onboarding
     await this.qcManager
       .connect(this.governance)
-      .queueQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+      .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
     
     await this.advanceTime(this.TEST_PARAMS.GOVERNANCE_DELAY)
     
     await this.qcManager
       .connect(this.governance)
-      .executeQCOnboarding(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
+      .registerQC(this.qc.address, this.TEST_PARAMS.MAX_MINTING_CAP)
 
     // Register first wallet
     const btcAddress = this.generateBitcoinAddress()
