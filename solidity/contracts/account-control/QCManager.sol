@@ -429,6 +429,10 @@ contract QCManager is AccessControl {
     /// @notice Verify QC solvency
     /// @param qc The address of the QC to verify
     /// @return solvent True if QC is solvent
+    /// @dev NOTE: This function ignores staleness of reserve proofs, unlike getAvailableMintingCapacity.
+    ///      This means a QC with stale reserves can still be marked as solvent if their last known
+    ///      balance covers minted amount. This is intentional to avoid false insolvency triggers
+    ///      due to temporary communication issues, but creates potential for manipulation.
     function verifyQCSolvency(address qc) external returns (bool solvent) {
         if (!hasRole(ARBITER_ROLE, msg.sender)) {
             revert NotAuthorizedForSolvency(msg.sender);
