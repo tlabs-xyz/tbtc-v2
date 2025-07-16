@@ -209,7 +209,7 @@ privilege.
 - **`PARAMETER_ADMIN_ROLE` (The DAO):** Responsible for tuning non-critical system
   parameters, such as timeouts and thresholds, and for upgrading Policy
   contracts.
-- **`TIME_LOCKED_ADMIN_ROLE` (The DAO):** Responsible for critical governance actions
+- **`QC_GOVERNANCE_ROLE` (The DAO):** Responsible for instant governance actions
   that require time-locked execution, including:
   - **QC Onboarding:** Adding new QC entities to the system
   - **Minting Cap Increases:** Increasing `maxMintingCap` for existing QCs
@@ -427,26 +427,26 @@ Critical governance actions now require a mandatory delay to provide community o
 
 **QC Onboarding Flow:**
 
-1. **Queue Action:** The DAO calls `queueQCOnboarding(qcAddress, maxMintingCap)` on `QCManager.sol`.
-2. **Community Review Period:** A 7-day delay begins, during which the community can review and potentially object to the action.
-3. **Execute Action:** After the delay expires, the DAO calls `executeQCOnboarding(qcAddress, maxMintingCap)` to complete the onboarding.
+1. **Instant Action:** The DAO calls `registerQC(qcAddress, maxMintingCap)` on `QCManager.sol`.
+2. **Immediate Execution:** The system performs instant validation and onboarding.
+3. **Role-Based Security:** Access control through QC_GOVERNANCE_ROLE provides security.
 
 **Minting Cap Increase Flow:**
 
-1. **Queue Action:** The DAO calls `queueMintingCapIncrease(qcAddress, newCap)` on `QCManager.sol`.
-2. **Community Review Period:** A 7-day delay provides transparency and oversight.
-3. **Execute Action:** The DAO calls `executeMintingCapIncrease(qcAddress, newCap)` to implement the change.
+1. **Instant Action:** The DAO calls `increaseMintingCapacity(qcAddress, newCap)` on `QCManager.sol`.
+2. **Immediate Execution:** The system performs instant validation and capacity increase.
+3. **Role-Based Security:** Access control through QC_GOVERNANCE_ROLE provides security.
 
 ```mermaid
 sequenceDiagram
-    participant DAO as DAO (TIME_LOCKED_ADMIN_ROLE)
+    participant DAO as DAO (QC_GOVERNANCE_ROLE)
     participant Manager as QCManager.sol
     participant Community as Community
     participant QC as Qualified Custodian
 
     Note over DAO, QC: Time-Locked QC Onboarding Flow
 
-    DAO->>Manager: 1. queueQCOnboarding(qc, maxMintingCap)
+    DAO->>Manager: 1. registerQC(qc, maxMintingCap)
     Manager->>Manager: Creates pending action with 7-day delay
     Manager-->>DAO: Success, emits GovernanceActionQueued
 
@@ -455,7 +455,7 @@ sequenceDiagram
 
     Note over DAO, Manager: After 7 days...
 
-    DAO->>Manager: 2. executeQCOnboarding(qc, maxMintingCap)
+    Manager->>Manager: 2. Instant execution and validation
     Manager->>Manager: Verify delay has passed
     Manager->>Manager: Register QC with minting cap
     Manager-->>DAO: Success, emits GovernanceActionExecuted
