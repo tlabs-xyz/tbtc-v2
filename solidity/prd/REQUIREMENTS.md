@@ -551,8 +551,8 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - Comprehensive event emission for monitoring
 
 **Acceptance Criteria**:
-- requestMint() provides seamless auto-minting
-- requestMintWithOption() supports manual minting workflow
+- requestMint() provides seamless one-step minting
+- Atomic operation ensures deposit and minting happen together
 - Clear error messages for all failure conditions
 - MintCompleted events with full transaction details
 

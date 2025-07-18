@@ -21,3 +21,6 @@
 
 # Ignore environment files
 .env*
+
+# Ignore Claude conversation files
+CLAUDE.md
