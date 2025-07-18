@@ -21,6 +21,7 @@ This document outlines proposed enhancements to the Account Control monitoring a
 ### 1.1 Existing Capabilities
 
 **Current Event Architecture**:
+
 ```solidity
 // From ARCHITECTURE.md - existing events
 event QCStatusChanged(address indexed qc, QCStatus oldStatus, QCStatus newStatus, bytes32 reason)
@@ -31,6 +32,7 @@ event RedemptionRequested(bytes32 indexed redemptionId, address indexed user, ad
 ```
 
 **Current Monitoring Gaps**:
+
 - No capacity utilization tracking
 - Limited performance metrics per QC
 - No proactive alerting for degraded conditions
@@ -40,6 +42,7 @@ event RedemptionRequested(bytes32 indexed redemptionId, address indexed user, ad
 ### 1.2 Requirements from Architecture Review
 
 **Identified Monitoring Needs**:
+
 1. **Capacity Management**: Real-time QC capacity utilization
 2. **Performance Tracking**: Success rates and response times
 3. **Freshness Monitoring**: Attestation staleness detection
@@ -55,6 +58,7 @@ event RedemptionRequested(bytes32 indexed redemptionId, address indexed user, ad
 #### 2.1.1 QC-Specific Metrics
 
 **Proposed Metrics**:
+
 ```yaml
 # QC Performance Metrics
 qc_capacity_utilization_percentage:
@@ -93,6 +97,7 @@ gas_optimization_tracking:
 #### 2.1.2 System-Wide Metrics
 
 **System Health Indicators**:
+
 ```yaml
 # System-Level Metrics
 total_system_capacity_utilization:
@@ -117,6 +122,7 @@ emergency_pause_frequency:
 #### 2.2.1 Proposed Alert Rules
 
 **Capacity Management Alerts**:
+
 ```yaml
 qc_approaching_capacity:
   threshold: 90%
@@ -133,6 +139,7 @@ qc_capacity_critical:
 ```
 
 **Operational Health Alerts**:
+
 ```yaml
 stale_attestation:
   threshold: 23 hours
@@ -162,6 +169,7 @@ watchdog_unresponsive:
 #### 3.1.1 Smart Contract Changes
 
 **Required Contract Enhancements**:
+
 ```solidity
 // Enhanced event structure for monitoring
 event QCCapacityUpdate(
@@ -190,6 +198,7 @@ interface IAccountControlMonitoring {
 ```
 
 **Gas Cost Impact**:
+
 - Estimated additional gas per operation: 5,000-10,000 gas
 - Trade-off: Enhanced monitoring vs. gas efficiency
 - Mitigation: Optional monitoring mode for cost-sensitive operations
@@ -197,6 +206,7 @@ interface IAccountControlMonitoring {
 #### 3.1.2 Off-Chain Infrastructure
 
 **Monitoring Stack Requirements**:
+
 ```yaml
 # Infrastructure Components
 event_indexer:
@@ -225,6 +235,7 @@ dashboard_system:
 #### 3.2.1 Benefits
 
 **Operational Improvements**:
+
 1. **Proactive Issue Detection**: Identify problems before they impact users
 2. **Capacity Planning**: Better resource allocation and planning
 3. **Performance Optimization**: Data-driven optimization opportunities
@@ -232,6 +243,7 @@ dashboard_system:
 5. **Compliance**: Enhanced audit trails and reporting
 
 **Risk Mitigation**:
+
 1. **QC Capacity Exhaustion**: Early warning prevents user transaction failures
 2. **Stale Attestations**: Proactive renewal prevents system disruption
 3. **Watchdog Issues**: Early detection enables rapid replacement
@@ -240,6 +252,7 @@ dashboard_system:
 #### 3.2.2 Costs and Complexity
 
 **Implementation Costs**:
+
 ```yaml
 development_effort:
   smart_contracts: "2-3 developer weeks"
@@ -255,6 +268,7 @@ operational_costs:
 ```
 
 **Complexity Considerations**:
+
 1. **Additional Attack Surface**: More code means more potential vulnerabilities
 2. **Operational Overhead**: Requires dedicated monitoring expertise
 3. **Alert Fatigue**: Risk of too many false positives
@@ -267,6 +281,7 @@ operational_costs:
 ### 4.1 Minimal Monitoring Approach
 
 **Scope**: Essential metrics only
+
 - QC capacity utilization
 - Basic operation success/failure
 - Critical system health
@@ -277,6 +292,7 @@ operational_costs:
 ### 4.2 External Service Integration
 
 **Scope**: Leverage existing blockchain monitoring services
+
 - Integrate with Tenderly, Defender, or similar
 - Custom alerting on top of existing infrastructure
 
@@ -299,9 +315,11 @@ operational_costs:
 ### 5.1 Key Decision Points
 
 #### 5.1.1 Gas Cost vs. Monitoring Depth
+
 **Question**: How much additional gas cost is acceptable for enhanced monitoring?
 
 **Options**:
+
 - **Option A**: Comprehensive monitoring (+10k gas per operation)
 - **Option B**: Essential metrics only (+3k gas per operation)
 - **Option C**: Optional monitoring mode (user choice)
@@ -309,9 +327,11 @@ operational_costs:
 **Recommendation**: Option C - Allow QCs to choose monitoring level based on their needs
 
 #### 5.1.2 Implementation Timing
+
 **Question**: When should monitoring enhancements be implemented?
 
 **Options**:
+
 - **Option A**: Before V1 mainnet launch (delays deployment)
 - **Option B**: V1.1 enhancement (post-launch)
 - **Option C**: Parallel development (complex coordination)
@@ -319,9 +339,11 @@ operational_costs:
 **Recommendation**: Option B - Focus on core functionality first, enhance monitoring in V1.1
 
 #### 5.1.3 Infrastructure Ownership
+
 **Question**: Who operates the monitoring infrastructure?
 
 **Options**:
+
 - **Option A**: DAO-operated infrastructure
 - **Option B**: Community-operated services
 - **Option C**: Multiple redundant services
@@ -331,16 +353,19 @@ operational_costs:
 ### 5.2 Required Discussions
 
 #### 5.2.1 With Technical Team
+
 1. **Gas Budget**: Acceptable gas overhead for monitoring
 2. **Implementation Complexity**: Resource allocation and timeline
 3. **Security Implications**: Additional attack vectors and mitigations
 
 #### 5.2.2 With Operations Team
+
 1. **Alert Management**: Escalation procedures and response protocols
 2. **Dashboard Requirements**: User interface and access control needs
 3. **Integration Points**: Existing monitoring and incident response tools
 
 #### 5.2.3 With DAO Governance
+
 1. **Cost Authorization**: Budget for infrastructure and development
 2. **Privacy Policies**: Data collection and retention policies
 3. **Service Providers**: Approval for external monitoring services
@@ -366,11 +391,13 @@ operational_costs:
 ### 6.3 Success Criteria
 
 **Technical Success**:
+
 - Monitoring system detects issues 95%+ of the time
 - False positive rate <5%
 - System overhead <2% additional gas cost
 
 **Operational Success**:
+
 - Mean time to detection <15 minutes for critical issues
 - Reduced incident response time by 50%
 - Improved capacity planning accuracy
@@ -382,6 +409,7 @@ operational_costs:
 Enhanced monitoring represents a critical capability for operational excellence in the Account Control system. While implementation requires careful consideration of costs and complexity, the benefits in terms of system reliability, user experience, and operational efficiency are substantial.
 
 **Key Recommendations**:
+
 1. **Proceed with gradual implementation** starting in V1.1
 2. **Allow optional monitoring levels** to balance costs and benefits
 3. **Focus on essential metrics first** with expansion based on operational experience

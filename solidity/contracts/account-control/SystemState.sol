@@ -229,7 +229,8 @@ contract SystemState is AccessControl {
 
     /// @notice Pause wallet registration operations
     function pauseWalletRegistration() external onlyRole(PAUSER_ROLE) {
-        if (isWalletRegistrationPaused) revert WalletRegistrationAlreadyPaused();
+        if (isWalletRegistrationPaused)
+            revert WalletRegistrationAlreadyPaused();
         isWalletRegistrationPaused = true;
         pauseTimestamps[keccak256("wallet_registration")] = block.timestamp;
         emit WalletRegistrationPaused(msg.sender, block.timestamp);
@@ -252,7 +253,8 @@ contract SystemState is AccessControl {
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
         if (newAmount == 0) revert InvalidAmount();
-        if (newAmount > maxMintAmount) revert MinAmountExceedsMax(newAmount, maxMintAmount);
+        if (newAmount > maxMintAmount)
+            revert MinAmountExceedsMax(newAmount, maxMintAmount);
 
         uint256 oldAmount = minMintAmount;
         minMintAmount = newAmount;
@@ -266,7 +268,8 @@ contract SystemState is AccessControl {
         external
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
-        if (newAmount < minMintAmount) revert MaxAmountBelowMin(newAmount, minMintAmount);
+        if (newAmount < minMintAmount)
+            revert MaxAmountBelowMin(newAmount, minMintAmount);
 
         uint256 oldAmount = maxMintAmount;
         maxMintAmount = newAmount;
@@ -296,7 +299,8 @@ contract SystemState is AccessControl {
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
         if (newThreshold == 0) revert InvalidThreshold();
-        if (newThreshold > 7 days) revert ThresholdTooLong(newThreshold, 7 days);
+        if (newThreshold > 7 days)
+            revert ThresholdTooLong(newThreshold, 7 days);
 
         uint256 oldThreshold = staleThreshold;
         staleThreshold = newThreshold;

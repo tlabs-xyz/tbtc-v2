@@ -1,3 +1,4 @@
+# Build and compilation artifacts
 .openzeppelin/
 artifacts/
 build/
@@ -8,3 +9,14 @@ hardhat-dependency-compiler/
 typechain/
 docgen-templates/
 export.json
+
+# External projects
+optimistic-minting/
+
+# Environment and configuration
+.env
+.env.example
+
+# IDE and tooling
+.serena/
+.claude/

@@ -161,7 +161,8 @@ describe("QCManager", () => {
       expect(await qcManager.hasRole(REGISTRAR_ROLE, deployer.address)).to.be
         .true
       expect(await qcManager.hasRole(ARBITER_ROLE, deployer.address)).to.be.true
-      expect(await qcManager.hasRole(QC_GOVERNANCE_ROLE, deployer.address)).to.be.true
+      expect(await qcManager.hasRole(QC_GOVERNANCE_ROLE, deployer.address)).to
+        .be.true
     })
   })
 
@@ -188,7 +189,10 @@ describe("QCManager", () => {
       let tx: any
 
       beforeEach(async () => {
-        tx = await qcManager.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        tx = await qcManager.registerQC(
+          qcAddress.address,
+          ethers.utils.parseEther("1000")
+        )
       })
 
       it("should call QCData registerQC", async () => {
@@ -209,7 +213,10 @@ describe("QCManager", () => {
     context("when called with invalid parameters", () => {
       it("should revert with zero address", async () => {
         await expect(
-          qcManager.registerQC(ethers.constants.AddressZero, ethers.utils.parseEther("1000"))
+          qcManager.registerQC(
+            ethers.constants.AddressZero,
+            ethers.utils.parseEther("1000")
+          )
         ).to.be.revertedWith("InvalidQCAddress")
       })
 
@@ -223,7 +230,10 @@ describe("QCManager", () => {
         mockQcData.isQCRegistered.returns(true)
 
         await expect(
-          qcManager.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+          qcManager.registerQC(
+            qcAddress.address,
+            ethers.utils.parseEther("1000")
+          )
         ).to.be.revertedWith("QCAlreadyRegistered")
       })
     })
@@ -237,7 +247,10 @@ describe("QCManager", () => {
 
       it("should revert", async () => {
         await expect(
-          qcManager.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+          qcManager.registerQC(
+            qcAddress.address,
+            ethers.utils.parseEther("1000")
+          )
         ).to.be.revertedWith("Function is paused")
       })
     })
@@ -245,7 +258,9 @@ describe("QCManager", () => {
     context("when called by non-admin", () => {
       it("should revert", async () => {
         await expect(
-          qcManager.connect(thirdParty).registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+          qcManager
+            .connect(thirdParty)
+            .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
         ).to.be.revertedWith(
           `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_GOVERNANCE_ROLE}`
         )
@@ -1051,7 +1066,10 @@ describe("QCManager", () => {
 
     context("boundary conditions for solvency", () => {
       beforeEach(async () => {
-        await qcManager.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        await qcManager.registerQC(
+          qcAddress.address,
+          ethers.utils.parseEther("1000")
+        )
         mockQcData.isQCRegistered.returns(true)
         mockQcData.getQCMintedAmount.returns(ethers.utils.parseEther("10"))
       })
@@ -1095,7 +1113,10 @@ describe("QCManager", () => {
 
     context("when QC is already UnderReview due to insolvency", () => {
       beforeEach(async () => {
-        await qcManager.registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        await qcManager.registerQC(
+          qcAddress.address,
+          ethers.utils.parseEther("1000")
+        )
         mockQcData.isQCRegistered.returns(true)
         mockQcData.getQCStatus.returns(1) // UnderReview
         mockQcData.getQCMintedAmount.returns(ethers.utils.parseEther("10"))
@@ -1163,7 +1184,10 @@ describe("QCManager", () => {
     context("when called with invalid parameters", () => {
       it("should revert with zero address", async () => {
         await expect(
-          qcManager.increaseMintingCapacity(ethers.constants.AddressZero, newCap)
+          qcManager.increaseMintingCapacity(
+            ethers.constants.AddressZero,
+            newCap
+          )
         ).to.be.revertedWith("InvalidQCAddress")
       })
 
@@ -1197,7 +1221,9 @@ describe("QCManager", () => {
     context("when called by non-governance", () => {
       it("should revert", async () => {
         await expect(
-          qcManager.connect(thirdParty).increaseMintingCapacity(qcAddress.address, newCap)
+          qcManager
+            .connect(thirdParty)
+            .increaseMintingCapacity(qcAddress.address, newCap)
         ).to.be.revertedWith(
           `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_GOVERNANCE_ROLE}`
         )

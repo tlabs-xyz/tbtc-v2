@@ -76,11 +76,15 @@ contract Bank is Ownable {
 
     event BridgeUpdated(address newBridge);
 
-    event AuthorizedBalanceIncreaserUpdated(address indexed increaser, bool authorized);
+    event AuthorizedBalanceIncreaserUpdated(
+        address indexed increaser,
+        bool authorized
+    );
 
     modifier onlyAuthorizedIncreaser() {
         require(
-            msg.sender == address(bridge) || authorizedBalanceIncreasers[msg.sender],
+            msg.sender == address(bridge) ||
+                authorizedBalanceIncreasers[msg.sender],
             "Unauthorized balance increaser"
         );
         _;
@@ -109,9 +113,9 @@ contract Bank is Ownable {
     /// @dev Only owner can authorize additional balance increasers beyond Bridge
     /// @param increaser The contract address to authorize/deauthorize
     /// @param authorized True to authorize, false to deauthorize
-    function setAuthorizedBalanceIncreaser(address increaser, bool authorized) 
-        external 
-        onlyOwner 
+    function setAuthorizedBalanceIncreaser(address increaser, bool authorized)
+        external
+        onlyOwner
     {
         require(increaser != address(0), "Increaser address cannot be zero");
         authorizedBalanceIncreasers[increaser] = authorized;

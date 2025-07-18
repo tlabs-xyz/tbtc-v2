@@ -55,7 +55,7 @@ describe("SingleWatchdog", () => {
     return ethers.utils.defaultAbiCoder.encode(
       [
         "tuple(bytes4 version, bytes inputVector, bytes outputVector, bytes4 locktime)",
-        "tuple(bytes merkleProof, uint256 txIndexInBlock, bytes bitcoinHeaders, bytes32 coinbasePreimage, bytes coinbaseProof)"
+        "tuple(bytes merkleProof, uint256 txIndexInBlock, bytes bitcoinHeaders, bytes32 coinbasePreimage, bytes coinbaseProof)",
       ],
       [mockSpvData.txInfo, mockSpvData.proof]
     )
@@ -110,7 +110,10 @@ describe("SingleWatchdog", () => {
     )
     await protocolRegistry.setService(QC_REDEEMER_KEY, mockQcRedeemer.address)
     await protocolRegistry.setService(QC_DATA_KEY, mockQcData.address)
-    await protocolRegistry.setService(SPV_VALIDATOR_KEY, mockSpvValidator.address)
+    await protocolRegistry.setService(
+      SPV_VALIDATOR_KEY,
+      mockSpvValidator.address
+    )
 
     // Grant roles
     await singleWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
@@ -206,9 +209,9 @@ describe("SingleWatchdog", () => {
       it("should register wallet successfully", async () => {
         // Ensure SPV validator returns true for this test
         mockSpvValidator.verifyWalletControl.returns(true)
-        
+
         const encodedSpvProof = createEncodedSpvProof()
-        
+
         const tx = await singleWatchdog.registerWalletWithProof(
           qcAddress.address,
           btcAddress,
@@ -225,7 +228,7 @@ describe("SingleWatchdog", () => {
         expect(qc).to.equal(qcAddress.address)
         expect(wallet).to.equal(btcAddress)
         expect(challenge).to.equal(challengeHash)
-        
+
         await expect(tx)
           .to.emit(singleWatchdog, "WatchdogWalletRegistration")
           .withArgs(qcAddress.address, btcAddress, challengeHash)
@@ -233,7 +236,7 @@ describe("SingleWatchdog", () => {
 
       it("should revert with empty btc address", async () => {
         const encodedSpvProof = createEncodedSpvProof()
-        
+
         await expect(
           singleWatchdog.registerWalletWithProof(
             qcAddress.address,
@@ -246,22 +249,22 @@ describe("SingleWatchdog", () => {
 
       it("should revert when SPV validator is not available", async () => {
         const encodedSpvProof = createEncodedSpvProof()
-        
+
         // Deploy a new registry without SPV validator to test the hasService check
         const ProtocolRegistryFactory = await ethers.getContractFactory(
           "ProtocolRegistry"
         )
         const newRegistry = await ProtocolRegistryFactory.deploy()
-        
+
         const SingleWatchdogFactory = await ethers.getContractFactory(
           "SingleWatchdog"
         )
         const newWatchdog = await SingleWatchdogFactory.deploy(
           newRegistry.address
         )
-        
+
         await newWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
-        
+
         await expect(
           newWatchdog.registerWalletWithProof(
             qcAddress.address,
@@ -274,10 +277,10 @@ describe("SingleWatchdog", () => {
 
       it("should revert when SPV verification fails", async () => {
         const encodedSpvProof = createEncodedSpvProof()
-        
+
         // Configure SPV validator to return false (verification failed)
         mockSpvValidator.verifyWalletControl.returns(false)
-        
+
         await expect(
           singleWatchdog.registerWalletWithProof(
             qcAddress.address,
@@ -290,7 +293,7 @@ describe("SingleWatchdog", () => {
 
       it("should revert with invalid SPV proof data", async () => {
         const invalidProofData = ethers.utils.toUtf8Bytes("invalid_proof_data")
-        
+
         await expect(
           singleWatchdog.registerWalletWithProof(
             qcAddress.address,
@@ -517,10 +520,10 @@ describe("SingleWatchdog", () => {
       it("should use updated services", async () => {
         // Ensure SPV validator returns true for this test
         mockSpvValidator.verifyWalletControl.returns(true)
-        
+
         await singleWatchdog.attestReserves(qcAddress.address, reserveBalance)
         const encodedSpvProof = createEncodedSpvProof()
-        
+
         await singleWatchdog.registerWalletWithProof(
           qcAddress.address,
           btcAddress,

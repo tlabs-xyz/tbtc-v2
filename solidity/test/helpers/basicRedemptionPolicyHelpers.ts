@@ -17,14 +17,18 @@ export async function bulkHandleRedemptionsHelper(
   reason?: string
 ): Promise<void> {
   // Simulate the bulk operation using individual calls
-  const reasonBytes32 = reason ? ethers.utils.id(reason) : ethers.constants.HashZero
-  
+  const reasonBytes32 = reason
+    ? ethers.utils.id(reason)
+    : ethers.constants.HashZero
+
   for (const redemptionId of redemptionIds) {
     try {
       if (action === "FULFILL") {
         // Note: This would require SPV proof data which isn't available in this helper
         // Individual recordFulfillment calls would be needed with proper proof data
-        throw new Error("Bulk fulfill requires individual recordFulfillment calls with SPV proofs")
+        throw new Error(
+          "Bulk fulfill requires individual recordFulfillment calls with SPV proofs"
+        )
       } else if (action === "DEFAULT") {
         await policy.flagDefault(redemptionId, reasonBytes32)
       }
@@ -43,12 +47,12 @@ export async function checkMultipleRedemptionsFulfilled(
   redemptionIds: string[]
 ): Promise<boolean[]> {
   const results: boolean[] = []
-  
+
   for (const redemptionId of redemptionIds) {
     const isFulfilled = await policy.isRedemptionFulfilled(redemptionId)
     results.push(isFulfilled)
   }
-  
+
   return results
 }
 
@@ -60,14 +64,14 @@ export async function checkMultipleRedemptionsDefaulted(
   redemptionIds: string[]
 ): Promise<Array<{ defaulted: boolean; reason: string }>> {
   const results: Array<{ defaulted: boolean; reason: string }> = []
-  
+
   for (const redemptionId of redemptionIds) {
     const [defaulted, reason] = await policy.isRedemptionDefaulted(redemptionId)
-    results.push({ 
-      defaulted, 
-      reason: ethers.utils.parseBytes32String(reason)
+    results.push({
+      defaulted,
+      reason: ethers.utils.parseBytes32String(reason),
     })
   }
-  
+
   return results
 }

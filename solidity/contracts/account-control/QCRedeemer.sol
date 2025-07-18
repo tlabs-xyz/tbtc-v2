@@ -104,7 +104,6 @@ contract QCRedeemer is AccessControl {
         uint256 timestamp
     );
 
-
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -117,15 +116,20 @@ contract QCRedeemer is AccessControl {
     /// @param amount The amount of tBTC to redeem
     /// @param userBtcAddress The user's Bitcoin address
     /// @return redemptionId Unique identifier for this redemption request
-    function initiateRedemption(address qc, uint256 amount, string calldata userBtcAddress)
-        external
-        returns (bytes32 redemptionId)
-    {
+    function initiateRedemption(
+        address qc,
+        uint256 amount,
+        string calldata userBtcAddress
+    ) external returns (bytes32 redemptionId) {
         if (qc == address(0)) revert InvalidQCAddress();
         if (amount == 0) revert InvalidAmount();
         if (bytes(userBtcAddress).length == 0) revert BitcoinAddressRequired();
         bytes memory addr = bytes(userBtcAddress);
-        if (!(addr[0] == 0x31 || addr[0] == 0x33 || (addr[0] == 0x62 && addr.length > 1 && addr[1] == 0x63))) {
+        if (
+            !(addr[0] == 0x31 ||
+                addr[0] == 0x33 ||
+                (addr[0] == 0x62 && addr.length > 1 && addr[1] == 0x63))
+        ) {
             revert InvalidBitcoinAddressFormat();
         }
 
@@ -135,13 +139,15 @@ contract QCRedeemer is AccessControl {
 
         redemptionId = _generateRedemptionId(msg.sender, qc, amount);
 
-        if (!policy.requestRedemption(
+        if (
+            !policy.requestRedemption(
                 redemptionId,
                 qc,
                 msg.sender,
                 amount,
                 userBtcAddress
-            )) {
+            )
+        ) {
             revert RedemptionRequestFailed();
         }
 
@@ -193,13 +199,15 @@ contract QCRedeemer is AccessControl {
         );
 
         // Delegate verification to policy contract
-        if (!policy.recordFulfillment(
+        if (
+            !policy.recordFulfillment(
                 redemptionId,
                 userBtcAddress,
                 expectedAmount,
                 txInfo,
                 proof
-            )) {
+            )
+        ) {
             revert FulfillmentVerificationFailed();
         }
 
@@ -284,7 +292,6 @@ contract QCRedeemer is AccessControl {
     {
         return redemptions[redemptionId];
     }
-
 
     /// @dev Generate unique redemption ID
     /// @param user The user requesting redemption

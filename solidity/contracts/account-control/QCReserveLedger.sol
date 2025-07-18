@@ -172,11 +172,11 @@ contract QCReserveLedger is AccessControl {
         bytes calldata proofData
     ) external onlyRole(ATTESTER_ROLE) {
         if (qc == address(0)) revert InvalidQCAddress();
-        
+
         // Extract proof transaction hash from proofData for event
         // In a full implementation, this would validate the SPV proof
         bytes32 proofTxHash = bytes32(proofData[:32]);
-        
+
         // Submit the attestation using the regular mechanism
         uint256 oldBalance = hasAttestation[qc]
             ? reserveAttestations[qc].balance
@@ -207,7 +207,7 @@ contract QCReserveLedger is AccessControl {
             block.timestamp,
             block.number
         );
-        
+
         emit SPVVerifiedAttestationSubmitted(
             msg.sender,
             qc,
@@ -301,5 +301,4 @@ contract QCReserveLedger is AccessControl {
     {
         return attestationHistory[qc];
     }
-
 }

@@ -1,2 +1,15 @@
+# Build and compilation artifacts
+artifacts/
+build/
+cache/
+deployments/
+export/
 hardhat-dependency-compiler/
+typechain/
+export.json
+
+# Dependencies
 node_modules/
+
+# External projects
+optimistic-minting/

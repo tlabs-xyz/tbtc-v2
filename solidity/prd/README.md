@@ -13,20 +13,20 @@ Welcome to the Account Control system documentation. This feature extends tBTC v
 
 ### 📋 Essential Documents
 
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| **[REQUIREMENTS.md](REQUIREMENTS.md)** | Complete requirements specification | All stakeholders |
-| **[ARCHITECTURE.md](ARCHITECTURE.md)** | Detailed technical architecture | Architects, developers |
-| **[IMPLEMENTATION.md](IMPLEMENTATION.md)** | Code patterns and deployment | Developers, DevOps |
-| **[FLOWS.md](FLOWS.md)** | User journeys and sequences | Product, QA, integrators |
+| Document                                   | Purpose                             | Audience                 |
+| ------------------------------------------ | ----------------------------------- | ------------------------ |
+| **[REQUIREMENTS.md](REQUIREMENTS.md)**     | Complete requirements specification | All stakeholders         |
+| **[ARCHITECTURE.md](ARCHITECTURE.md)**     | Detailed technical architecture     | Architects, developers   |
+| **[IMPLEMENTATION.md](IMPLEMENTATION.md)** | Code patterns and deployment        | Developers, DevOps       |
+| **[FLOWS.md](FLOWS.md)**                   | User journeys and sequences         | Product, QA, integrators |
 
 ### 📚 Reference Documents
 
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| **[SPV_IMPLEMENTATION_GUIDE.md](SPV_IMPLEMENTATION_GUIDE.md)** | SPV integration details | Blockchain developers |
-| **[FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md)** | V2 roadmap and enhancements | Product, architects |
-| **[RESEARCH.md](RESEARCH.md)** | Background research findings | Researchers, architects |
+| Document                                                       | Purpose                      | Audience                |
+| -------------------------------------------------------------- | ---------------------------- | ----------------------- |
+| **[SPV_IMPLEMENTATION_GUIDE.md](SPV_IMPLEMENTATION_GUIDE.md)** | SPV integration details      | Blockchain developers   |
+| **[FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md)**           | V2 roadmap and enhancements  | Product, architects     |
+| **[RESEARCH.md](RESEARCH.md)**                                 | Background research findings | Researchers, architects |
 
 ---
 
@@ -65,14 +65,14 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 
 ### System Components
 
-| Component | Purpose | Key Features |
-|-----------|---------|--------------|
-| **BasicMintingPolicy** | Direct Bank integration | Auto-minting, capacity validation, error handling |
-| **ProtocolRegistry** | Central service registry | Component upgrades, dependency management |
-| **QCManager** | Business logic | Stateless QC management, capacity calculations |
-| **QCData** | Storage layer | Pure storage, gas-optimized, audit-friendly |
-| **QCMinter** | Stable entry point | Policy delegation, emergency pause |
-| **QCRedeemer** | Redemption engine | Lifecycle management, default handling |
+| Component              | Purpose                  | Key Features                                      |
+| ---------------------- | ------------------------ | ------------------------------------------------- |
+| **BasicMintingPolicy** | Direct Bank integration  | Auto-minting, capacity validation, error handling |
+| **ProtocolRegistry**   | Central service registry | Component upgrades, dependency management         |
+| **QCManager**          | Business logic           | Stateless QC management, capacity calculations    |
+| **QCData**             | Storage layer            | Pure storage, gas-optimized, audit-friendly       |
+| **QCMinter**           | Stable entry point       | Policy delegation, emergency pause                |
+| **QCRedeemer**         | Redemption engine        | Lifecycle management, default handling            |
 
 ### Integration with Existing tBTC v2
 
@@ -181,9 +181,9 @@ The system deploys as an **independent contract suite** without modifying existi
 
 ## Version History
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0 | 2025-07-11 | Initial consolidated documentation release |
+| Version | Date       | Changes                                    |
+| ------- | ---------- | ------------------------------------------ |
+| 1.0     | 2025-07-11 | Initial consolidated documentation release |
 
 ---
 

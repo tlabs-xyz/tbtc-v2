@@ -59,9 +59,9 @@ describe("ProtocolRegistry", () => {
   describe("Role Constants", () => {
     it("should have correct default admin role", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-      expect(
-        await protocolRegistry.DEFAULT_ADMIN_ROLE()
-      ).to.equal(DEFAULT_ADMIN_ROLE)
+      expect(await protocolRegistry.DEFAULT_ADMIN_ROLE()).to.equal(
+        DEFAULT_ADMIN_ROLE
+      )
     })
   })
 
@@ -84,7 +84,9 @@ describe("ProtocolRegistry", () => {
 
       it("should emit ServiceUpdated event", async () => {
         const receipt = await tx.wait()
-        const event = receipt.events?.find((e: any) => e.event === "ServiceUpdated")
+        const event = receipt.events?.find(
+          (e: any) => e.event === "ServiceUpdated"
+        )
         expect(event).to.not.be.undefined
         expect(event.args.serviceId).to.equal(TEST_SERVICE_KEY)
         expect(event.args.oldAddress).to.equal(ethers.constants.AddressZero)
@@ -127,7 +129,9 @@ describe("ProtocolRegistry", () => {
 
       it("should emit ServiceUpdated event with old and new addresses", async () => {
         const receipt = await tx.wait()
-        const event = receipt.events?.find((e: any) => e.event === "ServiceUpdated")
+        const event = receipt.events?.find(
+          (e: any) => e.event === "ServiceUpdated"
+        )
         expect(event).to.not.be.undefined
         expect(event.args.serviceId).to.equal(TEST_SERVICE_KEY)
         expect(event.args.oldAddress).to.equal(oldAddress)
@@ -265,33 +269,21 @@ describe("ProtocolRegistry", () => {
     context("role management", () => {
       it("should allow admin to grant admin role", async () => {
         const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-        await protocolRegistry.grantRole(
-          DEFAULT_ADMIN_ROLE,
-          governance.address
-        )
+        await protocolRegistry.grantRole(DEFAULT_ADMIN_ROLE, governance.address)
         expect(
-          await protocolRegistry.hasRole(
-            DEFAULT_ADMIN_ROLE,
-            governance.address
-          )
+          await protocolRegistry.hasRole(DEFAULT_ADMIN_ROLE, governance.address)
         ).to.be.true
       })
 
       it("should allow admin to revoke admin role", async () => {
         const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-        await protocolRegistry.grantRole(
-          DEFAULT_ADMIN_ROLE,
-          governance.address
-        )
+        await protocolRegistry.grantRole(DEFAULT_ADMIN_ROLE, governance.address)
         await protocolRegistry.revokeRole(
           DEFAULT_ADMIN_ROLE,
           governance.address
         )
         expect(
-          await protocolRegistry.hasRole(
-            DEFAULT_ADMIN_ROLE,
-            governance.address
-          )
+          await protocolRegistry.hasRole(DEFAULT_ADMIN_ROLE, governance.address)
         ).to.be.false
       })
     })

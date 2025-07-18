@@ -15,7 +15,7 @@ import "./interfaces/ISPVValidator.sol";
 /// QCData and SystemState via the central ProtocolRegistry. Manages QC status
 /// changes, wallet registration flows, and integrates with role-based access control.
 /// V1.1: Simplified with instant governance for all actions, relying on RBAC for security.
-/// 
+///
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update system configurations
 /// - QC_ADMIN_ROLE: Can update minting amounts, request wallet deregistration
@@ -38,7 +38,10 @@ contract QCManager is AccessControl {
     error NotAuthorizedForSolvency(address caller);
     error QCNotRegisteredForSolvency(address qc);
     error ReasonRequired();
-    error InvalidStatusTransition(QCData.QCStatus oldStatus, QCData.QCStatus newStatus);
+    error InvalidStatusTransition(
+        QCData.QCStatus oldStatus,
+        QCData.QCStatus newStatus
+    );
     error NewCapMustBeHigher(uint256 currentCap, uint256 newCap);
     error WalletNotRegistered(string btcAddress);
     error NotAuthorizedForWalletDeregistration(address caller);
@@ -47,6 +50,7 @@ contract QCManager is AccessControl {
     error QCWouldBecomeInsolvent(uint256 newBalance, uint256 mintedAmount);
     error QCReserveLedgerNotAvailable();
     error SPVValidatorNotAvailable();
+    error ServiceNotAvailable(string service);
     bytes32 public constant QC_GOVERNANCE_ROLE =
         keccak256("QC_GOVERNANCE_ROLE");
 
@@ -57,9 +61,7 @@ contract QCManager is AccessControl {
         keccak256("QC_RESERVE_LEDGER");
     bytes32 public constant SPV_VALIDATOR_KEY = keccak256("SPV_VALIDATOR");
 
-
     ProtocolRegistry public immutable protocolRegistry;
-
 
     // =================== STANDARDIZED EVENTS ===================
 
@@ -98,7 +100,6 @@ contract QCManager is AccessControl {
         uint256 timestamp
     );
 
-
     /// @dev Emitted when QC is onboarded through governance process
     event QCOnboarded(
         address indexed qc,
@@ -129,6 +130,14 @@ contract QCManager is AccessControl {
         address indexed qc,
         uint256 indexed oldBalance,
         uint256 indexed newBalance,
+        address updatedBy,
+        uint256 timestamp
+    );
+
+    event QCMintedAmountUpdated(
+        address indexed qc,
+        uint256 indexed oldAmount,
+        uint256 indexed newAmount,
         address updatedBy,
         uint256 timestamp
     );
@@ -218,10 +227,7 @@ contract QCManager is AccessControl {
 
     // =================== INSTANT EMERGENCY FUNCTIONS ===================
 
-
     // =================== OPERATIONAL FUNCTIONS ===================
-
-
 
     /// @notice Change QC status
     /// @param qc The address of the QC
@@ -342,7 +348,10 @@ contract QCManager is AccessControl {
         if (qc == address(0)) {
             revert WalletNotRegistered(btcAddress);
         }
-        if (qcData.getWalletStatus(btcAddress) != QCData.WalletStatus.PendingDeRegistration) {
+        if (
+            qcData.getWalletStatus(btcAddress) !=
+            QCData.WalletStatus.PendingDeRegistration
+        ) {
             revert WalletNotPendingDeregistration(btcAddress);
         }
 
@@ -447,10 +456,31 @@ contract QCManager is AccessControl {
             revert QCNotRegistered(qc);
         }
 
+        uint256 oldAmount = qcData.getQCMintedAmount(qc);
         qcData.updateQCMintedAmount(qc, newAmount);
+
+        emit QCMintedAmountUpdated(
+            qc,
+            oldAmount,
+            newAmount,
+            msg.sender,
+            block.timestamp
+        );
     }
 
-
+    /// @dev Helper to safely get service from protocol registry
+    /// @param serviceKey The service key to look up
+    /// @return service The service address
+    function _getService(bytes32 serviceKey)
+        private
+        view
+        returns (address service)
+    {
+        service = protocolRegistry.getService(serviceKey);
+        if (service == address(0)) {
+            revert ServiceNotAvailable(string(abi.encodePacked(serviceKey)));
+        }
+    }
 
     /// @dev Validate status transitions according to the simple 3-state model
     /// @param oldStatus The current status
@@ -496,8 +526,10 @@ contract QCManager is AccessControl {
         if (!protocolRegistry.hasService(SPV_VALIDATOR_KEY)) {
             revert SPVValidatorNotAvailable();
         }
-        
-        address validatorAddress = protocolRegistry.getService(SPV_VALIDATOR_KEY);
+
+        address validatorAddress = protocolRegistry.getService(
+            SPV_VALIDATOR_KEY
+        );
         ISPVValidator spvValidator = ISPVValidator(validatorAddress);
         return
             spvValidator.verifyWalletControl(
@@ -522,8 +554,10 @@ contract QCManager is AccessControl {
         if (!protocolRegistry.hasService(QC_RESERVE_LEDGER_KEY)) {
             revert QCReserveLedgerNotAvailable();
         }
-        
-        address ledgerAddress = protocolRegistry.getService(QC_RESERVE_LEDGER_KEY);
+
+        address ledgerAddress = protocolRegistry.getService(
+            QC_RESERVE_LEDGER_KEY
+        );
         QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
         return reserveLedger.getReserveBalanceAndStaleness(qc);
     }
@@ -551,9 +585,11 @@ contract QCManager is AccessControl {
         if (!protocolRegistry.hasService(QC_RESERVE_LEDGER_KEY)) {
             revert QCReserveLedgerNotAvailable();
         }
-        
+
         // Update reserve ledger with new balance
-        address ledgerAddress = protocolRegistry.getService(QC_RESERVE_LEDGER_KEY);
+        address ledgerAddress = protocolRegistry.getService(
+            QC_RESERVE_LEDGER_KEY
+        );
         QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
         reserveLedger.submitReserveAttestation(qc, newBalance);
 
@@ -565,5 +601,4 @@ contract QCManager is AccessControl {
             block.timestamp
         );
     }
-
 }

@@ -1,3 +1,4 @@
+# Build and compilation artifacts
 artifacts/
 build/
 cache/
@@ -6,3 +7,10 @@ export/
 hardhat-dependency-compiler/
 typechain/
 export.json
+
+# External projects
+optimistic-minting/
+
+# IDE and tooling
+.serena/
+.claude/
