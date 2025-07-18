@@ -587,81 +587,52 @@ critical action within the contracts must emit a detailed event.
 - **`SystemState.sol` Events:**
   - Events for pausing and unpausing specific functionalities.
 
-## 6. Design Rationale - AutoMint Feature
+## 6. Design Rationale - Simplified Minting Architecture
 
 ### Overview
 
-This section explains the design decision behind the `autoMint` flag in BasicMintingPolicy and why it differs from the classic Bridge's approach to minting tBTC.
+Following YAGNI principles and production requirements analysis, the Account Control system implements a streamlined single-step minting process that directly integrates with the Bank/Vault infrastructure.
 
-### The Auto-Mint Flag
+### Direct Bank Integration
 
-The `autoMint` boolean parameter in `BasicMintingPolicy.requestMintWithOption()` controls whether:
-- **`true`**: Creates Bank balance AND immediately mints tBTC tokens (one-step process)
-- **`false`**: Only creates Bank balance without minting (two-step process)
+The `BasicMintingPolicy.requestMint()` function implements a simple, efficient flow:
+- Creates Bank balance AND immediately mints tBTC tokens in one atomic operation
+- Eliminates complexity of two-step processes
+- Reduces gas costs and operational overhead
 
-### Why BasicMintingPolicy Needs This Flexibility
+### Design Benefits
 
-#### Primary Use Cases for Auto-Mint (`autoMint = true`)
+1. **Simplicity**: Single function, single transaction, predictable outcome
+2. **Gas Efficiency**: One transaction for the complete minting process
+3. **Security**: Atomic operation prevents intermediate states
+4. **User Experience**: Clear, straightforward minting flow
 
-1. **Standard QC Operations**: Most QC minting follows a clear business intent - deposit and mint
-2. **Simplified UX**: Single transaction for end users
-3. **Gas Efficiency**: One transaction instead of two
-4. **Regulatory Clarity**: Immediate tokenization provides clear audit trail
+### Production-Driven Architecture
 
-#### Scenarios Requiring No Auto-Mint (`autoMint = false`)
-
-1. **Batch Operations**
-   - QC accumulates multiple deposits as Bank balances
-   - Mints tBTC in bulk later to optimize gas costs
-   - Useful for high-frequency institutional operations
-
-2. **Delayed Minting Strategies**
-   - Hold Bank balance during market volatility
-   - Mint tBTC based on market conditions or demand
-   - Enables more sophisticated treasury management
-
-3. **Integration Flexibility**
-   - DeFi protocols may need Bank balances without immediate tokenization
-   - Enables building structured products on top of Bank balances
-   - Allows for flash loan strategies using Bank balances
-
-4. **Risk Management**
-   - Separate deposit acknowledgment from token creation
-   - Additional verification step before minting
-   - Useful for large deposits requiring extra compliance checks
-
-5. **Custodian Preferences**
-   - Some QCs may want deposits tracked but not immediately tokenized
-   - Tax optimization strategies
-   - Regulatory requirements in certain jurisdictions
+After extensive analysis, the two-step minting process (previously `requestMintWithOption`) was removed because:
+- No production use cases required delayed minting
+- Batch operations can be handled at the application layer
+- Simpler contracts are easier to audit and maintain
+- Reduced attack surface from fewer state transitions
 
 ### Comparison with Classic Bridge
 
 #### Classic Bridge Approach
-- **Always** creates Bank balance first (no choice)
-- Users must manually call `TBTCVault.mint()` in separate transaction
-- Two-phase process driven by Bitcoin's async nature
+- Creates Bank balance first, then requires manual `TBTCVault.mint()` call
+- Two-phase process necessitated by Bitcoin's async nature and SPV requirements
+- Designed for trustless, decentralized operation
 
-#### Why Classic Bridge Works This Way
-1. **Bitcoin Deposit Complexity**: Deposits need SPV verification and sweeping
-2. **Multi-User Aggregation**: Multiple deposits swept together for efficiency
-3. **DKG Coordination**: Time needed for distributed signers to act
-4. **Historical Design**: Evolved from v1 architecture
+#### Account Control Approach
+- Single atomic operation: deposit acknowledgment and token creation
+- Instant verification through Watchdog attestation
+- Optimized for institutional, regulated entities
 
-#### Why BasicMintingPolicy Is Different
-1. **No Bitcoin Movement**: Reserves stay with custodian
-2. **Instant Verification**: Watchdog attestation replaces SPV proofs
-3. **Single Entity Decision**: QC controls timing, no coordination needed
-4. **Business Context**: Institutional users have clear intent
+### Why This Difference Makes Sense
 
-### Design Decision: Keep Current Implementation
-
-After careful analysis, we maintain the current design with the `autoMint` flag because:
-
-1. **Flexibility Without Complexity**: Simple boolean covers all use cases
-2. **Backward Compatible**: Can always add more options later
-3. **Clear Mental Model**: Easy for developers to understand
-4. **Proven Pattern**: Similar to `increaseBalanceAndCall()` in Bank
+1. **Different Trust Models**: Bridge is trustless, Account Control uses regulated entities
+2. **Different Timing**: Bridge handles async Bitcoin, Account Control has instant attestations
+3. **Different Users**: Bridge serves anyone, Account Control serves institutions
+4. **Different Goals**: Bridge maximizes decentralization, Account Control maximizes efficiency
 
 ### Integration with Existing Infrastructure
 

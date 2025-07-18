@@ -4,7 +4,6 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/IRedemptionPolicy.sol";
 import "./ProtocolRegistry.sol";
-import "./QCManager.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
 import "../token/TBTC.sol";
@@ -17,14 +16,10 @@ import "./interfaces/ISPVValidator.sol";
 /// Demonstrates the Policy contract pattern for upgradeable redemption logic.
 ///
 /// Role definitions:
-/// - DEFAULT_ADMIN_ROLE: Can perform bulk operations on redemptions
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - ARBITER_ROLE: Can record fulfillments and flag defaults
 /// - REDEEMER_ROLE: Can request redemptions (typically granted to QCRedeemer contract)
 contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
-    enum BulkAction {
-        FULFILL,
-        DEFAULT
-    }
 
     // Custom errors for gas-efficient reverts
     error InvalidRedemptionId();
@@ -39,8 +34,6 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
     error RedemptionsArePaused();
     error SPVVerificationFailed(bytes32 redemptionId);
     error InvalidReason();
-    error NoRedemptionsProvided();
-    error ReasonRequiredForDefault();
     error SPVValidatorNotAvailable();
 
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
@@ -422,50 +415,5 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
             );
     }
 
-    /// @notice Emergency function to bulk handle redemptions (DAO only)
-    /// @param redemptionIds Array of redemption IDs
-    /// @param action The action to perform on the redemptions (e.g., FULFILL, DEFAULT)
-    /// @param reason Reason for bulk action, required for DEFAULT action
-    function bulkHandleRedemptions(
-        bytes32[] calldata redemptionIds,
-        BulkAction action,
-        bytes32 reason
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (redemptionIds.length == 0) {
-            revert NoRedemptionsProvided();
-        }
-
-        if (action == BulkAction.DEFAULT && reason == bytes32(0)) {
-            revert ReasonRequiredForDefault();
-        }
-
-        for (uint256 i = 0; i < redemptionIds.length; i++) {
-            bytes32 redemptionId = redemptionIds[i];
-
-            if (
-                fulfilledRedemptions[redemptionId] ||
-                defaultedRedemptions[redemptionId] != bytes32(0)
-            ) {
-                continue; // Skip already processed redemptions
-            }
-
-            if (action == BulkAction.FULFILL) {
-                fulfilledRedemptions[redemptionId] = true;
-                emit RedemptionFulfilledByPolicy(
-                    redemptionId,
-                    msg.sender,
-                    block.timestamp
-                );
-            } else if (action == BulkAction.DEFAULT) {
-                defaultedRedemptions[redemptionId] = reason;
-                emit RedemptionDefaultedByPolicy(
-                    redemptionId,
-                    reason,
-                    msg.sender,
-                    block.timestamp
-                );
-            }
-        }
-    }
 
 }

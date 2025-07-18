@@ -218,46 +218,6 @@ contract QCManager is AccessControl {
 
     // =================== INSTANT EMERGENCY FUNCTIONS ===================
 
-    /// @notice Emergency QC pause (instant action for threat response)
-    /// @param qc QC address to pause
-    /// @param reason Reason for emergency pause
-    function emergencyPauseQC(address qc, bytes32 reason)
-        external
-        onlyRole(ARBITER_ROLE)
-        onlyWhenNotPaused("registry")
-    {
-        if (qc == address(0)) {
-            revert InvalidQCAddress();
-        }
-        if (reason == bytes32(0)) {
-            revert ReasonRequired();
-        }
-
-        QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        if (!qcData.isQCRegistered(qc)) {
-            revert QCNotRegistered(qc);
-        }
-
-        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
-
-        // Only pause if currently Active or UnderReview
-        if (
-            currentStatus == QCData.QCStatus.Active ||
-            currentStatus == QCData.QCStatus.UnderReview
-        ) {
-            qcData.setQCStatus(qc, QCData.QCStatus.UnderReview, reason);
-
-            emit QCStatusChanged(
-                qc,
-                currentStatus,
-                QCData.QCStatus.UnderReview,
-                reason,
-                msg.sender,
-                block.timestamp
-            );
-            emit QCEmergencyPaused(qc, reason, msg.sender, block.timestamp);
-        }
-    }
 
     // =================== OPERATIONAL FUNCTIONS ===================
 
@@ -490,29 +450,7 @@ contract QCManager is AccessControl {
         qcData.updateQCMintedAmount(qc, newAmount);
     }
 
-    /// @notice Get QC status
-    /// @param qc The address of the QC
-    /// @return status The current status of the QC
-    function getQCStatus(address qc)
-        external
-        view
-        returns (QCData.QCStatus status)
-    {
-        QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        return qcData.getQCStatus(qc);
-    }
 
-    /// @notice Get QC wallet addresses
-    /// @param qc The address of the QC
-    /// @return addresses Array of wallet addresses for the QC
-    function getQCWallets(address qc)
-        external
-        view
-        returns (string[] memory addresses)
-    {
-        QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        return qcData.getQCWallets(qc);
-    }
 
     /// @dev Validate status transitions according to the simple 3-state model
     /// @param oldStatus The current status
