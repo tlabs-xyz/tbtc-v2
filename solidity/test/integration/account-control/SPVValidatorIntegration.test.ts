@@ -8,12 +8,12 @@ import type {
   QCManager,
   BasicRedemptionPolicy,
   SystemTestRelay,
-  ProtocolRegistry
+  ProtocolRegistry,
 } from "../../../typechain"
 
 /**
  * SPV Validator Integration Tests
- * 
+ *
  * Tests the integration of SPVValidator with Account Control components:
  * - QCManager wallet registration with SPV proofs
  * - BasicRedemptionPolicy fulfillment with SPV proofs
@@ -38,52 +38,58 @@ describe("SPV Validator Integration", () => {
   const MOCK_WALLET_CONTROL_TX = {
     txInfo: {
       version: "0x01000000",
-      inputVector: "0x01" + // 1 input
+      inputVector:
+        "0x01" + // 1 input
         "47a5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5" + // prev tx hash
         "00000000" + // output index
         "6a" + // scriptSig length
         "47304402201234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef02201234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef01" +
         "21031234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12" +
         "ffffffff",
-      outputVector: "0x02" + // 2 outputs
+      outputVector:
+        "0x02" + // 2 outputs
         "00f2052a01000000" + // value
         "22" + // script length
         "6a20" + // OP_RETURN + push 32 bytes
         "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12" + // challenge
         "00e1f50500000000" + // value
         "1976a914389ffce9cd9ae88dcc0631e88a821ffdbe9bfe2688ac", // P2PKH script
-      locktime: "0x00000000"
+      locktime: "0x00000000",
     },
     proof: {
-      merkleProof: "0xb7e5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5",
+      merkleProof:
+        "0xb7e5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5",
       txIndexInBlock: 1,
-      bitcoinHeaders: "0x" + "01000000".repeat(20), // Mock headers
-      coinbaseProof: "0xb7e5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5",
-      coinbasePreimage: "0x" + "01000000".repeat(16)
-    }
+      bitcoinHeaders: `0x${"01000000".repeat(20)}`, // Mock headers
+      coinbaseProof:
+        "0xb7e5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5",
+      coinbasePreimage: `0x${"01000000".repeat(16)}`,
+    },
   }
 
   const MOCK_REDEMPTION_TX = {
     txInfo: {
       version: "0x01000000",
-      inputVector: "0x01" + // 1 input
+      inputVector:
+        "0x01" + // 1 input
         "47a5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5" +
         "00000000" +
         "6a" +
         "47304402201234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef02201234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef01" +
         "21031234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12" +
         "ffffffff",
-      outputVector: "0x01" + // 1 output
+      outputVector:
+        "0x01" + // 1 output
         "00e1f50500000000" + // 10 BTC value
         "16" + // script length
         "0014389ffce9cd9ae88dcc0631e88a821ffdbe9bfe26", // P2WPKH script
-      locktime: "0x00000000"
+      locktime: "0x00000000",
     },
-    proof: MOCK_WALLET_CONTROL_TX.proof
+    proof: MOCK_WALLET_CONTROL_TX.proof,
   }
 
   before(async () => {
-    [deployer, governance, qc, user, watchdog] = await ethers.getSigners()
+    ;[deployer, governance, qc, user, watchdog] = await ethers.getSigners()
 
     // Deploy SystemTestRelay
     const SystemTestRelay = await ethers.getContractFactory("SystemTestRelay")
@@ -124,7 +130,9 @@ describe("SPV Validator Integration", () => {
     await qcManager.deployed()
 
     // Deploy BasicRedemptionPolicy
-    const BasicRedemptionPolicy = await ethers.getContractFactory("BasicRedemptionPolicy")
+    const BasicRedemptionPolicy = await ethers.getContractFactory(
+      "BasicRedemptionPolicy"
+    )
     basicRedemptionPolicy = await BasicRedemptionPolicy.deploy(
       protocolRegistry.address,
       qcData.address,
@@ -135,27 +143,47 @@ describe("SPV Validator Integration", () => {
     await basicRedemptionPolicy.deployed()
 
     // Setup ProtocolRegistry with services
-    await protocolRegistry.registerService("SPV_VALIDATOR", spvValidator.address)
+    await protocolRegistry.registerService(
+      "SPV_VALIDATOR",
+      spvValidator.address
+    )
     await protocolRegistry.registerService("QC_MANAGER", qcManager.address)
-    await protocolRegistry.registerService("BASIC_REDEMPTION_POLICY", basicRedemptionPolicy.address)
+    await protocolRegistry.registerService(
+      "BASIC_REDEMPTION_POLICY",
+      basicRedemptionPolicy.address
+    )
 
     // Configure QCManager with SPV validator
     await qcManager.grantRole(await qcManager.CONFIG_ROLE(), deployer.address)
     await qcManager.setSPVValidator(spvValidator.address)
 
     // Configure BasicRedemptionPolicy with SPV validator
-    await basicRedemptionPolicy.grantRole(await basicRedemptionPolicy.CONFIG_ROLE(), deployer.address)
+    await basicRedemptionPolicy.grantRole(
+      await basicRedemptionPolicy.CONFIG_ROLE(),
+      deployer.address
+    )
     await basicRedemptionPolicy.setSPVValidator(spvValidator.address)
 
     // Transfer governance roles
-    await spvValidator.grantRole(await spvValidator.DEFAULT_ADMIN_ROLE(), governance.address)
-    await qcManager.grantRole(await qcManager.DEFAULT_ADMIN_ROLE(), governance.address)
-    await basicRedemptionPolicy.grantRole(await basicRedemptionPolicy.DEFAULT_ADMIN_ROLE(), governance.address)
+    await spvValidator.grantRole(
+      await spvValidator.DEFAULT_ADMIN_ROLE(),
+      governance.address
+    )
+    await qcManager.grantRole(
+      await qcManager.DEFAULT_ADMIN_ROLE(),
+      governance.address
+    )
+    await basicRedemptionPolicy.grantRole(
+      await basicRedemptionPolicy.DEFAULT_ADMIN_ROLE(),
+      governance.address
+    )
   })
 
   describe("Service Registration and Configuration", () => {
     it("should register SPV validator as a service", async () => {
-      const registeredAddress = await protocolRegistry.getService("SPV_VALIDATOR")
+      const registeredAddress = await protocolRegistry.getService(
+        "SPV_VALIDATOR"
+      )
       expect(registeredAddress).to.equal(spvValidator.address)
     })
 
@@ -171,21 +199,35 @@ describe("SPV Validator Integration", () => {
 
     it("should have proper access control setup", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-      
-      expect(await spvValidator.hasRole(DEFAULT_ADMIN_ROLE, governance.address)).to.be.true
-      expect(await qcManager.hasRole(DEFAULT_ADMIN_ROLE, governance.address)).to.be.true
-      expect(await basicRedemptionPolicy.hasRole(DEFAULT_ADMIN_ROLE, governance.address)).to.be.true
+
+      expect(await spvValidator.hasRole(DEFAULT_ADMIN_ROLE, governance.address))
+        .to.be.true
+      expect(await qcManager.hasRole(DEFAULT_ADMIN_ROLE, governance.address)).to
+        .be.true
+      expect(
+        await basicRedemptionPolicy.hasRole(
+          DEFAULT_ADMIN_ROLE,
+          governance.address
+        )
+      ).to.be.true
     })
   })
 
   describe("QCManager Integration", () => {
     it("should integrate SPV validation in wallet registration flow", async () => {
       const btcAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-      const challenge = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("test-challenge"))
-      
+      const challenge = ethers.utils.keccak256(
+        ethers.utils.toUtf8Bytes("test-challenge")
+      )
+
       // Encode SPV proof data for QCManager
       const spvProofData = ethers.utils.defaultAbiCoder.encode(
-        ["address", "bytes32", "tuple(bytes4,bytes,bytes,bytes4)", "tuple(bytes,uint256,bytes,bytes,bytes)"],
+        [
+          "address",
+          "bytes32",
+          "tuple(bytes4,bytes,bytes,bytes4)",
+          "tuple(bytes,uint256,bytes,bytes,bytes)",
+        ],
         [
           qc.address,
           challenge,
@@ -193,27 +235,25 @@ describe("SPV Validator Integration", () => {
             MOCK_WALLET_CONTROL_TX.txInfo.version,
             MOCK_WALLET_CONTROL_TX.txInfo.inputVector,
             MOCK_WALLET_CONTROL_TX.txInfo.outputVector,
-            MOCK_WALLET_CONTROL_TX.txInfo.locktime
+            MOCK_WALLET_CONTROL_TX.txInfo.locktime,
           ],
           [
             MOCK_WALLET_CONTROL_TX.proof.merkleProof,
             MOCK_WALLET_CONTROL_TX.proof.txIndexInBlock,
             MOCK_WALLET_CONTROL_TX.proof.bitcoinHeaders,
             MOCK_WALLET_CONTROL_TX.proof.coinbaseProof,
-            MOCK_WALLET_CONTROL_TX.proof.coinbasePreimage
-          ]
+            MOCK_WALLET_CONTROL_TX.proof.coinbasePreimage,
+          ],
         ]
       )
 
       // This test demonstrates the integration flow
       // With real Bitcoin data, this would succeed
       try {
-        await qcManager.connect(watchdog).registerQualifiedCustodian(
-          qc.address,
-          btcAddress,
-          spvProofData
-        )
-        
+        await qcManager
+          .connect(watchdog)
+          .registerQualifiedCustodian(qc.address, btcAddress, spvProofData)
+
         // If we reach here, the integration is working
         expect(true).to.be.true
       } catch (error: any) {
@@ -225,37 +265,53 @@ describe("SPV Validator Integration", () => {
 
     it("should handle invalid SPV proofs gracefully", async () => {
       const btcAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-      const challenge = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("invalid-test"))
-      
+      const challenge = ethers.utils.keccak256(
+        ethers.utils.toUtf8Bytes("invalid-test")
+      )
+
       const invalidSpvProofData = ethers.utils.defaultAbiCoder.encode(
-        ["address", "bytes32", "tuple(bytes4,bytes,bytes,bytes4)", "tuple(bytes,uint256,bytes,bytes,bytes)"],
+        [
+          "address",
+          "bytes32",
+          "tuple(bytes4,bytes,bytes,bytes4)",
+          "tuple(bytes,uint256,bytes,bytes,bytes)",
+        ],
         [
           qc.address,
           challenge,
           ["0x01000000", "0x00", "0x00", "0x00000000"], // Invalid transaction
-          ["0x00", 0, "0x00", "0x00", "0x00"] // Invalid proof
+          ["0x00", 0, "0x00", "0x00", "0x00"], // Invalid proof
         ]
       )
 
       await expect(
-        qcManager.connect(watchdog).registerQualifiedCustodian(
-          qc.address,
-          btcAddress,
-          invalidSpvProofData
-        )
+        qcManager
+          .connect(watchdog)
+          .registerQualifiedCustodian(
+            qc.address,
+            btcAddress,
+            invalidSpvProofData
+          )
       ).to.be.reverted
     })
   })
 
   describe("BasicRedemptionPolicy Integration", () => {
     it("should integrate SPV validation in redemption fulfillment", async () => {
-      const redemptionId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("redemption-123"))
+      const redemptionId = ethers.utils.keccak256(
+        ethers.utils.toUtf8Bytes("redemption-123")
+      )
       const userBtcAddress = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
       const expectedAmount = ethers.utils.parseUnits("10", 8) // 10 BTC in satoshis
-      
+
       // Encode SPV proof data for BasicRedemptionPolicy
       const spvProofData = ethers.utils.defaultAbiCoder.encode(
-        ["string", "uint64", "tuple(bytes4,bytes,bytes,bytes4)", "tuple(bytes,uint256,bytes,bytes,bytes)"],
+        [
+          "string",
+          "uint64",
+          "tuple(bytes4,bytes,bytes,bytes4)",
+          "tuple(bytes,uint256,bytes,bytes,bytes)",
+        ],
         [
           userBtcAddress,
           expectedAmount,
@@ -263,25 +319,24 @@ describe("SPV Validator Integration", () => {
             MOCK_REDEMPTION_TX.txInfo.version,
             MOCK_REDEMPTION_TX.txInfo.inputVector,
             MOCK_REDEMPTION_TX.txInfo.outputVector,
-            MOCK_REDEMPTION_TX.txInfo.locktime
+            MOCK_REDEMPTION_TX.txInfo.locktime,
           ],
           [
             MOCK_REDEMPTION_TX.proof.merkleProof,
             MOCK_REDEMPTION_TX.proof.txIndexInBlock,
             MOCK_REDEMPTION_TX.proof.bitcoinHeaders,
             MOCK_REDEMPTION_TX.proof.coinbaseProof,
-            MOCK_REDEMPTION_TX.proof.coinbasePreimage
-          ]
+            MOCK_REDEMPTION_TX.proof.coinbasePreimage,
+          ],
         ]
       )
 
       // Test redemption fulfillment flow
       try {
-        await basicRedemptionPolicy.connect(watchdog).recordRedemptionFulfillment(
-          redemptionId,
-          spvProofData
-        )
-        
+        await basicRedemptionPolicy
+          .connect(watchdog)
+          .recordRedemptionFulfillment(redemptionId, spvProofData)
+
         expect(true).to.be.true
       } catch (error: any) {
         // Expected to fail with mock data, but integration is working
@@ -291,12 +346,19 @@ describe("SPV Validator Integration", () => {
     })
 
     it("should validate payment amounts correctly", async () => {
-      const redemptionId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("amount-test"))
+      const redemptionId = ethers.utils.keccak256(
+        ethers.utils.toUtf8Bytes("amount-test")
+      )
       const userBtcAddress = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
       const tooHighAmount = ethers.utils.parseUnits("100", 8) // 100 BTC - too high for our mock tx
-      
+
       const spvProofData = ethers.utils.defaultAbiCoder.encode(
-        ["string", "uint64", "tuple(bytes4,bytes,bytes,bytes4)", "tuple(bytes,uint256,bytes,bytes,bytes)"],
+        [
+          "string",
+          "uint64",
+          "tuple(bytes4,bytes,bytes,bytes4)",
+          "tuple(bytes,uint256,bytes,bytes,bytes)",
+        ],
         [
           userBtcAddress,
           tooHighAmount,
@@ -304,23 +366,22 @@ describe("SPV Validator Integration", () => {
             MOCK_REDEMPTION_TX.txInfo.version,
             MOCK_REDEMPTION_TX.txInfo.inputVector,
             MOCK_REDEMPTION_TX.txInfo.outputVector,
-            MOCK_REDEMPTION_TX.txInfo.locktime
+            MOCK_REDEMPTION_TX.txInfo.locktime,
           ],
           [
             MOCK_REDEMPTION_TX.proof.merkleProof,
             MOCK_REDEMPTION_TX.proof.txIndexInBlock,
             MOCK_REDEMPTION_TX.proof.bitcoinHeaders,
             MOCK_REDEMPTION_TX.proof.coinbaseProof,
-            MOCK_REDEMPTION_TX.proof.coinbasePreimage
-          ]
+            MOCK_REDEMPTION_TX.proof.coinbasePreimage,
+          ],
         ]
       )
 
       await expect(
-        basicRedemptionPolicy.connect(watchdog).recordRedemptionFulfillment(
-          redemptionId,
-          spvProofData
-        )
+        basicRedemptionPolicy
+          .connect(watchdog)
+          .recordRedemptionFulfillment(redemptionId, spvProofData)
       ).to.be.reverted
     })
   })
@@ -335,11 +396,18 @@ describe("SPV Validator Integration", () => {
       // 5. Registration succeeds if SPV proof is valid
 
       const btcAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-      const challenge = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("e2e-test"))
-      
+      const challenge = ethers.utils.keccak256(
+        ethers.utils.toUtf8Bytes("e2e-test")
+      )
+
       // Mock the complete flow data
       const completeSpvProof = ethers.utils.defaultAbiCoder.encode(
-        ["address", "bytes32", "tuple(bytes4,bytes,bytes,bytes4)", "tuple(bytes,uint256,bytes,bytes,bytes)"],
+        [
+          "address",
+          "bytes32",
+          "tuple(bytes4,bytes,bytes,bytes4)",
+          "tuple(bytes,uint256,bytes,bytes,bytes)",
+        ],
         [
           qc.address,
           challenge,
@@ -347,26 +415,24 @@ describe("SPV Validator Integration", () => {
             MOCK_WALLET_CONTROL_TX.txInfo.version,
             MOCK_WALLET_CONTROL_TX.txInfo.inputVector,
             MOCK_WALLET_CONTROL_TX.txInfo.outputVector,
-            MOCK_WALLET_CONTROL_TX.txInfo.locktime
+            MOCK_WALLET_CONTROL_TX.txInfo.locktime,
           ],
           [
             MOCK_WALLET_CONTROL_TX.proof.merkleProof,
             MOCK_WALLET_CONTROL_TX.proof.txIndexInBlock,
             MOCK_WALLET_CONTROL_TX.proof.bitcoinHeaders,
             MOCK_WALLET_CONTROL_TX.proof.coinbaseProof,
-            MOCK_WALLET_CONTROL_TX.proof.coinbasePreimage
-          ]
+            MOCK_WALLET_CONTROL_TX.proof.coinbasePreimage,
+          ],
         ]
       )
 
       // Test the complete integration
       try {
-        const tx = await qcManager.connect(watchdog).registerQualifiedCustodian(
-          qc.address,
-          btcAddress,
-          completeSpvProof
-        )
-        
+        const tx = await qcManager
+          .connect(watchdog)
+          .registerQualifiedCustodian(qc.address, btcAddress, completeSpvProof)
+
         // In a real scenario with valid Bitcoin data, this would emit events
         console.log("Complete flow transaction hash:", tx.hash)
         expect(true).to.be.true
@@ -386,12 +452,19 @@ describe("SPV Validator Integration", () => {
       // 5. Policy calls SPVValidator.verifyRedemptionFulfillment
       // 6. Fulfillment is recorded if SPV proof is valid
 
-      const redemptionId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("e2e-redemption"))
+      const redemptionId = ethers.utils.keccak256(
+        ethers.utils.toUtf8Bytes("e2e-redemption")
+      )
       const userBtcAddress = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
       const amount = ethers.utils.parseUnits("5", 8) // 5 BTC
-      
+
       const completeRedemptionProof = ethers.utils.defaultAbiCoder.encode(
-        ["string", "uint64", "tuple(bytes4,bytes,bytes,bytes4)", "tuple(bytes,uint256,bytes,bytes,bytes)"],
+        [
+          "string",
+          "uint64",
+          "tuple(bytes4,bytes,bytes,bytes4)",
+          "tuple(bytes,uint256,bytes,bytes,bytes)",
+        ],
         [
           userBtcAddress,
           amount,
@@ -399,24 +472,23 @@ describe("SPV Validator Integration", () => {
             MOCK_REDEMPTION_TX.txInfo.version,
             MOCK_REDEMPTION_TX.txInfo.inputVector,
             MOCK_REDEMPTION_TX.txInfo.outputVector,
-            MOCK_REDEMPTION_TX.txInfo.locktime
+            MOCK_REDEMPTION_TX.txInfo.locktime,
           ],
           [
             MOCK_REDEMPTION_TX.proof.merkleProof,
             MOCK_REDEMPTION_TX.proof.txIndexInBlock,
             MOCK_REDEMPTION_TX.proof.bitcoinHeaders,
             MOCK_REDEMPTION_TX.proof.coinbaseProof,
-            MOCK_REDEMPTION_TX.proof.coinbasePreimage
-          ]
+            MOCK_REDEMPTION_TX.proof.coinbasePreimage,
+          ],
         ]
       )
 
       try {
-        const tx = await basicRedemptionPolicy.connect(watchdog).recordRedemptionFulfillment(
-          redemptionId,
-          completeRedemptionProof
-        )
-        
+        const tx = await basicRedemptionPolicy
+          .connect(watchdog)
+          .recordRedemptionFulfillment(redemptionId, completeRedemptionProof)
+
         console.log("Complete redemption flow transaction hash:", tx.hash)
         expect(true).to.be.true
       } catch (error: any) {
@@ -430,18 +502,22 @@ describe("SPV Validator Integration", () => {
   describe("Error Handling and Edge Cases", () => {
     it("should handle SPV validator not configured", async () => {
       // Test what happens if SPV validator is not set
-      const tempQCManager = await (await ethers.getContractFactory("QCManager")).deploy(
+      const tempQCManager = await (
+        await ethers.getContractFactory("QCManager")
+      ).deploy(
         protocolRegistry.address,
         await qcManager.qcData(),
         await qcManager.systemState()
       )
 
       await expect(
-        tempQCManager.connect(watchdog).registerQualifiedCustodian(
-          qc.address,
-          "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-          "0x00"
-        )
+        tempQCManager
+          .connect(watchdog)
+          .registerQualifiedCustodian(
+            qc.address,
+            "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+            "0x00"
+          )
       ).to.be.revertedWith("SPV validator not configured")
     })
 
@@ -449,11 +525,13 @@ describe("SPV Validator Integration", () => {
       const malformedProofData = "0xdeadbeef" // Invalid encoded data
 
       await expect(
-        qcManager.connect(watchdog).registerQualifiedCustodian(
-          qc.address,
-          "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-          malformedProofData
-        )
+        qcManager
+          .connect(watchdog)
+          .registerQualifiedCustodian(
+            qc.address,
+            "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+            malformedProofData
+          )
       ).to.be.reverted
     })
 
@@ -464,7 +542,9 @@ describe("SPV Validator Integration", () => {
       ).to.be.reverted
 
       await expect(
-        basicRedemptionPolicy.connect(user).setSPVValidator(spvValidator.address)
+        basicRedemptionPolicy
+          .connect(user)
+          .setSPVValidator(spvValidator.address)
       ).to.be.reverted
     })
   })
@@ -472,10 +552,17 @@ describe("SPV Validator Integration", () => {
   describe("Gas Usage in Integration", () => {
     it("should have reasonable gas usage for integrated flows", async () => {
       const btcAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-      const challenge = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("gas-test"))
-      
+      const challenge = ethers.utils.keccak256(
+        ethers.utils.toUtf8Bytes("gas-test")
+      )
+
       const spvProofData = ethers.utils.defaultAbiCoder.encode(
-        ["address", "bytes32", "tuple(bytes4,bytes,bytes,bytes4)", "tuple(bytes,uint256,bytes,bytes,bytes)"],
+        [
+          "address",
+          "bytes32",
+          "tuple(bytes4,bytes,bytes,bytes4)",
+          "tuple(bytes,uint256,bytes,bytes,bytes)",
+        ],
         [
           qc.address,
           challenge,
@@ -483,27 +570,31 @@ describe("SPV Validator Integration", () => {
             MOCK_WALLET_CONTROL_TX.txInfo.version,
             MOCK_WALLET_CONTROL_TX.txInfo.inputVector,
             MOCK_WALLET_CONTROL_TX.txInfo.outputVector,
-            MOCK_WALLET_CONTROL_TX.txInfo.locktime
+            MOCK_WALLET_CONTROL_TX.txInfo.locktime,
           ],
           [
             MOCK_WALLET_CONTROL_TX.proof.merkleProof,
             MOCK_WALLET_CONTROL_TX.proof.txIndexInBlock,
             MOCK_WALLET_CONTROL_TX.proof.bitcoinHeaders,
             MOCK_WALLET_CONTROL_TX.proof.coinbaseProof,
-            MOCK_WALLET_CONTROL_TX.proof.coinbasePreimage
-          ]
+            MOCK_WALLET_CONTROL_TX.proof.coinbasePreimage,
+          ],
         ]
       )
 
       try {
-        const gasEstimate = await qcManager.connect(watchdog).estimateGas.registerQualifiedCustodian(
-          qc.address,
-          btcAddress,
-          spvProofData
+        const gasEstimate = await qcManager
+          .connect(watchdog)
+          .estimateGas.registerQualifiedCustodian(
+            qc.address,
+            btcAddress,
+            spvProofData
+          )
+
+        console.log(
+          `Integrated wallet registration gas estimate: ${gasEstimate.toString()}`
         )
-        
-        console.log(`Integrated wallet registration gas estimate: ${gasEstimate.toString()}`)
-        
+
         // Target: Should be under 800k gas for complete flow
         // expect(gasEstimate).to.be.lt(800000)
       } catch (error) {

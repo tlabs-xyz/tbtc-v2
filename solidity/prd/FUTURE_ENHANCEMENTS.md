@@ -46,9 +46,11 @@ contract ProtocolRegistry {
 
   function activateServiceVersion(bytes32 serviceId, uint256 version) external;
 }
+
 ```
 
 **Benefits**:
+
 - Enables blue-green policy deployments
 - Allows testing V2 policies alongside V1 without disruption
 - Maintains backward compatibility
@@ -70,9 +72,11 @@ function getServiceHealth(bytes32 serviceId)
   external
   view
   returns (bool, string memory);
+
 ```
 
 **Benefits**:
+
 - Early detection of policy contract issues
 - Automated monitoring integration
 - Graceful degradation capabilities
@@ -85,23 +89,25 @@ Replace the simple `autoMint` boolean with a more flexible enum:
 
 ```solidity
 enum MintingStrategy {
-    AutoMint,        // Current behavior when autoMint = true
-    BankOnly,        // Current behavior when autoMint = false  
-    DeferredMint,    // Create balance with scheduled mint
-    ConditionalMint  // Mint only if conditions are met
+  AutoMint, // Current behavior when autoMint = true
+  BankOnly, // Current behavior when autoMint = false
+  DeferredMint, // Create balance with scheduled mint
+  ConditionalMint // Mint only if conditions are met
 }
 
 function creditQCBackedDeposit(
-    address user,
-    uint256 amount,
-    address qc,
-    bytes32 mintId,
-    MintingStrategy strategy,
-    bytes calldata strategyData  // Additional parameters for complex strategies
+  address user,
+  uint256 amount,
+  address qc,
+  bytes32 mintId,
+  MintingStrategy strategy,
+  bytes calldata strategyData // Additional parameters for complex strategies
 ) external;
+
 ```
 
 **Use Cases:**
+
 - **DeferredMint**: Schedule minting for specific time or block
 - **ConditionalMint**: Mint only if gas price below threshold or other conditions
 
@@ -111,19 +117,21 @@ Enable QCs to process multiple deposits in a single transaction:
 
 ```solidity
 struct CreditRequest {
-    address user;
-    uint256 amount;
-    bytes32 mintId;
-    bool autoMint;
+  address user;
+  uint256 amount;
+  bytes32 mintId;
+  bool autoMint;
 }
 
 function batchCreditQCBackedDeposits(
-    address qc,
-    CreditRequest[] calldata requests
+  address qc,
+  CreditRequest[] calldata requests
 ) external onlyRole(MINTER_ROLE) nonReentrant;
+
 ```
 
 **Benefits:**
+
 - Gas optimization for high-volume QCs
 - Atomic processing of related deposits
 - Simplified accounting for institutional users
@@ -164,9 +172,11 @@ contract QCReserveLedger {
     }
   }
 }
+
 ```
 
 **Benefits**:
+
 - Reduces gas costs for multiple QC updates
 - More efficient Watchdog operations
 - Better scalability
@@ -192,9 +202,11 @@ struct Custodian {
   // Slot 3: String storage (separate for variable length)
   string name;
 }
+
 ```
 
 **Benefits**:
+
 - Reduces storage costs by ~40%
 - Faster reads/writes for QC data
 - Better cache locality
@@ -218,6 +230,7 @@ event QCStatusChanged(
 ```
 
 **Benefits**:
+
 - Faster event filtering for monitoring
 - Better support for time-based queries
 - Improved analytics capabilities
@@ -242,9 +255,11 @@ contract QCDataDiff {
       history.length > 0 ? history[history.length - 1].status : QCStatus.Active;
   }
 }
+
 ```
 
 **Benefits**:
+
 - Reduces storage costs for frequently changing state
 - Maintains historical audit trail
 - Better for governance analysis
@@ -257,15 +272,17 @@ Enable QCs to provide liquidity without immediate minting:
 
 ```solidity
 interface ILiquidityProvider {
-    function provideLiquidity(
-        address qc,
-        uint256 bankBalance,
-        uint256 minReturn
-    ) external returns (uint256 lpTokens);
+  function provideLiquidity(
+    address qc,
+    uint256 bankBalance,
+    uint256 minReturn
+  ) external returns (uint256 lpTokens);
 }
+
 ```
 
 **Scenario Flow:**
+
 1. QC creates Bank balance (no auto-mint)
 2. DeFi protocol uses Bank balance as collateral
 3. Protocol mints tBTC only for liquidations
@@ -277,16 +294,18 @@ Support for derivatives and structured products:
 
 ```solidity
 interface IStructuredProduct {
-    function createOption(
-        address underlying,  // Bank balance holder
-        uint256 amount,
-        uint256 strike,
-        uint256 expiry
-    ) external returns (uint256 optionId);
+  function createOption(
+    address underlying, // Bank balance holder
+    uint256 amount,
+    uint256 strike,
+    uint256 expiry
+  ) external returns (uint256 optionId);
 }
+
 ```
 
 **Use Cases:**
+
 - Options on QC reserves
 - Yield-bearing Bank balance products
 - Insurance products for QC defaults
@@ -297,21 +316,23 @@ Enable flash loans of Bank balances:
 
 ```solidity
 interface IFlashLoanReceiver {
-    function executeOperation(
-        uint256 amount,
-        uint256 fee,
-        bytes calldata params
-    ) external;
+  function executeOperation(
+    uint256 amount,
+    uint256 fee,
+    bytes calldata params
+  ) external;
 }
 
 function flashLoanBankBalance(
-    uint256 amount,
-    IFlashLoanReceiver receiver,
-    bytes calldata params
+  uint256 amount,
+  IFlashLoanReceiver receiver,
+  bytes calldata params
 ) external nonReentrant;
+
 ```
 
 **Benefits:**
+
 - Arbitrage opportunities
 - Capital efficiency
 - Composability with other protocols
@@ -324,17 +345,18 @@ Replace trust-based attestations with cryptographic proofs:
 
 ```solidity
 struct ReserveProof {
-    bytes32 merkleRoot;     // Root of UTXO set
-    bytes[] inclusionProofs; // Proofs for QC's UTXOs
-    uint256 totalReserves;
-    uint256 timestamp;
-    bytes signature;        // QC's signature
+  bytes32 merkleRoot; // Root of UTXO set
+  bytes[] inclusionProofs; // Proofs for QC's UTXOs
+  uint256 totalReserves;
+  uint256 timestamp;
+  bytes signature; // QC's signature
 }
 
 function submitCryptographicReserveProof(
-    address qc,
-    ReserveProof calldata proof
+  address qc,
+  ReserveProof calldata proof
 ) external;
+
 ```
 
 ### 5.2 Emergency Pause Granularity
@@ -359,9 +381,11 @@ contract SystemState {
     _;
   }
 }
+
 ```
 
 **Benefits**:
+
 - Surgical response to specific threats
 - Minimizes disruption during emergencies
 - Better crisis management
@@ -392,9 +416,11 @@ contract EnhancedTimelockAccessControl is AccessControl {
 
   function executeRoleChange(bytes32 changeId) external;
 }
+
 ```
 
 **Benefits** (Additional to existing time-locked governance):
+
 - Extends time-lock coverage to role management changes
 - Provides transparency for administrative governance changes beyond QC operations
 - Reduces insider threat risks for role assignments
@@ -405,16 +431,17 @@ Support for multi-signature operations:
 
 ```solidity
 struct MultiSigRequest {
-    address[] signers;
-    uint256 requiredSignatures;
-    bytes32 operationHash;
-    uint256 deadline;
+  address[] signers;
+  uint256 requiredSignatures;
+  bytes32 operationHash;
+  uint256 deadline;
 }
 
 function initiateMultiSigDeposit(
-    MultiSigRequest calldata request,
-    uint256 amount
+  MultiSigRequest calldata request,
+  uint256 amount
 ) external;
+
 ```
 
 ## 6. Watchdog Service Improvements
@@ -443,9 +470,11 @@ contract WatchdogLivenessMonitor {
     lastHeartbeat = block.timestamp;
   }
 }
+
 ```
 
 **Benefits**:
+
 - Early detection of Watchdog failures
 - Enables emergency procedures
 - Maintains system reliability
@@ -482,9 +511,11 @@ contract SingleWatchdogOracle is IWatchdogOracle {
     reserveLedger.submitReserveAttestation(qc, balance);
   }
 }
+
 ```
 
 **Benefits**:
+
 - Future-proofs for decentralization
 - Maintains interface stability
 - Enables gradual migration
@@ -518,9 +549,11 @@ contract PolicyUpgradeValidator is IPolicyValidator {
     return (true, "Validation passed");
   }
 }
+
 ```
 
 **Benefits**:
+
 - Prevents invalid policy upgrades
 - Ensures interface compatibility
 - Reduces upgrade risks
@@ -548,9 +581,11 @@ contract BasicMintingPolicy {
     return parameterStore.getParameter(keccak256("STALE_THRESHOLD"));
   }
 }
+
 ```
 
 **Benefits**:
+
 - Centralized parameter governance
 - Hot-swappable configuration without contract upgrades
 - Better parameter auditability
@@ -563,13 +598,14 @@ Direct minting on Layer 2 solutions:
 
 ```solidity
 interface IL2Bridge {
-    function mintOnL2(
-        address user,
-        uint256 amount,
-        uint256 chainId,
-        bytes calldata userData
-    ) external;
+  function mintOnL2(
+    address user,
+    uint256 amount,
+    uint256 chainId,
+    bytes calldata userData
+  ) external;
 }
+
 ```
 
 ### 8.2 Cross-Chain Messaging
@@ -578,13 +614,14 @@ Support for cross-chain QC operations:
 
 ```solidity
 interface ICrossChainMessenger {
-    function sendCrossChainMint(
-        uint256 targetChain,
-        address recipient,
-        uint256 amount,
-        bytes calldata metadata
-    ) external;
+  function sendCrossChainMint(
+    uint256 targetChain,
+    address recipient,
+    uint256 amount,
+    bytes calldata metadata
+  ) external;
 }
+
 ```
 
 ## 9. Advanced Governance Features
@@ -625,17 +662,18 @@ Dynamic limits based on QC behavior:
 
 ```solidity
 function calculateDynamicMintingCap(address qc) public view returns (uint256) {
-    QCReputation memory rep = qcReputations[qc];
-    uint256 baseCap = custodians[qc].maxMintingCap;
-    
-    // Adjust based on reputation
-    if (rep.reputationScore > EXCELLENT_THRESHOLD) {
-        return baseCap * 120 / 100; // 20% bonus
-    } else if (rep.reputationScore < POOR_THRESHOLD) {
-        return baseCap * 50 / 100; // 50% reduction
-    }
-    return baseCap;
+  QCReputation memory rep = qcReputations[qc];
+  uint256 baseCap = custodians[qc].maxMintingCap;
+
+  // Adjust based on reputation
+  if (rep.reputationScore > EXCELLENT_THRESHOLD) {
+    return (baseCap * 120) / 100; // 20% bonus
+  } else if (rep.reputationScore < POOR_THRESHOLD) {
+    return (baseCap * 50) / 100; // 50% reduction
+  }
+  return baseCap;
 }
+
 ```
 
 ## 10. User Experience Enhancements
@@ -646,16 +684,17 @@ Support meta-transactions for QC operations:
 
 ```solidity
 function creditQCBackedDepositWithPermit(
-    address user,
-    uint256 amount,
-    address qc,
-    bytes32 mintId,
-    bool autoMint,
-    uint256 deadline,
-    uint8 v,
-    bytes32 r,
-    bytes32 s
+  address user,
+  uint256 amount,
+  address qc,
+  bytes32 mintId,
+  bool autoMint,
+  uint256 deadline,
+  uint8 v,
+  bytes32 r,
+  bytes32 s
 ) external;
+
 ```
 
 ### 10.2 Subscription-Based Minting
@@ -701,9 +740,11 @@ contract QCMetrics {
       uint256 reserves
     );
 }
+
 ```
 
 **Benefits**:
+
 - Real-time system health monitoring
 - Better analytics for DAO governance
 - Automated alerting capabilities
@@ -737,6 +778,7 @@ event QCPerformanceMetric(
 ```
 
 **Benefits**:
+
 - Standardized monitoring interface
 - Better integration with existing tBTC v2 monitoring
 - Historical trend analysis
@@ -746,12 +788,16 @@ event QCPerformanceMetric(
 Built-in analytics functions:
 
 ```solidity
-function getQCAnalytics(address qc) external view returns (
+function getQCAnalytics(address qc)
+  external
+  view
+  returns (
     uint256 totalVolume30d,
     uint256 averageDepositSize,
     uint256 uniqueUsers,
     uint256 healthScore
-);
+  );
+
 ```
 
 ## 12. Testing and Validation Framework
@@ -772,9 +818,11 @@ interface IPolicyTestable {
     view
     returns (bool success, bytes memory result);
 }
+
 ```
 
 **Benefits**:
+
 - Consistent policy testing
 - Easier validation of upgrades
 - Better quality assurance
@@ -799,9 +847,11 @@ contract AccountControlTestHelper {
     external
     returns (bool success);
 }
+
 ```
 
 **Benefits**:
+
 - Faster integration testing
 - Consistent test scenarios
 - Better regression testing
@@ -845,9 +895,11 @@ contract NoCollateralPolicy is ICollateralPolicy {
     return true; // V1 accepts any collateral amount
   }
 }
+
 ```
 
 **Benefits**:
+
 - Smooth V1 → V2 transition
 - Interface stability across versions
 - Backward compatibility
@@ -857,59 +909,67 @@ contract NoCollateralPolicy is ICollateralPolicy {
 Based on potential impact, complexity, and strategic importance:
 
 ### 1. **High Priority**
-   - **Service Versioning Support** (Section 1.1): Enables safe policy upgrades
-   - **Cryptographic Proof-of-Reserves** (Section 5.1): Critical security enhancement
-   - **Batch Operations Support** (Section 2.2): Gas optimization for scaling
-   - **Emergency Pause Granularity** (Section 5.2): Essential operational control
-   - **Watchdog Heartbeat Mechanism** (Section 6.1): System reliability assurance
-   - **L2 Integration** (Section 8.1): Cross-chain scaling necessity
+
+- **Service Versioning Support** (Section 1.1): Enables safe policy upgrades
+- **Cryptographic Proof-of-Reserves** (Section 5.1): Critical security enhancement
+- **Batch Operations Support** (Section 2.2): Gas optimization for scaling
+- **Emergency Pause Granularity** (Section 5.2): Essential operational control
+- **Watchdog Heartbeat Mechanism** (Section 6.1): System reliability assurance
+- **L2 Integration** (Section 8.1): Cross-chain scaling necessity
 
 ### 2. **Medium Priority**
-   - **Enhanced Minting Strategies** (Section 2.1): User experience improvements
-   - **Gas-Optimized Storage Layout** (Section 3.1): Cost reduction
-   - **Policy Validation Framework** (Section 7.1): Upgrade safety
-   - **On-Chain Metrics Collection** (Section 11.1): Operational monitoring
-   - **Enhanced Time-Locked Governance** (Section 5.3): Extended security controls
-   - **Dynamic Fee Models** (Section 9.1): Economic flexibility
-   - **Strategic Attestation Cost Optimization** (Section 2.3): Operational efficiency
+
+- **Enhanced Minting Strategies** (Section 2.1): User experience improvements
+- **Gas-Optimized Storage Layout** (Section 3.1): Cost reduction
+- **Policy Validation Framework** (Section 7.1): Upgrade safety
+- **On-Chain Metrics Collection** (Section 11.1): Operational monitoring
+- **Enhanced Time-Locked Governance** (Section 5.3): Extended security controls
+- **Dynamic Fee Models** (Section 9.1): Economic flexibility
+- **Strategic Attestation Cost Optimization** (Section 2.3): Operational efficiency
 
 ### 3. **Low Priority**
-   - **Service Health Checking** (Section 1.2): Monitoring enhancements
-   - **Event Indexing Strategy** (Section 3.2): Analytics improvements
-   - **Advanced DeFi Integration** (Section 4): Ecosystem expansion
-   - **Reputation System** (Section 9.2): Long-term governance evolution
-   - **Gasless Transactions** (Section 10.1): UX convenience features
-   - **Subscription-Based Minting** (Section 10.2): Automation features
-   - **Testing Framework** (Section 12): Development tooling
-   - **Future V2 Preparation** (Section 13): Forward compatibility
+
+- **Service Health Checking** (Section 1.2): Monitoring enhancements
+- **Event Indexing Strategy** (Section 3.2): Analytics improvements
+- **Advanced DeFi Integration** (Section 4): Ecosystem expansion
+- **Reputation System** (Section 9.2): Long-term governance evolution
+- **Gasless Transactions** (Section 10.1): UX convenience features
+- **Subscription-Based Minting** (Section 10.2): Automation features
+- **Testing Framework** (Section 12): Development tooling
+- **Future V2 Preparation** (Section 13): Forward compatibility
 
 ### 4. **Research Phase**
-   - **State Diff Compression** (Section 3.3): Novel storage optimization
-   - **Flash Loan Support** (Section 4.3): Complex DeFi integration
-   - **Cross-Chain Messaging** (Section 8.2): Advanced interoperability
-   - **Automated Risk Management** (Section 9.3): AI/ML governance integration
+
+- **State Diff Compression** (Section 3.3): Novel storage optimization
+- **Flash Loan Support** (Section 4.3): Complex DeFi integration
+- **Cross-Chain Messaging** (Section 8.2): Advanced interoperability
+- **Automated Risk Management** (Section 9.3): AI/ML governance integration
 
 ## Implementation Strategy
 
 ### Phase 1: Core Infrastructure (6-12 months)
+
 1. Deploy core contracts with service versioning support
 2. Implement cryptographic proof-of-reserves
 3. Add emergency pause granularity
 4. Deploy watchdog heartbeat mechanism
 
 ### Phase 2: Performance & Monitoring (3-6 months)
+
 1. Implement gas-optimized storage layout
 2. Add comprehensive monitoring and analytics
 3. Deploy batch operations support
 4. Enhance event system for better tracking
 
 ### Phase 3: Advanced Features (6-12 months)
+
 1. Implement enhanced minting strategies
 2. Add policy validation framework
 3. Deploy dynamic fee models
 4. Begin L2 integration work
 
 ### Phase 4: Ecosystem Integration (ongoing)
+
 1. DeFi protocol integrations
 2. Cross-chain expansion
 3. Advanced governance features
@@ -920,7 +980,7 @@ Based on potential impact, complexity, and strategic importance:
 This comprehensive enhancement roadmap represents the evolution of the tBTC v2 system from its current Account Control implementation to a full-featured, scalable Bitcoin-backed token protocol. The enhancements maintain strict adherence to the modular, policy-driven architecture while addressing:
 
 - **Operational Excellence**: Better monitoring, testing, and deployment capabilities
-- **Security Enhancements**: Granular controls, cryptographic proofs, and validation systems  
+- **Security Enhancements**: Granular controls, cryptographic proofs, and validation systems
 - **Performance Optimization**: Gas efficiency and scalability improvements
 - **Future-Proofing**: V2 preparation while maintaining V1 simplicity and compatibility
 - **Ecosystem Growth**: DeFi integration and cross-chain expansion capabilities

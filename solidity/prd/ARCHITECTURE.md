@@ -17,7 +17,7 @@ This document provides detailed technical architecture for the Account Control s
 The Account Control architecture is built on four core principles:
 
 1. **Direct Integration**: Leverage existing Bank/Vault infrastructure without abstraction layers
-2. **Modular Design**: Policy-driven contracts enable evolution without breaking core interfaces  
+2. **Modular Design**: Policy-driven contracts enable evolution without breaking core interfaces
 3. **Data/Logic Separation**: Clear separation between storage (QCData) and business logic (QCManager)
 4. **Future-Proof Interfaces**: Stable core contracts with upgradeable policy implementations
 
@@ -140,6 +140,7 @@ fulfillment and default handling logic to a pluggable "Redemption Policy"
 direct BasicMintingPolicy integration while maintaining backward compatibility.
 
 - **Bank Contract Modifications:**
+
   - Added `authorizedBalanceIncreasers` mapping to allow BasicMintingPolicy to increase balances
   - Modified `onlyBridge` modifier to `onlyAuthorizedIncreaser` for inclusive access
   - Added `setAuthorizedBalanceIncreaser()` function for managing authorized contracts
@@ -163,15 +164,18 @@ struct QCData {
   uint8 reserved; // 1 byte
   // Total: 32 bytes (1 storage slot)
 }
+
 ```
 
 **Gas Cost Targets**:
+
 - QC Registration: < 500,000 gas
 - Minting Operation: < 150,000 gas
 - Redemption Request: < 100,000 gas
 - Risk Assessment Update: < 80,000 gas
 
 **Computational Optimization**:
+
 - External libraries reduce deployment gas costs
 - Pure functions enable compile-time optimization
 - Batch operations reduce transaction costs
@@ -242,11 +246,13 @@ The minting flow is streamlined through direct Bank integration, providing a
 single-step experience for users.
 
 **Updated Flow:**
+
 ```
 User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 ```
 
 **Step-by-Step Process:**
+
 1. User calls `QCMinter.requestQCMint()` with tBTC amount
 2. QCMinter validates request and calls `BasicMintingPolicy.requestMint()`
 3. BasicMintingPolicy validates:
@@ -270,14 +276,14 @@ sequenceDiagram
 
     User->>Minter: 1. requestQCMint(amount)
     Minter->>Policy: 2. requestMint(qc, user, amount)
-    
+
     Policy->>Manager: 3. Validate QC status and capacity
     Manager-->>Policy: QC validated
-    
+
     Policy->>Bank: 4. increaseBalanceAndCall(vault, [user], [satoshis])
     Bank->>Vault: 5. receiveBalanceIncrease(user, satoshis)
     Vault->>User: 6. Mint tBTC tokens
-    
+
     Policy-->>User: tBTC tokens minted
 ```
 
@@ -344,11 +350,13 @@ sequenceDiagram
 The direct Bank integration ensures seamless coexistence with the regular Bridge:
 
 **Separation of Concerns:**
+
 - **Regular Bridge**: Handles DKG wallet management and Bitcoin SPV verification
 - **BasicMintingPolicy**: Handles QC reserve management and attestation verification
 - **Shared Components**: Both use same Bank and TBTCVault infrastructure
 
 **Authorization Model:**
+
 ```solidity
 // Bank contract maintains separate authorization for balance increasers
 mapping(address => bool) public authorizedBalanceIncreasers;
@@ -508,6 +516,7 @@ failure or capture and implement time-locked governance for critical actions.
 The direct Bank integration introduces several security considerations:
 
 **Strengths:**
+
 - Direct integration with proven Bank contract architecture
 - Role-based access control with separation of duties
 - Comprehensive input validation and system health checks
@@ -515,6 +524,7 @@ The direct Bank integration introduces several security considerations:
 - Simpler architecture reduces attack surface
 
 **Key Risks:**
+
 - **QC Reserve Attestation Trust Model**: Relies on QC attestations without
   cryptographic proof of Bitcoin holdings
 - **Bank Authorization**: BasicMintingPolicy must be properly authorized in Bank
@@ -596,6 +606,7 @@ Following YAGNI principles and production requirements analysis, the Account Con
 ### Direct Bank Integration
 
 The `BasicMintingPolicy.requestMint()` function implements a simple, efficient flow:
+
 - Creates Bank balance AND immediately mints tBTC tokens in one atomic operation
 - Eliminates complexity of two-step processes
 - Reduces gas costs and operational overhead
@@ -610,6 +621,7 @@ The `BasicMintingPolicy.requestMint()` function implements a simple, efficient f
 ### Production-Driven Architecture
 
 After extensive analysis, the two-step minting process (previously `requestMintWithOption`) was removed because:
+
 - No production use cases required delayed minting
 - Batch operations can be handled at the application layer
 - Simpler contracts are easier to audit and maintain
@@ -618,11 +630,13 @@ After extensive analysis, the two-step minting process (previously `requestMintW
 ### Comparison with Classic Bridge
 
 #### Classic Bridge Approach
+
 - Creates Bank balance first, then requires manual `TBTCVault.mint()` call
 - Two-phase process necessitated by Bitcoin's async nature and SPV requirements
 - Designed for trustless, decentralized operation
 
 #### Account Control Approach
+
 - Single atomic operation: deposit acknowledgment and token creation
 - Instant verification through Watchdog attestation
 - Optimized for institutional, regulated entities
@@ -642,7 +656,7 @@ The BasicMintingPolicy seamlessly integrates with tBTC's existing infrastructure
 // Auto-mint flow
 BasicMintingPolicy → Bank.increaseBalanceAndCall() → TBTCVault.receiveBalanceIncrease() → Mint tBTC
 
-// Manual mint flow  
+// Manual mint flow
 BasicMintingPolicy → Bank.increaseBalance() → User later calls → TBTCVault.mint()
 ```
 
@@ -658,6 +672,7 @@ Both paths use the same underlying Bank and TBTCVault contracts, ensuring consis
 ### Conclusion
 
 The `autoMint` flag represents a thoughtful balance between:
+
 - **Simplicity**: Clear, binary choice
 - **Flexibility**: Supports diverse use cases
 - **Compatibility**: Works within existing tBTC architecture
@@ -721,12 +736,14 @@ while preserving instant emergency response capabilities.
 **Decision**: Use library pattern for core business logic with contract orchestration.
 
 **Rationale**:
+
 - Gas efficiency through external library linking
 - Code reusability across multiple contracts
 - Easier testing and validation of isolated components
 - Modular design enables selective upgrades
 
 **Consequences**:
+
 - Positive: Lower deployment costs, better modularity
 - Negative: Additional complexity in library linking
 
@@ -740,12 +757,14 @@ while preserving instant emergency response capabilities.
 **Decision**: Use struct-based storage with library access patterns.
 
 **Rationale**:
+
 - Storage slot optimization through struct packing
 - Clear data organization and access patterns
 - Compatibility with existing BridgeState patterns
 - Support for future storage layout upgrades
 
 **Consequences**:
+
 - Positive: Optimal gas costs, clear data organization
 - Negative: Storage migration complexity for major changes
 
@@ -759,12 +778,14 @@ while preserving instant emergency response capabilities.
 **Decision**: Single trusted Watchdog with DAO oversight.
 
 **Rationale**:
+
 - Simplified trust model with clear accountability
 - Reduced complexity compared to multi-oracle consensus
 - Ability to rapidly respond to issues
 - Clear path to V2 multi-oracle upgrade
 
 **Consequences**:
+
 - Positive: Simple implementation, clear responsibilities
 - Negative: Single point of failure, trust dependency
 
@@ -778,12 +799,14 @@ while preserving instant emergency response capabilities.
 **Decision**: Simple reserve vs minted balance comparison with strategic attestation.
 
 **Rationale**:
+
 - Clear and auditable solvency model
 - Low computational overhead
 - Strategic attestation reduces on-chain costs
 - Easily extensible for future risk models
 
 **Consequences**:
+
 - Positive: Simple and reliable solvency verification, low gas costs
 - Negative: Relies on trusted Watchdog, less sophisticated risk modeling
 
@@ -797,6 +820,7 @@ while preserving instant emergency response capabilities.
 **Decision**: Direct Bank integration through BasicMintingPolicy.
 
 **Rationale**:
+
 - Zero breaking changes to existing functionality
 - Clear separation of concerns
 - Simplified architecture with direct Bank calls
@@ -804,6 +828,7 @@ while preserving instant emergency response capabilities.
 - Leverages existing Bank authorization patterns
 
 **Consequences**:
+
 - Positive: Seamless integration, backward compatibility, simpler architecture
 - Negative: Requires Bank authorization management
 
@@ -817,12 +842,14 @@ while preserving instant emergency response capabilities.
 **Decision**: Implement time-locked governance for QC onboarding and minting cap increases.
 
 **Rationale**:
+
 - Provides community review period for critical decisions
 - Maintains instant response for emergency actions
 - Balances decentralization with operational needs
 - Clear separation between routine and emergency actions
 
 **Consequences**:
+
 - Positive: Enhanced governance transparency, community oversight
 - Negative: Delayed execution for routine operations, increased complexity
 
@@ -831,16 +858,19 @@ while preserving instant emergency response capabilities.
 ### 9.1 Phased Deployment Strategy
 
 **Phase 1: Foundation Deployment**
+
 - Core Libraries: QCDataTypes, QCMath, QCEvents, QCValidation
 - Risk Assessment: QCRiskAssessment
 - Testing Infrastructure: Mock contracts, test utilities, integration helpers
 
 **Phase 2: Core Logic Deployment**
+
 - Storage Management: QCStorageManager
 - Oracle Integration: QCOracleManager
 - Integration Testing: Component integration tests, oracle consensus testing
 
 **Phase 3: Direct Bank Integration**
+
 - Policy Integration: BasicMintingPolicy with direct Bank calls
 - System Configuration: Parameter initialization, role assignments, Bank authorization
 - End-to-End Testing: Complete workflow testing, security validation, performance benchmarking
@@ -859,6 +889,7 @@ while preserving instant emergency response capabilities.
 ### 9.3 Deployment Scripts Architecture
 
 **Hardhat Deploy Pattern**:
+
 ```typescript
 // Following tBTC v2 numbered deployment pattern
 deploy/
@@ -870,6 +901,7 @@ deploy/
 ```
 
 **Environment-Specific Configuration**:
+
 - Testnet: Relaxed parameters for testing
 - Mainnet: Production-grade security parameters
 - Development: Fast iteration parameters
@@ -901,18 +933,21 @@ Monitoring System Architecture
 ### 10.2 Key Performance Indicators (KPIs)
 
 **System Health KPIs**:
+
 - QC system uptime percentage
 - Average transaction confirmation time
 - Oracle consensus success rate
 - Risk assessment computation time
 
 **Business Operation KPIs**:
+
 - Active QC count and utilization
 - Daily minting/redemption volumes
 - Average risk scores across QCs
 - Fee collection and distribution rates
 
 **Security KPIs**:
+
 - Number of failed validation attempts
 - Oracle consensus disagreement frequency
 - Emergency circuit breaker activations
@@ -921,12 +956,14 @@ Monitoring System Architecture
 ### 10.3 Alert Classification System
 
 **Severity Levels**:
+
 - **P0 Critical**: System down or security breach
 - **P1 High**: Major functionality impaired
 - **P2 Medium**: Minor functionality issues
 - **P3 Low**: Performance degradation or warnings
 
 **Response Timeline**:
+
 - **0-5 minutes**: Automated alert generation and initial assessment
 - **5-15 minutes**: Human verification and initial response
 - **15-60 minutes**: Detailed investigation and mitigation

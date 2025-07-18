@@ -9,7 +9,7 @@ import { ethers } from "ethers"
 /**
  * Helper to update any policy in the ProtocolRegistry
  * Replaces the removed updateMintingPolicy() and updateRedemptionPolicy() functions
- * 
+ *
  * Note: In production, policy updates should be done through
  * governance by updating the ProtocolRegistry directly
  */
@@ -23,13 +23,13 @@ export async function updatePolicyInRegistry(
   if (await protocolRegistry.hasService(policyKey)) {
     oldPolicy = await protocolRegistry.getService(policyKey)
   }
-  
+
   // Update registry with new policy
   await protocolRegistry.setService(policyKey, newPolicyAddress)
-  
+
   return {
     oldPolicy,
-    newPolicy: newPolicyAddress
+    newPolicy: newPolicyAddress,
   }
 }
 
@@ -41,7 +41,11 @@ export async function updateMintingPolicyInRegistry(
   newPolicyAddress: string
 ): Promise<{ oldPolicy: string; newPolicy: string }> {
   const MINTING_POLICY_KEY = ethers.utils.id("MINTING_POLICY")
-  return updatePolicyInRegistry(protocolRegistry, MINTING_POLICY_KEY, newPolicyAddress)
+  return updatePolicyInRegistry(
+    protocolRegistry,
+    MINTING_POLICY_KEY,
+    newPolicyAddress
+  )
 }
 
 /**
@@ -52,5 +56,9 @@ export async function updateRedemptionPolicyInRegistry(
   newPolicyAddress: string
 ): Promise<{ oldPolicy: string; newPolicy: string }> {
   const REDEMPTION_POLICY_KEY = ethers.utils.id("REDEMPTION_POLICY")
-  return updatePolicyInRegistry(protocolRegistry, REDEMPTION_POLICY_KEY, newPolicyAddress)
+  return updatePolicyInRegistry(
+    protocolRegistry,
+    REDEMPTION_POLICY_KEY,
+    newPolicyAddress
+  )
 }

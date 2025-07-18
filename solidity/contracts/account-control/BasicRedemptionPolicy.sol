@@ -20,7 +20,6 @@ import "./interfaces/ISPVValidator.sol";
 /// - ARBITER_ROLE: Can record fulfillments and flag defaults
 /// - REDEEMER_ROLE: Can request redemptions (typically granted to QCRedeemer contract)
 contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
-
     // Custom errors for gas-efficient reverts
     error InvalidRedemptionId();
     error RedemptionIdAlreadyUsed(bytes32 redemptionId);
@@ -171,10 +170,14 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         if (bytes(btcAddress).length == 0) {
             revert InvalidBitcoinAddress(btcAddress);
         }
-        
+
         // Bitcoin address format check
         bytes memory addr = bytes(btcAddress);
-        if (!(addr[0] == 0x31 || addr[0] == 0x33 || (addr[0] == 0x62 && addr.length > 1 && addr[1] == 0x63))) {
+        if (
+            !(addr[0] == 0x31 ||
+                addr[0] == 0x33 ||
+                (addr[0] == 0x62 && addr.length > 1 && addr[1] == 0x63))
+        ) {
             revert InvalidBitcoinAddressFormat(btcAddress);
         }
 
@@ -257,7 +260,15 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         }
 
         // SPV proof verification
-        if (!_verifySPVProof(redemptionId, userBtcAddress, expectedAmount, txInfo, proof)) {
+        if (
+            !_verifySPVProof(
+                redemptionId,
+                userBtcAddress,
+                expectedAmount,
+                txInfo,
+                proof
+            )
+        ) {
             revert SPVVerificationFailed(redemptionId);
         }
 
@@ -402,8 +413,10 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         if (!protocolRegistry.hasService(SPV_VALIDATOR_KEY)) {
             revert SPVValidatorNotAvailable();
         }
-        
-        address validatorAddress = protocolRegistry.getService(SPV_VALIDATOR_KEY);
+
+        address validatorAddress = protocolRegistry.getService(
+            SPV_VALIDATOR_KEY
+        );
         ISPVValidator spvValidator = ISPVValidator(validatorAddress);
         return
             spvValidator.verifyRedemptionFulfillment(
@@ -414,6 +427,4 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
                 proof
             );
     }
-
-
 }

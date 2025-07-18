@@ -709,9 +709,7 @@ export class QCOnboardingFlow extends BaseFlowTest {
     console.log("Step 1: Queueing QC onboarding...")
     const maxMintingCap = ethers.utils.parseEther("1000")
 
-    await qcManager
-      .connect(governance)
-      .registerQC(qc.address, maxMintingCap)
+    await qcManager.connect(governance).registerQC(qc.address, maxMintingCap)
     console.log("✅ QC onboarding queued with 7-day delay")
 
     // Step 2: Wait for time-lock period
@@ -721,9 +719,8 @@ export class QCOnboardingFlow extends BaseFlowTest {
 
     // Step 3: Execute QC Onboarding
     console.log("Step 3: Executing QC onboarding...")
-    await qcManager
-      .connect(governance)
-      // No additional step needed - instant execution
+    await qcManager.connect(governance)
+    // No additional step needed - instant execution
 
     // Verify QC status
     const qcStatus = await qcManager.getQCStatus(qc.address)

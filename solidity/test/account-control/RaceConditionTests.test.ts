@@ -478,11 +478,19 @@ describe("Race Condition Tests", () => {
         // Concurrent redemption requests using QCRedeemer
         const redeem1 = qcRedeemer
           .connect(user1)
-          .initiateRedemption(qcAddress.address, redemptionAmount, TEST_DATA.BTC_ADDRESSES.LEGACY)
+          .initiateRedemption(
+            qcAddress.address,
+            redemptionAmount,
+            TEST_DATA.BTC_ADDRESSES.LEGACY
+          )
 
         const redeem2 = qcRedeemer
           .connect(user2)
-          .initiateRedemption(qcAddress.address, redemptionAmount, TEST_DATA.BTC_ADDRESSES.LEGACY)
+          .initiateRedemption(
+            qcAddress.address,
+            redemptionAmount,
+            TEST_DATA.BTC_ADDRESSES.LEGACY
+          )
 
         await Promise.all([redeem1, redeem2])
 
@@ -508,11 +516,19 @@ describe("Race Condition Tests", () => {
         // Race condition: Both users try to create redemptions simultaneously
         const redeem1 = qcRedeemer
           .connect(user1)
-          .initiateRedemption(qcAddress.address, redemptionAmount, TEST_DATA.BTC_ADDRESSES.LEGACY)
+          .initiateRedemption(
+            qcAddress.address,
+            redemptionAmount,
+            TEST_DATA.BTC_ADDRESSES.LEGACY
+          )
 
         const redeem2 = qcRedeemer
           .connect(user2)
-          .initiateRedemption(qcAddress.address, redemptionAmount, TEST_DATA.BTC_ADDRESSES.LEGACY)
+          .initiateRedemption(
+            qcAddress.address,
+            redemptionAmount,
+            TEST_DATA.BTC_ADDRESSES.LEGACY
+          )
 
         // Both should succeed with unique IDs
         const results = await Promise.all([redeem1, redeem2])

@@ -370,7 +370,6 @@ contract QCData is AccessControl {
         return custodians[qc].maxMintingCapacity;
     }
 
-
     /// @notice Get wallet status
     /// @param btcAddress The Bitcoin address
     /// @return status The current status of the wallet
@@ -392,7 +391,6 @@ contract QCData is AccessControl {
     {
         return wallets[btcAddress].qc;
     }
-
 
     /// @notice Get QC wallet addresses
     /// @param qc The address of the QC

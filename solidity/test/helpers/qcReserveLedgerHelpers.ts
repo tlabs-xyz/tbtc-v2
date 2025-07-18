@@ -17,7 +17,7 @@ export async function getTimeUntilStale(
   currentTimestamp: number
 ): Promise<BigNumber> {
   const attestation = await qcReserveLedger.getCurrentAttestation(qcAddress)
-  
+
   if (!attestation.isValid || attestation.timestamp.eq(0)) {
     return BigNumber.from(0)
   }
@@ -57,7 +57,7 @@ export async function getAttestationHistoryPaginated(
 ): Promise<any[]> {
   // Get the full attestation history array
   const fullHistory = await qcReserveLedger.getAttestationHistory(qcAddress)
-  
+
   if (offset >= fullHistory.length) {
     return []
   }
@@ -76,7 +76,7 @@ export async function getAttestedQCs(
 ): Promise<string[]> {
   const qcs: string[] = []
   let index = 0
-  
+
   try {
     while (true) {
       const qc = await qcReserveLedger.attestedQCs(index)
@@ -86,7 +86,7 @@ export async function getAttestedQCs(
   } catch (error) {
     // Expected when we reach the end of the array
   }
-  
+
   return qcs
 }
 
@@ -105,24 +105,26 @@ export async function getAttestationSummary(
 }> {
   const qcs = await getAttestedQCs(qcReserveLedger)
   const staleThreshold = await systemState.staleThreshold()
-  
+
   let totalBalance = BigNumber.from(0)
   let staleCount = 0
-  
+
   for (const qc of qcs) {
     const attestation = await qcReserveLedger.getCurrentAttestation(qc)
-    
+
     if (attestation.isValid && !attestation.timestamp.eq(0)) {
       totalBalance = totalBalance.add(attestation.balance)
-      
-      if (currentTimestamp > attestation.timestamp.add(staleThreshold).toNumber()) {
+
+      if (
+        currentTimestamp > attestation.timestamp.add(staleThreshold).toNumber()
+      ) {
         staleCount++
       }
     } else {
       staleCount++
     }
   }
-  
+
   return {
     totalQCs: qcs.length,
     totalBalance,
@@ -139,12 +141,12 @@ export async function getLatestAttestationTimestamps(
   qcs: string[]
 ): Promise<BigNumber[]> {
   const timestamps = []
-  
+
   for (const qc of qcs) {
     const attestation = await qcReserveLedger.getCurrentAttestation(qc)
     timestamps.push(attestation.timestamp)
   }
-  
+
   return timestamps
 }
 
@@ -160,17 +162,18 @@ export async function checkMultipleStaleAttestations(
 ): Promise<boolean[]> {
   const staleFlags = []
   const staleThreshold = await systemState.staleThreshold()
-  
+
   for (const qc of qcs) {
     const attestation = await qcReserveLedger.getCurrentAttestation(qc)
-    
+
     if (!attestation.isValid || attestation.timestamp.eq(0)) {
       staleFlags.push(true)
     } else {
-      const isStale = currentTimestamp > attestation.timestamp.add(staleThreshold).toNumber()
+      const isStale =
+        currentTimestamp > attestation.timestamp.add(staleThreshold).toNumber()
       staleFlags.push(isStale)
     }
   }
-  
+
   return staleFlags
 }

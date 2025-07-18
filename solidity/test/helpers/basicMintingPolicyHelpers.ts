@@ -33,8 +33,10 @@ export function extractMintRequestFromEvent(receipt: ContractReceipt): {
   completed: boolean
   mintId: string
 } {
-  const mintCompletedEvent = receipt.events?.find(e => e.event === "MintCompleted")
-  
+  const mintCompletedEvent = receipt.events?.find(
+    (e) => e.event === "MintCompleted"
+  )
+
   if (!mintCompletedEvent || !mintCompletedEvent.args) {
     throw new Error("MintCompleted event not found in receipt")
   }
@@ -58,7 +60,7 @@ export function checkMintCompletedFromEvents(
   expectedMintId: string
 ): boolean {
   const mintCompletedEvent = receipt.events?.find(
-    e => e.event === "MintCompleted" && e.args?.mintId === expectedMintId
+    (e) => e.event === "MintCompleted" && e.args?.mintId === expectedMintId
   )
   return mintCompletedEvent !== undefined
 }
@@ -66,7 +68,7 @@ export function checkMintCompletedFromEvents(
 /**
  * Create Bank balance directly and verify changes for non-auto-mint test
  * Helper for testing the Bank-only balance creation scenario
- * 
+ *
  * Note: This test demonstrates how to create Bank balances without auto-minting
  * In practice, this would be done through the BasicMintingPolicy contract
  */
@@ -81,23 +83,27 @@ export async function verifyBankOnlyMint(
   // This test simulates direct Bank balance creation without auto-mint
   // In production, this would be done through BasicMintingPolicy
   const satoshis = mintAmount.div(SATOSHI_MULTIPLIER)
-  
+
   // The test demonstrates that when we create Bank balance directly,
   // no tBTC is minted (only Bank balance increases)
   // This is different from the full minting flow which auto-mints tBTC
-  
+
   // For the test, we expect the balances to remain unchanged
   // since we're not actually performing the operation
   const bankBalanceAfter = await bank.balanceOf(user)
   const tbtcBalanceAfter = await tbtc.balanceOf(user)
-  
+
   // Verify that balances haven't changed (since we're not actually minting)
   if (!bankBalanceAfter.eq(bankBalanceBefore)) {
-    throw new Error(`Bank balance should not have changed. Before: ${bankBalanceBefore}, After: ${bankBalanceAfter}`)
+    throw new Error(
+      `Bank balance should not have changed. Before: ${bankBalanceBefore}, After: ${bankBalanceAfter}`
+    )
   }
 
   if (!tbtcBalanceAfter.eq(tbtcBalanceBefore)) {
-    throw new Error(`tBTC balance should not have changed. Before: ${tbtcBalanceBefore}, After: ${tbtcBalanceAfter}`)
+    throw new Error(
+      `tBTC balance should not have changed. Before: ${tbtcBalanceBefore}, After: ${tbtcBalanceAfter}`
+    )
   }
 }
 
