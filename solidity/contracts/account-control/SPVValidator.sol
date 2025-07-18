@@ -26,7 +26,7 @@ pragma solidity 0.8.17;
  * - Role-based access control protects configuration changes
  *
  * ADDRESS DECODING: Bridge works directly with Bitcoin scripts (P2PKH, P2WPKH, etc.)
- * and never decodes addresses. BitcoinAddressUtils fills this gap, enabling 
+ * and never decodes addresses. BitcoinAddressUtils fills this gap, enabling
  * Account Control to accept human-readable Bitcoin addresses and convert them
  * to scripts for SPV validation - functionality Bridge never needed.
  */
@@ -263,28 +263,33 @@ contract SPVValidator is AccessControl {
 
         for (uint256 i = 0; i < outputsCount; i++) {
             bytes memory output = outputVector.extractOutputAtIndex(i);
-            
+
             // Check if this is an OP_RETURN output
-            if (output.length >= 34) { // Minimum: 8 bytes value + 1 byte script length + 1 byte OP_RETURN + 32 bytes data
+            if (output.length >= 34) {
+                // Minimum: 8 bytes value + 1 byte script length + 1 byte OP_RETURN + 32 bytes data
                 // Extract the locking script (skip 8-byte value)
                 uint256 scriptLength = uint8(output[8]);
-                
+
                 // Check if it's OP_RETURN with 32-byte data
-                if (scriptLength >= 34 && output[9] == 0x6a && output[10] == 0x20) {
+                if (
+                    scriptLength >= 34 &&
+                    output[9] == 0x6a &&
+                    output[10] == 0x20
+                ) {
                     // Extract the 32-byte data after OP_RETURN
                     bytes32 challengeData;
                     // solhint-disable-next-line no-inline-assembly
                     assembly {
                         challengeData := mload(add(output, 43)) // 32 bytes + 8 value + 1 script_len + 1 OP_RETURN + 1 data_len
                     }
-                    
+
                     if (challengeData == expectedChallenge) {
                         return true;
                     }
                 }
             }
         }
-        
+
         return false;
     }
 
@@ -298,47 +303,52 @@ contract SPVValidator is AccessControl {
     ) private pure returns (bool verified) {
         // Validate the address format by attempting to decode it
         // This will revert for invalid addresses, providing validation
-        (uint8 scriptType, bytes memory expectedHash) = BitcoinAddressUtils.decodeAddress(btcAddress);
-        
+        (uint8 scriptType, bytes memory expectedHash) = BitcoinAddressUtils
+            .decodeAddress(btcAddress);
+
         // Ensure we got a valid result
         if (expectedHash.length == 0) return false;
-        
+
         // Count inputs by parsing the VarInt
         uint256 inputsCount = _parseVarInt(inputVector, 0);
         if (inputsCount == 0) return false;
-        
+
         // Parse each input to check if it spends from the expected address
         uint256 offset = _varIntLength(inputVector, 0);
-        
+
         for (uint256 i = 0; i < inputsCount; i++) {
             // Each input is: [32-byte tx hash][4-byte output index][varint scriptSig length][scriptSig][4-byte sequence]
-            
+
             // Skip tx hash (32 bytes) and output index (4 bytes)
             offset += 36;
-            
+
             // Get scriptSig length
             uint256 scriptSigLen = _parseVarInt(inputVector, offset);
             offset += _varIntLength(inputVector, offset);
-            
+
             // Extract and validate scriptSig if present
             if (scriptSigLen > 0) {
-                bytes memory scriptSig = _extractBytes(inputVector, offset, scriptSigLen);
-                
+                bytes memory scriptSig = _extractBytes(
+                    inputVector,
+                    offset,
+                    scriptSigLen
+                );
+
                 // Check if this input spends from the expected address
                 if (_validateInputScript(scriptSig, scriptType, expectedHash)) {
                     return true;
                 }
-                
+
                 offset += scriptSigLen;
             }
-            
+
             // Skip sequence number (4 bytes)
             offset += 4;
         }
-        
+
         return false;
     }
-    
+
     /// @dev Validate input script against expected address
     /// @param scriptSig The input script signature
     /// @param addressType The type of Bitcoin address (0=P2PKH, 1=P2SH, 2=P2WPKH, 3=P2WSH)
@@ -354,68 +364,80 @@ contract SPVValidator is AccessControl {
             // Extract public key from scriptSig
             bytes memory pubKey = _extractPubKeyFromP2PKHScriptSig(scriptSig);
             if (pubKey.length == 0) return false;
-            
+
             // Hash the public key and compare with expected hash
-            bytes memory pubKeyHash = abi.encodePacked(ripemd160(abi.encodePacked(sha256(pubKey))));
+            bytes memory pubKeyHash = abi.encodePacked(
+                ripemd160(abi.encodePacked(sha256(pubKey)))
+            );
             return keccak256(pubKeyHash) == keccak256(expectedHash);
         }
-        
+
         // For P2SH inputs, scriptSig contains the redeem script
         if (addressType == 1) {
             // Extract redeem script (it's the last data push in scriptSig)
             bytes memory redeemScript = _extractLastDataPush(scriptSig);
             if (redeemScript.length == 0) return false;
-            
+
             // Hash the redeem script and compare with expected hash
-            bytes memory scriptHash = abi.encodePacked(ripemd160(abi.encodePacked(sha256(redeemScript))));
+            bytes memory scriptHash = abi.encodePacked(
+                ripemd160(abi.encodePacked(sha256(redeemScript)))
+            );
             return keccak256(scriptHash) == keccak256(expectedHash);
         }
-        
+
         // P2WPKH and P2WSH have empty scriptSig in witness transactions
         // For now, we don't support witness transaction parsing
         return false;
     }
-    
+
     /// @dev Extract public key from P2PKH scriptSig
     /// @param scriptSig The script signature data
     /// @return pubKey The extracted public key
-    function _extractPubKeyFromP2PKHScriptSig(bytes memory scriptSig) private pure returns (bytes memory pubKey) {
+    function _extractPubKeyFromP2PKHScriptSig(bytes memory scriptSig)
+        private
+        pure
+        returns (bytes memory pubKey)
+    {
         if (scriptSig.length < 35) return pubKey; // Too short to contain sig + pubkey
-        
+
         // Skip the signature: first byte is push opcode for signature length
         uint256 sigLen = uint256(uint8(scriptSig[0]));
         if (sigLen >= scriptSig.length) return pubKey;
-        
+
         uint256 pubKeyOffset = sigLen + 1;
         if (pubKeyOffset >= scriptSig.length) return pubKey;
-        
+
         // Get public key length
         uint256 pubKeyLen = uint256(uint8(scriptSig[pubKeyOffset]));
         pubKeyOffset += 1;
-        
+
         // Validate public key length (33 for compressed, 65 for uncompressed)
         if (pubKeyLen != 33 && pubKeyLen != 65) return pubKey;
         if (pubKeyOffset + pubKeyLen > scriptSig.length) return pubKey;
-        
+
         // Extract public key
         pubKey = _extractBytes(scriptSig, pubKeyOffset, pubKeyLen);
     }
-    
+
     /// @dev Extract the last data push from a script
     /// @param script The script data
     /// @return data The last pushed data
-    function _extractLastDataPush(bytes memory script) private pure returns (bytes memory data) {
+    function _extractLastDataPush(bytes memory script)
+        private
+        pure
+        returns (bytes memory data)
+    {
         if (script.length == 0) return data;
-        
+
         uint256 offset = 0;
         uint256 lastDataOffset = 0;
         uint256 lastDataLen = 0;
-        
+
         // Parse through the script to find the last data push
         while (offset < script.length) {
             uint8 opcode = uint8(script[offset]);
             offset += 1;
-            
+
             // Handle data push opcodes
             if (opcode <= 75) {
                 // Direct push of 'opcode' bytes
@@ -426,7 +448,8 @@ contract SPVValidator is AccessControl {
                 } else {
                     break;
                 }
-            } else if (opcode == 0x4c) { // OP_PUSHDATA1
+            } else if (opcode == 0x4c) {
+                // OP_PUSHDATA1
                 if (offset + 1 <= script.length) {
                     uint256 len = uint256(uint8(script[offset]));
                     offset += 1;
@@ -440,9 +463,11 @@ contract SPVValidator is AccessControl {
                 } else {
                     break;
                 }
-            } else if (opcode == 0x4d) { // OP_PUSHDATA2
+            } else if (opcode == 0x4d) {
+                // OP_PUSHDATA2
                 if (offset + 2 <= script.length) {
-                    uint256 len = uint256(uint8(script[offset])) | (uint256(uint8(script[offset + 1])) << 8);
+                    uint256 len = uint256(uint8(script[offset])) |
+                        (uint256(uint8(script[offset + 1])) << 8);
                     offset += 2;
                     if (offset + len <= script.length) {
                         lastDataOffset = offset;
@@ -459,21 +484,25 @@ contract SPVValidator is AccessControl {
                 continue;
             }
         }
-        
+
         // Extract the last data push found
         if (lastDataLen > 0) {
             data = _extractBytes(script, lastDataOffset, lastDataLen);
         }
     }
-    
+
     /// @dev Extract bytes from data at specific offset and length
     /// @param data The data to extract from
     /// @param offset The starting offset
     /// @param length The number of bytes to extract
     /// @return extracted The extracted bytes
-    function _extractBytes(bytes memory data, uint256 offset, uint256 length) private pure returns (bytes memory extracted) {
+    function _extractBytes(
+        bytes memory data,
+        uint256 offset,
+        uint256 length
+    ) private pure returns (bytes memory extracted) {
         if (offset + length > data.length) return extracted;
-        
+
         extracted = new bytes(length);
         for (uint256 i = 0; i < length; i++) {
             extracted[i] = data[offset + i];
@@ -491,13 +520,14 @@ contract SPVValidator is AccessControl {
         uint64 expectedAmount
     ) private pure returns (bool found) {
         uint256 outputsCount = _parseVarInt(outputVector, 0);
-        
+
         // Decode the Bitcoin address
-        (uint8 scriptType, bytes memory expectedHash) = BitcoinAddressUtils.decodeAddress(userBtcAddress);
-        
+        (uint8 scriptType, bytes memory expectedHash) = BitcoinAddressUtils
+            .decodeAddress(userBtcAddress);
+
         // Ensure we got a valid result
         if (expectedHash.length == 0) return false;
-        
+
         // Build the expected script based on address type
         bytes memory expectedScript;
         if (scriptType == 0) {
@@ -509,34 +539,24 @@ contract SPVValidator is AccessControl {
             );
         } else if (scriptType == 1) {
             // P2SH: OP_HASH160 <20-byte-hash> OP_EQUAL
-            expectedScript = abi.encodePacked(
-                hex"a914",
-                expectedHash,
-                hex"87"
-            );
+            expectedScript = abi.encodePacked(hex"a914", expectedHash, hex"87");
         } else if (scriptType == 2) {
             // P2WPKH: OP_0 <20-byte-hash>
-            expectedScript = abi.encodePacked(
-                hex"0014",
-                expectedHash
-            );
+            expectedScript = abi.encodePacked(hex"0014", expectedHash);
         } else if (scriptType == 3) {
             // P2WSH: OP_0 <32-byte-hash>
-            expectedScript = abi.encodePacked(
-                hex"0020",
-                expectedHash
-            );
+            expectedScript = abi.encodePacked(hex"0020", expectedHash);
         } else {
             return false; // Unsupported script type
         }
-        
+
         // Check each output
         for (uint256 i = 0; i < outputsCount; i++) {
             bytes memory output = outputVector.extractOutputAtIndex(i);
-            
+
             // Extract value (first 8 bytes, little-endian)
             uint64 outputValue = output.extractValue();
-            
+
             // Extract the script (skip value and script length)
             uint256 scriptLen = uint256(uint8(output[8]));
             if (output.length >= 9 + scriptLen) {
@@ -544,28 +564,30 @@ contract SPVValidator is AccessControl {
                 for (uint256 j = 0; j < scriptLen; j++) {
                     outputScript[j] = output[9 + j];
                 }
-                
+
                 // Check if amount and script match
-                if (outputValue >= expectedAmount && 
-                    _compareBytes(outputScript, expectedScript)) {
+                if (
+                    outputValue >= expectedAmount &&
+                    _compareBytes(outputScript, expectedScript)
+                ) {
                     return true;
                 }
             }
         }
-        
+
         return false;
     }
 
     /// @dev Convert Bitcoin address to script hash for comparison
     /// @param btcAddress The Bitcoin address
     /// @return scriptHash The corresponding script hash (empty if invalid)
-    function _addressToScriptHash(string memory btcAddress) 
-        private 
-        pure 
-        returns (bytes memory scriptHash) 
+    function _addressToScriptHash(string memory btcAddress)
+        private
+        pure
+        returns (bytes memory scriptHash)
     {
         (, bytes memory hash) = BitcoinAddressUtils.decodeAddress(btcAddress);
-        
+
         // For P2PKH and P2WPKH, we return the hash directly
         // For P2SH and P2WSH, we also return the hash directly
         return hash;
@@ -575,17 +597,17 @@ contract SPVValidator is AccessControl {
     /// @param a First byte array
     /// @param b Second byte array
     /// @return equal True if arrays are equal
-    function _compareBytes(bytes memory a, bytes memory b) 
-        private 
-        pure 
-        returns (bool equal) 
+    function _compareBytes(bytes memory a, bytes memory b)
+        private
+        pure
+        returns (bool equal)
     {
         if (a.length != b.length) return false;
-        
+
         for (uint256 i = 0; i < a.length; i++) {
             if (a[i] != b[i]) return false;
         }
-        
+
         return true;
     }
 
@@ -634,22 +656,25 @@ contract SPVValidator is AccessControl {
     /// @param data The byte array containing the VarInt
     /// @param offset The offset to start parsing from
     /// @return value The parsed integer value
-    function _parseVarInt(bytes memory data, uint256 offset) 
-        private 
-        pure 
-        returns (uint256 value) 
+    function _parseVarInt(bytes memory data, uint256 offset)
+        private
+        pure
+        returns (uint256 value)
     {
         uint8 firstByte = uint8(data[offset]);
-        
+
         if (firstByte < 0xfd) {
             return firstByte;
         } else if (firstByte == 0xfd) {
-            return uint16(uint8(data[offset + 1])) | (uint16(uint8(data[offset + 2])) << 8);
+            return
+                uint16(uint8(data[offset + 1])) |
+                (uint16(uint8(data[offset + 2])) << 8);
         } else if (firstByte == 0xfe) {
-            return uint32(uint8(data[offset + 1])) | 
-                   (uint32(uint8(data[offset + 2])) << 8) |
-                   (uint32(uint8(data[offset + 3])) << 16) |
-                   (uint32(uint8(data[offset + 4])) << 24);
+            return
+                uint32(uint8(data[offset + 1])) |
+                (uint32(uint8(data[offset + 2])) << 8) |
+                (uint32(uint8(data[offset + 3])) << 16) |
+                (uint32(uint8(data[offset + 4])) << 24);
         } else {
             // firstByte == 0xff - 8 byte integer
             uint256 result = 0;
@@ -664,13 +689,13 @@ contract SPVValidator is AccessControl {
     /// @param data The byte array containing the VarInt
     /// @param offset The offset of the VarInt
     /// @return length The total length including the prefix
-    function _varIntLength(bytes memory data, uint256 offset) 
-        private 
-        pure 
-        returns (uint256 length) 
+    function _varIntLength(bytes memory data, uint256 offset)
+        private
+        pure
+        returns (uint256 length)
     {
         uint8 firstByte = uint8(data[offset]);
-        
+
         if (firstByte < 0xfd) {
             return 1;
         } else if (firstByte == 0xfd) {

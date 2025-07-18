@@ -12,21 +12,21 @@ import "../bridge/BitcoinTx.sol";
 
 /// @title SingleWatchdog
 /// @dev Proxy contract implementing the single Watchdog model for tBTC v2.
-/// 
+///
 /// This contract acts as a proxy that consolidates multiple system roles under
 /// a single WATCHDOG_OPERATOR_ROLE for operational efficiency. While all functions
 /// in this contract require WATCHDOG_OPERATOR_ROLE, the SingleWatchdog contract
 /// itself must be granted specific roles in other system contracts:
 /// - ARBITER_ROLE in QCManager and QCRedeemer
-/// - ATTESTER_ROLE in QCReserveLedger  
+/// - ATTESTER_ROLE in QCReserveLedger
 /// - REGISTRAR_ROLE in QCManager
-/// 
+///
 /// The proxy pattern allows a single operator to perform:
 /// - Proof-of-Reserves attestations
 /// - Wallet registration with SPV verification
 /// - Redemption arbitration and fulfillment
 /// - QC status management
-/// 
+///
 /// Use setupWatchdogRoles() to grant this contract the necessary roles in system contracts.
 contract SingleWatchdog is AccessControl {
     bytes32 public constant WATCHDOG_OPERATOR_ROLE =
@@ -213,10 +213,15 @@ contract SingleWatchdog is AccessControl {
         );
 
         // Parse SPV proof data and verify wallet control
-        (BitcoinTx.Info memory txInfo, BitcoinTx.Proof memory proof) = _parseSPVProof(spvProof);
-        
+        (
+            BitcoinTx.Info memory txInfo,
+            BitcoinTx.Proof memory proof
+        ) = _parseSPVProof(spvProof);
+
         // Verify wallet control using SPV validator
-        if (!_verifyWalletControl(qc, btcAddress, challengeHash, txInfo, proof)) {
+        if (
+            !_verifyWalletControl(qc, btcAddress, challengeHash, txInfo, proof)
+        ) {
             revert SPVVerificationFailed();
         }
 
@@ -401,15 +406,19 @@ contract SingleWatchdog is AccessControl {
         // Check if this contract has been granted the necessary roles
         // Note: This function intentionally returns false rather than reverting
         // when services are missing, as it's checking operational readiness
-        
+
         // Check QCReserveLedger service and role
         if (!protocolRegistry.hasService(QC_RESERVE_LEDGER_KEY)) {
             return false; // Service not available - watchdog not operational
         }
-        
-        address ledgerAddress = protocolRegistry.getService(QC_RESERVE_LEDGER_KEY);
+
+        address ledgerAddress = protocolRegistry.getService(
+            QC_RESERVE_LEDGER_KEY
+        );
         QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
-        if (!reserveLedger.hasRole(reserveLedger.ATTESTER_ROLE(), address(this))) {
+        if (
+            !reserveLedger.hasRole(reserveLedger.ATTESTER_ROLE(), address(this))
+        ) {
             return false;
         }
 
@@ -417,7 +426,7 @@ contract SingleWatchdog is AccessControl {
         if (!protocolRegistry.hasService(QC_MANAGER_KEY)) {
             return false; // Service not available - watchdog not operational
         }
-        
+
         address managerAddress = protocolRegistry.getService(QC_MANAGER_KEY);
         QCManager qcManager = QCManager(managerAddress);
         if (!qcManager.hasRole(qcManager.REGISTRAR_ROLE(), address(this))) {
@@ -431,7 +440,7 @@ contract SingleWatchdog is AccessControl {
         if (!protocolRegistry.hasService(QC_REDEEMER_KEY)) {
             return false; // Service not available - watchdog not operational
         }
-        
+
         address redeemerAddress = protocolRegistry.getService(QC_REDEEMER_KEY);
         QCRedeemer redeemer = QCRedeemer(redeemerAddress);
         if (!redeemer.hasRole(redeemer.ARBITER_ROLE(), address(this))) {
@@ -449,9 +458,14 @@ contract SingleWatchdog is AccessControl {
         QCReserveLedger reserveLedger = QCReserveLedger(
             protocolRegistry.getService(QC_RESERVE_LEDGER_KEY)
         );
-        
+
         // Validate that this contract has admin privileges in QCReserveLedger
-        if (!reserveLedger.hasRole(reserveLedger.DEFAULT_ADMIN_ROLE(), address(this))) {
+        if (
+            !reserveLedger.hasRole(
+                reserveLedger.DEFAULT_ADMIN_ROLE(),
+                address(this)
+            )
+        ) {
             revert("SingleWatchdog: Missing admin role in QCReserveLedger");
         }
         reserveLedger.grantRole(reserveLedger.ATTESTER_ROLE(), address(this));
@@ -460,7 +474,7 @@ contract SingleWatchdog is AccessControl {
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
         );
-        
+
         // Validate that this contract has admin privileges in QCManager
         if (!qcManager.hasRole(qcManager.DEFAULT_ADMIN_ROLE(), address(this))) {
             revert("SingleWatchdog: Missing admin role in QCManager");
@@ -472,7 +486,7 @@ contract SingleWatchdog is AccessControl {
         QCRedeemer redeemer = QCRedeemer(
             protocolRegistry.getService(QC_REDEEMER_KEY)
         );
-        
+
         // Validate that this contract has admin privileges in QCRedeemer
         if (!redeemer.hasRole(redeemer.DEFAULT_ADMIN_ROLE(), address(this))) {
             revert("SingleWatchdog: Missing admin role in QCRedeemer");
@@ -484,10 +498,10 @@ contract SingleWatchdog is AccessControl {
     /// @param spvProofData The encoded SPV proof data
     /// @return txInfo Bitcoin transaction information
     /// @return proof SPV proof of transaction inclusion
-    function _parseSPVProof(bytes calldata spvProofData) 
-        private 
-        view 
-        returns (BitcoinTx.Info memory txInfo, BitcoinTx.Proof memory proof) 
+    function _parseSPVProof(bytes calldata spvProofData)
+        private
+        view
+        returns (BitcoinTx.Info memory txInfo, BitcoinTx.Proof memory proof)
     {
         // Decode the SPV proof data expecting ABI-encoded BitcoinTx.Info and BitcoinTx.Proof
         // The spvProofData should contain both structures encoded together
@@ -510,7 +524,10 @@ contract SingleWatchdog is AccessControl {
         pure
         returns (BitcoinTx.Info memory txInfo, BitcoinTx.Proof memory proof)
     {
-        (txInfo, proof) = abi.decode(spvProofData, (BitcoinTx.Info, BitcoinTx.Proof));
+        (txInfo, proof) = abi.decode(
+            spvProofData,
+            (BitcoinTx.Info, BitcoinTx.Proof)
+        );
     }
 
     /// @dev Verify wallet control via SPV proof using SPV validator
@@ -531,15 +548,18 @@ contract SingleWatchdog is AccessControl {
         if (!protocolRegistry.hasService(SPV_VALIDATOR_KEY)) {
             revert SPVValidatorNotAvailable();
         }
-        
-        address validatorAddress = protocolRegistry.getService(SPV_VALIDATOR_KEY);
-        ISPVValidator spvValidator = ISPVValidator(validatorAddress);
-        return spvValidator.verifyWalletControl(
-            qc,
-            btcAddress,
-            challenge,
-            txInfo,
-            proof
+
+        address validatorAddress = protocolRegistry.getService(
+            SPV_VALIDATOR_KEY
         );
+        ISPVValidator spvValidator = ISPVValidator(validatorAddress);
+        return
+            spvValidator.verifyWalletControl(
+                qc,
+                btcAddress,
+                challenge,
+                txInfo,
+                proof
+            );
     }
 }

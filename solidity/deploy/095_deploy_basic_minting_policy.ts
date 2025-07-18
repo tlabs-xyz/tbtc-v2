@@ -8,9 +8,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   // Deploy BasicMintingPolicy with direct Bank integration
   log("Deploying BasicMintingPolicy with direct Bank integration...")
-  
+
   const protocolRegistry = await get("ProtocolRegistry")
-  
+
   const basicMintingPolicy = await deploy("BasicMintingPolicy", {
     from: deployer,
     args: [protocolRegistry.address],
@@ -20,7 +20,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   // Register services in ProtocolRegistry
   log("Registering services in ProtocolRegistry...")
-  
+
   // Get existing contract addresses
   const bank = await get("Bank")
   const tbtcVault = await get("TBTCVault")
@@ -57,11 +57,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   // Grant BasicMintingPolicy authorization to increase Bank balances
   log("Authorizing BasicMintingPolicy in Bank...")
-  
+
   // First, we need to ensure governance owns the Bank
   const bankContract = await ethers.getContractAt("Bank", bank.address)
   const bankOwner = await bankContract.owner()
-  
+
   if (bankOwner.toLowerCase() === governance.toLowerCase()) {
     // Governance owns Bank, can authorize directly
     await execute(
@@ -82,15 +82,19 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     )
     log("Note: Bank ownership should be transferred to governance")
   } else {
-    log(`WARNING: Cannot authorize BasicMintingPolicy - Bank is owned by ${bankOwner}`)
+    log(
+      `WARNING: Cannot authorize BasicMintingPolicy - Bank is owned by ${bankOwner}`
+    )
     log("Manual authorization required")
   }
 
   // Grant BasicMintingPolicy the MINTER_ROLE in QCMinter
   try {
     const qcMinter = await get("QCMinter")
-    const MINTER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"))
-    
+    const MINTER_ROLE = ethers.utils.keccak256(
+      ethers.utils.toUtf8Bytes("MINTER_ROLE")
+    )
+
     await execute(
       "QCMinter",
       { from: deployer, log: true },
@@ -131,10 +135,10 @@ export default func
 func.tags = ["DirectQCIntegration", "AccountControl"]
 func.dependencies = [
   "Bank",
-  "TBTCVault", 
+  "TBTCVault",
   "ProtocolRegistry",
   "QCManager",
   "QCData",
   "SystemState",
-  "QCReserveLedger"
+  "QCReserveLedger",
 ]

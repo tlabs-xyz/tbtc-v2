@@ -20,10 +20,10 @@ class IntegrationTestRunner {
 
     const testFiles = [
       "QCOnboardingIntegration.test.ts",
-      "ReserveAttestationIntegration.test.ts", 
+      "ReserveAttestationIntegration.test.ts",
       "QCMintingIntegration.test.ts",
       "UserRedemptionIntegration.test.ts",
-      "CompleteFlowIntegration.test.ts"
+      "CompleteFlowIntegration.test.ts",
     ]
 
     for (const testFile of testFiles) {
@@ -38,9 +38,9 @@ class IntegrationTestRunner {
     const testPath = `test/integration/account-control/${testFile}`
 
     console.log(chalk.yellow(`\n📋 Running ${testName}...`))
-    
+
     const startTime = Date.now()
-    
+
     try {
       const { stdout, stderr } = await execAsync(
         `npx hardhat test ${testPath} --network hardhat`,
@@ -48,22 +48,22 @@ class IntegrationTestRunner {
       )
 
       const duration = Date.now() - startTime
-      
+
       if (stderr && stderr.includes("Error") && !stderr.includes("Warning")) {
         throw new Error(stderr)
       }
 
       // Parse output for test results
       const passed = stdout.includes("passing") && !stdout.includes("failing")
-      
+
       this.results.push({
         name: testName,
         passed,
-        duration
+        duration,
       })
 
       console.log(chalk.green(`✅ ${testName} - PASSED (${duration}ms)`))
-      
+
       // Show test details
       if (stdout.includes("passing")) {
         const passingMatch = stdout.match(/(\d+) passing/)
@@ -71,29 +71,28 @@ class IntegrationTestRunner {
           console.log(chalk.gray(`   ${passingMatch[1]} tests passed`))
         }
       }
-
     } catch (error) {
       const duration = Date.now() - startTime
-      
+
       this.results.push({
         name: testName,
         passed: false,
         duration,
-        error: error.message
+        error: error.message,
       })
 
       console.log(chalk.red(`❌ ${testName} - FAILED (${duration}ms)`))
-      console.log(chalk.red(`   Error: ${error.message.split('\n')[0]}`))
+      console.log(chalk.red(`   Error: ${error.message.split("\n")[0]}`))
     }
   }
 
   private printSummary(): void {
-    console.log(chalk.blue("\n" + "=" .repeat(60)))
+    console.log(chalk.blue("\n" + "=".repeat(60)))
     console.log(chalk.blue("📊 Integration Test Summary"))
-    console.log(chalk.blue("=" .repeat(60)))
+    console.log(chalk.blue("=".repeat(60)))
 
     const totalTests = this.results.length
-    const passedTests = this.results.filter(r => r.passed).length
+    const passedTests = this.results.filter((r) => r.passed).length
     const failedTests = totalTests - passedTests
     const totalDuration = this.results.reduce((sum, r) => sum + r.duration, 0)
 
@@ -101,26 +100,36 @@ class IntegrationTestRunner {
     console.log(chalk.green(`Passed: ${passedTests}`))
     console.log(chalk.red(`Failed: ${failedTests}`))
     console.log(chalk.white(`Total Duration: ${totalDuration}ms`))
-    console.log(chalk.white(`Success Rate: ${((passedTests / totalTests) * 100).toFixed(1)}%`))
+    console.log(
+      chalk.white(
+        `Success Rate: ${((passedTests / totalTests) * 100).toFixed(1)}%`
+      )
+    )
 
     console.log(chalk.blue("\n📋 Detailed Results:"))
-    
-    this.results.forEach(result => {
-      const status = result.passed ? chalk.green("✅ PASS") : chalk.red("❌ FAIL")
+
+    this.results.forEach((result) => {
+      const status = result.passed
+        ? chalk.green("✅ PASS")
+        : chalk.red("❌ FAIL")
       const duration = chalk.gray(`(${result.duration}ms)`)
-      
+
       console.log(`${status} ${result.name} ${duration}`)
-      
+
       if (!result.passed && result.error) {
-        console.log(chalk.red(`   Error: ${result.error.split('\n')[0]}`))
+        console.log(chalk.red(`   Error: ${result.error.split("\n")[0]}`))
       }
     })
 
     if (failedTests > 0) {
-      console.log(chalk.red("\n⚠️  Some tests failed. Please review the errors above."))
+      console.log(
+        chalk.red("\n⚠️  Some tests failed. Please review the errors above.")
+      )
       process.exit(1)
     } else {
-      console.log(chalk.green("\n🎉 All integration tests passed successfully!"))
+      console.log(
+        chalk.green("\n🎉 All integration tests passed successfully!")
+      )
     }
   }
 }
@@ -128,7 +137,7 @@ class IntegrationTestRunner {
 // CLI interface
 async function main() {
   const args = process.argv.slice(2)
-  
+
   if (args.includes("--help") || args.includes("-h")) {
     console.log(`
 Account Control Integration Test Runner
@@ -154,8 +163,8 @@ Options:
   }
 
   const runner = new IntegrationTestRunner()
-  
-  const specificTest = args.find(arg => arg.startsWith("--test="))
+
+  const specificTest = args.find((arg) => arg.startsWith("--test="))
   if (specificTest) {
     const testName = specificTest.split("=")[1]
     const testFile = `${testName}Integration.test.ts`

@@ -6,6 +6,17 @@ https://github.com/keep-network/tbtc-v2/actions/workflows/contracts.yml[image:ht
 
 This package contains tBTC v2 contracts.
 
+== Account Control System
+
+This branch includes the *Account Control* extension for tBTC v2, enabling Qualified Custodians (QCs) to mint tBTC tokens against their segregated Bitcoin reserves. The system provides:
+
+- **Direct Bank Integration**: QCs can mint tBTC through direct integration with the existing Bank/Vault architecture
+- **Segregated Reserves**: Each QC maintains independent Bitcoin reserves with attestation-based solvency verification
+- **Unified Token**: Account Control minted tBTC is perfectly fungible with Bridge-minted tBTC
+- **Institutional Grade**: Designed for regulated institutional adoption with comprehensive audit trails
+
+For detailed documentation, see the link:prd/README.md[Product Requirements Documentation].
+
 toc::[]
 
 == Build, test and deploy

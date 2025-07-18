@@ -38,7 +38,8 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     bytes32 public constant QC_MANAGER_KEY = keccak256("QC_MANAGER");
     bytes32 public constant QC_DATA_KEY = keccak256("QC_DATA");
     bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
-    bytes32 public constant QC_RESERVE_LEDGER_KEY = keccak256("QC_RESERVE_LEDGER");
+    bytes32 public constant QC_RESERVE_LEDGER_KEY =
+        keccak256("QC_RESERVE_LEDGER");
     bytes32 public constant BANK_KEY = keccak256("BANK");
     bytes32 public constant TBTC_VAULT_KEY = keccak256("TBTC_VAULT");
 
@@ -120,25 +121,56 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
             protocolRegistry.getService(SYSTEM_STATE_KEY)
         );
         if (systemState.isMintingPaused()) {
-            emit MintRejected(qc, user, amount, "Minting paused", msg.sender, block.timestamp);
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "Minting paused",
+                msg.sender,
+                block.timestamp
+            );
             revert MintingPaused();
         }
-        if (amount < systemState.minMintAmount() || amount > systemState.maxMintAmount()) {
-            emit MintRejected(qc, user, amount, "Amount outside allowed range", msg.sender, block.timestamp);
+        if (
+            amount < systemState.minMintAmount() ||
+            amount > systemState.maxMintAmount()
+        ) {
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "Amount outside allowed range",
+                msg.sender,
+                block.timestamp
+            );
             revert AmountOutsideAllowedRange();
         }
 
         // Check QC status
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
         if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
-            emit MintRejected(qc, user, amount, "QC not active", msg.sender, block.timestamp);
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "QC not active",
+                msg.sender,
+                block.timestamp
+            );
             revert QCNotActive();
         }
 
         // Check minting capacity
         uint256 availableCapacity = getAvailableMintingCapacity(qc);
         if (amount > availableCapacity) {
-            emit MintRejected(qc, user, amount, "Insufficient capacity", msg.sender, block.timestamp);
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "Insufficient capacity",
+                msg.sender,
+                block.timestamp
+            );
             revert InsufficientMintingCapacity();
         }
 
@@ -156,7 +188,9 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
 
         // Get Bank and Vault references
         Bank bank = Bank(protocolRegistry.getService(BANK_KEY));
-        TBTCVault tbtcVault = TBTCVault(protocolRegistry.getService(TBTC_VAULT_KEY));
+        TBTCVault tbtcVault = TBTCVault(
+            protocolRegistry.getService(TBTC_VAULT_KEY)
+        );
 
         // Verify this contract is authorized in Bank
         if (!bank.authorizedBalanceIncreasers(address(this))) {
@@ -172,7 +206,7 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         uint256[] memory amounts = new uint256[](1);
         depositors[0] = user;
         amounts[0] = satoshis;
-        
+
         // This will create Bank balance and automatically trigger TBTCVault minting
         bank.increaseBalanceAndCall(address(tbtcVault), depositors, amounts);
 
@@ -264,13 +298,14 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
             );
     }
 
-
     /// @dev Helper to update QC minted amount to avoid stack too deep errors
     function _updateQCMintedAmount(address qc, uint256 amount) private {
         QCManager qcManager = QCManager(
             protocolRegistry.getService(QC_MANAGER_KEY)
         );
-        QCData qcDataContract = QCData(protocolRegistry.getService(QC_DATA_KEY));
+        QCData qcDataContract = QCData(
+            protocolRegistry.getService(QC_DATA_KEY)
+        );
         uint256 currentMinted = qcDataContract.getQCMintedAmount(qc);
         qcManager.updateQCMintedAmount(qc, currentMinted + amount);
     }

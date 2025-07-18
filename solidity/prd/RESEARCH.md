@@ -27,6 +27,7 @@ The tBTC v2 system uses a sophisticated library pattern for modular functionalit
   - `using MovingFunds for BridgeState.Storage`
 
 This pattern enables:
+
 - Modular functionality without contract size limits
 - Gas-efficient storage layout
 - Upgradeable components via proxy + library linking
@@ -36,10 +37,12 @@ This pattern enables:
 Current implementations primarily use:
 
 1. **Ownable Pattern** (`@openzeppelin/contracts/access/Ownable.sol`):
+
    - **LightRelay.sol**: `contract LightRelay is Ownable, ILightRelay`
    - **BridgeGovernance.sol**: Inherits Ownable for governance functions
 
 2. **Governable Pattern** (custom implementation):
+
    - **Bridge.sol**: `contract Bridge is Governable, EcdsaWalletOwner, Initializable`
    - Provides governance delay mechanisms for sensitive operations
 
@@ -49,6 +52,7 @@ Current implementations primarily use:
 ### Bitcoin SPV & LightRelay Integration
 
 **SPV Proof Validation**:
+
 - Key validation steps:
   1. Input/output vector validation
   2. Merkle proof verification against Bitcoin headers
@@ -56,6 +60,7 @@ Current implementations primarily use:
   4. Difficulty evaluation via `evaluateProofDifficulty()`
 
 **LightRelay Architecture**:
+
 - Uses `@keep-network/bitcoin-spv-sol` libraries: `BytesLib`, `BTCUtils`, `ValidateSPV`
 - Implements Bitcoin difficulty retargeting
 - Manages epoch transitions and proof validation
@@ -64,6 +69,7 @@ Current implementations primarily use:
 ### Testing Patterns & Tooling
 
 **Test Framework**:
+
 - **Hardhat** with TypeScript configuration
 - **Waffle** for contract testing
 - **Chai** for assertions with `chai-as-promised`
@@ -72,6 +78,7 @@ Current implementations primarily use:
 ### Libraries & External Dependencies
 
 **Core Libraries**:
+
 1. **Bitcoin SPV**: `@keep-network/bitcoin-spv-sol: "3.4.0-solc-0.8"`
 2. **Keep Network Stack**: ECDSA, Random Beacon, tBTC development versions
 3. **OpenZeppelin**: Contracts 4.8.1 for security primitives
@@ -80,6 +87,7 @@ Current implementations primarily use:
 ### Integration Points for Account Control
 
 **Recommended Implementation Approach**:
+
 1. **Access Control Extension**: Extend existing Ownable pattern with multi-role support
 2. **Storage Integration**: Extend BridgeState.Storage with QC-specific parameters
 3. **Library Pattern Adoption**: Create AccountControl library following existing patterns
