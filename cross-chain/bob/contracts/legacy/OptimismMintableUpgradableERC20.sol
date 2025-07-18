@@ -49,6 +49,7 @@ contract OptimismMintableUpgradableERC20 is Initializable, IOptimismMintableERC2
     /// @custom:semver 1.3.0
     string public constant version = "1.3.0";
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }

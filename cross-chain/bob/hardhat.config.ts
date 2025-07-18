@@ -60,6 +60,7 @@ const config: HardhatUserConfig = {
       accounts: process.env.L2_ACCOUNTS_PRIVATE_KEYS
         ? process.env.L2_ACCOUNTS_PRIVATE_KEYS.split(",")
         : undefined,
+      tags: ["bobscan"],
     },
     bobSepolia: {
       url: process.env.L2_CHAIN_API_URL || "https://testnet.rpc.gobob.xyz/",
@@ -68,6 +69,7 @@ const config: HardhatUserConfig = {
       accounts: process.env.L2_ACCOUNTS_PRIVATE_KEYS
         ? process.env.L2_ACCOUNTS_PRIVATE_KEYS.split(",")
         : undefined,
+      tags: ["bobscan"],
     },
   },
 
@@ -85,21 +87,10 @@ const config: HardhatUserConfig = {
       goerli: process.env.ETHERSCAN_API_KEY,
       sepolia: process.env.ETHERSCAN_API_KEY,
       mainnet: process.env.ETHERSCAN_API_KEY,
-      arbitrumGoerli: process.env.ARBISCAN_API_KEY,
-      arbitrumSepolia: process.env.ARBISCAN_API_KEY,
-      arbitrumOne: process.env.ARBISCAN_API_KEY,
       bobMainnet: process.env.BOBSCAN_API_KEY,
       bobSepolia: process.env.BOBSCAN_API_KEY,
     },
     customChains: [
-      {
-        network: "arbitrumSepolia",
-        chainId: 421614,
-        urls: {
-          apiURL: "https://api-sepolia.arbiscan.io/api",
-          browserURL: "https://sepolia.arbiscan.io/",
-        },
-      },
       {
         network: "bobMainnet",
         chainId: 60808,
