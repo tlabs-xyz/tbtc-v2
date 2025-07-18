@@ -16,6 +16,7 @@ This document records the systematic refactoring performed on the Account Contro
 ### Motivation
 
 Analysis revealed multiple issues across the Account Control contracts:
+
 - Test-only functions added to production contracts
 - Superficial getters duplicating existing functionality
 - Speculative features never integrated into production flows
@@ -31,6 +32,7 @@ Analysis revealed multiple issues across the Account Control contracts:
 ## Functions Removed by Contract
 
 ### 1. QCReserveLedger.sol (7 functions, 32% size reduction)
+
 - `getReserveBalance()` - Duplicated public storage access
 - `isAttestationStale()` - Test-only helper
 - `getAttestationTimestamp()` - Test-only helper
@@ -40,26 +42,32 @@ Analysis revealed multiple issues across the Account Control contracts:
 - `isValidAttestation()` - Test-only helper
 
 ### 2. BasicMintingPolicy.sol (4 functions, 20% size reduction)
+
 - `requestMintWithOption()` - Over-engineered two-step minting
 - `getMintRequest()` - Test-only state access
 - `isMintCompleted()` - Test-only state check
 - `_array()` - Helper that should be inlined
 
 ### 3. QCManager.sol (3 functions, 15% size reduction)
+
 - `getQCWallets()` - Superficial getter
 - `getQCStatus()` - Superficial getter
 - `emergencyPauseQC()` - Redundant wrapper
 
 ### 4. BasicRedemptionPolicy.sol (1 function, 7% size reduction)
+
 - `bulkHandleRedemptions()` - Emergency batch function with security vulnerability
 
 ### 5. QCMinter.sol (1 function, 15% size reduction)
+
 - `updateMintingPolicy()` - Test-only admin function
 
 ### 6. QCRedeemer.sol (1 function, 7% size reduction)
+
 - `updateRedemptionPolicy()` - Test-only admin function
 
 ### 7. SingleWatchdog.sol (0 functions)
+
 - Initial analysis was incorrect; no functions needed removal
 
 ## Design Decisions
@@ -67,6 +75,7 @@ Analysis revealed multiple issues across the Account Control contracts:
 ### Simplified Minting Flow
 
 The removal of `requestMintWithOption()` simplified the minting architecture:
+
 - **Before**: Complex two-step process with optional auto-minting
 - **After**: Direct Bank integration with automatic tBTC minting
 - **Rationale**: No production use case required the two-step process
@@ -74,15 +83,19 @@ The removal of `requestMintWithOption()` simplified the minting architecture:
 ### Test Helper Pattern
 
 All removed test utilities were replaced with TypeScript helpers:
+
 ```typescript
 // Instead of on-chain function:
 // function getMintRequest(bytes32 mintId) external view returns (MintRequest memory)
 
 // Use TypeScript helper:
-export function extractMintRequestFromEvent(receipt: ContractReceipt): MintRequest
+export function extractMintRequestFromEvent(
+  receipt: ContractReceipt
+): MintRequest
 ```
 
 This pattern:
+
 - Reduces contract size and deployment costs
 - Maintains test functionality
 - Follows standard testing practices
@@ -90,6 +103,7 @@ This pattern:
 ### Role-Based Access Simplification
 
 Removed redundant role-based wrappers:
+
 - `emergencyPauseQC()` duplicated existing status management
 - Direct use of `setQCStatus()` provides same functionality
 - Reduces interface complexity
@@ -97,11 +111,13 @@ Removed redundant role-based wrappers:
 ## Security Considerations
 
 ### No Security Degradation
+
 - All removed functions were either test-only or redundant
 - Core security mechanisms remain unchanged
 - Access control patterns preserved
 
 ### Improved Attack Surface
+
 - Smaller contracts mean less code to audit
 - Removed unused emergency functions that could be misused
 - Cleaner interfaces reduce potential for errors
@@ -124,6 +140,7 @@ for (uint256 i = 0; i < redemptionIds.length; i++) {
 ```
 
 **Attack Vector**: A malicious user could:
+
 1. Submit multiple redemption requests
 2. Cause one to fail intentionally (e.g., manipulate wallet state)
 3. Force the Emergency Council to process redemptions one-by-one
@@ -134,11 +151,12 @@ for (uint256 i = 0; i < redemptionIds.length; i++) {
 1. **Over-Engineering**: The two-step minting process with `requestMintWithOption()` created unnecessary complexity for theoretical batch processing that was never implemented
 
 2. **No Production Use Case**: Analysis revealed:
+
    - No actual need for batch emergency operations
    - Individual transaction processing is sufficient
    - Batch operations add complexity without clear benefit
 
-3. **Emergency Operations Misconception**: 
+3. **Emergency Operations Misconception**:
    - Emergency situations require careful, individual assessment
    - Batch processing could mask important details
    - Better to handle each case deliberately
@@ -152,6 +170,7 @@ for (uint256 i = 0; i < redemptionIds.length; i++) {
 ## Migration Guide
 
 ### For Test Authors
+
 Replace removed functions with helpers:
 
 ```typescript
@@ -159,11 +178,12 @@ Replace removed functions with helpers:
 const mintRequest = await basicMintingPolicy.getMintRequest(mintId)
 
 // After:
-import { extractMintRequestFromEvent } from './helpers/basicMintingPolicyHelpers'
+import { extractMintRequestFromEvent } from "./helpers/basicMintingPolicyHelpers"
 const mintRequest = extractMintRequestFromEvent(receipt)
 ```
 
 ### For Integrators
+
 - `requestMint()` is now the only minting function
 - Always auto-mints tBTC (no two-step process)
 - Status checks use QCData directly, not QCManager getters
@@ -171,16 +191,18 @@ const mintRequest = extractMintRequestFromEvent(receipt)
 ## Metrics
 
 ### Contract Size Reduction
-| Contract | Before | After | Reduction |
-|----------|--------|-------|-----------|
-| QCReserveLedger | 9.752 KB | 6.614 KB | 32% |
-| BasicMintingPolicy | ~10.5 KB | ~8.4 KB | 20% |
-| QCManager | 17.067 KB | 14.702 KB | 14% |
-| BasicRedemptionPolicy | ~9.2 KB | ~8.5 KB | 7% |
-| QCMinter | ~4.5 KB | ~3.8 KB | 15% |
-| QCRedeemer | ~9.7 KB | ~9.0 KB | 7% |
+
+| Contract              | Before    | After     | Reduction |
+| --------------------- | --------- | --------- | --------- |
+| QCReserveLedger       | 9.752 KB  | 6.614 KB  | 32%       |
+| BasicMintingPolicy    | ~10.5 KB  | ~8.4 KB   | 20%       |
+| QCManager             | 17.067 KB | 14.702 KB | 14%       |
+| BasicRedemptionPolicy | ~9.2 KB   | ~8.5 KB   | 7%        |
+| QCMinter              | ~4.5 KB   | ~3.8 KB   | 15%       |
+| QCRedeemer            | ~9.7 KB   | ~9.0 KB   | 7%        |
 
 ### Overall Impact
+
 - **17 functions removed** across 6 contracts
 - **15-25% average size reduction**
 - **All tests passing** after refactoring

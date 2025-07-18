@@ -187,10 +187,7 @@ describe("Economic Attack Tests", () => {
         await expect(
           protocolRegistry
             .connect(attacker)
-            .setService(
-              SERVICE_KEYS.MINTING_POLICY,
-              maliciousPolicyAddress
-            )
+            .setService(SERVICE_KEYS.MINTING_POLICY, maliciousPolicyAddress)
         ).to.be.revertedWith("AccessControl: account") // Should require DEFAULT_ADMIN_ROLE
 
         // Step 2: Even with governance tokens, changes should have timelock
@@ -332,7 +329,10 @@ describe("Economic Attack Tests", () => {
 
         // Scenario: Legitimate QC tries to register, attacker front-runs
         // The legitimate registration should succeed
-        const legitimateRegistration = qcData.registerQC(newQC, ethers.utils.parseEther("1000"))
+        const legitimateRegistration = qcData.registerQC(
+          newQC,
+          ethers.utils.parseEther("1000")
+        )
         await expect(legitimateRegistration).to.not.be.reverted
 
         // The attacker should NOT be able to register without proper role
@@ -492,10 +492,7 @@ describe("Economic Attack Tests", () => {
         await expect(
           protocolRegistry
             .connect(attacker)
-            .setService(
-              SERVICE_KEYS.MINTING_POLICY,
-              maliciousPolicyAddress
-            )
+            .setService(SERVICE_KEYS.MINTING_POLICY, maliciousPolicyAddress)
         ).to.be.revertedWith("AccessControl: account")
 
         // Even authorized updates should not affect in-flight transactions

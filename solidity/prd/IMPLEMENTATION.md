@@ -21,53 +21,63 @@ This document provides comprehensive implementation guidance for the Account Con
 ```solidity
 // BasicMintingPolicy.sol - Direct Bank integration for QC minting
 contract BasicMintingPolicy is IMintingPolicy, AccessControl {
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    uint256 public constant SATOSHI_MULTIPLIER = 1e10;
-    
-    ProtocolRegistry public immutable protocolRegistry;
-    
-    /// @notice Request minting with direct Bank integration
-    /// @param qc The address of the Qualified Custodian
-    /// @param user The address receiving the tBTC tokens
-    /// @param amount The amount of tBTC to mint (in wei)
-    /// @return mintId Unique identifier for this minting request
-    function requestMint(
-        address qc,
-        address user,
-        uint256 amount
-    ) external override onlyRole(MINTER_ROLE) returns (bytes32 mintId) {
-        // Validate QC status, system state, and capacity
-        _validateMintingRequest(qc, user, amount);
-        
-        // Convert tBTC amount to satoshis
-        uint256 satoshis = amount / SATOSHI_MULTIPLIER;
-        
-        // Direct Bank interaction with auto-minting
-        Bank bank = Bank(protocolRegistry.getService(BANK_KEY));
-        TBTCVault tbtcVault = TBTCVault(protocolRegistry.getService(TBTC_VAULT_KEY));
-        
-        address[] memory depositors = new address[](1);
-        uint256[] memory amounts = new uint256[](1);
-        depositors[0] = user;
-        amounts[0] = satoshis;
-        
-        // Create Bank balance and automatically trigger TBTCVault minting
-        bank.increaseBalanceAndCall(address(tbtcVault), depositors, amounts);
-        
-        // Update QC minted amount and complete mint
-        _completeMint(qc, amount);
-        return mintId;
-    }
-    
-    /// @notice Get available minting capacity for a QC
-    function getAvailableMintingCapacity(address qc) external view returns (uint256) {
-        QCManager qcManager = QCManager(protocolRegistry.getService(QC_MANAGER_KEY));
-        return qcManager.getAvailableMintingCapacity(qc);
-    }
+  bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+  uint256 public constant SATOSHI_MULTIPLIER = 1e10;
+
+  ProtocolRegistry public immutable protocolRegistry;
+
+  /// @notice Request minting with direct Bank integration
+  /// @param qc The address of the Qualified Custodian
+  /// @param user The address receiving the tBTC tokens
+  /// @param amount The amount of tBTC to mint (in wei)
+  /// @return mintId Unique identifier for this minting request
+  function requestMint(
+    address qc,
+    address user,
+    uint256 amount
+  ) external override onlyRole(MINTER_ROLE) returns (bytes32 mintId) {
+    // Validate QC status, system state, and capacity
+    _validateMintingRequest(qc, user, amount);
+
+    // Convert tBTC amount to satoshis
+    uint256 satoshis = amount / SATOSHI_MULTIPLIER;
+
+    // Direct Bank interaction with auto-minting
+    Bank bank = Bank(protocolRegistry.getService(BANK_KEY));
+    TBTCVault tbtcVault = TBTCVault(
+      protocolRegistry.getService(TBTC_VAULT_KEY)
+    );
+
+    address[] memory depositors = new address[](1);
+    uint256[] memory amounts = new uint256[](1);
+    depositors[0] = user;
+    amounts[0] = satoshis;
+
+    // Create Bank balance and automatically trigger TBTCVault minting
+    bank.increaseBalanceAndCall(address(tbtcVault), depositors, amounts);
+
+    // Update QC minted amount and complete mint
+    _completeMint(qc, amount);
+    return mintId;
+  }
+
+  /// @notice Get available minting capacity for a QC
+  function getAvailableMintingCapacity(address qc)
+    external
+    view
+    returns (uint256)
+  {
+    QCManager qcManager = QCManager(
+      protocolRegistry.getService(QC_MANAGER_KEY)
+    );
+    return qcManager.getAvailableMintingCapacity(qc);
+  }
 }
+
 ```
 
 **Implementation Features**:
+
 - Direct `Bank.increaseBalanceAndCall()` integration
 - Comprehensive validation pipeline
 - Support for both auto-minting and manual minting workflows
@@ -81,33 +91,39 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
 ```solidity
 // ProtocolRegistry.sol - Central service registry
 contract ProtocolRegistry is AccessControl {
-    mapping(bytes32 => address) public services;
-    
-    event ServiceUpdated(bytes32 indexed serviceId, address indexed oldAddress, address indexed newAddress);
-    
-    function setService(bytes32 serviceId, address serviceAddress) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
-        require(serviceAddress != address(0), "Invalid service address");
-        address oldAddress = services[serviceId];
-        services[serviceId] = serviceAddress;
-        emit ServiceUpdated(serviceId, oldAddress, serviceAddress);
-    }
-    
-    function getService(bytes32 serviceId) external view returns (address) {
-        address service = services[serviceId];
-        require(service != address(0), "Service not found");
-        return service;
-    }
-    
-    function hasService(bytes32 serviceId) external view returns (bool) {
-        return services[serviceId] != address(0);
-    }
+  mapping(bytes32 => address) public services;
+
+  event ServiceUpdated(
+    bytes32 indexed serviceId,
+    address indexed oldAddress,
+    address indexed newAddress
+  );
+
+  function setService(bytes32 serviceId, address serviceAddress)
+    external
+    onlyRole(DEFAULT_ADMIN_ROLE)
+  {
+    require(serviceAddress != address(0), "Invalid service address");
+    address oldAddress = services[serviceId];
+    services[serviceId] = serviceAddress;
+    emit ServiceUpdated(serviceId, oldAddress, serviceAddress);
+  }
+
+  function getService(bytes32 serviceId) external view returns (address) {
+    address service = services[serviceId];
+    require(service != address(0), "Service not found");
+    return service;
+  }
+
+  function hasService(bytes32 serviceId) external view returns (bool) {
+    return services[serviceId] != address(0);
+  }
 }
+
 ```
 
 **Benefits**:
+
 - Enables component upgrades without full-system redeployment
 - Decouples all system contracts
 - Provides single source of truth for service addresses
@@ -120,56 +136,58 @@ contract ProtocolRegistry is AccessControl {
 ```solidity
 // QCData.sol - Dedicated storage for QC data
 contract QCData is Ownable {
-    enum QCStatus {
-        Active,        // QC is fully operational
-        UnderReview,   // QC's minting rights are paused pending review
-        Revoked        // QC's rights are permanently terminated
-    }
-    
-    enum WalletStatus {
-        Inactive,              // Not in use
-        Active,                // Actively monitored for reserves
-        PendingDeRegistration  // QC has requested to de-register
-    }
-    
-    struct Custodian {
-        QCStatus status;
-        uint256 maxMintingCap;
-        uint256 mintedAmount;
-        uint256 registeredAt;
-        string name;
-    }
-    
-    struct Wallet {
-        WalletStatus status;
-        address owner; // The QC address that owns this wallet
-        uint256 registeredAt;
-    }
-    
-    mapping(address => Custodian) public custodians;
-    mapping(address => mapping(string => Wallet)) public wallets;
-    
-    // Data access functions callable only by the owner (QCManager)
-    function setCustodianStatus(address qc, QCStatus status) external onlyOwner {
-        custodians[qc].status = status;
-    }
-    
-    function updateMintedAmount(address qc, uint256 amount) external onlyOwner {
-        custodians[qc].mintedAmount = amount;
-    }
-    
-    // View functions for external access
-    function getQCStatus(address qc) external view returns (QCStatus) {
-        return custodians[qc].status;
-    }
-    
-    function getQCMintedAmount(address qc) external view returns (uint256) {
-        return custodians[qc].mintedAmount;
-    }
+  enum QCStatus {
+    Active, // QC is fully operational
+    UnderReview, // QC's minting rights are paused pending review
+    Revoked // QC's rights are permanently terminated
+  }
+
+  enum WalletStatus {
+    Inactive, // Not in use
+    Active, // Actively monitored for reserves
+    PendingDeRegistration // QC has requested to de-register
+  }
+
+  struct Custodian {
+    QCStatus status;
+    uint256 maxMintingCap;
+    uint256 mintedAmount;
+    uint256 registeredAt;
+    string name;
+  }
+
+  struct Wallet {
+    WalletStatus status;
+    address owner; // The QC address that owns this wallet
+    uint256 registeredAt;
+  }
+
+  mapping(address => Custodian) public custodians;
+  mapping(address => mapping(string => Wallet)) public wallets;
+
+  // Data access functions callable only by the owner (QCManager)
+  function setCustodianStatus(address qc, QCStatus status) external onlyOwner {
+    custodians[qc].status = status;
+  }
+
+  function updateMintedAmount(address qc, uint256 amount) external onlyOwner {
+    custodians[qc].mintedAmount = amount;
+  }
+
+  // View functions for external access
+  function getQCStatus(address qc) external view returns (QCStatus) {
+    return custodians[qc].status;
+  }
+
+  function getQCMintedAmount(address qc) external view returns (uint256) {
+    return custodians[qc].mintedAmount;
+  }
 }
+
 ```
 
 **Design Principles**:
+
 - Pure storage with no business logic
 - Owned by QCManager for controlled access
 - Gas-optimized struct layouts
@@ -182,44 +200,49 @@ contract QCData is Ownable {
 ```solidity
 // QCMinter.sol - Entry point for QC minting
 contract QCMinter is AccessControl, Pausable {
-    ProtocolRegistry public immutable protocolRegistry;
-    
-    event MintingPolicyUpdated(address indexed oldPolicy, address indexed newPolicy);
-    
-    /// @notice Called by a QC to request minting
-    function requestQCMint(uint256 amount) external whenNotPaused {
-        IMintingPolicy mintingPolicy = IMintingPolicy(
-            protocolRegistry.getService(MINTING_POLICY_KEY)
-        );
-        mintingPolicy.requestMint(msg.sender, msg.sender, amount);
-    }
-    
-    /// @notice Called by authorized minter to mint for specific user
-    function requestQCMintFor(address user, uint256 amount) 
-        external 
-        onlyRole(MINTER_ROLE) 
-        whenNotPaused 
-    {
-        IMintingPolicy mintingPolicy = IMintingPolicy(
-            protocolRegistry.getService(MINTING_POLICY_KEY)
-        );
-        mintingPolicy.requestMint(msg.sender, user, amount);
-    }
-    
-    /// @notice Update the minting policy (DAO only)
-    function setMintingPolicy(address newPolicy) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
-        bytes32 policyKey = MINTING_POLICY_KEY;
-        address oldPolicy = protocolRegistry.getService(policyKey);
-        protocolRegistry.setService(policyKey, newPolicy);
-        emit MintingPolicyUpdated(oldPolicy, newPolicy);
-    }
+  ProtocolRegistry public immutable protocolRegistry;
+
+  event MintingPolicyUpdated(
+    address indexed oldPolicy,
+    address indexed newPolicy
+  );
+
+  /// @notice Called by a QC to request minting
+  function requestQCMint(uint256 amount) external whenNotPaused {
+    IMintingPolicy mintingPolicy = IMintingPolicy(
+      protocolRegistry.getService(MINTING_POLICY_KEY)
+    );
+    mintingPolicy.requestMint(msg.sender, msg.sender, amount);
+  }
+
+  /// @notice Called by authorized minter to mint for specific user
+  function requestQCMintFor(address user, uint256 amount)
+    external
+    onlyRole(MINTER_ROLE)
+    whenNotPaused
+  {
+    IMintingPolicy mintingPolicy = IMintingPolicy(
+      protocolRegistry.getService(MINTING_POLICY_KEY)
+    );
+    mintingPolicy.requestMint(msg.sender, user, amount);
+  }
+
+  /// @notice Update the minting policy (DAO only)
+  function setMintingPolicy(address newPolicy)
+    external
+    onlyRole(DEFAULT_ADMIN_ROLE)
+  {
+    bytes32 policyKey = MINTING_POLICY_KEY;
+    address oldPolicy = protocolRegistry.getService(policyKey);
+    protocolRegistry.setService(policyKey, newPolicy);
+    emit MintingPolicyUpdated(oldPolicy, newPolicy);
+  }
 }
+
 ```
 
 **Key Features**:
+
 - Stable interface that never changes
 - Delegates all logic to upgradeable Policy contracts
 - Emergency pause capabilities
@@ -234,32 +257,33 @@ The existing Bank contract requires modification to support multiple balance inc
 ```solidity
 // Bank.sol modifications for Account Control integration
 contract Bank {
-    mapping(address => bool) public authorizedBalanceIncreasers;
-    
-    modifier onlyAuthorizedIncreaser() {
-        require(
-            authorizedBalanceIncreasers[msg.sender],
-            "Caller not authorized to increase balances"
-        );
-        _;
-    }
-    
-    function setAuthorizedBalanceIncreaser(address increaser, bool authorized) 
-        external 
-        onlyOwner 
-    {
-        authorizedBalanceIncreasers[increaser] = authorized;
-        emit BalanceIncreaserAuthorizationUpdated(increaser, authorized);
-    }
-    
-    function increaseBalanceAndCall(
-        address vault,
-        address[] calldata depositors,
-        uint256[] calldata amounts
-    ) external onlyAuthorizedIncreaser {
-        // Existing implementation with authorization check
-    }
+  mapping(address => bool) public authorizedBalanceIncreasers;
+
+  modifier onlyAuthorizedIncreaser() {
+    require(
+      authorizedBalanceIncreasers[msg.sender],
+      "Caller not authorized to increase balances"
+    );
+    _;
+  }
+
+  function setAuthorizedBalanceIncreaser(address increaser, bool authorized)
+    external
+    onlyOwner
+  {
+    authorizedBalanceIncreasers[increaser] = authorized;
+    emit BalanceIncreaserAuthorizationUpdated(increaser, authorized);
+  }
+
+  function increaseBalanceAndCall(
+    address vault,
+    address[] calldata depositors,
+    uint256[] calldata amounts
+  ) external onlyAuthorizedIncreaser {
+    // Existing implementation with authorization check
+  }
 }
+
 ```
 
 ### Integration Workflow
@@ -277,46 +301,46 @@ Following the existing tBTC v2 numbered deployment script convention:
 
 ```typescript
 // deploy/95_deploy_account_control.ts
-import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { DeployFunction } from "hardhat-deploy/types";
+import { HardhatRuntimeEnvironment } from "hardhat/types"
+import { DeployFunction } from "hardhat-deploy/types"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { deployments, getNamedAccounts } = hre;
-  const { deploy, execute, get } = deployments;
-  const { deployer, governance } = await getNamedAccounts();
+  const { deployments, getNamedAccounts } = hre
+  const { deploy, execute, get } = deployments
+  const { deployer, governance } = await getNamedAccounts()
 
   // Deploy ProtocolRegistry
   const protocolRegistry = await deploy("ProtocolRegistry", {
     from: deployer,
     log: true,
-  });
+  })
 
   // Deploy QCData
   const qcData = await deploy("QCData", {
     from: deployer,
     log: true,
-  });
+  })
 
   // Deploy QCManager
   const qcManager = await deploy("QCManager", {
     from: deployer,
     args: [protocolRegistry.address],
     log: true,
-  });
+  })
 
   // Deploy BasicMintingPolicy
   const basicMintingPolicy = await deploy("BasicMintingPolicy", {
     from: deployer,
     args: [protocolRegistry.address],
     log: true,
-  });
+  })
 
   // Deploy QCMinter
   const qcMinter = await deploy("QCMinter", {
     from: deployer,
     args: [protocolRegistry.address],
     log: true,
-  });
+  })
 
   // Configure ProtocolRegistry
   await execute(
@@ -325,11 +349,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     "setService",
     ethers.utils.id("QC_DATA"),
     qcData.address
-  );
+  )
 
   // Get existing Bank contract
-  const bank = await get("Bank");
-  
+  const bank = await get("Bank")
+
   // Authorize BasicMintingPolicy in Bank
   await execute(
     "Bank",
@@ -337,7 +361,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     "setAuthorizedBalanceIncreaser",
     basicMintingPolicy.address,
     true
-  );
+  )
 
   // Transfer ownership to governance
   await execute(
@@ -345,13 +369,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     { from: deployer },
     "transferOwnership",
     governance
-  );
-};
+  )
+}
 
-func.tags = ["AccountControl"];
-func.dependencies = ["Bank", "TBTCVault", "TBTC"];
+func.tags = ["AccountControl"]
+func.dependencies = ["Bank", "TBTCVault", "TBTC"]
 
-export default func;
+export default func
 ```
 
 ### Configuration Management
@@ -373,7 +397,7 @@ export const AccountControlConfig = {
     minMintAmount: ethers.utils.parseEther("0.001"),
     maxMintAmount: ethers.utils.parseEther("10"),
   },
-};
+}
 ```
 
 ## Testing Implementation
@@ -383,54 +407,65 @@ export const AccountControlConfig = {
 ```typescript
 // test/BasicMintingPolicy.test.ts
 describe("BasicMintingPolicy", () => {
-  let basicMintingPolicy: BasicMintingPolicy;
-  let protocolRegistry: ProtocolRegistry;
-  let bank: Bank;
-  let tbtcVault: TBTCVault;
-  let qcManager: QCManager;
+  let basicMintingPolicy: BasicMintingPolicy
+  let protocolRegistry: ProtocolRegistry
+  let bank: Bank
+  let tbtcVault: TBTCVault
+  let qcManager: QCManager
 
   beforeEach(async () => {
     // Deploy test fixtures
-    const fixture = await deployAccountControlFixture();
-    basicMintingPolicy = fixture.basicMintingPolicy;
-    protocolRegistry = fixture.protocolRegistry;
-    bank = fixture.bank;
-    tbtcVault = fixture.tbtcVault;
-    qcManager = fixture.qcManager;
-  });
+    const fixture = await deployAccountControlFixture()
+    basicMintingPolicy = fixture.basicMintingPolicy
+    protocolRegistry = fixture.protocolRegistry
+    bank = fixture.bank
+    tbtcVault = fixture.tbtcVault
+    qcManager = fixture.qcManager
+  })
 
   describe("requestMint", () => {
     it("should successfully mint tokens with direct Bank integration", async () => {
       // Setup QC with Active status and sufficient capacity
-      await qcManager.setQCStatus(qc.address, QCStatus.Active);
-      await qcManager.setMintingCapacity(qc.address, ethers.utils.parseEther("100"));
+      await qcManager.setQCStatus(qc.address, QCStatus.Active)
+      await qcManager.setMintingCapacity(
+        qc.address,
+        ethers.utils.parseEther("100")
+      )
 
       // Request mint
-      const amount = ethers.utils.parseEther("1");
-      const tx = await basicMintingPolicy.requestMint(qc.address, user.address, amount);
+      const amount = ethers.utils.parseEther("1")
+      const tx = await basicMintingPolicy.requestMint(
+        qc.address,
+        user.address,
+        amount
+      )
 
       // Verify Bank balance increased
-      const satoshis = amount.div(SATOSHI_MULTIPLIER);
-      expect(await bank.balanceOf(user.address)).to.equal(satoshis);
+      const satoshis = amount.div(SATOSHI_MULTIPLIER)
+      expect(await bank.balanceOf(user.address)).to.equal(satoshis)
 
       // Verify tBTC tokens minted
-      expect(await tbtc.balanceOf(user.address)).to.equal(amount);
+      expect(await tbtc.balanceOf(user.address)).to.equal(amount)
 
       // Verify events emitted
       await expect(tx)
         .to.emit(basicMintingPolicy, "QCBackedDepositCredited")
-        .withArgs(user.address, satoshis, qc.address, anyValue, true);
-    });
+        .withArgs(user.address, satoshis, qc.address, anyValue, true)
+    })
 
     it("should revert if QC is not Active", async () => {
-      await qcManager.setQCStatus(qc.address, QCStatus.UnderReview);
+      await qcManager.setQCStatus(qc.address, QCStatus.UnderReview)
 
       await expect(
-        basicMintingPolicy.requestMint(qc.address, user.address, ethers.utils.parseEther("1"))
-      ).to.be.revertedWith("QCNotActive");
-    });
-  });
-});
+        basicMintingPolicy.requestMint(
+          qc.address,
+          user.address,
+          ethers.utils.parseEther("1")
+        )
+      ).to.be.revertedWith("QCNotActive")
+    })
+  })
+})
 ```
 
 ### Integration Test Pattern
@@ -440,25 +475,28 @@ describe("BasicMintingPolicy", () => {
 describe("Account Control Integration", () => {
   it("should handle complete QC lifecycle", async () => {
     // 1. QC Onboarding
-    await governance.registerQC(qc.address, ethers.utils.parseEther("100"));
+    await governance.registerQC(qc.address, ethers.utils.parseEther("100"))
     // Instant execution - no time delay needed
 
     // 2. Wallet Registration with SPV proof
-    const spvProof = await generateSPVProof(btcAddress, challengeHash);
-    await watchdog.registerWallet(qc.address, btcAddress, spvProof);
+    const spvProof = await generateSPVProof(btcAddress, challengeHash)
+    await watchdog.registerWallet(qc.address, btcAddress, spvProof)
 
     // 3. Reserve Attestation
-    await watchdog.submitReserveAttestation(qc.address, ethers.utils.parseEther("10"));
+    await watchdog.submitReserveAttestation(
+      qc.address,
+      ethers.utils.parseEther("10")
+    )
 
     // 4. Minting Operation
-    const mintAmount = ethers.utils.parseEther("1");
-    await qcMinter.connect(qc).requestQCMint(mintAmount);
+    const mintAmount = ethers.utils.parseEther("1")
+    await qcMinter.connect(qc).requestQCMint(mintAmount)
 
     // 5. Verify Complete Flow
-    expect(await tbtc.balanceOf(qc.address)).to.equal(mintAmount);
-    expect(await qcData.getQCMintedAmount(qc.address)).to.equal(mintAmount);
-  });
-});
+    expect(await tbtc.balanceOf(qc.address)).to.equal(mintAmount)
+    expect(await qcData.getQCMintedAmount(qc.address)).to.equal(mintAmount)
+  })
+})
 ```
 
 ## Security Implementation
@@ -468,25 +506,28 @@ describe("Account Control Integration", () => {
 ```solidity
 // Comprehensive role-based access control
 contract AccountControlAccessControl is AccessControl {
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
-    bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
-    bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant QC_GOVERNANCE_ROLE = keccak256("QC_GOVERNANCE_ROLE");
+  bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+  bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
+  bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
+  bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
+  bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+  bytes32 public constant QC_GOVERNANCE_ROLE = keccak256("QC_GOVERNANCE_ROLE");
 
-    modifier onlyActiveQC(address qc) {
-        QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
-        require(qcData.getQCStatus(qc) == QCData.QCStatus.Active, "QC not active");
-        _;
-    }
+  modifier onlyActiveQC(address qc) {
+    QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
+    require(qcData.getQCStatus(qc) == QCData.QCStatus.Active, "QC not active");
+    _;
+  }
 
-    modifier whenNotPaused(bytes32 functionId) {
-        SystemState systemState = SystemState(protocolRegistry.getService(SYSTEM_STATE_KEY));
-        require(!systemState.isPaused(functionId), "Function paused");
-        _;
-    }
+  modifier whenNotPaused(bytes32 functionId) {
+    SystemState systemState = SystemState(
+      protocolRegistry.getService(SYSTEM_STATE_KEY)
+    );
+    require(!systemState.isPaused(functionId), "Function paused");
+    _;
+  }
 }
+
 ```
 
 ### Input Validation Implementation
@@ -494,34 +535,40 @@ contract AccountControlAccessControl is AccessControl {
 ```solidity
 // Comprehensive input validation with custom errors
 contract ValidationLibrary {
-    error InvalidQCAddress();
-    error InvalidUserAddress();
-    error InvalidAmount();
-    error AmountOutsideAllowedRange();
-    error InsufficientMintingCapacity();
-    error StaleReserveAttestation();
+  error InvalidQCAddress();
+  error InvalidUserAddress();
+  error InvalidAmount();
+  error AmountOutsideAllowedRange();
+  error InsufficientMintingCapacity();
+  error StaleReserveAttestation();
 
-    function validateMintingRequest(
-        address qc,
-        address user,
-        uint256 amount,
-        ProtocolRegistry registry
-    ) internal view {
-        if (qc == address(0)) revert InvalidQCAddress();
-        if (user == address(0)) revert InvalidUserAddress();
-        if (amount == 0) revert InvalidAmount();
+  function validateMintingRequest(
+    address qc,
+    address user,
+    uint256 amount,
+    ProtocolRegistry registry
+  ) internal view {
+    if (qc == address(0)) revert InvalidQCAddress();
+    if (user == address(0)) revert InvalidUserAddress();
+    if (amount == 0) revert InvalidAmount();
 
-        SystemState systemState = SystemState(registry.getService(SYSTEM_STATE_KEY));
-        if (amount < systemState.minMintAmount() || amount > systemState.maxMintAmount()) {
-            revert AmountOutsideAllowedRange();
-        }
-
-        QCManager qcManager = QCManager(registry.getService(QC_MANAGER_KEY));
-        if (amount > qcManager.getAvailableMintingCapacity(qc)) {
-            revert InsufficientMintingCapacity();
-        }
+    SystemState systemState = SystemState(
+      registry.getService(SYSTEM_STATE_KEY)
+    );
+    if (
+      amount < systemState.minMintAmount() ||
+      amount > systemState.maxMintAmount()
+    ) {
+      revert AmountOutsideAllowedRange();
     }
+
+    QCManager qcManager = QCManager(registry.getService(QC_MANAGER_KEY));
+    if (amount > qcManager.getAvailableMintingCapacity(qc)) {
+      revert InsufficientMintingCapacity();
+    }
+  }
 }
+
 ```
 
 ## Gas Optimization Implementation
@@ -531,20 +578,20 @@ contract ValidationLibrary {
 ```solidity
 // Gas-optimized storage layout
 struct OptimizedCustodian {
-    // Slot 1: Pack status, capacity, and minted amount
-    QCStatus status;           // 1 byte
-    uint88 maxMintingCap;     // 11 bytes (sufficient for 2^88 satoshis)
-    uint88 mintedAmount;      // 11 bytes
-    bool isPaused;            // 1 byte
-    // 8 bytes remaining in slot 1
-    
-    // Slot 2: Timestamps
-    uint128 registeredAt;     // 16 bytes
-    uint128 lastUpdated;      // 16 bytes
-    
-    // Slot 3+: Variable length data
-    string name;
+  // Slot 1: Pack status, capacity, and minted amount
+  QCStatus status; // 1 byte
+  uint88 maxMintingCap; // 11 bytes (sufficient for 2^88 satoshis)
+  uint88 mintedAmount; // 11 bytes
+  bool isPaused; // 1 byte
+  // 8 bytes remaining in slot 1
+
+  // Slot 2: Timestamps
+  uint128 registeredAt; // 16 bytes
+  uint128 lastUpdated; // 16 bytes
+  // Slot 3+: Variable length data
+  string name;
 }
+
 ```
 
 ### Event Optimization
@@ -575,24 +622,68 @@ event QCBackedDepositCredited(
 ```solidity
 // Events for complete system monitoring
 contract AccountControlEvents {
-    // QC Lifecycle Events
-    event QCOnboardingQueued(address indexed qc, string name, uint256 capacity, uint256 executeAfter);
-    event QCOnboardingExecuted(address indexed qc, string name, uint256 capacity);
-    event QCStatusChanged(address indexed qc, uint8 oldStatus, uint8 newStatus, bytes32 reason);
+  // QC Lifecycle Events
+  event QCOnboardingQueued(
+    address indexed qc,
+    string name,
+    uint256 capacity,
+    uint256 executeAfter
+  );
+  event QCOnboardingExecuted(address indexed qc, string name, uint256 capacity);
+  event QCStatusChanged(
+    address indexed qc,
+    uint8 oldStatus,
+    uint8 newStatus,
+    bytes32 reason
+  );
 
-    // Minting Events
-    event MintRequested(bytes32 indexed mintId, address indexed qc, address indexed user, uint256 amount);
-    event MintCompleted(bytes32 indexed mintId, address indexed qc, uint256 amount, uint256 timestamp);
-    event MintRejected(address indexed qc, uint256 amount, string reason, uint256 timestamp);
+  // Minting Events
+  event MintRequested(
+    bytes32 indexed mintId,
+    address indexed qc,
+    address indexed user,
+    uint256 amount
+  );
+  event MintCompleted(
+    bytes32 indexed mintId,
+    address indexed qc,
+    uint256 amount,
+    uint256 timestamp
+  );
+  event MintRejected(
+    address indexed qc,
+    uint256 amount,
+    string reason,
+    uint256 timestamp
+  );
 
-    // Reserve Events
-    event ReserveAttestationSubmitted(address indexed attester, address indexed qc, uint256 balance, uint256 timestamp);
-    event SolvencyStatusChanged(address indexed qc, bool isSolvent, uint256 reserves, uint256 minted);
+  // Reserve Events
+  event ReserveAttestationSubmitted(
+    address indexed attester,
+    address indexed qc,
+    uint256 balance,
+    uint256 timestamp
+  );
+  event SolvencyStatusChanged(
+    address indexed qc,
+    bool isSolvent,
+    uint256 reserves,
+    uint256 minted
+  );
 
-    // System Events
-    event EmergencyPauseActivated(bytes32 functionId, address indexed pauser, uint256 timestamp);
-    event SystemParameterUpdated(bytes32 indexed parameter, uint256 oldValue, uint256 newValue);
+  // System Events
+  event EmergencyPauseActivated(
+    bytes32 functionId,
+    address indexed pauser,
+    uint256 timestamp
+  );
+  event SystemParameterUpdated(
+    bytes32 indexed parameter,
+    uint256 oldValue,
+    uint256 newValue
+  );
 }
+
 ```
 
 ### Metrics Collection Interface
@@ -600,21 +691,28 @@ contract AccountControlEvents {
 ```solidity
 // Standardized metrics for monitoring systems
 interface IAccountControlMetrics {
-    function getSystemMetrics() external view returns (
-        uint256 totalQCs,
-        uint256 activeQCs,
-        uint256 totalMinted,
-        uint256 totalReserves,
-        uint256 averageCapacityUtilization
+  function getSystemMetrics()
+    external
+    view
+    returns (
+      uint256 totalQCs,
+      uint256 activeQCs,
+      uint256 totalMinted,
+      uint256 totalReserves,
+      uint256 averageCapacityUtilization
     );
 
-    function getQCMetrics(address qc) external view returns (
-        uint256 minted,
-        uint256 capacity,
-        uint256 reserves,
-        uint256 utilizationRate
+  function getQCMetrics(address qc)
+    external
+    view
+    returns (
+      uint256 minted,
+      uint256 capacity,
+      uint256 reserves,
+      uint256 utilizationRate
     );
 }
+
 ```
 
 ## Conclusion

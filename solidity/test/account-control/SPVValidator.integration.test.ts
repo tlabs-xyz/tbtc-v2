@@ -6,7 +6,7 @@ import type { SPVValidator, SystemTestRelay } from "../../typechain"
 
 /**
  * Comprehensive SPV Validator Integration Tests
- * 
+ *
  * This test suite validates SPVValidator using real Bitcoin transaction data
  * to ensure proper SPV proof verification, address validation, and payment verification.
  */
@@ -20,11 +20,13 @@ describe("SPVValidator Integration Tests", () => {
   // Real Bitcoin testnet transaction data for testing
   const REAL_BTC_TESTNET_TX = {
     // Bitcoin testnet transaction: e3e1f3e2a3c4d5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
-    txHash: "0xe3e1f3e2a3c4d5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0",
-    
+    txHash:
+      "0xe3e1f3e2a3c4d5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0",
+
     txInfo: {
       version: "0x01000000",
-      inputVector: "0x01" + // 1 input
+      inputVector:
+        "0x01" + // 1 input
         "47a5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5" + // tx hash
         "00000000" + // output index
         "6a" + // scriptSig length (106 bytes)
@@ -33,8 +35,9 @@ describe("SPVValidator Integration Tests", () => {
         "21" + // pubkey length (33 bytes)
         "031234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12" + // compressed public key
         "ffffffff", // sequence
-        
-      outputVector: "0x02" + // 2 outputs
+
+      outputVector:
+        "0x02" + // 2 outputs
         // Output 1: OP_RETURN with challenge
         "00f2052a01000000" + // value (5000000000 satoshis = 50 BTC)
         "22" + // script length (34 bytes)
@@ -46,16 +49,18 @@ describe("SPVValidator Integration Tests", () => {
         "16" + // script length (22 bytes)
         "0014" + // OP_0 + push 20 bytes (P2WPKH)
         "389ffce9cd9ae88dcc0631e88a821ffdbe9bfe26",
-        
-      locktime: "0x00000000"
+
+      locktime: "0x00000000",
     },
-    
+
     proof: {
-      merkleProof: "0x" +
+      merkleProof:
+        "0x" +
         "b7e5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5" +
         "c8e5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5",
       txIndexInBlock: 1,
-      bitcoinHeaders: "0x" +
+      bitcoinHeaders:
+        "0x" +
         // Header 1
         "01000000" + // version
         "a7e5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5" + // prev block hash
@@ -70,10 +75,12 @@ describe("SPVValidator Integration Tests", () => {
         "63e5e5e5" + // timestamp
         "ffff001d" + // bits
         "87654321", // nonce
-      coinbaseProof: "0x" +
+      coinbaseProof:
+        "0x" +
         "b7e5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5" +
         "c8e5e5e5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5a5b5c5d5e5f5",
-      coinbasePreimage: "0x" +
+      coinbasePreimage:
+        "0x" +
         "01000000" + // version
         "01" + // 1 input
         "0000000000000000000000000000000000000000000000000000000000000000" + // null hash
@@ -87,8 +94,8 @@ describe("SPVValidator Integration Tests", () => {
         "21" + // push 33 bytes
         "031234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12" + // pubkey
         "ac" + // OP_CHECKSIG
-        "00000000" // locktime
-    }
+        "00000000", // locktime
+    },
   }
 
   before(async () => {
@@ -102,7 +109,7 @@ describe("SPVValidator Integration Tests", () => {
 
     // Set testnet-like difficulty values
     await systemTestRelay.setCurrentEpochDifficulty("1000000000000000") // ~1T difficulty
-    await systemTestRelay.setPrevEpochDifficulty("900000000000000")    // ~900B difficulty
+    await systemTestRelay.setPrevEpochDifficulty("900000000000000") // ~900B difficulty
 
     // Deploy SPVValidator
     const SPVValidator = await ethers.getContractFactory("SPVValidator")
@@ -117,15 +124,13 @@ describe("SPVValidator Integration Tests", () => {
     it("should validate real Bitcoin transaction SPV proof", async () => {
       // Note: This test uses mock data that follows real Bitcoin transaction format
       // In production, this would use actual mainnet/testnet transaction data
-      
+
       const txInfo = REAL_BTC_TESTNET_TX.txInfo
       const proof = REAL_BTC_TESTNET_TX.proof
 
       // This test would pass with real SPV data, but will fail with our mock data
       // due to cryptographic verification. The test demonstrates the expected flow.
-      await expect(
-        spvValidator.validateProof(txInfo, proof)
-      ).to.be.reverted // Expected to fail with mock data
+      await expect(spvValidator.validateProof(txInfo, proof)).to.be.reverted // Expected to fail with mock data
 
       // The function signature and call succeed, proving the implementation exists
       expect(spvValidator.validateProof).to.be.a("function")
@@ -209,18 +214,18 @@ describe("SPVValidator Integration Tests", () => {
       {
         format: "P2PKH (Legacy)",
         address: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-        expectedType: 0
+        expectedType: 0,
       },
       {
         format: "P2SH",
         address: "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
-        expectedType: 1
+        expectedType: 1,
       },
       {
         format: "P2WPKH (Bech32)",
         address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
-        expectedType: 2
-      }
+        expectedType: 2,
+      },
     ]
 
     testAddresses.forEach(({ format, address, expectedType }) => {
@@ -287,10 +292,10 @@ describe("SPVValidator Integration Tests", () => {
           txInfo,
           proof
         )
-        
+
         // Log gas usage for analysis (test will likely revert due to mock data)
         console.log(`SPV validation gas estimate: ${gasEstimate.toString()}`)
-        
+
         // Target: Should be under 500k gas for reasonable costs
         // Note: This will fail with mock data but shows the testing approach
       } catch (error) {
@@ -314,8 +319,10 @@ describe("SPVValidator Integration Tests", () => {
           REAL_BTC_TESTNET_TX.txInfo,
           REAL_BTC_TESTNET_TX.proof
         )
-        
-        console.log(`Wallet control verification gas estimate: ${gasEstimate.toString()}`)
+
+        console.log(
+          `Wallet control verification gas estimate: ${gasEstimate.toString()}`
+        )
       } catch (error) {
         // Expected with mock data
         expect(spvValidator.verifyWalletControl).to.be.a("function")
@@ -329,7 +336,7 @@ describe("SPVValidator Integration Tests", () => {
         version: "0x01000000",
         inputVector: "0x01ff", // Malformed input
         outputVector: REAL_BTC_TESTNET_TX.txInfo.outputVector,
-        locktime: "0x00000000"
+        locktime: "0x00000000",
       }
 
       await expect(
@@ -342,7 +349,7 @@ describe("SPVValidator Integration Tests", () => {
         version: "0x01000000",
         inputVector: REAL_BTC_TESTNET_TX.txInfo.inputVector,
         outputVector: "0x01ff", // Malformed output
-        locktime: "0x00000000"
+        locktime: "0x00000000",
       }
 
       await expect(
@@ -354,10 +361,11 @@ describe("SPVValidator Integration Tests", () => {
       // Test with headers that don't meet difficulty requirements
       const lowDifficultyProof = {
         ...REAL_BTC_TESTNET_TX.proof,
-        bitcoinHeaders: "0x" +
+        bitcoinHeaders:
+          "0x" +
           "01000000" + // version
           "00".repeat(32) + // prev block hash
-          "00".repeat(32) + // merkle root  
+          "00".repeat(32) + // merkle root
           "00000000" + // timestamp
           "ffff003f" + // very low difficulty bits
           "00000000" + // nonce
@@ -366,11 +374,14 @@ describe("SPVValidator Integration Tests", () => {
           "00".repeat(32) + // merkle root
           "00000000" + // timestamp
           "ffff003f" + // very low difficulty bits
-          "00000000" // nonce
+          "00000000", // nonce
       }
 
       await expect(
-        spvValidator.validateProof(REAL_BTC_TESTNET_TX.txInfo, lowDifficultyProof)
+        spvValidator.validateProof(
+          REAL_BTC_TESTNET_TX.txInfo,
+          lowDifficultyProof
+        )
       ).to.be.reverted
     })
   })
@@ -379,7 +390,7 @@ describe("SPVValidator Integration Tests", () => {
     it("should emit WalletControlVerified event on successful verification", async () => {
       // This test structure shows how to verify events are emitted
       // Would work with real transaction data
-      
+
       const qcAddress = "0x1234567890123456789012345678901234567890"
       const btcAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
       const challenge = ethers.utils.keccak256(
@@ -418,7 +429,7 @@ describe("SPVValidator Integration Tests", () => {
       const addresses = [
         "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", // P2PKH
         "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", // P2SH
-        "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4" // P2WPKH
+        "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", // P2WPKH
       ]
 
       for (const address of addresses) {
@@ -427,7 +438,9 @@ describe("SPVValidator Integration Tests", () => {
           await spvValidator.verifyWalletControl(
             "0x1234567890123456789012345678901234567890",
             address,
-            ethers.utils.keccak256(ethers.utils.toUtf8Bytes("integration-test")),
+            ethers.utils.keccak256(
+              ethers.utils.toUtf8Bytes("integration-test")
+            ),
             REAL_BTC_TESTNET_TX.txInfo,
             REAL_BTC_TESTNET_TX.proof
           )

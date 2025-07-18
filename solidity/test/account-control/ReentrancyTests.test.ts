@@ -71,10 +71,7 @@ describe("Advanced Reentrancy Tests", () => {
         await expect(
           protocolRegistry
             .connect(attacker)
-            .setService(
-              SERVICE_KEYS.MINTING_POLICY,
-              maliciousPolicyAddress
-            )
+            .setService(SERVICE_KEYS.MINTING_POLICY, maliciousPolicyAddress)
         ).to.be.revertedWith("AccessControl: account")
 
         // The system's access controls prevent unauthorized policy updates
@@ -200,9 +197,7 @@ describe("Advanced Reentrancy Tests", () => {
             mockSpvData.txInfo,
             mockSpvData.proof
           )
-        ).to.be.revertedWith(
-          "RedemptionAlreadyFulfilled"
-        )
+        ).to.be.revertedWith("RedemptionAlreadyFulfilled")
       })
     })
   })

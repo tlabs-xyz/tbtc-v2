@@ -24,3 +24,6 @@
 
 # Ignore Claude conversation files
 CLAUDE.md
+
+# Ignore symlinked directory
+optimistic-minting

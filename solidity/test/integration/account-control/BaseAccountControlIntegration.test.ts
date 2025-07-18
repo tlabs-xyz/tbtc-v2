@@ -18,7 +18,7 @@ import type {
   Bank,
   TBTCVault,
   TBTC,
-  Bridge
+  Bridge,
 } from "../../../typechain"
 
 export abstract class BaseAccountControlIntegration {
@@ -56,7 +56,7 @@ export abstract class BaseAccountControlIntegration {
     REDEMPTION_POLICY: ethers.utils.id("REDEMPTION_POLICY"),
     QC_RESERVE_LEDGER: ethers.utils.id("QC_RESERVE_LEDGER"),
     WATCHDOG: ethers.utils.id("WATCHDOG"),
-    QC_BRIDGE: ethers.utils.id("QC_BRIDGE")
+    QC_BRIDGE: ethers.utils.id("QC_BRIDGE"),
   }
 
   // Roles
@@ -66,7 +66,7 @@ export abstract class BaseAccountControlIntegration {
     ARBITER_ROLE: ethers.utils.id("ARBITER_ROLE"),
     DEFAULT_ADMIN_ROLE: ethers.constants.HashZero,
     PAUSER_ROLE: ethers.utils.id("PAUSER_ROLE"),
-    UNPAUSER_ROLE: ethers.utils.id("UNPAUSER_ROLE")
+    UNPAUSER_ROLE: ethers.utils.id("UNPAUSER_ROLE"),
   }
 
   // Test parameters
@@ -78,7 +78,7 @@ export abstract class BaseAccountControlIntegration {
     MAX_REDEMPTION_AMOUNT: ethers.utils.parseEther("10"),
     REDEMPTION_TIMEOUT: 86400, // 24 hours
     GOVERNANCE_DELAY: 7 * 24 * 60 * 60, // 7 days
-    ATTESTATION_STALE_THRESHOLD: 3600 // 1 hour
+    ATTESTATION_STALE_THRESHOLD: 3600, // 1 hour
   }
 
   async setupBase() {
@@ -89,18 +89,18 @@ export abstract class BaseAccountControlIntegration {
       this.qc,
       this.user,
       this.watchdog,
-      this.emergencyCouncil
+      this.emergencyCouncil,
     ] = await ethers.getSigners()
 
     // Deploy all contracts
     await this.deployContracts()
-    
+
     // Configure services in registry
     await this.configureServices()
-    
+
     // Set up roles and permissions
     await this.configureRoles()
-    
+
     // Initialize system parameters
     await this.initializeParameters()
   }
@@ -155,104 +155,113 @@ export abstract class BaseAccountControlIntegration {
     await this.qcRedeemer.deployed()
 
     // Deploy policies
-    const BasicMintingPolicy = await ethers.getContractFactory("BasicMintingPolicy")
-    this.basicMintingPolicy = await BasicMintingPolicy.deploy(this.protocolRegistry.address)
+    const BasicMintingPolicy = await ethers.getContractFactory(
+      "BasicMintingPolicy"
+    )
+    this.basicMintingPolicy = await BasicMintingPolicy.deploy(
+      this.protocolRegistry.address
+    )
     await this.basicMintingPolicy.deployed()
 
-    const BasicRedemptionPolicy = await ethers.getContractFactory("BasicRedemptionPolicy")
-    this.basicRedemptionPolicy = await BasicRedemptionPolicy.deploy(this.protocolRegistry.address)
+    const BasicRedemptionPolicy = await ethers.getContractFactory(
+      "BasicRedemptionPolicy"
+    )
+    this.basicRedemptionPolicy = await BasicRedemptionPolicy.deploy(
+      this.protocolRegistry.address
+    )
     await this.basicRedemptionPolicy.deployed()
 
     // Deploy QCReserveLedger
     const QCReserveLedger = await ethers.getContractFactory("QCReserveLedger")
-    this.qcReserveLedger = await QCReserveLedger.deploy(this.protocolRegistry.address)
+    this.qcReserveLedger = await QCReserveLedger.deploy(
+      this.protocolRegistry.address
+    )
     await this.qcReserveLedger.deployed()
 
     // Deploy SingleWatchdog
     const SingleWatchdog = await ethers.getContractFactory("SingleWatchdog")
-    this.singleWatchdog = await SingleWatchdog.deploy(this.protocolRegistry.address)
+    this.singleWatchdog = await SingleWatchdog.deploy(
+      this.protocolRegistry.address
+    )
     await this.singleWatchdog.deployed()
   }
 
   private async configureServices() {
     // Register all services in ProtocolRegistry
-    await this.protocolRegistry.connect(this.deployer).setService(
-      this.SERVICE_KEYS.QC_DATA,
-      this.qcData.address
-    )
+    await this.protocolRegistry
+      .connect(this.deployer)
+      .setService(this.SERVICE_KEYS.QC_DATA, this.qcData.address)
 
-    await this.protocolRegistry.connect(this.deployer).setService(
-      this.SERVICE_KEYS.SYSTEM_STATE,
-      this.systemState.address
-    )
+    await this.protocolRegistry
+      .connect(this.deployer)
+      .setService(this.SERVICE_KEYS.SYSTEM_STATE, this.systemState.address)
 
-    await this.protocolRegistry.connect(this.deployer).setService(
-      this.SERVICE_KEYS.QC_MANAGER,
-      this.qcManager.address
-    )
+    await this.protocolRegistry
+      .connect(this.deployer)
+      .setService(this.SERVICE_KEYS.QC_MANAGER, this.qcManager.address)
 
-    await this.protocolRegistry.connect(this.deployer).setService(
-      this.SERVICE_KEYS.MINTING_POLICY,
-      this.basicMintingPolicy.address
-    )
+    await this.protocolRegistry
+      .connect(this.deployer)
+      .setService(
+        this.SERVICE_KEYS.MINTING_POLICY,
+        this.basicMintingPolicy.address
+      )
 
-    await this.protocolRegistry.connect(this.deployer).setService(
-      this.SERVICE_KEYS.REDEMPTION_POLICY,
-      this.basicRedemptionPolicy.address
-    )
+    await this.protocolRegistry
+      .connect(this.deployer)
+      .setService(
+        this.SERVICE_KEYS.REDEMPTION_POLICY,
+        this.basicRedemptionPolicy.address
+      )
 
-    await this.protocolRegistry.connect(this.deployer).setService(
-      this.SERVICE_KEYS.QC_RESERVE_LEDGER,
-      this.qcReserveLedger.address
-    )
+    await this.protocolRegistry
+      .connect(this.deployer)
+      .setService(
+        this.SERVICE_KEYS.QC_RESERVE_LEDGER,
+        this.qcReserveLedger.address
+      )
 
-    await this.protocolRegistry.connect(this.deployer).setService(
-      this.SERVICE_KEYS.WATCHDOG,
-      this.singleWatchdog.address
-    )
+    await this.protocolRegistry
+      .connect(this.deployer)
+      .setService(this.SERVICE_KEYS.WATCHDOG, this.singleWatchdog.address)
 
-    await this.protocolRegistry.connect(this.deployer).setService(
-      this.SERVICE_KEYS.QC_BRIDGE,
-      this.qcBridge.address
-    )
+    await this.protocolRegistry
+      .connect(this.deployer)
+      .setService(this.SERVICE_KEYS.QC_BRIDGE, this.qcBridge.address)
   }
 
   private async configureRoles() {
     // Grant QC Manager roles
-    await this.qcManager.connect(this.deployer).grantRole(
-      this.ROLES.DEFAULT_ADMIN_ROLE,
-      this.governance.address
-    )
+    await this.qcManager
+      .connect(this.deployer)
+      .grantRole(this.ROLES.DEFAULT_ADMIN_ROLE, this.governance.address)
 
     // Grant watchdog roles
-    await this.qcReserveLedger.connect(this.deployer).grantRole(
-      this.ROLES.ATTESTER_ROLE,
-      this.watchdog.address
-    )
+    await this.qcReserveLedger
+      .connect(this.deployer)
+      .grantRole(this.ROLES.ATTESTER_ROLE, this.watchdog.address)
 
-    await this.qcManager.connect(this.deployer).grantRole(
-      this.ROLES.REGISTRAR_ROLE,
-      this.watchdog.address
-    )
+    await this.qcManager
+      .connect(this.deployer)
+      .grantRole(this.ROLES.REGISTRAR_ROLE, this.watchdog.address)
 
-    await this.qcManager.connect(this.deployer).grantRole(
-      this.ROLES.ARBITER_ROLE,
-      this.watchdog.address
-    )
+    await this.qcManager
+      .connect(this.deployer)
+      .grantRole(this.ROLES.ARBITER_ROLE, this.watchdog.address)
 
     // Grant emergency council roles
-    await this.systemState.connect(this.deployer).grantRole(
-      this.ROLES.PAUSER_ROLE,
-      this.emergencyCouncil.address
-    )
+    await this.systemState
+      .connect(this.deployer)
+      .grantRole(this.ROLES.PAUSER_ROLE, this.emergencyCouncil.address)
 
-    await this.systemState.connect(this.deployer).grantRole(
-      this.ROLES.UNPAUSER_ROLE,
-      this.emergencyCouncil.address
-    )
+    await this.systemState
+      .connect(this.deployer)
+      .grantRole(this.ROLES.UNPAUSER_ROLE, this.emergencyCouncil.address)
 
     // Grant QCBridge permission to increase Bank balance
-    this.bank.authorizedBalanceIncreasers.whenCalledWith(this.qcBridge.address).returns(true)
+    this.bank.authorizedBalanceIncreasers
+      .whenCalledWith(this.qcBridge.address)
+      .returns(true)
   }
 
   private async initializeParameters() {
@@ -271,7 +280,7 @@ export abstract class BaseAccountControlIntegration {
     return {
       merkleProof: [ethers.utils.randomBytes(32)],
       txIndexInBlock: 0,
-      bitcoinHeaders: [ethers.utils.randomBytes(80)]
+      bitcoinHeaders: [ethers.utils.randomBytes(80)],
     }
   }
 

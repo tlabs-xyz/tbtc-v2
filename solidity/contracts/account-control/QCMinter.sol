@@ -36,7 +36,6 @@ contract QCMinter is AccessControl {
         uint256 timestamp
     );
 
-
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -106,5 +105,4 @@ contract QCMinter is AccessControl {
 
         return policy.checkMintingEligibility(qc, amount);
     }
-
 }

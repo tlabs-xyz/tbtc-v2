@@ -152,7 +152,9 @@ await qcManager.finalizeWalletRegistration(qc.address, btcAddress)
 await qcReserveLedger.submitAttestation(qc.address, totalReserves, timestamp)
 
 // Verify solvency check
-const availableCapacity = await qcManager.getAvailableMintingCapacity(qc.address)
+const availableCapacity = await qcManager.getAvailableMintingCapacity(
+  qc.address
+)
 expect(availableCapacity).to.be.greaterThan(0)
 ```
 
@@ -232,7 +234,7 @@ setupUserWithTokens(): Promise<void>
 
 ```typescript
 // Verify events emitted
-const event = receipt.events?.find(e => e.event === "QCOnboarded")
+const event = receipt.events?.find((e) => e.event === "QCOnboarded")
 expect(event).to.exist
 expect(event.args?.qc).to.equal(qc.address)
 ```
