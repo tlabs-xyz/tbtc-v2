@@ -21,7 +21,7 @@ import "../bridge/BitcoinTx.sol";
 /// - Integration with tBTC v2 token burning mechanism
 ///
 /// Role definitions:
-/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update redemption policy
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - REDEEMER_ROLE: Reserved for future functionality (currently unused)
 /// - ARBITER_ROLE: Can record redemption fulfillments and flag defaults
 contract QCRedeemer is AccessControl {
@@ -104,13 +104,6 @@ contract QCRedeemer is AccessControl {
         uint256 timestamp
     );
 
-    /// @dev Emitted when the redemption policy is updated
-    event RedemptionPolicyUpdated(
-        address indexed oldPolicy,
-        address indexed newPolicy,
-        address indexed updatedBy,
-        uint256 timestamp
-    );
 
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
@@ -292,27 +285,6 @@ contract QCRedeemer is AccessControl {
         return redemptions[redemptionId];
     }
 
-    /// @notice Update redemption policy (DAO only)
-    /// @dev This is called automatically when ProtocolRegistry is updated
-    function updateRedemptionPolicy() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        address oldPolicy = address(0);
-        
-        // Check if old policy exists
-        if (protocolRegistry.hasService(REDEMPTION_POLICY_KEY)) {
-            oldPolicy = protocolRegistry.getService(REDEMPTION_POLICY_KEY);
-        }
-        
-        // Note: The new policy should already be set in the registry before calling this
-        // The caller is responsible for ensuring the new policy is registered
-        address newPolicy = protocolRegistry.getService(REDEMPTION_POLICY_KEY);
-
-        emit RedemptionPolicyUpdated(
-            oldPolicy,
-            newPolicy,
-            msg.sender,
-            block.timestamp
-        );
-    }
 
     /// @dev Generate unique redemption ID
     /// @param user The user requesting redemption
