@@ -12,7 +12,7 @@ import "./ProtocolRegistry.sol";
 /// to be upgraded without changing the core minter contract.
 ///
 /// Role definitions:
-/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update minting policy
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - MINTER_ROLE: Can request QC mints
 contract QCMinter is AccessControl {
     // Custom errors for gas-efficient reverts
@@ -36,13 +36,6 @@ contract QCMinter is AccessControl {
         uint256 timestamp
     );
 
-    /// @dev Emitted when the minting policy is updated
-    event MintingPolicyUpdated(
-        address indexed oldPolicy,
-        address indexed newPolicy,
-        address indexed updatedBy,
-        uint256 timestamp
-    );
 
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
@@ -114,25 +107,4 @@ contract QCMinter is AccessControl {
         return policy.checkMintingEligibility(qc, amount);
     }
 
-    /// @notice Update minting policy (DAO only)
-    /// @dev This is called automatically when ProtocolRegistry is updated
-    function updateMintingPolicy() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        address oldPolicy = address(0);
-        
-        // Check if old policy exists
-        if (protocolRegistry.hasService(MINTING_POLICY_KEY)) {
-            oldPolicy = protocolRegistry.getService(MINTING_POLICY_KEY);
-        }
-        
-        // Note: The new policy should already be set in the registry before calling this
-        // The caller is responsible for ensuring the new policy is registered
-        address newPolicy = protocolRegistry.getService(MINTING_POLICY_KEY);
-
-        emit MintingPolicyUpdated(
-            oldPolicy,
-            newPolicy,
-            msg.sender,
-            block.timestamp
-        );
-    }
 }

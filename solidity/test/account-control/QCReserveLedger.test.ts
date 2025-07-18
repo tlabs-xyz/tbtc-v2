@@ -2,6 +2,11 @@ import { expect } from "chai"
 import { ethers, helpers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { QCReserveLedger, ProtocolRegistry, SystemState } from "../../typechain"
+import {
+  getTimeUntilStale,
+  getAttestationHistoryCount,
+  getAttestationHistoryPaginated,
+} from "../helpers/qcReserveLedgerHelpers"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 const { time } = helpers
@@ -304,11 +309,15 @@ describe("QCReserveLedger", () => {
       })
     })
 
-    describe("getTimeUntilStale", () => {
+    describe("getTimeUntilStale (using helper)", () => {
       it("should return correct time remaining", async () => {
         const staleThreshold = await systemState.staleThreshold()
-        const timeUntilStale = await qcReserveLedger.getTimeUntilStale(
-          qcAddress.address
+        const currentBlock = await ethers.provider.getBlock("latest")
+        const timeUntilStale = await getTimeUntilStale(
+          qcReserveLedger,
+          systemState,
+          qcAddress.address,
+          currentBlock.timestamp
         )
         expect(timeUntilStale).to.be.closeTo(staleThreshold, 1)
       })
@@ -316,15 +325,23 @@ describe("QCReserveLedger", () => {
       it("should return 0 if attestation is stale", async () => {
         const staleThreshold = await systemState.staleThreshold()
         await time.increaseTime(staleThreshold.toNumber() + 1)
-        const timeUntilStale = await qcReserveLedger.getTimeUntilStale(
-          qcAddress.address
+        const currentBlock = await ethers.provider.getBlock("latest")
+        const timeUntilStale = await getTimeUntilStale(
+          qcReserveLedger,
+          systemState,
+          qcAddress.address,
+          currentBlock.timestamp
         )
         expect(timeUntilStale).to.equal(0)
       })
 
       it("should return 0 for non-existent QC", async () => {
-        const timeUntilStale = await qcReserveLedger.getTimeUntilStale(
-          thirdParty.address
+        const currentBlock = await ethers.provider.getBlock("latest")
+        const timeUntilStale = await getTimeUntilStale(
+          qcReserveLedger,
+          systemState,
+          thirdParty.address,
+          currentBlock.timestamp
         )
         expect(timeUntilStale).to.equal(0)
       })
@@ -422,7 +439,8 @@ describe("QCReserveLedger", () => {
       }
       await Promise.all(attestationPromises)
 
-      const history = await qcReserveLedger.getAttestationHistoryPaginated(
+      const history = await getAttestationHistoryPaginated(
+        qcReserveLedger,
         qcAddress.address,
         1,
         2
@@ -432,13 +450,15 @@ describe("QCReserveLedger", () => {
       expect(history[1].balance).to.equal(reserveBalance.add(2))
     })
 
-    it("should return correct history count", async () => {
+    it("should return correct history count (using helper)", async () => {
       await qcReserveLedger
         .connect(attester)
         .submitReserveAttestation(qcAddress.address, reserveBalance)
-      expect(
-        await qcReserveLedger.getAttestationHistoryCount(qcAddress.address)
-      ).to.equal(1)
+      const count = await getAttestationHistoryCount(
+        qcReserveLedger,
+        qcAddress.address
+      )
+      expect(count).to.equal(1)
     })
   })
 
