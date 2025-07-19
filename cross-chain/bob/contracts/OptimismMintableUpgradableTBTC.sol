@@ -54,6 +54,10 @@ contract OptimismMintableUpgradableTBTC is
     /// @notice List of all guardians.
     address[] public guardians;
 
+    /// @notice Tracks the remaining capacity for legacy bridge operations.
+    ///         Incremented on bridge mints, decremented on bridge burns.
+    uint256 public legacyCapRemaining;
+
     event MinterAdded(address indexed minter);
     event MinterRemoved(address indexed minter);
 
@@ -86,6 +90,16 @@ contract OptimismMintableUpgradableTBTC is
     function initializeV2() public reinitializer(2) {
         __Ownable_init();
         __Pausable_init();
+
+        // Set legacyCapRemaining to current total supply
+        legacyCapRemaining = totalSupply();
+
+        // Add the standard bridge as a minter
+        if (!isMinter[BRIDGE]) {
+            isMinter[BRIDGE] = true;
+            minters.push(BRIDGE);
+            emit MinterAdded(BRIDGE);
+        }
     }
 
     /// @notice Adds the address to the minters list.
@@ -198,6 +212,12 @@ contract OptimismMintableUpgradableTBTC is
         uint256 amount
     ) external virtual override whenNotPaused onlyMinter {
         _mint(account, amount);
+
+        // If the minter is the standard bridge, increment legacyCapRemaining
+        if (msg.sender == BRIDGE) {
+            legacyCapRemaining += amount;
+        }
+
         emit Mint(account, amount);
     }
 
@@ -219,15 +239,60 @@ contract OptimismMintableUpgradableTBTC is
     ///        least `amount`.
     ///      - `account` must not be the zero address.
     ///      - `account` must have at least `amount` tokens.
+    ///      - If legacyCapRemaining > 0, only the standard bridge can burn.
     /// @param account The address owning tokens to be burned.
     /// @param amount The amount of token to be burned.
     function burnFrom(
         address account,
         uint256 amount
     ) public virtual whenNotPaused {
+        // If legacyCapRemaining is above zero, only standard bridge can perform the burn
+        if (legacyCapRemaining > 0) {
+            require(
+                msg.sender == BRIDGE,
+                "Only bridge can burn while legacy cap remains"
+            );
+            require(
+                amount <= legacyCapRemaining,
+                "Amount exceeds legacy cap remaining"
+            );
+            legacyCapRemaining -= amount;
+        }
+
         _spendAllowance(account, _msgSender(), amount);
         _burn(account, amount);
         emit Burn(account, amount);
+    }
+
+    /// @notice Allows the StandardBridge on this network to burn tokens.
+    /// @dev This overrides the burn function from OptimismMintableUpgradableERC20.
+    ///      Requirements:
+    ///      - The caller must be the bridge.
+    ///      - legacyCapRemaining must be greater than 0.
+    /// @param _from Address to burn tokens from.
+    /// @param _amount Amount of tokens to burn.
+    function burn(
+        address _from,
+        uint256 _amount
+    )
+        external
+        virtual
+        override(OptimismMintableUpgradableERC20)
+        onlyBridge
+        whenNotPaused
+    {
+        require(legacyCapRemaining > 0, "Legacy cap exhausted");
+        require(
+            _amount <= legacyCapRemaining,
+            "Amount exceeds legacy cap remaining"
+        );
+
+        _burn(_from, _amount);
+
+        // Decrement legacyCapRemaining on bridge burns
+        legacyCapRemaining -= _amount;
+
+        emit Burn(_from, _amount);
     }
 
     /// @notice Allows to fetch a list of all minters.
@@ -240,8 +305,13 @@ contract OptimismMintableUpgradableTBTC is
         return guardians;
     }
 
+    /// @notice Allows to fetch the remaining capacity for legacy bridge operations.
+    function getLegacyCapRemaining() external view returns (uint256) {
+        return legacyCapRemaining;
+    }
+
     /// @dev This empty reserved space is put in place to allow future versions to add new
     ///      variables without shifting down storage in the inheritance chain.
     ///      See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-    uint256[49] private __gap;
+    uint256[45] private __gap;
 }

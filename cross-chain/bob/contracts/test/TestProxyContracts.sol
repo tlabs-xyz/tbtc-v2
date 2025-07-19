@@ -9,4 +9,4 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 contract TestProxyContracts {
     // This contract exists solely to ensure ProxyAdmin and TransparentUpgradeableProxy
     // are compiled and available in the artifacts for testing
-} 
+}

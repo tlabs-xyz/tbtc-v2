@@ -63,8 +63,8 @@ const config: HardhatUserConfig = {
       tags: ["bobscan"],
     },
     bobSepolia: {
-      url: process.env.L2_CHAIN_API_URL || "https://testnet.rpc.gobob.xyz/",
-      chainId: 111,
+      url: process.env.L2_CHAIN_API_URL || "https://bob-sepolia.rpc.gobob.xyz/",
+      chainId: 808813,
       deploy: ["deploy_l2"],
       accounts: process.env.L2_ACCOUNTS_PRIVATE_KEYS
         ? process.env.L2_ACCOUNTS_PRIVATE_KEYS.split(",")
@@ -101,10 +101,10 @@ const config: HardhatUserConfig = {
       },
       {
         network: "bobSepolia",
-        chainId: 111,
+        chainId: 808813,
         urls: {
-          apiURL: "https://testnet-explorer.gobob.xyz/api?",
-          browserURL: "https://testnet.rpc.gobob.xyz"
+          apiURL: "https://bob-sepolia.explorer.gobob.xyz/api?",
+          browserURL: "https://bob-sepolia.rpc.gobob.xyz"
         }
       },
     ],

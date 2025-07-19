@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { ILegacyMintableERC20, IOptimismMintableERC20 } from "../interfaces/IOptimismMintableERC20.sol";
-import { ISemver } from "../interfaces/ISemver.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ILegacyMintableERC20, IOptimismMintableERC20} from "../interfaces/IOptimismMintableERC20.sol";
+import {ISemver} from "../interfaces/ISemver.sol";
 
 /// @title OptimismMintableUpgradableERC20
 /// @notice OptimismMintableUpgradableERC20 is a standard extension of the base ERC20 token contract designed
@@ -13,7 +13,13 @@ import { ISemver } from "../interfaces/ISemver.sol";
 ///         use an OptimismMintablERC20 as the L2 representation of an L1 token, or vice-versa.
 ///         Designed to be backwards compatible with the older StandardL2ERC20 token which was only
 ///         meant for use on L2.
-contract OptimismMintableUpgradableERC20 is Initializable, IOptimismMintableERC20, ILegacyMintableERC20, ERC20Upgradeable, ISemver {
+contract OptimismMintableUpgradableERC20 is
+    Initializable,
+    IOptimismMintableERC20,
+    ILegacyMintableERC20,
+    ERC20Upgradeable,
+    ISemver
+{
     /// @notice Address of the corresponding version of this token on the remote chain.
     /// @notice Breaking the naming convention to remain as close as possible to the non-
     ///         upgradable version (where this is immutable)
@@ -41,7 +47,10 @@ contract OptimismMintableUpgradableERC20 is Initializable, IOptimismMintableERC2
 
     /// @notice A modifier that only allows the bridge to call
     modifier onlyBridge() {
-        require(msg.sender == BRIDGE, "OptimismMintableERC20: only bridge can mint and burn");
+        require(
+            msg.sender == BRIDGE,
+            "OptimismMintableERC20: only bridge can mint and burn"
+        );
         _;
     }
 
@@ -64,8 +73,7 @@ contract OptimismMintableUpgradableERC20 is Initializable, IOptimismMintableERC2
         string memory _name,
         string memory _symbol,
         uint8 _decimals
-    ) initializer public
-    {
+    ) public initializer {
         __ERC20_init(_name, _symbol);
         REMOTE_TOKEN = _remoteToken;
         BRIDGE = _bridge;
@@ -107,13 +115,18 @@ contract OptimismMintableUpgradableERC20 is Initializable, IOptimismMintableERC2
     /// @notice ERC165 interface check function.
     /// @param _interfaceId Interface ID to check.
     /// @return Whether or not the interface is supported by this contract.
-    function supportsInterface(bytes4 _interfaceId) external pure virtual returns (bool) {
+    function supportsInterface(
+        bytes4 _interfaceId
+    ) external pure virtual returns (bool) {
         bytes4 iface1 = type(IERC165).interfaceId;
         // Interface corresponding to the legacy L2StandardERC20.
         bytes4 iface2 = type(ILegacyMintableERC20).interfaceId;
         // Interface corresponding to the updated OptimismMintableERC20 (this contract).
         bytes4 iface3 = type(IOptimismMintableERC20).interfaceId;
-        return _interfaceId == iface1 || _interfaceId == iface2 || _interfaceId == iface3;
+        return
+            _interfaceId == iface1 ||
+            _interfaceId == iface2 ||
+            _interfaceId == iface3;
     }
 
     /// @custom:legacy
