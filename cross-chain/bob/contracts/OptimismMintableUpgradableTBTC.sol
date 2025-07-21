@@ -199,6 +199,25 @@ contract OptimismMintableUpgradableTBTC is
         token.safeTransferFrom(address(this), recipient, tokenId, data);
     }
 
+    /// @notice Allows one of the guardians to pause mints and burns allowing
+    ///         avoidance of contagion in case of a chain- or bridge-specific
+    ///         incident.
+    /// @dev Requirements:
+    ///      - The caller must be a guardian.
+    ///      - The contract must not be already paused.
+    function pause() external onlyGuardian {
+        _pause();
+    }
+
+    /// @notice Allows the governance to unpause mints and burns previously
+    ///         paused by one of the guardians.
+    /// @dev Requirements:
+    ///      - The caller must be the contract owner.
+    ///      - The contract must be paused.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     /// @notice Allows one of the minters to mint `amount` tokens and assign
     ///         them to `account`, increasing the total supply. Emits
     ///         a `Transfer` event with `from` set to the zero address.
