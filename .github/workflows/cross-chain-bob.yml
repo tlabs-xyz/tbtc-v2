@@ -146,7 +146,7 @@ jobs:
 
       - name: Install Solidity
         env:
-          SOLC_VERSION: 0.8.17 # according to solidity.version in hardhat.config.ts
+          SOLC_VERSION: 0.8.15 # according to solidity.version in hardhat.config.ts
         run: |
           pip3 install solc-select
           solc-select install $SOLC_VERSION
@@ -154,7 +154,7 @@ jobs:
 
       - name: Install Slither
         env:
-          SLITHER_VERSION: 0.8.3
+          SLITHER_VERSION: 0.9.0
         run: pip3 install slither-analyzer==$SLITHER_VERSION
 
       # A workaround for transitive dependencies that use the obsolete git://
