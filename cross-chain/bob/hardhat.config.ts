@@ -87,26 +87,26 @@ const config: HardhatUserConfig = {
       goerli: process.env.ETHERSCAN_API_KEY,
       sepolia: process.env.ETHERSCAN_API_KEY,
       mainnet: process.env.ETHERSCAN_API_KEY,
-      bobMainnet: process.env.BOBSCAN_API_KEY,
-      bobSepolia: process.env.BOBSCAN_API_KEY,
+      bobMainnet: "empty",
+      bobSepolia: "empty",
     },
     customChains: [
       {
         network: "bobMainnet",
         chainId: 60808,
         urls: {
-          apiURL: "https://explorer.gobob.xyz/api?",
-          browserURL: "https://rpc.gobob.xyz"
+          apiURL: "https://explorer-bob-mainnet-0.t.conduit.xyz/api",
+          browserURL: "https://explorer-bob-mainnet-0.t.conduit.xyz:443"
         }
       },
       {
         network: "bobSepolia",
         chainId: 808813,
         urls: {
-          apiURL: "https://bob-sepolia.explorer.gobob.xyz/api?",
-          browserURL: "https://bob-sepolia.rpc.gobob.xyz"
+          apiURL: "https://explorer-bob-sepolia-dm6uw0yhh3.t.conduit.xyz/api",
+          browserURL: "https://explorer-bob-sepolia-dm6uw0yhh3.t.conduit.xyz:443"
         }
-      },
+      }
     ],
   },
 
@@ -115,10 +115,7 @@ const config: HardhatUserConfig = {
       default: 1,
       goerli: 0,
       sepolia: 0,
-      arbitrumGoerli: 0,
-      arbitrumSepolia: 0,
       mainnet: "0x123694886DBf5Ac94DDA07135349534536D14cAf",
-      arbitrumOne: "0x123694886DBf5Ac94DDA07135349534536D14cAf",
       bobMainnet: "0x123694886DBf5Ac94DDA07135349534536D14cAf",
       bobSepolia: "0x123694886DBf5Ac94DDA07135349534536D14cAf",
     },
@@ -126,10 +123,7 @@ const config: HardhatUserConfig = {
       default: 2,
       goerli: 0,
       sepolia: 0,
-      arbitrumGoerli: 0,
-      arbitrumSepolia: 0,
       mainnet: "0x9f6e831c8f8939dc0c830c6e492e7cef4f9c2f5f",
-      arbitrumOne: "0x9f6e831c8f8939dc0c830c6e492e7cef4f9c2f5f",
       bobMainnet: "0x9f6e831c8f8939dc0c830c6e492e7cef4f9c2f5f",
       bobSepolia: "0x9f6e831c8f8939dc0c830c6e492e7cef4f9c2f5f",
     },
