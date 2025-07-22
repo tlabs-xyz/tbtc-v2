@@ -246,8 +246,8 @@ contract OptimismMintableUpgradableTBTC is
     ///      - The caller must have at least `amount` tokens.
     /// @param amount The amount of token to be burned.
     function burn(uint256 amount) public virtual whenNotPaused {
-        _burn(_msgSender(), amount);
-        emit Burn(_msgSender(), amount);
+        _burn(msg.sender, amount);
+        emit Burn(msg.sender, amount);
     }
 
     /// @notice Destroys `amount` tokens from `account`, deducting from the
@@ -278,7 +278,7 @@ contract OptimismMintableUpgradableTBTC is
             legacyCapRemaining -= amount;
         }
 
-        _spendAllowance(account, _msgSender(), amount);
+        _spendAllowance(account, msg.sender, amount);
         _burn(account, amount);
         emit Burn(account, amount);
     }
