@@ -54,7 +54,6 @@ This document outlines the migration plan from the over-engineered V1.1 watchdog
 
 **Add:**
 - `SimplifiedWatchdogConsensus.sol` (~300 lines)
-- `ISimplifiedWatchdogConsensus.sol` (~150 lines)
 
 ### 2. Core Simplifications
 
