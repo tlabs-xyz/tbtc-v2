@@ -7,9 +7,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./ProtocolRegistry.sol";
 
 /// @title SimplifiedWatchdogConsensus
-/// @notice Simplified N-of-M watchdog consensus system using basic majority voting
-/// @dev Replaces the over-engineered OptimisticWatchdogConsensus with a straightforward
-///      voting mechanism. No MEV resistance, no escalating delays, no emergency overrides.
+/// @notice N-of-M watchdog consensus using majority voting
 contract SimplifiedWatchdogConsensus is AccessControl, Pausable, ReentrancyGuard {
     // =================== CONSTANTS ===================
     
