@@ -12,11 +12,7 @@ import "../vault/TBTCVault.sol";
 import "../token/TBTC.sol";
 
 /// @title OptimizedMintingPolicy
-/// @notice Gas-optimized implementation with direct integration for critical paths
-/// @dev Uses direct references for immutable core contracts (Bank, Vault, Token)
-///      and ProtocolRegistry only for upgradeable business logic (QC management).
-///      This reduces gas overhead by ~80% on registry lookups while maintaining
-///      upgrade flexibility for components that actually need it.
+/// @notice Minting policy with direct integration for core contracts
 contract OptimizedMintingPolicy is IMintingPolicy, AccessControl {
     // =================== ERRORS ===================
     

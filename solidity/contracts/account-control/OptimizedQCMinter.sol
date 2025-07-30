@@ -6,10 +6,7 @@ import "./interfaces/IMintingPolicy.sol";
 import "./ProtocolRegistry.sol";
 
 /// @title OptimizedQCMinter
-/// @notice Gas-optimized minter with hybrid direct/registry integration
-/// @dev Uses direct integration for stable policy contract and registry
-///      only for components that genuinely need upgradeability.
-///      This demonstrates the "selective registry usage" pattern.
+/// @notice QC minter with hybrid direct/registry integration
 contract OptimizedQCMinter is AccessControl {
     // =================== ERRORS ===================
     
