@@ -71,7 +71,6 @@ Execution Paths:     4 → 1    (75% reduction)
 
 ### 1. **New Smart Contracts**
 - ✅ `SimplifiedWatchdogConsensus.sol` - Core voting contract (300 lines)
-- ✅ `ISimplifiedWatchdogConsensus.sol` - Clean interface (150 lines)
 
 ### 2. **Documentation**
 - ✅ `watchdog-quorum-analysis.md` - Critical review of V1.1 over-engineering
