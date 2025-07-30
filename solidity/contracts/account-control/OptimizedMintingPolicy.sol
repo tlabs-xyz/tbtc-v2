@@ -36,21 +36,13 @@ contract OptimizedMintingPolicy is IMintingPolicy, AccessControl {
     bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
 
     // =================== DIRECT INTEGRATION ===================
-    // These contracts are immutable core protocol - no need for registry overhead
     
-    /// @notice Core Bank contract - never changes, high frequency access
     Bank public immutable bank;
-    
-    /// @notice Core TBTCVault contract - never changes, high frequency access  
     TBTCVault public immutable tbtcVault;
-    
-    /// @notice Core TBTC token - immutable by design, high frequency access
     TBTC public immutable tbtc;
 
     // =================== REGISTRY INTEGRATION ===================
-    // These contracts contain business logic that may need updates
     
-    /// @notice Protocol registry for upgradeable components only
     ProtocolRegistry public immutable protocolRegistry;
 
     // =================== EVENTS ===================
