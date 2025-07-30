@@ -11,22 +11,11 @@ import "./ProtocolRegistry.sol";
 contract SimplifiedWatchdogConsensus is AccessControl, Pausable, ReentrancyGuard {
     // =================== CONSTANTS ===================
     
-    /// @notice Role for managing watchdog set
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
-    
-    /// @notice Service key for operation executor
     bytes32 public constant OPERATION_EXECUTOR_KEY = keccak256("OPERATION_EXECUTOR");
-    
-    /// @notice Fixed challenge period for all operations
     uint32 public constant CHALLENGE_PERIOD = 2 hours;
-    
-    /// @notice Minimum number of watchdogs required
     uint8 public constant MIN_WATCHDOGS = 3;
-    
-    /// @notice Maximum number of watchdogs allowed
     uint8 public constant MAX_WATCHDOGS = 20;
-    
-    /// @notice Operation type constants
     bytes32 public constant RESERVE_ATTESTATION = keccak256("RESERVE_ATTESTATION");
     bytes32 public constant WALLET_REGISTRATION = keccak256("WALLET_REGISTRATION");
     bytes32 public constant STATUS_CHANGE = keccak256("STATUS_CHANGE");

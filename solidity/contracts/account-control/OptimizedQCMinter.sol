@@ -20,18 +20,8 @@ contract OptimizedQCMinter is AccessControl {
 
     // =================== INTEGRATION STRATEGY ===================
     
-    /// @notice Direct integration for minting policy
-    /// @dev In practice, minting policy changes infrequently enough that
-    ///      direct integration with upgrade capability is more gas-efficient
-    ///      than registry lookup on every mint operation
     IMintingPolicy public mintingPolicy;
-    
-    /// @notice Registry for truly dynamic components (if any)
-    /// @dev Kept for components that need frequent updates, but in this
-    ///      optimized version, we minimize registry usage
     ProtocolRegistry public immutable protocolRegistry;
-    
-    /// @notice Flag to track if we're using direct or registry integration
     bool public useDirectIntegration;
 
     // =================== EVENTS ===================
