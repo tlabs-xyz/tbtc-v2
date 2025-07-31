@@ -40,12 +40,14 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
 
     // =================== DIRECT INTEGRATION ===================
+    // Core protocol contracts - immutable, high-frequency access, no registry overhead
     
-    Bank public immutable bank;
-    TBTCVault public immutable tbtcVault;
-    TBTC public immutable tbtc;
+    Bank public immutable bank;            // Direct Bank integration saves ~5k gas per mint
+    TBTCVault public immutable tbtcVault;  // Direct Vault integration for minting
+    TBTC public immutable tbtc;            // Direct token contract access
 
     // =================== REGISTRY INTEGRATION ===================
+    // Business logic contracts - upgradeable, lower frequency access
     
     ProtocolRegistry public immutable protocolRegistry;
 
