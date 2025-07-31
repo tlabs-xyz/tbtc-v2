@@ -12,7 +12,15 @@ import "../vault/TBTCVault.sol";
 import "../token/TBTC.sol";
 
 /// @title BasicMintingPolicy
-/// @notice Minting policy with direct integration for core contracts
+/// @notice Direct integration implementation of IMintingPolicy
+/// @dev This policy validates QC status, reserve freshness, and capacity
+///      before directly creating Bank balances and auto-minting tBTC tokens.
+///      Implements direct Bank integration following the project's preference
+///      for simple, direct patterns.
+///
+/// Role definitions:
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
+/// - MINTER_ROLE: Can request minting of tBTC tokens (typically granted to QCMinter contract)
 contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     error InvalidQCAddress();
     error InvalidUserAddress();
