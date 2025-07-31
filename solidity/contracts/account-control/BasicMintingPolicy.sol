@@ -12,17 +12,8 @@ import "../vault/TBTCVault.sol";
 import "../token/TBTC.sol";
 
 /// @title BasicMintingPolicy
-/// @notice Direct integration implementation of IMintingPolicy
-/// @dev This policy validates QC status, reserve freshness, and capacity
-///      before directly creating Bank balances and auto-minting tBTC tokens.
-///      Implements direct Bank integration following the project's preference
-///      for simple, direct patterns.
-///
-/// Role definitions:
-/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
-/// - MINTER_ROLE: Can request minting of tBTC tokens (typically granted to QCMinter contract)
+/// @notice Minting policy with direct integration for core contracts
 contract BasicMintingPolicy is IMintingPolicy, AccessControl {
-    // Custom errors for gas-efficient reverts
     error InvalidQCAddress();
     error InvalidUserAddress();
     error InvalidAmount();
@@ -33,19 +24,21 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     error NotAuthorizedInBank();
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    uint256 public constant SATOSHI_MULTIPLIER = 1e10;
 
-    // Service keys for ProtocolRegistry
+    // Service keys for remaining registry-based lookups
     bytes32 public constant QC_MANAGER_KEY = keccak256("QC_MANAGER");
     bytes32 public constant QC_DATA_KEY = keccak256("QC_DATA");
     bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
-    bytes32 public constant QC_RESERVE_LEDGER_KEY =
-        keccak256("QC_RESERVE_LEDGER");
-    bytes32 public constant BANK_KEY = keccak256("BANK");
-    bytes32 public constant TBTC_VAULT_KEY = keccak256("TBTC_VAULT");
 
-    /// @notice Satoshi multiplier for converting tBTC to satoshis
-    uint256 public constant SATOSHI_MULTIPLIER = 1e10;
+    // =================== DIRECT INTEGRATION ===================
+    
+    Bank public immutable bank;
+    TBTCVault public immutable tbtcVault;
+    TBTC public immutable tbtc;
 
+    // =================== REGISTRY INTEGRATION ===================
+    
     ProtocolRegistry public immutable protocolRegistry;
 
     /// @dev Mapping to track mint requests
@@ -93,9 +86,22 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         uint256 timestamp
     );
 
-    constructor(address _protocolRegistry) {
-        if (_protocolRegistry == address(0)) revert InvalidQCAddress();
+    constructor(
+        address _bank,
+        address _tbtcVault,
+        address _tbtc,
+        address _protocolRegistry
+    ) {
+        require(_bank != address(0), "Invalid bank address");
+        require(_tbtcVault != address(0), "Invalid vault address");
+        require(_tbtc != address(0), "Invalid token address");
+        require(_protocolRegistry != address(0), "Invalid registry address");
+
+        bank = Bank(_bank);
+        tbtcVault = TBTCVault(_tbtcVault);
+        tbtc = TBTC(_tbtc);
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
     }
@@ -186,14 +192,8 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
             completed: false
         });
 
-        // Get Bank and Vault references
-        Bank bank = Bank(protocolRegistry.getService(BANK_KEY));
-        TBTCVault tbtcVault = TBTCVault(
-            protocolRegistry.getService(TBTC_VAULT_KEY)
-        );
-
-        // Verify this contract is authorized in Bank
-        if (!bank.authorizedBalanceIncreasers(address(this))) {
+        // Verify this contract is authorized in Bank - direct integration
+        if (!bank.isAuthorizedBalanceIncreaser(address(this))) {
             revert NotAuthorizedInBank();
         }
 
@@ -308,5 +308,23 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         );
         uint256 currentMinted = qcDataContract.getQCMintedAmount(qc);
         qcManager.updateQCMintedAmount(qc, currentMinted + amount);
+    }
+
+    /// @notice Get core contract addresses for verification
+    function getCoreContracts()
+        external
+        view
+        returns (
+            address bankAddress,
+            address vaultAddress,
+            address tokenAddress
+        )
+    {
+        return (address(bank), address(tbtcVault), address(tbtc));
+    }
+
+    /// @notice Check Bank authorization efficiently
+    function checkBankAuthorization() external view returns (bool isAuthorized) {
+        return bank.isAuthorizedBalanceIncreaser(address(this));
     }
 }

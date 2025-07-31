@@ -98,8 +98,8 @@ Execute:      200k     100k     50%
 - **Direct integration** for core contracts (Bank, Vault, Token)
 - **Registry only** for upgradeable business logic  
 - **50% reduction** in registry overhead (~$375k/year savings)
-- **OptimizedMintingPolicy.sol** - Direct Bank/Vault/Token references
-- **OptimizedQCMinter.sol** - Hybrid mode switching capability
+- **BasicMintingPolicy.sol** - Updated with direct Bank/Vault/Token references
+- **QCMinter.sol** - Updated with hybrid mode switching capability
 
 ## 💡 Key Learnings
 
