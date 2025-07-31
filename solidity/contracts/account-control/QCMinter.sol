@@ -6,7 +6,15 @@ import "./interfaces/IMintingPolicy.sol";
 import "./ProtocolRegistry.sol";
 
 /// @title QCMinter
-/// @notice QC minter with hybrid direct/registry integration
+/// @notice Stable entry point for tBTC minting with Policy delegation
+/// @dev Acts as a focused contract that delegates core validation and minting
+///      logic to a pluggable "Minting Policy" contract, allowing minting rules
+///      to be upgraded without changing the core minter contract.
+///      Supports both direct and registry-based policy integration.
+///
+/// Role definitions:
+/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
+/// - MINTER_ROLE: Can request QC mints
 contract QCMinter is AccessControl {
     error InvalidQCAddress();
     error InvalidAmount();

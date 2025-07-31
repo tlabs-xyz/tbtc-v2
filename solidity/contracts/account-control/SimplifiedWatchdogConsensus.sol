@@ -8,6 +8,9 @@ import "./ProtocolRegistry.sol";
 
 /// @title SimplifiedWatchdogConsensus
 /// @notice N-of-M watchdog consensus using majority voting
+/// @dev Simplified consensus system that replaces over-engineered V1.1 implementation.
+///      Key features: fixed 2-hour challenge period, simple majority voting (N/2+1),
+///      single execution path, no MEV resistance or escalating delays.
 contract SimplifiedWatchdogConsensus is AccessControl, Pausable, ReentrancyGuard {
     // =================== CONSTANTS ===================
     
@@ -280,6 +283,8 @@ contract SimplifiedWatchdogConsensus is AccessControl, Pausable, ReentrancyGuard
     // =================== VIEW FUNCTIONS ===================
     
     /// @notice Get the required number of votes (simple majority)
+    /// @dev Calculates N/2 + 1 where N is active watchdog count.
+    ///      Examples: 3 watchdogs → 2 votes, 5 watchdogs → 3 votes, 7 watchdogs → 4 votes
     /// @return votes Required number of votes
     function getRequiredVotes() public view returns (uint256 votes) {
         return (activeWatchdogs.length / 2) + 1;
