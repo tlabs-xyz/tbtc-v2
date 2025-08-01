@@ -3,8 +3,8 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "./interfaces/IQCManager.sol";
-import "./interfaces/IQCRedeemer.sol";
+import "./QCManager.sol";
+import "./QCRedeemer.sol";
 import "./QCData.sol";
 
 /// @title WatchdogConsensusManager
@@ -48,8 +48,8 @@ contract WatchdogConsensusManager is AccessControl, ReentrancyGuard {
     uint256 public proposalCount;
     
     // External contracts
-    IQCManager public qcManager;
-    IQCRedeemer public qcRedeemer;
+    QCManager public qcManager;
+    QCRedeemer public qcRedeemer;
     QCData public qcData;
     
     // Events
@@ -102,8 +102,8 @@ contract WatchdogConsensusManager is AccessControl, ReentrancyGuard {
         address _qcRedeemer,
         address _qcData
     ) {
-        qcManager = IQCManager(_qcManager);
-        qcRedeemer = IQCRedeemer(_qcRedeemer);
+        qcManager = QCManager(_qcManager);
+        qcRedeemer = QCRedeemer(_qcRedeemer);
         qcData = QCData(_qcData);
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);

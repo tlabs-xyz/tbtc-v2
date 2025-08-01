@@ -752,4 +752,214 @@ describe("Account Control System - Integration Test", () => {
       expect(deployerBalance).to.equal(ethers.utils.parseEther("1"))
     })
   })
+
+  describe("Watchdog Consensus Integration", () => {
+    let watchdogConsensusManager: any
+    let watchdogMonitor: any
+    let watchdog1: SignerWithAddress
+    let watchdog2: SignerWithAddress
+    let watchdog3: SignerWithAddress
+
+    before(async () => {
+      // Get additional signers for watchdogs
+      ;[, , , , , watchdog1, watchdog2, watchdog3] = await ethers.getSigners()
+
+      // Deploy WatchdogConsensusManager
+      const WatchdogConsensusManager = await ethers.getContractFactory("WatchdogConsensusManager")
+      watchdogConsensusManager = await WatchdogConsensusManager.deploy(
+        qcManager.address,
+        qcRedeemer.address,
+        qcData.address
+      )
+      await watchdogConsensusManager.deployed()
+
+      // Deploy WatchdogMonitor
+      const WatchdogMonitor = await ethers.getContractFactory("WatchdogMonitor")  
+      watchdogMonitor = await WatchdogMonitor.deploy(
+        watchdogConsensusManager.address,
+        qcData.address
+      )
+      await watchdogMonitor.deployed()
+
+      // Grant roles
+      const WATCHDOG_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("WATCHDOG_ROLE"))
+      const MANAGER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MANAGER_ROLE"))
+      const ARBITER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ARBITER_ROLE"))
+
+      await watchdogConsensusManager.grantRole(MANAGER_ROLE, governance.address)
+      await watchdogConsensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog1.address)
+      await watchdogConsensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog2.address)
+      await watchdogConsensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog3.address)
+
+      // Grant ARBITER_ROLE to consensus manager in QCManager
+      await qcManager.grantRole(ARBITER_ROLE, watchdogConsensusManager.address)
+    })
+
+    it("should handle complete QC status change flow via consensus", async () => {
+      // Ensure QC is registered and active
+      const isRegistered = await qcData.isQCRegistered(qcAddress.address)
+      if (!isRegistered) {
+        await qcManager
+          .connect(governance)
+          .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+      }
+
+      // Verify QC is initially active
+      const initialStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(initialStatus).to.equal(0) // Active
+
+      // Watchdog1 proposes status change to UnderReview
+      const reason = "Detected suspicious activity in reserve attestations"
+      const newStatus = 1 // UnderReview
+      
+      const proposalTx = await watchdogConsensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress.address, newStatus, reason)
+      const proposalReceipt = await proposalTx.wait()
+      const proposalId = proposalReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Verify proposal exists but not executed yet (only 1 vote, need 2)
+      let proposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(proposal.executed).to.equal(false)
+      expect(proposal.voteCount).to.equal(1)
+
+      // QC should still be active
+      let currentStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(currentStatus).to.equal(0) // Still Active
+
+      // Watchdog2 votes - should trigger execution (reaches 2-of-5 threshold)
+      const voteTx = await watchdogConsensusManager.connect(watchdog2).vote(proposalId) 
+      const voteReceipt = await voteTx.wait()
+      
+      // Should have execution event
+      const executionEvent = voteReceipt.events?.find(e => e.event === 'ProposalExecuted')
+      expect(executionEvent).to.not.be.undefined
+
+      // Verify proposal is now executed
+      proposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(proposal.executed).to.equal(true)
+      expect(proposal.voteCount).to.equal(2)
+
+      // Verify QC status was actually changed
+      currentStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(currentStatus).to.equal(1) // UnderReview
+
+      // Verify minting is now blocked due to status change
+      await expect(
+        qcMinter.connect(qcAddress).requestQCMint(qcAddress.address, ethers.utils.parseEther("10"))
+      ).to.be.reverted // Should fail because QC is UnderReview
+    })
+
+    it("should handle wallet deregistration consensus flow", async () => {
+      // Ensure QC has a registered wallet first
+      const btcAddress = "bc1qintegrationtestwallet" 
+      
+      // For test purposes, assume wallet is already registered
+      // In real scenario, this would have been done via SPV proof
+      
+      // Watchdog1 proposes wallet deregistration due to security concern
+      const reason = "Wallet appears to be compromised based on transaction patterns"
+      
+      const proposalTx = await watchdogConsensusManager
+        .connect(watchdog1)
+        .proposeWalletDeregistration(qcAddress.address, btcAddress, reason)
+      const proposalReceipt = await proposalTx.wait()
+      const proposalId = proposalReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Verify proposal type and initial state
+      const proposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(proposal.proposalType).to.equal(1) // WALLET_DEREGISTRATION
+      expect(proposal.executed).to.equal(false)
+      expect(proposal.voteCount).to.equal(1)
+
+      // Watchdog2 and Watchdog3 vote (should reach 2-vote threshold and execute)
+      await watchdogConsensusManager.connect(watchdog2).vote(proposalId)
+      
+      // Verify execution occurred
+      const finalProposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(finalProposal.executed).to.equal(true)
+      expect(finalProposal.voteCount).to.equal(2)
+    })
+
+    it("should demonstrate complete emergency response workflow", async () => {
+      // Scenario: Multiple watchdogs detect QC issues and coordinate response
+      
+      // Step 1: First watchdog detects issue and proposes status change
+      const emergencyReason = "URGENT: QC reserves appear to be moved to unknown addresses"
+      
+      const statusProposalTx = await watchdogConsensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress.address, 2, emergencyReason) // 2 = Revoked
+      const statusReceipt = await statusProposalTx.wait()
+      const statusProposalId = statusReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Step 2: Second watchdog confirms the issue and votes
+      await watchdogConsensusManager.connect(watchdog2).vote(statusProposalId)
+
+      // Step 3: Verify QC is now revoked
+      const finalStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(finalStatus).to.equal(2) // Revoked
+
+      // Step 4: Verify all QC operations are now blocked
+      await expect(
+        qcMinter.connect(qcAddress).requestQCMint(qcAddress.address, ethers.utils.parseEther("1"))
+      ).to.be.reverted // Should fail because QC is Revoked
+
+      // Step 5: Demonstrate that consensus can handle concurrent proposals
+      const redemptionId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("emergency-redemption-123"))
+      const defaultReason = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_REVOKED"))
+      
+      const redemptionProposalTx = await watchdogConsensusManager
+        .connect(watchdog3)
+        .proposeRedemptionDefault(redemptionId, defaultReason, "QC revoked, defaulting pending redemptions")
+      const redemptionReceipt = await redemptionProposalTx.wait()
+      const redemptionProposalId = redemptionReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Another watchdog votes to execute redemption defaults
+      await watchdogConsensusManager.connect(watchdog1).vote(redemptionProposalId)
+
+      // Verify both emergency proposals were executed
+      const statusProposal = await watchdogConsensusManager.getProposal(statusProposalId)
+      const redemptionProposal = await watchdogConsensusManager.getProposal(redemptionProposalId)
+      
+      expect(statusProposal.executed).to.equal(true)
+      expect(redemptionProposal.executed).to.equal(true)
+    })
+
+    it("should demonstrate M-of-N parameter adjustment and impact", async () => {
+      // Start with default 2-of-5, change to 3-of-5 for higher security
+      await watchdogConsensusManager.connect(governance).updateConsensusParams(3, 5)
+
+      // Verify parameters updated
+      const params = await watchdogConsensusManager.getConsensusParams()
+      expect(params.required).to.equal(3)
+      expect(params.total).to.equal(5)
+
+      // Test that proposals now require 3 votes
+      const testReason = "Testing 3-of-5 consensus requirement"
+      const proposalTx = await watchdogConsensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress.address, 0, testReason) // Back to Active
+      const proposalReceipt = await proposalTx.wait()
+      const proposalId = proposalReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Two votes should not be enough (1 from proposer + 1 additional = 2 < 3)
+      await watchdogConsensusManager.connect(watchdog2).vote(proposalId)
+      
+      let proposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(proposal.executed).to.equal(false)
+      expect(proposal.voteCount).to.equal(2)
+
+      // Third vote should trigger execution
+      await watchdogConsensusManager.connect(watchdog3).vote(proposalId)
+      
+      proposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(proposal.executed).to.equal(true)
+      expect(proposal.voteCount).to.equal(3)
+
+      // Verify QC status was changed back to Active
+      const finalStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(finalStatus).to.equal(0) // Active again
+    })
+  })
 })
