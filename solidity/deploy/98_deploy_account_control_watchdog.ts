@@ -8,29 +8,40 @@ const func: DeployFunction = async function DeployAccountControlWatchdog(
   const { deployer } = await getNamedAccounts()
   const { deploy, log, get } = deployments
 
-  log("Deploying Account Control Watchdog Consensus...")
+  log("Deploying Account Control Watchdog System...")
 
-  // Phase 4: Watchdog Consensus System
-  log("Phase 4: Deploying Watchdog Consensus System")
+  // Phase 4: Watchdog System
+  log("Phase 4: Deploying Watchdog System")
 
-  const protocolRegistry = await get("ProtocolRegistry")
+  const qcManager = await get("QCManager")
+  const qcRedeemer = await get("QCRedeemer")
+  const qcData = await get("QCData")
 
-  // Deploy WatchdogConsensus - Core N-of-M consensus mechanism
-  const watchdogConsensus = await deploy("WatchdogConsensus", {
+  // Deploy WatchdogConsensusManager - M-of-N consensus for critical operations
+  const watchdogConsensusManager = await deploy("WatchdogConsensusManager", {
     from: deployer,
-    args: [protocolRegistry.address],
+    args: [qcManager.address, qcRedeemer.address, qcData.address],
     log: true,
     waitConfirmations: helpers.network?.confirmations || 1,
   })
 
-  log("Phase 4 completed: Watchdog Consensus System deployed")
-  log(`WatchdogConsensus: ${watchdogConsensus.address}`)
+  // Deploy WatchdogMonitor - Coordinates multiple SingleWatchdog instances
+  const watchdogMonitor = await deploy("WatchdogMonitor", {
+    from: deployer,
+    args: [watchdogConsensusManager.address, qcData.address],
+    log: true,
+    waitConfirmations: helpers.network?.confirmations || 1,
+  })
+
+  log("Phase 4 completed: Watchdog System deployed")
+  log(`WatchdogConsensusManager: ${watchdogConsensusManager.address}`)
+  log(`WatchdogMonitor: ${watchdogMonitor.address}`)
   log("")
   log("Features:")
-  log("- Simple majority voting (N/2+1)")
-  log("- Fixed 2-hour challenge period")
-  log("- Single execution path")
-  log("- Clean architecture with no unnecessary complexity")
+  log("- Configurable M-of-N consensus (default: 2-of-5)")
+  log("- Multiple independent SingleWatchdog instances")
+  log("- Emergency pause with 3-report threshold")
+  log("- Clean separation of monitoring vs consensus")
 }
 
 export default func
