@@ -352,9 +352,10 @@ Wallet management is hardened with mandatory, on-chain cryptographic
 verification for critical actions.
 
 1. **Registration (SPV-Verified):** A QC proves control of a BTC address via an
-   `OP_RETURN` transaction. In practice, QCs submit registration requests through
-   a watchdog's authenticated REST API rather than watchdogs monitoring Bitcoin
-   independently. The selected watchdog then calls `registerWallet` with an SPV 
+   `OP_RETURN` transaction on Bitcoin. After sending the transaction, the QC
+   submits a registration request through a watchdog's authenticated REST API.
+   The watchdog independently verifies the Bitcoin transaction, cross-checks the
+   information provided by the QC, and then calls `registerWallet` with an SPV 
    proof, which `QCManager` verifies against the on-chain BTC light client.
 2. **De-registration (Hardened On-Chain Flow):** A two-step process to prevent
    race conditions.
@@ -378,9 +379,10 @@ sequenceDiagram
     QC->>Watchdog: 1. Signal intent to register btcAddress (off-chain)
     Watchdog-->>QC: Provides challenge hash (off-chain)
     QC->>BTCNet: 2. Create BTC Tx from btcAddress with OP_RETURN challenge
-    QC->>Watchdog: Submits registration request via REST API with SPV proof
-    Watchdog->>Manager: 3. registerWallet(qc, btcAddress, spvProof)
-    Manager->>BTCClient: 4. verifyOpReturn(spvProof, challenge)
+    QC->>Watchdog: 3. Submits registration request via REST API
+    Watchdog->>BTCNet: 4. Independently verifies BTC transaction
+    Watchdog->>Manager: 5. registerWallet(qc, btcAddress, spvProof)
+    Manager->>BTCClient: 6. verifyOpReturn(spvProof, challenge)
     BTCClient-->>Manager: Returns true
     Manager->>Manager: Adds wallet to QC's pool
 
