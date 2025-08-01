@@ -24,7 +24,8 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const qcReserveLedger = await get("QCReserveLedger")
   const basicMintingPolicy = await get("BasicMintingPolicy")
   const basicRedemptionPolicy = await get("BasicRedemptionPolicy")
-  const watchdogConsensus = await get("WatchdogConsensus")
+  const watchdogConsensusManager = await get("WatchdogConsensusManager")
+  const watchdogMonitor = await get("WatchdogMonitor")
   const tbtc = await get("TBTC")
 
   // Generate service keys (same as in contracts)
@@ -37,9 +38,9 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const QC_MINTER_KEY = ethers.utils.id("QC_MINTER")
   const QC_REDEEMER_KEY = ethers.utils.id("QC_REDEEMER")
   const TBTC_TOKEN_KEY = ethers.utils.id("TBTC_TOKEN")
-  // Watchdog Consensus System keys
-  const WATCHDOG_CONSENSUS_KEY = ethers.utils.id("WATCHDOG_CONSENSUS")
-  const OPERATION_EXECUTOR_KEY = ethers.utils.id("OPERATION_EXECUTOR")
+  // Watchdog System keys
+  const WATCHDOG_CONSENSUS_MANAGER_KEY = ethers.utils.id("WATCHDOG_CONSENSUS_MANAGER")
+  const WATCHDOG_MONITOR_KEY = ethers.utils.id("WATCHDOG_MONITOR")
 
   log("Step 1: Registering all services in ProtocolRegistry...")
 
@@ -116,22 +117,21 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     tbtc.address
   )
 
-  // Register Watchdog Consensus System services
+  // Register Watchdog System services
   await execute(
     "ProtocolRegistry",
     { from: deployer, log: true },
     "setService",
-    WATCHDOG_CONSENSUS_KEY,
-    watchdogConsensus.address
+    WATCHDOG_CONSENSUS_MANAGER_KEY,
+    watchdogConsensusManager.address
   )
 
-  // WatchdogConsensus acts as its own operation executor
   await execute(
     "ProtocolRegistry",
     { from: deployer, log: true },
     "setService",
-    OPERATION_EXECUTOR_KEY,
-    watchdogConsensus.address
+    WATCHDOG_MONITOR_KEY,
+    watchdogMonitor.address
   )
 
   log("Step 2: Configuring access control roles...")
@@ -190,85 +190,95 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     qcRedeemer.address
   )
 
-  log("Step 3: Setting up Watchdog Consensus System roles...")
+  log("Step 3: Setting up Watchdog System roles...")
 
-  // Grant roles to WatchdogConsensus in other contracts
-  // Grant ATTESTER_ROLE to WatchdogConsensus in QCReserveLedger
-  const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
-  await execute(
-    "QCReserveLedger",
-    { from: deployer, log: true },
-    "grantRole",
-    ATTESTER_ROLE,
-    watchdogConsensus.address
-  )
-
-  // Grant REGISTRAR_ROLE to WatchdogConsensus in QCManager
-  const REGISTRAR_ROLE = ethers.utils.id("REGISTRAR_ROLE")
-  await execute(
-    "QCManager",
-    { from: deployer, log: true },
-    "grantRole",
-    REGISTRAR_ROLE,
-    watchdogConsensus.address
-  )
-
-  // Grant ARBITER_ROLE to WatchdogConsensus in QCManager
+  // Grant ARBITER_ROLE to WatchdogConsensusManager in QCManager (for status changes)
   const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
   await execute(
     "QCManager",
     { from: deployer, log: true },
     "grantRole",
     ARBITER_ROLE,
-    watchdogConsensus.address
+    watchdogConsensusManager.address
   )
 
-  // Grant ARBITER_ROLE to WatchdogConsensus in QCRedeemer
+  // Grant ARBITER_ROLE to WatchdogConsensusManager in QCRedeemer (for redemption defaults)
   await execute(
     "QCRedeemer",
     { from: deployer, log: true },
     "grantRole",
     ARBITER_ROLE,
-    watchdogConsensus.address
+    watchdogConsensusManager.address
   )
 
-  // Configure consensus system roles
+  // Configure watchdog system roles
   const MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")
+  const WATCHDOG_OPERATOR_ROLE = ethers.utils.id("WATCHDOG_OPERATOR_ROLE")
 
-  // Grant manager role to deployer (should be transferred to governance later)
+  // Grant manager roles to deployer (should be transferred to governance later)
   await execute(
-    "WatchdogConsensus",
+    "WatchdogConsensusManager",
     { from: deployer, log: true },
     "grantRole",
     MANAGER_ROLE,
     deployer
   )
 
-  log("Step 3.1: Setting up initial watchdog set...")
-  
-  // Add initial watchdogs to the consensus system
-  // These should be replaced with actual watchdog addresses in production
-  const { governance } = await getNamedAccounts()
-  
-  // Add deployer as initial watchdog for testing (remove in production)
   await execute(
-    "WatchdogConsensus",
+    "WatchdogMonitor",
     { from: deployer, log: true },
-    "addWatchdog",
+    "grantRole",
+    MANAGER_ROLE,
     deployer
   )
 
-  // Add governance as initial watchdog if different from deployer
+  log("Step 3: Configuring governance roles...")
+  
+  // Get governance account
+  const { governance } = await getNamedAccounts()
+  
+  // Grant QC_GOVERNANCE_ROLE to governance for QC registration
+  const QC_GOVERNANCE_ROLE = ethers.utils.id("QC_GOVERNANCE_ROLE")
+  if (governance && governance !== deployer) {
+    log(`Granting QC_GOVERNANCE_ROLE to governance: ${governance}`)
+    await execute(
+      "QCManager",
+      { from: deployer, log: true },
+      "grantRole",
+      QC_GOVERNANCE_ROLE,
+      governance
+    )
+  } else {
+    log("Warning: No separate governance account configured. QC_GOVERNANCE_ROLE remains with deployer.")
+    log("Remember to transfer this role to DAO governance before production!")
+  }
+  
+  log("Step 3.1: Setting up initial watchdog operators...")
+  
+  // Grant WATCHDOG_OPERATOR_ROLE to initial operators for testing
+  // These should be replaced with actual watchdog operator addresses in production
+  
+  // Add deployer as initial watchdog operator for testing (remove in production)
+  await execute(
+    "WatchdogMonitor",
+    { from: deployer, log: true },
+    "grantRole",
+    WATCHDOG_OPERATOR_ROLE,
+    deployer
+  )
+
+  // Add governance as initial watchdog operator if different from deployer
   if (governance && governance !== deployer) {
     await execute(
-      "WatchdogConsensus",
+      "WatchdogMonitor",
       { from: deployer, log: true },
-      "addWatchdog",
+      "grantRole",
+      WATCHDOG_OPERATOR_ROLE,
       governance
     )
   }
 
-  log("⚠️  Initial watchdog set configured for testing. Update with production watchdogs before mainnet deployment!")
+  log("⚠️  Initial watchdog operators configured for testing. Deploy SingleWatchdog instances and register them in WatchdogMonitor before production!")
 
   log("Step 4: Configuring system parameters...")
 
@@ -278,20 +288,28 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
   log("Step 5: Verifying system configuration...")
 
-  // Verify WatchdogConsensus state
-  const consensusContract = await ethers.getContractAt(
-    "WatchdogConsensus",
-    watchdogConsensus.address
+  // Verify WatchdogConsensusManager state
+  const consensusManagerContract = await ethers.getContractAt(
+    "WatchdogConsensusManager",
+    watchdogConsensusManager.address
   )
-  const activeWatchdogCount = await consensusContract.getActiveWatchdogCount()
-  const activeWatchdogs = await consensusContract.getActiveWatchdogs()
-  const requiredVotes = await consensusContract.getRequiredVotes()
+  const consensusParams = await consensusManagerContract.getConsensusParams()
+  
+  // Verify WatchdogMonitor state
+  const monitorContract = await ethers.getContractAt(
+    "WatchdogMonitor",
+    watchdogMonitor.address
+  )
+  const activeWatchdogCount = await monitorContract.getActiveWatchdogCount()
 
-  log(`✅ WatchdogConsensus state:`)
-  log(`   - Active watchdogs: ${activeWatchdogCount}`)
-  log(`   - Required votes: ${requiredVotes}`)
-  log(`   - Challenge period: 2 hours (fixed)`)
-  log(`   - Watchdog addresses: ${activeWatchdogs.join(", ")}`)
+  log(`✅ WatchdogConsensusManager state:`)
+  log(`   - Required votes (M): ${consensusParams.required}`)
+  log(`   - Total watchdogs (N): ${consensusParams.total}`)
+  log(`   - Voting period: ${consensusParams.period / 3600} hours`)
+  
+  log(`✅ WatchdogMonitor state:`)
+  log(`   - Active watchdog instances: ${activeWatchdogCount}`)
+  log(`   - Emergency threshold: 3 critical reports`)
 
   log("Phase 5 completed: Account Control system fully configured")
   log("")
@@ -306,21 +324,56 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log(`BasicMintingPolicy: ${basicMintingPolicy.address}`)
   log(`BasicRedemptionPolicy: ${basicRedemptionPolicy.address}`)
   log("")
-  log("=== WATCHDOG CONSENSUS SYSTEM ===")
-  log(`WatchdogConsensus: ${watchdogConsensus.address}`)
+  log("=== WATCHDOG SYSTEM ===")
+  log(`WatchdogConsensusManager: ${watchdogConsensusManager.address}`)
+  log(`WatchdogMonitor: ${watchdogMonitor.address}`)
   log("")
   log("System is ready for:")
   log("1. QC registration via QCManager")
   log("2. Policy upgrades via ProtocolRegistry")
-  log("3. Watchdog consensus operations")
-  log("4. Integration with existing tBTC v2")
+  log("3. Multiple independent watchdog deployment")
+  log("4. M-of-N consensus for critical operations")
+  log("5. Emergency monitoring and automatic pause")
+  log("6. Integration with existing tBTC v2")
   log("")
   log("Features:")
-  log("- Simple majority voting (N/2+1)")
-  log("- Fixed 2-hour challenge period")
-  log("- Single execution path")
-  log("- Clean, auditable architecture")
-  log("- No unnecessary complexity")
+  log("- Configurable M-of-N consensus (default: 2-of-5)")
+  log("- Independent SingleWatchdog instances")
+  log("- Emergency pause with 3-report threshold")
+  log("- Clean separation of monitoring vs consensus")
+  log("- Minimal complexity, maximum security")
+  log("")
+  log("=== IMPORTANT: PRODUCTION DEPLOYMENT STEPS ===")
+  log("After deployment, the following role transfers MUST be performed:")
+  log("")
+  log("1. Transfer QC_GOVERNANCE_ROLE in QCManager:")
+  log("   - Current: deployer (or governance if configured)")
+  log("   - Transfer to: DAO governance contract")
+  log("   - Purpose: Allows DAO to register new QCs")
+  log("")
+  log("2. Transfer DEFAULT_ADMIN_ROLE in all contracts to governance:")
+  log("   - QCManager, QCData, QCReserveLedger, QCRedeemer")
+  log("   - SystemState, BasicMintingPolicy, BasicRedemptionPolicy")
+  log("   - WatchdogConsensusManager, WatchdogMonitor, ProtocolRegistry")
+  log("")
+  log("3. Transfer PAUSER_ROLE in SystemState:")
+  log("   - Current: deployer")
+  log("   - Transfer to: Emergency multisig or DAO")
+  log("")
+  log("4. Deploy and register production SingleWatchdog instances:")
+  log("   - Deploy SingleWatchdog for each watchdog operator")
+  log("   - Register each instance via WatchdogMonitor.registerWatchdog()")
+  log("   - Grant WATCHDOG_ROLE to operators in WatchdogConsensusManager")
+  log("   - Remove test operators (deployer)")
+  log("")
+  log("5. Configure consensus parameters:")
+  log("   - Adjust M and N values based on deployed watchdog count")
+  log("   - Use WatchdogConsensusManager.updateConsensusParams()")
+  log("")
+  log("6. Grant MINTER_ROLE in QCMinter to registered QCs")
+  log("")
+  log("Remember: Until these transfers are complete, the system is NOT")
+  log("under DAO control and should NOT be used in production!")
 }
 
 export default func

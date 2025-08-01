@@ -7,6 +7,8 @@ import type { FakeContract } from "@defi-wonderland/smock"
 
 const { loadFixture } = waffle
 
+// TODO: This test file needs significant updates to work with the new WatchdogConsensusManager/WatchdogMonitor architecture
+// Many test cases reference the old OptimisticWatchdogConsensus and WatchdogAdapter contracts
 describe("V1.1 Security Tests", () => {
   let deployer: SignerWithAddress
   let governance: SignerWithAddress
@@ -17,16 +19,17 @@ describe("V1.1 Security Tests", () => {
   let watchdog5: SignerWithAddress
   let attacker: SignerWithAddress
 
-  let consensus: Contract
-  let adapter: Contract
-  let protocolRegistry: FakeContract<Contract>
-  let operationExecutor: FakeContract<Contract>
+  let consensusManager: Contract
+  let watchdogMonitor: Contract
+  let qcManager: FakeContract<Contract>
+  let qcRedeemer: FakeContract<Contract>
+  let qcData: FakeContract<Contract>
 
-  // Operation type constants
-  const RESERVE_ATTESTATION = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("RESERVE_ATTESTATION"))
-  const WALLET_REGISTRATION = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("WALLET_REGISTRATION"))
-  const STATUS_CHANGE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("STATUS_CHANGE"))
-  const REDEMPTION_FULFILLMENT = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("REDEMPTION_FULFILLMENT"))
+  // Proposal type constants (matches WatchdogConsensusManager.sol)
+  const STATUS_CHANGE = 0
+  const WALLET_DEREGISTRATION = 1
+  const REDEMPTION_DEFAULT = 2
+  const FORCE_INTERVENTION = 3
 
   // Role constants
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
@@ -52,15 +55,24 @@ describe("V1.1 Security Tests", () => {
     // Set up protocol registry
     protocolRegistry.getService.whenCalledWith(OPERATION_EXECUTOR_KEY).returns(operationExecutor.address)
 
-    // Deploy OptimisticWatchdogConsensus
-    const OptimisticWatchdogConsensus = await ethers.getContractFactory("OptimisticWatchdogConsensus")
-    consensus = await OptimisticWatchdogConsensus.deploy(protocolRegistry.address)
-    await consensus.deployed()
+    // Deploy mock QC contracts for WatchdogConsensusManager
+    qcManager = await smock.fake("QCManager")
+    qcRedeemer = await smock.fake("QCRedeemer")
+    qcData = await smock.fake("QCData")
 
-    // Deploy WatchdogAdapter
-    const WatchdogAdapter = await ethers.getContractFactory("WatchdogAdapter")
-    adapter = await WatchdogAdapter.deploy(protocolRegistry.address, consensus.address)
-    await adapter.deployed()
+    // Deploy WatchdogConsensusManager
+    const WatchdogConsensusManager = await ethers.getContractFactory("WatchdogConsensusManager")
+    consensusManager = await WatchdogConsensusManager.deploy(
+      qcManager.address,
+      qcRedeemer.address,
+      qcData.address
+    )
+    await consensusManager.deployed()
+
+    // Deploy WatchdogMonitor
+    const WatchdogMonitor = await ethers.getContractFactory("WatchdogMonitor")
+    watchdogMonitor = await WatchdogMonitor.deploy(consensusManager.address, qcData.address)
+    await watchdogMonitor.deployed()
 
     // Setup roles
     await consensus.grantRole(DEFAULT_ADMIN_ROLE, governance.address)
