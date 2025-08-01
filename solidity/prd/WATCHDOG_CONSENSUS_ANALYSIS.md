@@ -86,13 +86,13 @@ Execute:      200k     100k     50%
 ## 🏗️ Implementation Details
 
 ### New Contracts
-- **SimplifiedWatchdogConsensus.sol** (300 lines) - Core voting logic
+- **WatchdogConsensus.sol** (300 lines) - Core voting logic
 - **Comprehensive test suite** with gas benchmarks
 
 ### Removed Contracts
 - **OptimisticWatchdogConsensus.sol** (669 lines) - Over-engineered consensus
 - **WatchdogAdapter.sol** (673 lines) - Unnecessary compatibility layer
-- **ISimplifiedWatchdogConsensus.sol** - Unused interface (YAGNI)
+- **Unused interfaces** - YAGNI principle applied
 
 ### Protocol Registry Optimization
 - **Direct integration** for core contracts (Bank, Vault, Token)
