@@ -50,9 +50,9 @@ The Account Control architecture is built on four core principles:
                     │         V1.1 Watchdog Quorum System          │
                     │                                             │
                     │  ┌─────────────────────┐ ┌─────────────────┐ │
-                    │  │OptimisticWatchdog   │ │  WatchdogAdapter │ │
-                    │  │     Consensus       │ │  (Compatibility) │ │
-                    │  │ (N-of-M Quorum)     │ │                 │ │
+                    │  │WatchdogConsensus    │ │   WatchdogMonitor   │ │
+                    │  │     Manager         │ │   (Emergency        │ │
+                    │  │ (M-of-N Voting)     │ │    Coordination)    │ │
                     │  └─────────────────────┘ └─────────────────┘ │
                     │            │                       │        │
                     │            └───────────────────────┘        │
@@ -164,38 +164,37 @@ direct BasicMintingPolicy integration while maintaining backward compatibility.
 
 ### 2.9 V1.1 Watchdog Quorum Architecture
 
-**CORE COMPONENT**: The V1.1 system implements an optimistic N-of-M watchdog quorum
+**CORE COMPONENT**: The V1.1 system implements a configurable M-of-N watchdog consensus
 that provides Byzantine fault tolerance while maintaining gas efficiency through
-proven optimistic execution patterns.
+direct voting mechanisms and emergency response capabilities.
 
-#### 2.9.1 OptimisticWatchdogConsensus.sol
+#### 2.9.1 WatchdogConsensusManager.sol
 
-**Primary Component**: Implements the core consensus mechanism with the following features:
+**Primary Component**: Implements configurable M-of-N voting for critical operations:
 
-- **MEV-Resistant Validator Selection**: Uses blockhash-based randomness for primary validator selection
-- **Optimistic Execution**: Primary validators submit operations that execute after challenge periods
-- **Escalating Consensus**: Progressive delays (1h→4h→12h→24h) based on objection count
-- **Approval Mechanism**: Explicit approvals required for highly disputed operations (≥3 objections)
-- **Emergency Override**: Governance can execute operations immediately in extreme scenarios
+- **Configurable Consensus**: M-of-N voting with default 2-of-5 configuration
+- **Proposal-Based System**: Structured voting on specific operation types
+- **Time-Limited Voting**: 2-hour voting periods with cleanup mechanisms
+- **Four Operation Types**: Status changes, wallet deregistration, redemption defaults, force intervention
+- **Byzantine Fault Tolerance**: Minimum consensus requirements with safety bounds
 
 ```solidity
-// Core consensus structure
-struct WatchdogOperation {
-    bytes32 operationType;      // ATTESTATION, REGISTRATION, STATUS_CHANGE, REDEMPTION
-    bytes operationData;        // Encoded operation parameters
-    address primaryValidator;   // Selected primary validator
-    uint64 submittedAt;        // Submission timestamp
-    uint64 finalizedAt;        // Execution timestamp
-    uint8 objectionCount;      // Number of challenges
+// Core proposal structure
+struct Proposal {
+    ProposalType proposalType;  // STATUS_CHANGE, WALLET_DEREGISTRATION, etc.
+    bytes data;                // Encoded operation parameters
+    address proposer;          // Proposing watchdog
+    uint256 voteCount;         // Current vote count
+    uint256 timestamp;         // Proposal timestamp
     bool executed;             // Execution status
-    bool challenged;           // Challenge status
+    string reason;             // Human-readable reason
 }
 ```
 
-#### 2.9.2 WatchdogAdapter.sol
+#### 2.9.2 WatchdogMonitor.sol
 
-**Compatibility Component**: Provides backward compatibility with the SingleWatchdog interface
-while routing operations through the consensus system:
+**Emergency Coordination Component**: Coordinates multiple SingleWatchdog instances
+and provides emergency circuit breaker functionality:
 
 - **Dual Execution Path**: Consensus routing for active watchdogs, direct execution for operators
 - **Event Compatibility**: Maintains all SingleWatchdog events for monitoring systems
@@ -248,11 +247,11 @@ gas efficiency through optimistic execution patterns.
 
 - **Key Functions & Responsibilities:**
   - **Decentralized Quorum:** Multiple DAO-appointed watchdogs form an N-of-M consensus system
-  - **Optimistic Execution:** Primary validator submits operations optimistically with challenge periods
-  - **Progressive Consensus:** Escalating delays and approval thresholds based on objection levels
-  - **MEV-Resistant Selection:** Primary validator selection using blockhash-based randomness
+  - **M-of-N Consensus:** Configurable voting thresholds with default 2-of-5 configuration
+  - **Proposal-Based Operations:** Structured voting system for critical interventions
+  - **Time-Limited Voting:** 2-hour voting windows with automatic cleanup
   - **Proof-of-Reserves Attestation:** Continuously monitors all registered QC
-    Bitcoin addresses through distributed consensus on `OptimisticWatchdogConsensus.sol`
+    Bitcoin addresses through M-of-N consensus on `WatchdogConsensusManager.sol`
   - **Delinquency Arbitration:** Acts as the trusted on-chain arbiter for
     redemption failures. It monitors pending redemptions, investigates timeouts,
     and calls `recordRedemptionFulfillment` or `flagDefaultedRedemption` on
