@@ -10,12 +10,12 @@ import "./QCRedeemer.sol";
 import "./interfaces/ISPVValidator.sol";
 import "../bridge/BitcoinTx.sol";
 
-/// @title SingleWatchdog
-/// @dev Proxy contract implementing the single Watchdog model for tBTC v2.
+/// @title QCWatchdog
+/// @dev Proxy contract implementing the watchdog model for QC operations in tBTC v2.
 ///
 /// This contract acts as a proxy that consolidates multiple system roles under
 /// a single WATCHDOG_OPERATOR_ROLE for operational efficiency. While all functions
-/// in this contract require WATCHDOG_OPERATOR_ROLE, the SingleWatchdog contract
+/// in this contract require WATCHDOG_OPERATOR_ROLE, the QCWatchdog contract
 /// itself must be granted specific roles in other system contracts:
 /// - ARBITER_ROLE in QCManager and QCRedeemer
 /// - ATTESTER_ROLE in QCReserveLedger
@@ -28,7 +28,7 @@ import "../bridge/BitcoinTx.sol";
 /// - QC status management
 ///
 /// Use setupWatchdogRoles() to grant this contract the necessary roles in system contracts.
-contract SingleWatchdog is AccessControl {
+contract QCWatchdog is AccessControl {
     bytes32 public constant WATCHDOG_OPERATOR_ROLE =
         keccak256("WATCHDOG_OPERATOR_ROLE");
 

@@ -13,7 +13,7 @@ import type {
   BasicMintingPolicy,
   BasicRedemptionPolicy,
   QCReserveLedger,
-  SingleWatchdog,
+  QCWatchdog,
   QCBridge,
   Bank,
   TBTCVault,
@@ -40,7 +40,7 @@ export abstract class BaseAccountControlIntegration {
   protected basicMintingPolicy: BasicMintingPolicy
   protected basicRedemptionPolicy: BasicRedemptionPolicy
   protected qcReserveLedger: QCReserveLedger
-  protected singleWatchdog: SingleWatchdog
+  protected qcWatchdog: QCWatchdog
   protected qcBridge: QCBridge
   protected bank: FakeContract<Bank>
   protected tbtcVault: FakeContract<TBTCVault>
@@ -178,12 +178,12 @@ export abstract class BaseAccountControlIntegration {
     )
     await this.qcReserveLedger.deployed()
 
-    // Deploy SingleWatchdog
-    const SingleWatchdog = await ethers.getContractFactory("SingleWatchdog")
-    this.singleWatchdog = await SingleWatchdog.deploy(
+    // Deploy QCWatchdog
+    const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
+    this.qcWatchdog = await QCWatchdog.deploy(
       this.protocolRegistry.address
     )
-    await this.singleWatchdog.deployed()
+    await this.qcWatchdog.deployed()
   }
 
   private async configureServices() {
@@ -223,7 +223,7 @@ export abstract class BaseAccountControlIntegration {
 
     await this.protocolRegistry
       .connect(this.deployer)
-      .setService(this.SERVICE_KEYS.WATCHDOG, this.singleWatchdog.address)
+      .setService(this.SERVICE_KEYS.WATCHDOG, this.qcWatchdog.address)
 
     await this.protocolRegistry
       .connect(this.deployer)

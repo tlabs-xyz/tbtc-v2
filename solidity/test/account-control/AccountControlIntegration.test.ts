@@ -12,7 +12,7 @@ import {
   QCReserveLedger,
   BasicMintingPolicy,
   BasicRedemptionPolicy,
-  SingleWatchdog,
+  QCWatchdog,
   TBTC,
   SPVValidator,
   QCBridge,
@@ -38,7 +38,7 @@ describe("Account Control System - Integration Test", () => {
   let qcReserveLedger: QCReserveLedger
   let basicMintingPolicy: BasicMintingPolicy
   let basicRedemptionPolicy: BasicRedemptionPolicy
-  let singleWatchdog: SingleWatchdog
+  let qcWatchdog: QCWatchdog
   let tbtc: TBTC
   let mockSpvValidator: FakeContract<SPVValidator>
   let qcBridge: QCBridge
@@ -176,13 +176,13 @@ describe("Account Control System - Integration Test", () => {
     await basicRedemptionPolicy.deployed()
 
     // Phase 4: Watchdog Integration
-    const SingleWatchdogFactory = await ethers.getContractFactory(
-      "SingleWatchdog"
+    const QCWatchdogFactory = await ethers.getContractFactory(
+      "QCWatchdog"
     )
-    singleWatchdog = await SingleWatchdogFactory.deploy(
+    qcWatchdog = await QCWatchdogFactory.deploy(
       protocolRegistry.address
     )
-    await singleWatchdog.deployed()
+    await qcWatchdog.deployed()
 
     // Phase 5: System Configuration
     await configureSystem()
@@ -230,11 +230,11 @@ describe("Account Control System - Integration Test", () => {
     await bank.setAuthorizedBalanceIncreaser(basicMintingPolicy.address, true)
 
     // Setup Watchdog roles
-    await qcReserveLedger.grantRole(ATTESTER_ROLE, singleWatchdog.address)
-    await qcManager.grantRole(REGISTRAR_ROLE, singleWatchdog.address)
-    await qcManager.grantRole(ARBITER_ROLE, singleWatchdog.address)
-    await qcRedeemer.grantRole(ARBITER_ROLE, singleWatchdog.address)
-    await basicRedemptionPolicy.grantRole(ARBITER_ROLE, singleWatchdog.address)
+    await qcReserveLedger.grantRole(ATTESTER_ROLE, qcWatchdog.address)
+    await qcManager.grantRole(REGISTRAR_ROLE, qcWatchdog.address)
+    await qcManager.grantRole(ARBITER_ROLE, qcWatchdog.address)
+    await qcRedeemer.grantRole(ARBITER_ROLE, qcWatchdog.address)
+    await basicRedemptionPolicy.grantRole(ARBITER_ROLE, qcWatchdog.address)
 
     // Grant QCRedeemer the ARBITER role in BasicRedemptionPolicy so it can record fulfillments
     await basicRedemptionPolicy.grantRole(ARBITER_ROLE, qcRedeemer.address)
@@ -244,8 +244,8 @@ describe("Account Control System - Integration Test", () => {
     await basicRedemptionPolicy.grantRole(REDEEMER_ROLE, qcRedeemer.address)
 
     // Grant watchdog operator role
-    await singleWatchdog.grantRole(
-      await singleWatchdog.WATCHDOG_OPERATOR_ROLE(),
+    await qcWatchdog.grantRole(
+      await qcWatchdog.WATCHDOG_OPERATOR_ROLE(),
       watchdog.address
     )
   }
@@ -261,7 +261,7 @@ describe("Account Control System - Integration Test", () => {
       expect(qcReserveLedger.address).to.be.properAddress
       expect(basicMintingPolicy.address).to.be.properAddress
       expect(basicRedemptionPolicy.address).to.be.properAddress
-      expect(singleWatchdog.address).to.be.properAddress
+      expect(qcWatchdog.address).to.be.properAddress
     })
 
     it("should register all services correctly", async () => {
@@ -288,15 +288,15 @@ describe("Account Control System - Integration Test", () => {
     it("should verify Watchdog has necessary roles", async () => {
       const hasAttesterRole = await qcReserveLedger.hasRole(
         ATTESTER_ROLE,
-        singleWatchdog.address
+        qcWatchdog.address
       )
       const hasRegistrarRole = await qcManager.hasRole(
         REGISTRAR_ROLE,
-        singleWatchdog.address
+        qcWatchdog.address
       )
       const hasArbiterRole = await qcManager.hasRole(
         ARBITER_ROLE,
-        singleWatchdog.address
+        qcWatchdog.address
       )
 
       expect(hasAttesterRole).to.be.true
@@ -330,7 +330,7 @@ describe("Account Control System - Integration Test", () => {
       // Register wallet via Watchdog
       const { challenge, txInfo, proof } = createMockSpvData("wallet_reg_test")
 
-      // Encode the SPV proof data as expected by SingleWatchdog
+      // Encode the SPV proof data as expected by QCWatchdog
       const spvProofData = ethers.utils.defaultAbiCoder.encode(
         [
           "tuple(bytes4,bytes,bytes,bytes4)",
@@ -353,7 +353,7 @@ describe("Account Control System - Integration Test", () => {
         ]
       )
 
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .registerWalletWithProof(
           qcAddress.address,
@@ -379,7 +379,7 @@ describe("Account Control System - Integration Test", () => {
         ethers.utils.parseEther("1000")
       )
 
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
@@ -388,7 +388,7 @@ describe("Account Control System - Integration Test", () => {
       )
       expect(attestation.balance).to.equal(initialReserveBalance)
       expect(attestation.isValid).to.be.true
-      expect(attestation.attester).to.equal(singleWatchdog.address)
+      expect(attestation.attester).to.equal(qcWatchdog.address)
     })
 
     it("should detect stale attestations", async () => {
@@ -397,7 +397,7 @@ describe("Account Control System - Integration Test", () => {
         ethers.utils.parseEther("1000")
       )
 
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
@@ -419,7 +419,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
@@ -457,7 +457,7 @@ describe("Account Control System - Integration Test", () => {
         ethers.utils.id("TEST_REVIEW")
       ) // UnderReview
 
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
@@ -479,7 +479,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
@@ -524,7 +524,7 @@ describe("Account Control System - Integration Test", () => {
       const mockSpvData = createMockSpvData()
       const expectedAmount = mintAmount.div(ethers.BigNumber.from(10).pow(10)) // Convert from 18 decimals to 8 decimals (satoshis)
 
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .recordRedemptionFulfillment(
           redemptionId,
@@ -555,7 +555,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
 
@@ -653,7 +653,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
 
@@ -693,7 +693,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
 
@@ -729,7 +729,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
       await qcMinter

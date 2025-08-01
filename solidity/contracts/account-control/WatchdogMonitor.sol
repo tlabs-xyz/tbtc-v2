@@ -3,12 +3,13 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "./SingleWatchdog.sol";
+import "./QCWatchdog.sol";
 import "./WatchdogConsensusManager.sol";
 import "./QCData.sol";
+import "./ProtocolRegistry.sol";
 
 /// @title WatchdogMonitor
-/// @notice Coordinates multiple independent SingleWatchdog instances for V1.1
+/// @notice Coordinates multiple independent QCWatchdog instances for V1.1
 /// @dev Manages watchdog registration, monitoring, and emergency responses
 contract WatchdogMonitor is AccessControl, ReentrancyGuard {
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
@@ -98,7 +99,7 @@ contract WatchdogMonitor is AccessControl, ReentrancyGuard {
     // =================== WATCHDOG MANAGEMENT ===================
     
     /// @notice Register a new watchdog instance
-    /// @param watchdogContract The SingleWatchdog contract address
+    /// @param watchdogContract The QCWatchdog contract address
     /// @param operator The operator address
     /// @param identifier Human-readable identifier
     function registerWatchdog(
@@ -108,9 +109,9 @@ contract WatchdogMonitor is AccessControl, ReentrancyGuard {
     ) external onlyRole(MANAGER_ROLE) {
         if (watchdogs[operator].active) revert WatchdogAlreadyRegistered();
         
-        // Verify it's actually a SingleWatchdog contract
-        try SingleWatchdog(watchdogContract).protocolRegistry() returns (address) {
-            // Valid SingleWatchdog
+        // Verify it's actually a QCWatchdog contract
+        try QCWatchdog(watchdogContract).protocolRegistry() returns (ProtocolRegistry) {
+            // Valid QCWatchdog
         } catch {
             revert InvalidWatchdog();
         }

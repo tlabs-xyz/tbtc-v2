@@ -24,9 +24,12 @@ function registerWalletWithProof(address qc, string btcAddress, bytes spvProof)
 **Needs Consensus?** ❌ NO
 - SPV proof is deterministic
 - Either valid or not
-- BUT... what if QC already at wallet limit?
+- First valid registration wins (as documented in WATCHDOG_WALLET_REGISTRATION_GUIDE.md)
 
-**🤔 WAIT**: Should multiple watchdogs agree before adding wallet #10 to a QC?
+**ANSWERED**: Should multiple watchdogs agree before adding wallet #10 to a QC?
+**NO** - The SPV proof is the sole authority. If the proof is valid, the wallet gets registered. 
+The system prevents duplicates by reverting with "Wallet already registered" error.
+Wallet limits (if any) would be enforced at the QCData contract level, not through consensus.
 
 ### 3. Wallet Deregistration
 ```solidity
