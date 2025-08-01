@@ -142,6 +142,22 @@ contract QCManager is AccessControl {
         uint256 timestamp
     );
 
+    /// @dev Emitted when wallet deregistration is completed with reserve balance details
+    event WalletDeregistrationCompleted(
+        address indexed qc,
+        string btcAddress,
+        uint256 newReserveBalance,
+        uint256 previousReserveBalance
+    );
+
+    /// @dev Emitted when wallet registration fails
+    event WalletRegistrationFailed(
+        address indexed qc,
+        string btcAddress,
+        string reason,
+        address attemptedBy
+    );
+
     modifier onlyWhenNotPaused(string memory functionName) {
         SystemState systemState = SystemState(
             protocolRegistry.getService(SYSTEM_STATE_KEY)
@@ -280,20 +296,24 @@ contract QCManager is AccessControl {
         onlyWhenNotPaused("wallet_registration")
     {
         if (bytes(btcAddress).length == 0) {
+            emit WalletRegistrationFailed(qc, btcAddress, "INVALID_WALLET_ADDRESS", msg.sender);
             revert InvalidWalletAddress();
         }
 
         // Cache QCData service to avoid redundant SLOAD operations
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
         if (!qcData.isQCRegistered(qc)) {
+            emit WalletRegistrationFailed(qc, btcAddress, "QC_NOT_REGISTERED", msg.sender);
             revert QCNotRegistered(qc);
         }
         if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
+            emit WalletRegistrationFailed(qc, btcAddress, "QC_NOT_ACTIVE", msg.sender);
             revert QCNotActive(qc);
         }
 
         // Verify wallet control using SPV client
         if (!_verifyWalletControl(qc, btcAddress, challenge, txInfo, proof)) {
+            emit WalletRegistrationFailed(qc, btcAddress, "SPV_VERIFICATION_FAILED", msg.sender);
             revert SPVVerificationFailed();
         }
 
@@ -355,11 +375,22 @@ contract QCManager is AccessControl {
             revert WalletNotPendingDeregistration(btcAddress);
         }
 
+        // Get old balance before updating
+        (uint256 oldBalance, ) = _getReserveBalanceAndStaleness(qc);
+
         // Update reserve balance and perform solvency check
         _updateReserveBalanceAndCheckSolvency(qc, newReserveBalance);
 
         // If we reach here, QC is solvent - finalize deregistration
         qcData.finalizeWalletDeRegistration(btcAddress);
+
+        // Emit comprehensive deregistration event
+        emit WalletDeregistrationCompleted(
+            qc,
+            btcAddress,
+            newReserveBalance,
+            oldBalance
+        );
     }
 
     /// @notice Get available minting capacity for a QC

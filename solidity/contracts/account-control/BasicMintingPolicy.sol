@@ -96,6 +96,14 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         uint256 timestamp
     );
 
+    /// @notice Emitted when QC-backed balance is created in Bank
+    event QCBankBalanceCreated(
+        address indexed qc,
+        address indexed user,
+        uint256 satoshis,
+        bytes32 indexed mintId
+    );
+
     constructor(
         address _bank,
         address _tbtcVault,
@@ -216,6 +224,9 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         uint256[] memory amounts = new uint256[](1);
         depositors[0] = user;
         amounts[0] = satoshis;
+
+        // Emit event before Bank interaction for QC attribution
+        emit QCBankBalanceCreated(qc, user, satoshis, mintId);
 
         // This will create Bank balance and automatically trigger TBTCVault minting
         bank.increaseBalanceAndCall(address(tbtcVault), depositors, amounts);
