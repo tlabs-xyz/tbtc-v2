@@ -278,7 +278,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     )
   }
 
-  log("⚠️  Initial watchdog operators configured for testing. Deploy SingleWatchdog instances and register them in WatchdogMonitor before production!")
+  log("⚠️  Initial watchdog operators configured for testing. Deploy QCWatchdog instances and register them in WatchdogMonitor before production!")
 
   log("Step 4: Configuring system parameters...")
 
@@ -338,7 +338,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log("")
   log("Features:")
   log("- Configurable M-of-N consensus (default: 2-of-5)")
-  log("- Independent SingleWatchdog instances")
+  log("- Independent QCWatchdog instances")
   log("- Emergency pause with 3-report threshold")
   log("- Clean separation of monitoring vs consensus")
   log("- Minimal complexity, maximum security")
@@ -360,8 +360,8 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log("   - Current: deployer")
   log("   - Transfer to: Emergency multisig or DAO")
   log("")
-  log("4. Deploy and register production SingleWatchdog instances:")
-  log("   - Deploy SingleWatchdog for each watchdog operator")
+  log("4. Deploy and register production QCWatchdog instances:")
+  log("   - Deploy QCWatchdog for each watchdog operator")
   log("   - Register each instance via WatchdogMonitor.registerWatchdog()")
   log("   - Grant WATCHDOG_ROLE to operators in WatchdogConsensusManager")
   log("   - Remove test operators (deployer)")
@@ -378,4 +378,4 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
 export default func
 func.tags = ["AccountControlConfig", "SystemConfiguration", "V1.1Configuration"]
-func.dependencies = ["AccountControlWatchdog"]
+func.dependencies = ["AccountControlWatchdog", "SPVValidator"]

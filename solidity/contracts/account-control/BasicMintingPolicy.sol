@@ -203,7 +203,7 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         });
 
         // Verify this contract is authorized in Bank - direct integration
-        if (!bank.isAuthorizedBalanceIncreaser(address(this))) {
+        if (!bank.authorizedBalanceIncreasers(address(this))) {
             revert NotAuthorizedInBank();
         }
 
@@ -335,6 +335,6 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
 
     /// @notice Check Bank authorization efficiently
     function checkBankAuthorization() external view returns (bool isAuthorized) {
-        return bank.isAuthorizedBalanceIncreaser(address(this));
+        return bank.authorizedBalanceIncreasers(address(this));
     }
 }
