@@ -193,11 +193,11 @@ struct Proposal {
 
 #### 2.9.2 WatchdogMonitor.sol
 
-**Emergency Coordination Component**: Coordinates multiple SingleWatchdog instances
+**Emergency Coordination Component**: Coordinates multiple QCWatchdog instances
 and provides emergency circuit breaker functionality:
 
 - **Dual Execution Path**: Consensus routing for active watchdogs, direct execution for operators
-- **Event Compatibility**: Maintains all SingleWatchdog events for monitoring systems
+- **Event Compatibility**: Maintains all QCWatchdog events for monitoring systems
 - **Role-Based Access**: Supports existing WATCHDOG_OPERATOR_ROLE permissions
 - **Operation Encoding**: Handles all operation types (attestation, registration, status change, redemption)
 

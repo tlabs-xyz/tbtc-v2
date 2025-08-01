@@ -25,7 +25,7 @@ const func: DeployFunction = async function DeployAccountControlWatchdog(
     waitConfirmations: helpers.network?.confirmations || 1,
   })
 
-  // Deploy WatchdogMonitor - Coordinates multiple SingleWatchdog instances
+  // Deploy WatchdogMonitor - Coordinates multiple QCWatchdog instances
   const watchdogMonitor = await deploy("WatchdogMonitor", {
     from: deployer,
     args: [watchdogConsensusManager.address, qcData.address],
@@ -39,7 +39,7 @@ const func: DeployFunction = async function DeployAccountControlWatchdog(
   log("")
   log("Features:")
   log("- Configurable M-of-N consensus (default: 2-of-5)")
-  log("- Multiple independent SingleWatchdog instances")
+  log("- Multiple independent QCWatchdog instances")
   log("- Emergency pause with 3-report threshold")
   log("- Clean separation of monitoring vs consensus")
 }

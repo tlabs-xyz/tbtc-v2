@@ -3,7 +3,7 @@ import { ethers, helpers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 import {
-  SingleWatchdog,
+  QCWatchdog,
   ProtocolRegistry,
   QCManager,
   QCReserveLedger,
@@ -17,13 +17,13 @@ chai.use(smock.matchers)
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
-describe("SingleWatchdog", () => {
+describe("QCWatchdog", () => {
   let deployer: SignerWithAddress
   let governance: SignerWithAddress
   let qcAddress: SignerWithAddress
   let thirdParty: SignerWithAddress
 
-  let singleWatchdog: SingleWatchdog
+  let qcWatchdog: QCWatchdog
   let protocolRegistry: ProtocolRegistry
   let mockQcManager: FakeContract<QCManager>
   let mockQcReserveLedger: FakeContract<QCReserveLedger>
@@ -86,14 +86,14 @@ describe("SingleWatchdog", () => {
     protocolRegistry = await ProtocolRegistryFactory.deploy()
     await protocolRegistry.deployed()
 
-    // Deploy SingleWatchdog
-    const SingleWatchdogFactory = await ethers.getContractFactory(
-      "SingleWatchdog"
+    // Deploy QCWatchdog
+    const QCWatchdogFactory = await ethers.getContractFactory(
+      "QCWatchdog"
     )
-    singleWatchdog = await SingleWatchdogFactory.deploy(
+    qcWatchdog = await QCWatchdogFactory.deploy(
       protocolRegistry.address
     )
-    await singleWatchdog.deployed()
+    await qcWatchdog.deployed()
 
     // Create mock contracts
     mockQcManager = await smock.fake<QCManager>("QCManager")
@@ -116,7 +116,7 @@ describe("SingleWatchdog", () => {
     )
 
     // Grant roles
-    await singleWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
+    await qcWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
   })
 
   afterEach(async () => {
@@ -125,7 +125,7 @@ describe("SingleWatchdog", () => {
 
   describe("Deployment", () => {
     it("should set correct protocol registry", async () => {
-      expect(await singleWatchdog.protocolRegistry()).to.equal(
+      expect(await qcWatchdog.protocolRegistry()).to.equal(
         protocolRegistry.address
       )
     })
@@ -133,33 +133,33 @@ describe("SingleWatchdog", () => {
     it("should grant deployer all Watchdog roles", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
       const WATCHDOG_OPERATOR_ROLE =
-        await singleWatchdog.WATCHDOG_OPERATOR_ROLE()
-      expect(await singleWatchdog.hasRole(DEFAULT_ADMIN_ROLE, deployer.address))
+        await qcWatchdog.WATCHDOG_OPERATOR_ROLE()
+      expect(await qcWatchdog.hasRole(DEFAULT_ADMIN_ROLE, deployer.address))
         .to.be.true
       expect(
-        await singleWatchdog.hasRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
+        await qcWatchdog.hasRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
       ).to.be.true
     })
 
     it("should have correct role constants", async () => {
-      expect(await singleWatchdog.WATCHDOG_OPERATOR_ROLE()).to.equal(
+      expect(await qcWatchdog.WATCHDOG_OPERATOR_ROLE()).to.equal(
         WATCHDOG_OPERATOR_ROLE
       )
     })
 
     it("should have correct service key constants", async () => {
-      expect(await singleWatchdog.QC_MANAGER_KEY()).to.equal(QC_MANAGER_KEY)
-      expect(await singleWatchdog.QC_RESERVE_LEDGER_KEY()).to.equal(
+      expect(await qcWatchdog.QC_MANAGER_KEY()).to.equal(QC_MANAGER_KEY)
+      expect(await qcWatchdog.QC_RESERVE_LEDGER_KEY()).to.equal(
         QC_RESERVE_LEDGER_KEY
       )
-      expect(await singleWatchdog.QC_REDEEMER_KEY()).to.equal(QC_REDEEMER_KEY)
+      expect(await qcWatchdog.QC_REDEEMER_KEY()).to.equal(QC_REDEEMER_KEY)
     })
   })
 
   describe("attestReserves", () => {
     context("when called by an operator", () => {
       it("should submit reserve attestation successfully", async () => {
-        const tx = await singleWatchdog.attestReserves(
+        const tx = await qcWatchdog.attestReserves(
           qcAddress.address,
           reserveBalance
         )
@@ -169,7 +169,7 @@ describe("SingleWatchdog", () => {
         ).to.have.been.calledWith(qcAddress.address, reserveBalance)
 
         await expect(tx)
-          .to.emit(singleWatchdog, "WatchdogReserveAttestation")
+          .to.emit(qcWatchdog, "WatchdogReserveAttestation")
           .withArgs(
             qcAddress.address,
             reserveBalance,
@@ -183,7 +183,7 @@ describe("SingleWatchdog", () => {
 
       it("should revert with zero QC address", async () => {
         await expect(
-          singleWatchdog.attestReserves(
+          qcWatchdog.attestReserves(
             ethers.constants.AddressZero,
             reserveBalance
           )
@@ -194,7 +194,7 @@ describe("SingleWatchdog", () => {
     context("when called by a non-operator", () => {
       it("should revert", async () => {
         await expect(
-          singleWatchdog
+          qcWatchdog
             .connect(thirdParty)
             .attestReserves(qcAddress.address, reserveBalance)
         ).to.be.revertedWith(
@@ -212,7 +212,7 @@ describe("SingleWatchdog", () => {
 
         const encodedSpvProof = createEncodedSpvProof()
 
-        const tx = await singleWatchdog.registerWalletWithProof(
+        const tx = await qcWatchdog.registerWalletWithProof(
           qcAddress.address,
           btcAddress,
           encodedSpvProof,
@@ -230,7 +230,7 @@ describe("SingleWatchdog", () => {
         expect(challenge).to.equal(challengeHash)
 
         await expect(tx)
-          .to.emit(singleWatchdog, "WatchdogWalletRegistration")
+          .to.emit(qcWatchdog, "WatchdogWalletRegistration")
           .withArgs(qcAddress.address, btcAddress, challengeHash)
       })
 
@@ -238,7 +238,7 @@ describe("SingleWatchdog", () => {
         const encodedSpvProof = createEncodedSpvProof()
 
         await expect(
-          singleWatchdog.registerWalletWithProof(
+          qcWatchdog.registerWalletWithProof(
             qcAddress.address,
             "",
             encodedSpvProof,
@@ -282,7 +282,7 @@ describe("SingleWatchdog", () => {
         mockSpvValidator.verifyWalletControl.returns(false)
 
         await expect(
-          singleWatchdog.registerWalletWithProof(
+          qcWatchdog.registerWalletWithProof(
             qcAddress.address,
             btcAddress,
             encodedSpvProof,
@@ -295,7 +295,7 @@ describe("SingleWatchdog", () => {
         const invalidProofData = ethers.utils.toUtf8Bytes("invalid_proof_data")
 
         await expect(
-          singleWatchdog.registerWalletWithProof(
+          qcWatchdog.registerWalletWithProof(
             qcAddress.address,
             btcAddress,
             invalidProofData,
@@ -310,7 +310,7 @@ describe("SingleWatchdog", () => {
     context("when called by an operator", () => {
       it("should set QC status successfully", async () => {
         const reason = ethers.utils.formatBytes32String("Under review")
-        const tx = await singleWatchdog.setQCStatus(
+        const tx = await qcWatchdog.setQCStatus(
           qcAddress.address,
           1,
           reason
@@ -324,7 +324,7 @@ describe("SingleWatchdog", () => {
 
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
-          .to.emit(singleWatchdog, "WatchdogQCStatusChange")
+          .to.emit(qcWatchdog, "WatchdogQCStatusChange")
           .withArgs(
             qcAddress.address,
             1,
@@ -340,7 +340,7 @@ describe("SingleWatchdog", () => {
     context("when called by an operator", () => {
       it("should verify solvency", async () => {
         mockQcManager.verifyQCSolvency.returns(true)
-        const isSolvent = await singleWatchdog.callStatic.verifyQCSolvency(
+        const isSolvent = await qcWatchdog.callStatic.verifyQCSolvency(
           qcAddress.address
         )
         expect(isSolvent).to.be.true
@@ -356,7 +356,7 @@ describe("SingleWatchdog", () => {
         const userBtcAddress = "bc1qtest123456789"
         const expectedAmount = 100000
 
-        const tx = await singleWatchdog.recordRedemptionFulfillment(
+        const tx = await qcWatchdog.recordRedemptionFulfillment(
           redemptionId,
           userBtcAddress,
           expectedAmount,
@@ -369,7 +369,7 @@ describe("SingleWatchdog", () => {
 
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
-          .to.emit(singleWatchdog, "WatchdogRedemptionAction")
+          .to.emit(qcWatchdog, "WatchdogRedemptionAction")
           .withArgs(
             redemptionId,
             "FULFILLED",
@@ -386,7 +386,7 @@ describe("SingleWatchdog", () => {
       it("should flag redemption default", async () => {
         const redemptionId = ethers.utils.id("redemption-1")
         const reason = ethers.utils.formatBytes32String("Timeout")
-        const tx = await singleWatchdog.flagRedemptionDefault(
+        const tx = await qcWatchdog.flagRedemptionDefault(
           redemptionId,
           reason
         )
@@ -398,7 +398,7 @@ describe("SingleWatchdog", () => {
 
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
-          .to.emit(singleWatchdog, "WatchdogRedemptionAction")
+          .to.emit(qcWatchdog, "WatchdogRedemptionAction")
           .withArgs(
             redemptionId,
             "DEFAULTED",
@@ -415,7 +415,7 @@ describe("SingleWatchdog", () => {
       it("should change QC status", async () => {
         const reason = ethers.utils.formatBytes32String("Revoked")
         // Enum QCStatus { Active, UnderReview, Revoked }
-        const tx = await singleWatchdog.changeQCStatus(
+        const tx = await qcWatchdog.changeQCStatus(
           qcAddress.address,
           2,
           reason
@@ -429,7 +429,7 @@ describe("SingleWatchdog", () => {
 
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
-          .to.emit(singleWatchdog, "WatchdogQCStatusChange")
+          .to.emit(qcWatchdog, "WatchdogQCStatusChange")
           .withArgs(
             qcAddress.address,
             2,
@@ -445,18 +445,18 @@ describe("SingleWatchdog", () => {
     context("when called by an operator", () => {
       it("should do nothing if solvent", async () => {
         mockQcManager.verifyQCSolvency.returns(true)
-        const tx = await singleWatchdog.verifySolvencyAndAct(qcAddress.address)
+        const tx = await qcWatchdog.verifySolvencyAndAct(qcAddress.address)
         expect(mockQcManager.setQCStatus).to.not.have.been.called
-        await expect(tx).to.not.emit(singleWatchdog, "WatchdogQCStatusChange")
+        await expect(tx).to.not.emit(qcWatchdog, "WatchdogQCStatusChange")
       })
 
       it("should emit event if insolvent", async () => {
         mockQcManager.verifyQCSolvency.returns(false)
-        const tx = await singleWatchdog.verifySolvencyAndAct(qcAddress.address)
+        const tx = await qcWatchdog.verifySolvencyAndAct(qcAddress.address)
         // Enum QCStatus { Active, UnderReview, Revoked }
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         await expect(tx)
-          .to.emit(singleWatchdog, "WatchdogQCStatusChange")
+          .to.emit(qcWatchdog, "WatchdogQCStatusChange")
           .withArgs(
             qcAddress.address,
             1,
@@ -470,13 +470,13 @@ describe("SingleWatchdog", () => {
 
   describe("Access Control Management", () => {
     it("should allow admin to grant roles to other accounts", async () => {
-      await singleWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, thirdParty.address)
+      await qcWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, thirdParty.address)
       expect(
-        await singleWatchdog.hasRole(WATCHDOG_OPERATOR_ROLE, thirdParty.address)
+        await qcWatchdog.hasRole(WATCHDOG_OPERATOR_ROLE, thirdParty.address)
       ).to.be.true
 
       // Third party should now be able to attest reserves
-      await singleWatchdog
+      await qcWatchdog
         .connect(thirdParty)
         .attestReserves(qcAddress.address, reserveBalance)
       expect(
@@ -485,13 +485,13 @@ describe("SingleWatchdog", () => {
     })
 
     it("should allow admin to revoke roles from accounts", async () => {
-      await singleWatchdog.revokeRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
+      await qcWatchdog.revokeRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
       expect(
-        await singleWatchdog.hasRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
+        await qcWatchdog.hasRole(WATCHDOG_OPERATOR_ROLE, deployer.address)
       ).to.be.false
 
       await expect(
-        singleWatchdog.attestReserves(qcAddress.address, reserveBalance)
+        qcWatchdog.attestReserves(qcAddress.address, reserveBalance)
       ).to.be.revertedWith(
         `AccessControl: account ${deployer.address.toLowerCase()} is missing role ${WATCHDOG_OPERATOR_ROLE}`
       )
@@ -521,10 +521,10 @@ describe("SingleWatchdog", () => {
         // Ensure SPV validator returns true for this test
         mockSpvValidator.verifyWalletControl.returns(true)
 
-        await singleWatchdog.attestReserves(qcAddress.address, reserveBalance)
+        await qcWatchdog.attestReserves(qcAddress.address, reserveBalance)
         const encodedSpvProof = createEncodedSpvProof()
 
-        await singleWatchdog.registerWalletWithProof(
+        await qcWatchdog.registerWalletWithProof(
           qcAddress.address,
           btcAddress,
           encodedSpvProof,
@@ -556,7 +556,7 @@ describe("SingleWatchdog", () => {
         const encodedSpvProof = createEncodedSpvProof()
 
         await expect(
-          singleWatchdog.registerWalletWithProof(
+          qcWatchdog.registerWalletWithProof(
             qcAddress.address,
             btcAddress,
             encodedSpvProof,
@@ -571,7 +571,7 @@ describe("SingleWatchdog", () => {
         )
 
         await expect(
-          singleWatchdog.attestReserves(qcAddress.address, reserveBalance)
+          qcWatchdog.attestReserves(qcAddress.address, reserveBalance)
         ).to.be.reverted
       })
     })
