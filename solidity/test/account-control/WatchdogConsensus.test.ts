@@ -7,7 +7,7 @@ import type { FakeContract } from "@defi-wonderland/smock"
 
 const { loadFixture } = waffle
 
-describe("SimplifiedWatchdogConsensus", () => {
+describe("WatchdogConsensus", () => {
   let deployer: SignerWithAddress
   let governance: SignerWithAddress
   let watchdog1: SignerWithAddress
@@ -51,9 +51,9 @@ describe("SimplifiedWatchdogConsensus", () => {
     // Set up protocol registry to return operation executor
     protocolRegistry.getService.whenCalledWith(OPERATION_EXECUTOR_KEY).returns(operationExecutor.address)
 
-    // Deploy SimplifiedWatchdogConsensus
-    const SimplifiedWatchdogConsensus = await ethers.getContractFactory("SimplifiedWatchdogConsensus")
-    consensus = await SimplifiedWatchdogConsensus.deploy(protocolRegistry.address)
+    // Deploy WatchdogConsensus
+    const WatchdogConsensus = await ethers.getContractFactory("WatchdogConsensus")
+    consensus = await WatchdogConsensus.deploy(protocolRegistry.address)
     await consensus.deployed()
 
     // Grant roles to governance

@@ -6,12 +6,11 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./ProtocolRegistry.sol";
 
-/// @title SimplifiedWatchdogConsensus
+/// @title WatchdogConsensus
 /// @notice N-of-M watchdog consensus using majority voting
-/// @dev Simplified consensus system that replaces over-engineered V1.1 implementation.
-///      Key features: fixed 2-hour challenge period, simple majority voting (N/2+1),
-///      single execution path, no MEV resistance or escalating delays.
-contract SimplifiedWatchdogConsensus is AccessControl, Pausable, ReentrancyGuard {
+/// @dev Clean consensus implementation with fixed 2-hour challenge period, 
+///      simple majority voting (N/2+1), and single execution path.
+contract WatchdogConsensus is AccessControl, Pausable, ReentrancyGuard {
     // =================== CONSTANTS ===================
     
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
