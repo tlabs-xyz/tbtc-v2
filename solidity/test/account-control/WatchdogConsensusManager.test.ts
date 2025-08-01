@@ -300,4 +300,217 @@ describe("WatchdogConsensusManager", () => {
         .withArgs(proposalId)
     })
   })
+
+  describe("Wallet Deregistration Proposals", () => {
+    it("Should allow watchdog to propose wallet deregistration", async () => {
+      const qcAddress = ethers.Wallet.createRandom().address
+      const btcAddress = "bc1qexamplewallet"
+      const reason = "Suspicious wallet activity"
+
+      const tx = await consensusManager.connect(watchdog1).proposeWalletDeregistration(
+        qcAddress,
+        btcAddress,
+        reason
+      )
+
+      const receipt = await tx.wait()
+      const event = receipt.events?.find(e => e.event === 'ProposalCreated')
+      expect(event).to.not.be.undefined
+      expect(event?.args?.proposalType).to.equal(1) // WALLET_DEREGISTRATION
+      expect(event?.args?.proposer).to.equal(watchdog1.address)
+      expect(event?.args?.reason).to.equal(reason)
+    })
+
+    it("Should execute wallet deregistration when consensus reached", async () => {
+      const qcAddress = ethers.Wallet.createRandom().address
+      const btcAddress = "bc1qexamplewallet"
+      const reason = "Consensus reached"
+
+      const tx = await consensusManager.connect(watchdog1).proposeWalletDeregistration(
+        qcAddress,
+        btcAddress,
+        reason
+      )
+      const receipt = await tx.wait()
+      const proposalId = receipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Second vote should trigger execution
+      const voteTx = await consensusManager.connect(watchdog2).vote(proposalId)
+      const voteReceipt = await voteTx.wait()
+      
+      // Should have execution event
+      const executionEvent = voteReceipt.events?.find(e => e.event === 'ProposalExecuted')
+      expect(executionEvent).to.not.be.undefined
+      expect(executionEvent?.args?.proposalType).to.equal(1)
+      
+      // Should have called QCManager.requestWalletDeRegistration
+      expect(qcManager.requestWalletDeRegistration).to.have.been.calledOnceWith(btcAddress)
+    })
+  })
+
+  describe("Redemption Default Proposals", () => {
+    it("Should allow watchdog to propose redemption default", async () => {
+      const redemptionId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("redemption123"))
+      const defaultReason = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("TIMEOUT"))
+      const description = "Redemption timed out after 48 hours"
+
+      const tx = await consensusManager.connect(watchdog1).proposeRedemptionDefault(
+        redemptionId,
+        defaultReason,
+        description
+      )
+
+      const receipt = await tx.wait()
+      const event = receipt.events?.find(e => e.event === 'ProposalCreated')
+      expect(event).to.not.be.undefined
+      expect(event?.args?.proposalType).to.equal(2) // REDEMPTION_DEFAULT
+      expect(event?.args?.proposer).to.equal(watchdog1.address)
+      expect(event?.args?.reason).to.equal(description)
+    })
+
+    it("Should execute redemption default when consensus reached", async () => {
+      const redemptionId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("redemption123"))
+      const defaultReason = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("TIMEOUT"))
+      const description = "Consensus reached"
+
+      const tx = await consensusManager.connect(watchdog1).proposeRedemptionDefault(
+        redemptionId,
+        defaultReason,
+        description
+      )
+      const receipt = await tx.wait()
+      const proposalId = receipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Second vote should trigger execution
+      const voteTx = await consensusManager.connect(watchdog2).vote(proposalId)
+      const voteReceipt = await voteTx.wait()
+      
+      // Should have execution event
+      const executionEvent = voteReceipt.events?.find(e => e.event === 'ProposalExecuted')
+      expect(executionEvent).to.not.be.undefined
+      expect(executionEvent?.args?.proposalType).to.equal(2)
+      
+      // Should have called QCRedeemer.flagDefaultedRedemption
+      expect(qcRedeemer.flagDefaultedRedemption).to.have.been.calledOnceWith(redemptionId, defaultReason)
+    })
+  })
+
+  describe("Force Intervention Proposals", () => {
+    it("Should allow watchdog to propose force intervention", async () => {
+      const targetContract = ethers.Wallet.createRandom().address
+      const callData = "0x1234567890abcdef"
+      const reason = "Emergency intervention required"
+
+      const tx = await consensusManager.connect(watchdog1).proposeForceIntervention(
+        targetContract,
+        callData,
+        reason
+      )
+
+      const receipt = await tx.wait()
+      const event = receipt.events?.find(e => e.event === 'ProposalCreated')
+      expect(event).to.not.be.undefined
+      expect(event?.args?.proposalType).to.equal(3) // FORCE_INTERVENTION
+      expect(event?.args?.proposer).to.equal(watchdog1.address)
+      expect(event?.args?.reason).to.equal(reason)
+    })
+
+    it("Should execute force intervention when consensus reached", async () => {
+      // Deploy a mock target contract for testing
+      const MockTarget = await ethers.getContractFactory("contracts/test/TestERC20.sol:TestERC20")
+      const mockTarget = await MockTarget.deploy()
+      await mockTarget.deployed()
+
+      const callData = mockTarget.interface.encodeFunctionData("pause")
+      const reason = "Emergency pause required"
+
+      const tx = await consensusManager.connect(watchdog1).proposeForceIntervention(
+        mockTarget.address,
+        callData,
+        reason
+      )
+      const receipt = await tx.wait()
+      const proposalId = receipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Second vote should trigger execution
+      const voteTx = await consensusManager.connect(watchdog2).vote(proposalId)
+      const voteReceipt = await voteTx.wait()
+      
+      // Should have execution event
+      const executionEvent = voteReceipt.events?.find(e => e.event === 'ProposalExecuted')
+      expect(executionEvent).to.not.be.undefined
+      expect(executionEvent?.args?.proposalType).to.equal(3)
+    })
+  })
+
+  describe("M-of-N Consensus Scenarios", () => {
+    beforeEach(async () => {
+      // Set up 3-of-5 consensus for more complex testing
+      await consensusManager.connect(governance).updateConsensusParams(3, 5)
+    })
+
+    it("Should require 3 votes for execution with 3-of-5 configuration", async () => {
+      const qcAddress = ethers.Wallet.createRandom().address
+      const newStatus = 1
+      const reason = "3-of-5 test"
+
+      // Create proposal (watchdog1 auto-votes = 1 vote)
+      const tx = await consensusManager.connect(watchdog1).proposeStatusChange(
+        qcAddress,
+        newStatus,
+        reason
+      )
+      const receipt = await tx.wait()
+      const proposalId = receipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Second vote (total = 2 votes) - should not execute yet
+      await consensusManager.connect(watchdog2).vote(proposalId)
+      let proposal = await consensusManager.getProposal(proposalId)
+      expect(proposal.executed).to.equal(false)
+      expect(proposal.voteCount).to.equal(2)
+
+      // Third vote (total = 3 votes) - should trigger execution
+      const thirdVoteTx = await consensusManager.connect(watchdog3).vote(proposalId)
+      const thirdVoteReceipt = await thirdVoteTx.wait()
+      
+      const executionEvent = thirdVoteReceipt.events?.find(e => e.event === 'ProposalExecuted')
+      expect(executionEvent).to.not.be.undefined
+
+      proposal = await consensusManager.getProposal(proposalId)
+      expect(proposal.executed).to.equal(true)
+      expect(proposal.voteCount).to.equal(3)
+    })
+
+    it("Should handle mixed proposal types with different consensus requirements", async () => {
+      // Create multiple proposals of different types
+      const qcAddress = ethers.Wallet.createRandom().address
+      
+      const statusTx = await consensusManager.connect(watchdog1).proposeStatusChange(
+        qcAddress, 1, "Status change"
+      )
+      const statusReceipt = await statusTx.wait()
+      const statusProposalId = statusReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      const walletTx = await consensusManager.connect(watchdog2).proposeWalletDeregistration(
+        qcAddress, "bc1qwallet", "Wallet issue"
+      )
+      const walletReceipt = await walletTx.wait()
+      const walletProposalId = walletReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Both should require 3 votes total
+      // Status proposal needs 2 more votes (already has 1 from proposer)
+      await consensusManager.connect(watchdog3).vote(statusProposalId)
+      await consensusManager.connect(watchdog4).vote(statusProposalId) // Should execute
+
+      // Wallet proposal needs 2 more votes (already has 1 from proposer)
+      await consensusManager.connect(watchdog1).vote(walletProposalId)
+      await consensusManager.connect(watchdog3).vote(walletProposalId) // Should execute
+
+      const statusProposal = await consensusManager.getProposal(statusProposalId)
+      const walletProposal = await consensusManager.getProposal(walletProposalId)
+
+      expect(statusProposal.executed).to.equal(true)
+      expect(walletProposal.executed).to.equal(true)
+    })
+  })
 })
