@@ -8,41 +8,31 @@ const func: DeployFunction = async function DeployAccountControlWatchdog(
   const { deployer } = await getNamedAccounts()
   const { deploy, log, get } = deployments
 
-  log("Deploying Account Control Watchdog Integration (V1.1 Quorum)...")
+  log("Deploying Account Control Watchdog Consensus...")
 
-  // Phase 4: V1.1 Watchdog Quorum System
-  log("Phase 4: Deploying V1.1 Optimistic Watchdog Quorum System")
+  // Phase 4: Watchdog Consensus System
+  log("Phase 4: Deploying Watchdog Consensus System")
 
   const protocolRegistry = await get("ProtocolRegistry")
 
-  // Deploy OptimisticWatchdogConsensus - Core N-of-M consensus mechanism
-  const optimisticConsensus = await deploy("OptimisticWatchdogConsensus", {
+  // Deploy WatchdogConsensus - Core N-of-M consensus mechanism
+  const watchdogConsensus = await deploy("WatchdogConsensus", {
     from: deployer,
     args: [protocolRegistry.address],
     log: true,
     waitConfirmations: helpers.network?.confirmations || 1,
   })
 
-  // Deploy WatchdogAdapter - Backward compatibility with SingleWatchdog interface
-  const watchdogAdapter = await deploy("WatchdogAdapter", {
-    from: deployer,
-    args: [protocolRegistry.address, optimisticConsensus.address],
-    log: true,
-    waitConfirmations: helpers.network?.confirmations || 1,
-  })
-
-  log("Phase 4 completed: V1.1 Watchdog Quorum System deployed")
-  log(`OptimisticWatchdogConsensus: ${optimisticConsensus.address}`)
-  log(`WatchdogAdapter: ${watchdogAdapter.address}`)
+  log("Phase 4 completed: Watchdog Consensus System deployed")
+  log(`WatchdogConsensus: ${watchdogConsensus.address}`)
   log("")
-  log("V1.1 Features:")
-  log("- Optimistic execution with challenge periods")
-  log("- MEV-resistant primary validator selection")
-  log("- Escalating consensus (1h→4h→12h→24h)")
-  log("- Approval mechanism for disputed operations")
-  log("- Backward compatibility with SingleWatchdog interface")
+  log("Features:")
+  log("- Simple majority voting (N/2+1)")
+  log("- Fixed 2-hour challenge period")
+  log("- Single execution path")
+  log("- Clean architecture with no unnecessary complexity")
 }
 
 export default func
-func.tags = ["AccountControlWatchdog", "OptimisticWatchdogConsensus", "WatchdogAdapter"]
+func.tags = ["AccountControlWatchdog", "WatchdogConsensus"]
 func.dependencies = ["AccountControlPolicies"]
