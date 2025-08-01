@@ -99,6 +99,13 @@ contract QCReserveLedger is AccessControl {
         uint256 timestamp
     );
 
+    /// @dev Emitted when an attestation fails
+    event AttestationFailed(
+        address indexed qc,
+        address indexed attester,
+        string reason
+    );
+
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -119,7 +126,10 @@ contract QCReserveLedger is AccessControl {
         external
         onlyRole(ATTESTER_ROLE)
     {
-        if (qc == address(0)) revert InvalidQCAddress();
+        if (qc == address(0)) {
+            emit AttestationFailed(qc, msg.sender, "INVALID_QC_ADDRESS");
+            revert InvalidQCAddress();
+        }
 
         // Get old balance for event emission
         uint256 oldBalance = hasAttestation[qc]
@@ -171,7 +181,10 @@ contract QCReserveLedger is AccessControl {
         uint256 balance,
         bytes calldata proofData
     ) external onlyRole(ATTESTER_ROLE) {
-        if (qc == address(0)) revert InvalidQCAddress();
+        if (qc == address(0)) {
+            emit AttestationFailed(qc, msg.sender, "INVALID_QC_ADDRESS");
+            revert InvalidQCAddress();
+        }
 
         // Extract proof transaction hash from proofData for event
         // In a full implementation, this would validate the SPV proof

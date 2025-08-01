@@ -113,6 +113,12 @@ singleWatchdog.registerWalletWithProof(
 );
 ```
 
+**Note**: In practice, QCs request wallet registration through a specific watchdog's REST API rather than watchdogs monitoring the Bitcoin blockchain independently. This eliminates potential conflicts:
+- QC authenticates with their chosen watchdog's API
+- Submits registration request with SPV proof
+- That specific watchdog executes the on-chain registration
+- No multi-watchdog coordination needed
+
 #### Redemption Fulfillment
 ```solidity
 // Each watchdog can record redemption fulfillment
