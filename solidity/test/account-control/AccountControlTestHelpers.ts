@@ -11,7 +11,7 @@ import {
   QCReserveLedger,
   BasicMintingPolicy,
   BasicRedemptionPolicy,
-  SingleWatchdog,
+  QCWatchdog,
   TBTC,
   SPVValidator,
 } from "../../typechain"
@@ -33,7 +33,7 @@ export const SERVICE_KEYS = {
   QC_RESERVE_LEDGER: ethers.utils.id("QC_RESERVE_LEDGER"),
   MINTING_POLICY: ethers.utils.id("MINTING_POLICY"),
   REDEMPTION_POLICY: ethers.utils.id("REDEMPTION_POLICY"),
-  SINGLE_WATCHDOG: ethers.utils.id("SINGLE_WATCHDOG"),
+  QC_WATCHDOG: ethers.utils.id("QC_WATCHDOG"),
   TBTC_TOKEN: ethers.utils.id("TBTC_TOKEN"),
   SPV_VALIDATOR: ethers.utils.id("SPV_VALIDATOR"),
 }
@@ -111,7 +111,7 @@ export interface AccountControlFixture {
   qcReserveLedger: QCReserveLedger
   basicMintingPolicy: BasicMintingPolicy
   basicRedemptionPolicy: BasicRedemptionPolicy
-  singleWatchdog: SingleWatchdog
+  qcWatchdog: QCWatchdog
 
   // TBTC token
   tbtc: TBTC
@@ -195,14 +195,14 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   )
   await basicRedemptionPolicy.deployed()
 
-  // Deploy SingleWatchdog
-  const SingleWatchdogFactory = await ethers.getContractFactory(
-    "SingleWatchdog"
+  // Deploy QCWatchdog
+  const QCWatchdogFactory = await ethers.getContractFactory(
+    "QCWatchdog"
   )
-  const singleWatchdog = await SingleWatchdogFactory.deploy(
+  const qcWatchdog = await QCWatchdogFactory.deploy(
     protocolRegistry.address
   )
-  await singleWatchdog.deployed()
+  await qcWatchdog.deployed()
 
   // Deploy real TBTC token (same as integration test)
   const TBTCFactory = await ethers.getContractFactory("TBTC")
@@ -234,8 +234,8 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     basicRedemptionPolicy.address
   )
   await protocolRegistry.setService(
-    SERVICE_KEYS.SINGLE_WATCHDOG,
-    singleWatchdog.address
+    SERVICE_KEYS.QC_WATCHDOG,
+    qcWatchdog.address
   )
   await protocolRegistry.setService(SERVICE_KEYS.TBTC_TOKEN, tbtc.address)
 
@@ -245,7 +245,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   await qcManager.grantRole(ROLES.ARBITER_ROLE, watchdog.address)
   await qcManager.grantRole(ROLES.QC_ADMIN_ROLE, basicMintingPolicy.address) // Grant role to policy for minting
   await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
-  await singleWatchdog.grantRole(ROLES.WATCHDOG_OPERATOR_ROLE, watchdog.address)
+  await qcWatchdog.grantRole(ROLES.WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
   // Transfer ownership of TBTC to the BasicMintingPolicy for minting
   await tbtc.transferOwnership(basicMintingPolicy.address)
@@ -260,7 +260,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     qcReserveLedger,
     basicMintingPolicy,
     basicRedemptionPolicy,
-    singleWatchdog,
+    qcWatchdog,
     tbtc,
     deployer,
     governance,
@@ -330,14 +330,14 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
   )
   await basicRedemptionPolicy.deployed()
 
-  // Deploy SingleWatchdog
-  const SingleWatchdogFactory = await ethers.getContractFactory(
-    "SingleWatchdog"
+  // Deploy QCWatchdog
+  const QCWatchdogFactory = await ethers.getContractFactory(
+    "QCWatchdog"
   )
-  const singleWatchdog = await SingleWatchdogFactory.deploy(
+  const qcWatchdog = await QCWatchdogFactory.deploy(
     protocolRegistry.address
   )
-  await singleWatchdog.deployed()
+  await qcWatchdog.deployed()
 
   // Create mock TBTC token for security tests
   const tbtc = await smock.fake<TBTC>("TBTC")
@@ -376,8 +376,8 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
     basicRedemptionPolicy.address
   )
   await protocolRegistry.setService(
-    SERVICE_KEYS.SINGLE_WATCHDOG,
-    singleWatchdog.address
+    SERVICE_KEYS.QC_WATCHDOG,
+    qcWatchdog.address
   )
   await protocolRegistry.setService(SERVICE_KEYS.TBTC_TOKEN, tbtc.address)
 
@@ -387,12 +387,12 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
   await qcManager.grantRole(ROLES.ARBITER_ROLE, watchdog.address)
   await qcManager.grantRole(ROLES.QC_ADMIN_ROLE, basicMintingPolicy.address) // Grant role to policy for minting
   await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
-  await singleWatchdog.grantRole(ROLES.WATCHDOG_OPERATOR_ROLE, watchdog.address)
+  await qcWatchdog.grantRole(ROLES.WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
-  // Grant roles to SingleWatchdog contract so it can call other contracts
-  await qcManager.grantRole(ROLES.REGISTRAR_ROLE, singleWatchdog.address)
-  await qcManager.grantRole(ROLES.ARBITER_ROLE, singleWatchdog.address)
-  await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, singleWatchdog.address)
+  // Grant roles to QCWatchdog contract so it can call other contracts
+  await qcManager.grantRole(ROLES.REGISTRAR_ROLE, qcWatchdog.address)
+  await qcManager.grantRole(ROLES.ARBITER_ROLE, qcWatchdog.address)
+  await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, qcWatchdog.address)
 
   // Grant QCManager the ATTESTER_ROLE so it can update reserves during wallet deregistration
   await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, qcManager.address)
@@ -415,7 +415,7 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
     qcReserveLedger,
     basicMintingPolicy,
     basicRedemptionPolicy,
-    singleWatchdog,
+    qcWatchdog,
     tbtc,
     mockSpvValidator,
     deployer,
@@ -725,7 +725,7 @@ export function validateTestFixture(fixture: AccountControlFixture): void {
     "qcReserveLedger",
     "basicMintingPolicy",
     "basicRedemptionPolicy",
-    "singleWatchdog",
+    "qcWatchdog",
     "tbtc",
   ]
 

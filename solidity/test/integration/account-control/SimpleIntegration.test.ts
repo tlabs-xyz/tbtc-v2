@@ -11,7 +11,7 @@ import type {
   QCMinter,
   BasicMintingPolicy,
   QCReserveLedger,
-  SingleWatchdog,
+  QCWatchdog,
   Bank,
   TBTCVault,
   TBTC,
@@ -31,7 +31,7 @@ describe("Simple Account Control Integration Test", () => {
   let qcMinter: QCMinter
   let basicMintingPolicy: BasicMintingPolicy
   let qcReserveLedger: QCReserveLedger
-  let singleWatchdog: SingleWatchdog
+  let qcWatchdog: QCWatchdog
 
   // Mock contracts
   let mockBank: FakeContract<Bank>
@@ -103,9 +103,9 @@ describe("Simple Account Control Integration Test", () => {
     qcReserveLedger = await QCReserveLedger.deploy(protocolRegistry.address)
     await qcReserveLedger.deployed()
 
-    const SingleWatchdog = await ethers.getContractFactory("SingleWatchdog")
-    singleWatchdog = await SingleWatchdog.deploy(protocolRegistry.address)
-    await singleWatchdog.deployed()
+    const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
+    qcWatchdog = await QCWatchdog.deploy(protocolRegistry.address)
+    await qcWatchdog.deployed()
 
     // Register services
     await protocolRegistry.setService(SERVICE_KEYS.QC_DATA, qcData.address)
@@ -127,7 +127,7 @@ describe("Simple Account Control Integration Test", () => {
     )
     await protocolRegistry.setService(
       SERVICE_KEYS.WATCHDOG,
-      singleWatchdog.address
+      qcWatchdog.address
     )
 
     // Set up roles

@@ -289,49 +289,49 @@ describe("Advanced Reentrancy Tests", () => {
     /**
      * CRITICAL: Watchdog reentrancy vulnerabilities
      *
-     * The SingleWatchdog contract has multiple roles and makes calls
+     * The QCWatchdog contract has multiple roles and makes calls
      * to other contracts, creating potential reentrancy vectors.
      */
     context("Multi-Role Reentrancy Prevention", () => {
       it("should prevent reentrancy through watchdog role separation", async () => {
-        const { singleWatchdog, qcAddress, watchdog } = fixture
+        const { qcWatchdog, qcAddress, watchdog } = fixture
 
         const reserveBalance = TEST_DATA.AMOUNTS.RESERVE_BALANCE
 
         // Grant WATCHDOG_OPERATOR_ROLE to watchdog
         const WATCHDOG_OPERATOR_ROLE =
-          await singleWatchdog.WATCHDOG_OPERATOR_ROLE()
-        await singleWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
+          await qcWatchdog.WATCHDOG_OPERATOR_ROLE()
+        await qcWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
         // Attestation should not allow reentrancy to other watchdog functions
         await expect(
-          singleWatchdog
+          qcWatchdog
             .connect(watchdog)
             .attestReserves(qcAddress.address, reserveBalance)
         ).to.not.be.reverted
 
         // Subsequent calls should work independently
         await expect(
-          singleWatchdog.connect(watchdog).verifyQCSolvency(qcAddress.address)
+          qcWatchdog.connect(watchdog).verifyQCSolvency(qcAddress.address)
         ).to.not.be.reverted
       })
 
       it("should prevent cross-role reentrancy exploitation", async () => {
-        const { singleWatchdog, qcAddress, watchdog } = fixture
+        const { qcWatchdog, qcAddress, watchdog } = fixture
 
         const testReason = ethers.utils.id("TEST_REASON")
 
         // Grant WATCHDOG_OPERATOR_ROLE to watchdog
         const WATCHDOG_OPERATOR_ROLE =
-          await singleWatchdog.WATCHDOG_OPERATOR_ROLE()
-        await singleWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
+          await qcWatchdog.WATCHDOG_OPERATOR_ROLE()
+        await qcWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
         // Different watchdog roles should not allow reentrancy between each other
-        await singleWatchdog
+        await qcWatchdog
           .connect(watchdog)
           .setQCStatus(qcAddress.address, 1, testReason)
 
-        await singleWatchdog
+        await qcWatchdog
           .connect(watchdog)
           .attestReserves(qcAddress.address, TEST_DATA.AMOUNTS.RESERVE_BALANCE)
 
