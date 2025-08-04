@@ -114,6 +114,89 @@ The research revealed that Account Control could be implemented as an independen
 - SPV proof validation complexity requiring existing infrastructure reuse
 - Testing framework requirements for comprehensive coverage
 
+## V1.1 Implementation Lessons (August 2025)
+
+### Watchdog Consensus Simplification
+
+**Research Findings**: The initial OptimisticWatchdogConsensus design was abandoned during development in favor of a simplified dual-path architecture.
+
+#### Key Insights from Implementation
+
+**1. Operational Complexity vs. Theoretical Security**
+- Complex consensus mechanisms proved operationally burdensome
+- 90% of watchdog operations are routine and don't require consensus
+- Byzantine fault tolerance is less critical than operational efficiency for institutional use cases
+
+**2. Gas Efficiency Requirements**
+- Complex voting mechanisms consumed excessive gas
+- Escalating delay patterns (1h→4h→12h→24h) created poor user experience
+- Direct contract calls proved more practical than elaborate consensus systems
+
+**3. Human-Machine Interface Challenges**
+- Original design required machines to interpret human-readable proposals
+- Subjective decision-making proved difficult to automate effectively
+- Deterministic rule enforcement more reliable than consensus-based decisions
+
+#### Architectural Evolution Drivers
+
+**From Complex to Simple**: The evolution path showed clear preference for practical solutions:
+
+1. **OptimisticWatchdogConsensus** (Theoretical) → **QCWatchdog** (Practical)
+2. **Multi-Layer Consensus** (Complex) → **Selective Consensus** (Targeted)
+3. **Human-Readable Proposals** (Subjective) → **Deterministic Rules** (Objective)
+
+**YAGNI Principle Validation**: Many sophisticated features designed for theoretical edge cases were never needed in practice, validating the "You Aren't Gonna Need It" principle.
+
+### V1.2 Automated Framework Research
+
+**Problem Identification**: V1.1 consensus still required human interpretation of proposals, limiting true automation potential.
+
+#### Machine-Interpretable Evidence System
+
+**Research Innovation**: Development of structured evidence system enabling machine processing:
+
+- **Evidence Hash**: Cryptographic verification of evidence integrity
+- **IPFS URI Pattern**: Decentralized storage for detailed evidence
+- **Threshold Mechanisms**: 3+ reports within 24 hours trigger automated actions
+- **Escalation Pathways**: Clear progression from automated to governance decisions
+
+#### Three-Layer Decision Framework Research
+
+**Layer 1 (Deterministic)**: 90%+ automation through objective rule enforcement
+- Reserve compliance (staleness, collateralization ratios)
+- Redemption timeouts (objective time-based criteria)
+- Operational compliance (measurable activity thresholds)
+
+**Layer 2 (Threshold)**: Human-supervised consensus for subjective issues  
+- Report aggregation from multiple watchdogs
+- Machine-interpretable evidence requirements
+- Automatic escalation to governance
+
+**Layer 3 (Governance)**: Final arbitration for complex decisions
+- Integration with existing DAO infrastructure
+- Emergency proposal creation capabilities
+- Resolution tracking and implementation
+
+### Testing and Validation Insights
+
+**Comprehensive Test Coverage**: Account Control required extensive testing across multiple domains:
+
+- **Unit Tests**: Individual contract functionality validation
+- **Integration Tests**: Cross-contract interaction verification  
+- **Security Tests**: Attack vector prevention and access control validation
+- **Performance Tests**: Gas optimization and scalability verification
+
+**Test Framework Evolution**: Sophisticated testing requirements led to development of specialized test helpers and mocking strategies using Hardhat and Smock.
+
+### Future Research Directions
+
+Based on V1.1/V1.2 implementation experience, future research should focus on:
+
+1. **Cryptographic Proof Systems**: Zero-knowledge proofs for reserve attestations
+2. **Cross-Chain Integration**: Multi-network deployment patterns and challenges
+3. **Advanced Automation**: Machine learning integration for pattern detection
+4. **Governance Optimization**: DAO integration patterns and decision automation
+
 ---
 
 **Document Control**

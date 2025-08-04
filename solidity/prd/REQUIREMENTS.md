@@ -1,8 +1,8 @@
 # tBTC v2 Account Control - Requirements Specification
 
-**Document Version**: 3.0  
-**Date**: 2025-07-11  
-**Architecture**: Direct Bank Integration  
+**Document Version**: 3.1  
+**Date**: 2025-08-04  
+**Architecture**: V1.1 Dual-Path + V1.2 Automated Framework  
 **Purpose**: Complete requirements specification (source of truth)  
 **Related Documents**: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION.md](IMPLEMENTATION.md), [FLOWS.md](FLOWS.md)
 
@@ -176,22 +176,27 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 ### 3.4 Reserve Management
 
-#### 3.4.1 Optimistic Watchdog Quorum Attestation (REQ-FUNC-RES-001)
-**Requirement**: The system MUST implement optimistic N-of-M watchdog quorum for reserve attestation
+#### 3.4.1 Dual-Path Watchdog Architecture (REQ-FUNC-RES-001)
+**Requirement**: The system MUST implement dual-path watchdog architecture for operational efficiency
 
-- **Optimistic Execution**: Primary validator submits attestations optimistically
-- **Challenge Period**: 1-24 hour window for other watchdogs to object
-- **Escalating Consensus**: Progressive delays based on objection count (1h→4h→12h→24h)
-- **MEV-Resistant Selection**: Primary validator selection using blockhash randomness
-- **Approval Mechanism**: Explicit approvals required for highly disputed operations (≥3 objections)
+**V1.1 Dual-Path Design**:
+- **Individual Operations**: QCWatchdog instances handle 90% of routine operations (attestation, registration, fulfillment)
+- **Consensus Operations**: WatchdogConsensusManager handles critical authority decisions (status changes, defaults)
+- **Emergency Coordination**: WatchdogMonitor coordinates multiple instances with automatic emergency response
+- **Selective Consensus**: M-of-N voting (default 2-of-5) only for operations requiring authority
+
+**V1.2 Automated Framework**:
+- **Layer 1 (Deterministic)**: WatchdogAutomatedEnforcement for objective rule violations (90%+ automation)
+- **Layer 2 (Threshold)**: WatchdogThresholdActions for subjective issues (3+ reports → action)
+- **Layer 3 (Governance)**: WatchdogDAOEscalation for complex decisions requiring DAO intervention
 
 **Acceptance Criteria**:
-- Only active watchdogs can submit attestations as primary validators
-- Primary validator determined by MEV-resistant selection algorithm
-- Challenge period allows other watchdogs to object with evidence
-- Operations execute after challenge period expires (unless insufficient approvals)
-- Automatic QC status change to UnderReview if undercollateralized
-- ReentrancyGuard protection on all operation executions
+- Individual QCWatchdog instances can execute routine operations without consensus delay
+- Critical operations (status changes, defaults) require M-of-N consensus approval
+- Automated enforcement executes deterministic rules without human intervention
+- Emergency scenarios trigger automatic responses via WatchdogMonitor
+- All operations protected by ReentrancyGuard and comprehensive access control
+- V1.2 framework achieves 90%+ automation for measurable violations
 
 #### 3.4.2 Proof-of-Reserves Process (REQ-FUNC-POR-001)
 
