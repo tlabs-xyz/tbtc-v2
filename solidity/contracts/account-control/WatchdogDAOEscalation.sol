@@ -7,22 +7,22 @@ import "./QCManager.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
 
+// DAO interface - simplified for integration
+interface IGovernor {
+    function propose(
+        address[] memory targets,
+        uint256[] memory values,  
+        bytes[] memory calldatas,
+        string memory description
+    ) external returns (uint256 proposalId);
+}
+
 /// @title WatchdogDAOEscalation
 /// @notice Layer 3: DAO escalation system for non-deterministic decisions
 /// @dev Creates DAO proposals for all issues requiring governance decisions
 contract WatchdogDAOEscalation is AccessControl, ReentrancyGuard {
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     bytes32 public constant ESCALATOR_ROLE = keccak256("ESCALATOR_ROLE");
-
-    // DAO interface - simplified for integration
-    interface IGovernor {
-        function propose(
-            address[] memory targets,
-            uint256[] memory values,
-            bytes[] memory calldatas,
-            string memory description
-        ) external returns (uint256 proposalId);
-    }
 
     enum ReportType {
         SUSPICIOUS_ACTIVITY,    // 0
@@ -208,7 +208,7 @@ contract WatchdogDAOEscalation is AccessControl, ReentrancyGuard {
             calldatas[0] = abi.encodeWithSignature(
                 "setQCStatus(address,uint8,bytes32)",
                 target,
-                uint8(QCData.QCStatus.Suspended),
+                uint8(QCData.QCStatus.UnderReview),
                 "EMERGENCY_CONFIRMED"
             );
 

@@ -336,14 +336,14 @@ struct Report {
 - **Resolution Tracking**: Marks issues as resolved post-governance
 - **Integration**: Works with existing BridgeGovernance infrastructure
 
-#### 2.10.5 ReserveLedger.sol (Supporting Infrastructure)
+#### 2.10.5 Integration with Existing QCReserveLedger
 
-**Reserve Tracking**: Dedicated contract for reserve attestation management:
+**Reserve Tracking**: The automated framework leverages the existing `QCReserveLedger.sol`:
 
-- **Attestation Storage**: Tracks reserve levels with timestamps
-- **Staleness Detection**: Configurable thresholds for attestation freshness
-- **Collateralization Calculation**: Real-time ratio computation
-- **History Tracking**: Maintains attestation history for analysis
+- **Existing Functionality**: Uses established attestation and staleness detection
+- **No Duplication**: Reuses proven reserve tracking infrastructure  
+- **Seamless Integration**: `WatchdogAutomatedEnforcement` calls existing methods
+- **Backwards Compatible**: No changes required to existing reserve operations
 
 #### 2.10.6 Key Benefits Over V1.1
 
