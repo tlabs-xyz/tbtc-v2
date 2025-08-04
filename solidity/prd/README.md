@@ -16,16 +16,16 @@ Welcome to the Account Control system documentation. This feature extends tBTC v
 | Document                                   | Purpose                             | Audience                 |
 | ------------------------------------------ | ----------------------------------- | ------------------------ |
 | **[REQUIREMENTS.md](REQUIREMENTS.md)**     | Complete requirements specification | All stakeholders         |
-| **[ARCHITECTURE.md](ARCHITECTURE.md)**     | Detailed technical architecture     | Architects, developers   |
-| **[IMPLEMENTATION.md](IMPLEMENTATION.md)** | Code patterns and deployment        | Developers, DevOps       |
+| **[../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)**     | Detailed technical architecture     | Architects, developers   |
+| **[../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md)** | Code patterns and deployment        | Developers, DevOps       |
 | **[FLOWS.md](FLOWS.md)**                   | User journeys and sequences         | Product, QA, integrators |
 
 ### 📚 Reference Documents
 
 | Document                                                       | Purpose                      | Audience                |
 | -------------------------------------------------------------- | ---------------------------- | ----------------------- |
-| **[SPV_IMPLEMENTATION_GUIDE.md](SPV_IMPLEMENTATION_GUIDE.md)** | SPV integration details      | Blockchain developers   |
-| **[FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md)**           | V2 roadmap and enhancements  | Product, architects     |
+| **[../docs/WATCHDOG_GUIDE.md](../docs/WATCHDOG_GUIDE.md)** | Complete watchdog system guide | Watchdog operators, DevOps |
+| **[../docs/future-enhancements/FUTURE_ENHANCEMENTS.md](../docs/future-enhancements/FUTURE_ENHANCEMENTS.md)**           | V2 roadmap and enhancements  | Product, architects     |
 | **[RESEARCH.md](RESEARCH.md)**                                 | Background research findings | Researchers, architects |
 
 ---
@@ -93,21 +93,22 @@ The system deploys as an **independent contract suite** without modifying existi
 ### For Developers
 
 1. **Start with**: [REQUIREMENTS.md](REQUIREMENTS.md) - Understand what we're building
-2. **Then read**: [ARCHITECTURE.md](ARCHITECTURE.md) - Learn the technical design
-3. **Implementation**: [IMPLEMENTATION.md](IMPLEMENTATION.md) - Deploy and configure
+2. **Then read**: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) - Learn the technical design
+3. **Implementation**: [../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md) - Deploy and configure
 4. **User flows**: [FLOWS.md](FLOWS.md) - Understand user journeys
+5. **Watchdog operations**: [../docs/WATCHDOG_GUIDE.md](../docs/WATCHDOG_GUIDE.md) - Complete watchdog system guide
 
 ### For Product Managers
 
 1. **Business case**: [REQUIREMENTS.md](REQUIREMENTS.md) - Section 2 (Business Requirements)
 2. **User experience**: [FLOWS.md](FLOWS.md) - Complete user journey documentation
-3. **Future roadmap**: [FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md) - V2 evolution path
+3. **Future roadmap**: [../docs/future-enhancements/FUTURE_ENHANCEMENTS.md](../docs/future-enhancements/FUTURE_ENHANCEMENTS.md) - V2 evolution path
 
 ### For Security Reviewers
 
 1. **Security requirements**: [REQUIREMENTS.md](REQUIREMENTS.md) - Section 5 (Security Requirements)
-2. **Architecture security**: [ARCHITECTURE.md](ARCHITECTURE.md) - Section 6 (Security Considerations)
-3. **Implementation security**: [IMPLEMENTATION.md](IMPLEMENTATION.md) - Security patterns and access control
+2. **Architecture security**: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) - Complete security model
+3. **Implementation security**: [../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md) - Security patterns and access control
 
 ### For QCs (Qualified Custodians)
 
