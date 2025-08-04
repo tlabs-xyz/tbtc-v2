@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.21;
+pragma solidity 0.8.17;
 
 /// @title IWatchdogThresholdActions
 /// @notice Interface for the threshold-based reporting component of the watchdog system
