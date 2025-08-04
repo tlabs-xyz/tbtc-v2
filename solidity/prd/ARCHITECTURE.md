@@ -1,8 +1,8 @@
 # Account Control Architecture for tBTC v2
 
-**Document Version**: 1.0  
-**Date**: 2025-07-11  
-**Architecture**: Direct Bank Integration  
+**Document Version**: 1.2  
+**Date**: 2025-08-03  
+**Architecture**: Direct Bank Integration with Automated Decision Framework  
 **Purpose**: Detailed technical architecture specification  
 **Related Documents**: [README.md](README.md), [REQUIREMENTS.md](REQUIREMENTS.md), [IMPLEMENTATION.md](IMPLEMENTATION.md), [RESEARCH.md](RESEARCH.md)
 
@@ -56,6 +56,24 @@ The Account Control architecture is built on four core principles:
                     │  └─────────────────────┘ └─────────────────┘ │
                     │            │                       │        │
                     │            └───────────────────────┘        │
+                    └─────────────────────────────────────────────┘
+                                        │
+                    ┌─────────────────────────────────────────────┐
+                    │    V1.2 Automated Decision Framework        │
+                    │                                             │
+                    │  ┌─────────────────────┐ ┌─────────────────┐ │
+                    │  │ WatchdogAutomated   │ │ WatchdogThreshold   │ │
+                    │  │    Enforcement      │ │     Actions         │ │
+                    │  │ (Deterministic)     │ │ (3+ Reports)        │ │
+                    │  └─────────────────────┘ └─────────────────┘ │
+                    │            │                       │        │
+                    │            └───────────┬───────────┘        │
+                    │                        │                    │
+                    │              ┌─────────────────────┐        │
+                    │              │  WatchdogDAO        │        │
+                    │              │   Escalation       │        │
+                    │              │ (DAO Governance)   │        │
+                    │              └─────────────────────┘        │
                     └─────────────────────────────────────────────┘
 ```
 
@@ -208,7 +226,134 @@ and provides emergency circuit breaker functionality:
 - **Input Validation**: Comprehensive validation of operation parameters and states
 - **Byzantine Fault Tolerance**: Tolerates up to (N-1)/3 Byzantine failures
 
-### 2.10 Gas Optimization Strategy
+### 2.10 Automated Decision Framework (V1.2 Enhancement)
+
+**MAJOR ENHANCEMENT**: The V1.2 system introduces a three-layer automated decision framework 
+that addresses the fundamental limitation of the V1.1 consensus system - machines cannot 
+interpret subjective human-readable proposals. This framework achieves 90%+ automation 
+for deterministic violations while maintaining human oversight for subjective issues.
+
+#### 2.10.1 Three-Layer Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Layer 3: DAO Escalation                      │
+│              (WatchdogDAOEscalation.sol)                        │
+│    - Governance proposals for unresolved subjective issues      │
+│    - Emergency proposal creation                                │
+│    - Final arbitration layer                                    │
+└────────────────────────┬───────────────────────────────────────┘
+                         │ Escalate (3+ reports)
+┌────────────────────────┴───────────────────────────────────────┐
+│                Layer 2: Threshold Actions                       │
+│            (WatchdogThresholdActions.sol)                       │
+│    - Collect reports from multiple watchdogs                    │
+│    - Execute actions at threshold (3+ reports in 24h)           │
+│    - Machine-interpretable evidence system                      │
+└────────────────────────┬───────────────────────────────────────┘
+                         │ Report subjective issues
+┌────────────────────────┴───────────────────────────────────────┐
+│              Layer 1: Automated Enforcement                     │
+│          (WatchdogAutomatedEnforcement.sol)                     │
+│    - Deterministic rule enforcement                             │
+│    - Reserve compliance, redemption timeouts                    │
+│    - Operational compliance checks                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 2.10.2 WatchdogAutomatedEnforcement.sol (Layer 1)
+
+**Primary Component**: Handles 90%+ of watchdog operations through deterministic rules:
+
+- **Reserve Compliance**: Automatically enforces stale attestations, insufficient reserves
+- **Redemption Timeouts**: Defaults redemptions exceeding timeout periods
+- **Operational Compliance**: Enforces wallet inactivity and QC operational requirements
+- **MEV-Resistant Selection**: Uses blockhash randomness for operation selection
+- **Idempotent Operations**: Prevents duplicate enforcement through cooldown periods
+
+```solidity
+// Enforcement types with cooldown tracking
+mapping(string => mapping(address => uint256)) private lastEnforcement;
+uint256 public enforcementCooldown = 1 hours; // Prevents spam
+
+// Example deterministic rule
+function enforceReserveCompliance(address qc) external {
+    require(_canEnforce("RESERVE_COMPLIANCE", qc), "Cooldown active");
+    
+    // Check stale attestation (objective: timestamp > threshold)
+    if (reserveLedger.isAttestationStale(qc)) {
+        qcManager.setQCStatus(qc, QCStatus.UnderReview);
+        emit AutomatedStatusChange(qc, QCStatus.Active, QCStatus.UnderReview, 
+                                  "Stale reserve attestation");
+    }
+    
+    // Check collateralization ratio (objective: ratio < 90%)
+    if (reserveLedger.getCollateralizationRatio(qc) < minCollateralRatio) {
+        qcManager.setQCStatus(qc, QCStatus.UnderReview);
+        emit AutomatedStatusChange(qc, QCStatus.Active, QCStatus.UnderReview,
+                                  "Insufficient reserves");
+    }
+}
+```
+
+#### 2.10.3 WatchdogThresholdActions.sol (Layer 2)
+
+**Threshold Component**: Handles subjective issues requiring human judgment:
+
+- **Report Types**: AnomalousActivity, PolicyViolation, OperationalConcern, SecurityThreat
+- **Consensus Threshold**: 3+ watchdog reports within 24 hours trigger action
+- **Evidence System**: Machine-interpretable with hash + IPFS URI pattern
+- **Automatic Escalation**: Unresolved issues escalate to DAO after threshold
+
+```solidity
+// Report aggregation with threshold tracking
+struct Issue {
+    uint8 reportType;
+    address target;
+    uint256 reportCount;
+    uint256 firstReportTime;
+    bool actionExecuted;
+    bool escalated;
+}
+
+// Evidence structure for machine processing
+struct Report {
+    uint8 reportType;
+    address target;
+    address reporter;
+    uint256 timestamp;
+    bytes32 evidenceHash;    // For verification
+    string evidenceURI;      // IPFS link to detailed evidence
+}
+```
+
+#### 2.10.4 WatchdogDAOEscalation.sol (Layer 3)
+
+**Governance Component**: Final arbitration for complex issues:
+
+- **Proposal Creation**: Converts threshold reports into governance proposals
+- **Emergency Powers**: DAO can create emergency proposals directly
+- **Resolution Tracking**: Marks issues as resolved post-governance
+- **Integration**: Works with existing BridgeGovernance infrastructure
+
+#### 2.10.5 ReserveLedger.sol (Supporting Infrastructure)
+
+**Reserve Tracking**: Dedicated contract for reserve attestation management:
+
+- **Attestation Storage**: Tracks reserve levels with timestamps
+- **Staleness Detection**: Configurable thresholds for attestation freshness
+- **Collateralization Calculation**: Real-time ratio computation
+- **History Tracking**: Maintains attestation history for analysis
+
+#### 2.10.6 Key Benefits Over V1.1
+
+1. **90%+ Automation**: Deterministic rules handle most operations without voting
+2. **Machine Interpretable**: No more human-readable proposal parsing issues
+3. **Gas Efficient**: Batch operations and optimized storage patterns
+4. **MEV Resistant**: Randomized selection prevents frontrunning
+5. **Gradual Migration**: Can run parallel to V1.1 during transition
+
+### 2.11 Gas Optimization Strategy
 
 **Storage Layout Optimization**:
 
@@ -286,6 +431,17 @@ privilege.
   - **`ARBITER_ROLE`**: The permission to flag redemption defaults and change a
     QC's status (e.g., to `UnderReview` or `Revoked`) in `QCManager`. This role
     can act **instantly** for emergency actions like pausing or removing QCs.
+- **V1.2 Automated Framework Roles:** The automated decision framework introduces
+  additional roles for machine-driven enforcement:
+  - **`ENFORCER_ROLE`**: Permission to execute deterministic enforcement actions
+    in `WatchdogAutomatedEnforcement`. Granted to watchdog operators for
+    automated compliance checks.
+  - **`WATCHDOG_ROLE`**: Permission to submit reports in `WatchdogThresholdActions`
+    for subjective issues requiring multiple attestations.
+  - **`ESCALATOR_ROLE`**: Permission to escalate unresolved issues to DAO
+    governance. Typically granted to `WatchdogThresholdActions` contract.
+  - **`DAO_ROLE`**: Permission to create emergency proposals in
+    `WatchdogDAOEscalation`. Reserved for governance contracts.
 - **`PAUSER_ROLE` (The Emergency Council):** A separate, technical multi-sig
   with the limited power to trigger a granular, temporary pause on specific
   system functions (e.g., `pauseMinting()`, `pauseRedemptions()`). This surgical

@@ -14,6 +14,10 @@ import {
   QCWatchdog,
   TBTC,
   SPVValidator,
+  WatchdogAutomatedEnforcement,
+  WatchdogThresholdActions,
+  WatchdogDAOEscalation,
+  ReserveLedger,
 } from "../../typechain"
 
 /**
@@ -36,6 +40,11 @@ export const SERVICE_KEYS = {
   QC_WATCHDOG: ethers.utils.id("QC_WATCHDOG"),
   TBTC_TOKEN: ethers.utils.id("TBTC_TOKEN"),
   SPV_VALIDATOR: ethers.utils.id("SPV_VALIDATOR"),
+  // Automated Decision Framework services
+  WATCHDOG_AUTOMATED_ENFORCEMENT: ethers.utils.id("WATCHDOG_AUTOMATED_ENFORCEMENT"),
+  WATCHDOG_THRESHOLD_ACTIONS: ethers.utils.id("WATCHDOG_THRESHOLD_ACTIONS"),
+  WATCHDOG_DAO_ESCALATION: ethers.utils.id("WATCHDOG_DAO_ESCALATION"),
+  RESERVE_LEDGER: ethers.utils.id("RESERVE_LEDGER"),
 }
 
 // Role constants
@@ -50,6 +59,10 @@ export const ROLES = {
   PARAMETER_ADMIN_ROLE: ethers.utils.id("PARAMETER_ADMIN_ROLE"),
   POLICY_ADMIN_ROLE: ethers.utils.id("POLICY_ADMIN_ROLE"),
   WATCHDOG_OPERATOR_ROLE: ethers.utils.id("WATCHDOG_OPERATOR_ROLE"),
+  // Automated Decision Framework roles
+  WATCHDOG_ROLE: ethers.utils.id("WATCHDOG_ROLE"),
+  MANAGER_ROLE: ethers.utils.id("MANAGER_ROLE"),
+  ESCALATOR_ROLE: ethers.utils.id("ESCALATOR_ROLE"),
 }
 
 // Test data constants
@@ -112,6 +125,12 @@ export interface AccountControlFixture {
   basicMintingPolicy: BasicMintingPolicy
   basicRedemptionPolicy: BasicRedemptionPolicy
   qcWatchdog: QCWatchdog
+
+  // Automated Decision Framework contracts
+  watchdogAutomatedEnforcement: WatchdogAutomatedEnforcement
+  watchdogThresholdActions: WatchdogThresholdActions
+  watchdogDAOEscalation: WatchdogDAOEscalation
+  reserveLedger: ReserveLedger
 
   // TBTC token
   tbtc: TBTC
@@ -204,6 +223,45 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   )
   await qcWatchdog.deployed()
 
+  // Deploy ReserveLedger
+  const ReserveLedgerFactory = await ethers.getContractFactory("ReserveLedger")
+  const reserveLedger = await ReserveLedgerFactory.deploy()
+  await reserveLedger.deployed()
+
+  // Deploy Automated Decision Framework contracts
+  const WatchdogAutomatedEnforcementFactory = await ethers.getContractFactory(
+    "WatchdogAutomatedEnforcement"
+  )
+  const watchdogAutomatedEnforcement = await WatchdogAutomatedEnforcementFactory.deploy(
+    qcManager.address,
+    qcRedeemer.address,
+    qcData.address,
+    systemState.address,
+    reserveLedger.address
+  )
+  await watchdogAutomatedEnforcement.deployed()
+
+  const WatchdogThresholdActionsFactory = await ethers.getContractFactory(
+    "WatchdogThresholdActions"
+  )
+  const watchdogThresholdActions = await WatchdogThresholdActionsFactory.deploy(
+    qcManager.address,
+    qcData.address,
+    systemState.address
+  )
+  await watchdogThresholdActions.deployed()
+
+  const WatchdogDAOEscalationFactory = await ethers.getContractFactory(
+    "WatchdogDAOEscalation"
+  )
+  const watchdogDAOEscalation = await WatchdogDAOEscalationFactory.deploy(
+    qcManager.address,
+    qcData.address,
+    systemState.address,
+    governance.address // Use governance as DAO for testing
+  )
+  await watchdogDAOEscalation.deployed()
+
   // Deploy real TBTC token (same as integration test)
   const TBTCFactory = await ethers.getContractFactory("TBTC")
   const tbtc = await TBTCFactory.deploy()
@@ -238,6 +296,21 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     qcWatchdog.address
   )
   await protocolRegistry.setService(SERVICE_KEYS.TBTC_TOKEN, tbtc.address)
+  
+  // Register Automated Decision Framework services
+  await protocolRegistry.setService(
+    SERVICE_KEYS.WATCHDOG_AUTOMATED_ENFORCEMENT,
+    watchdogAutomatedEnforcement.address
+  )
+  await protocolRegistry.setService(
+    SERVICE_KEYS.WATCHDOG_THRESHOLD_ACTIONS,
+    watchdogThresholdActions.address
+  )
+  await protocolRegistry.setService(
+    SERVICE_KEYS.WATCHDOG_DAO_ESCALATION,
+    watchdogDAOEscalation.address
+  )
+  await protocolRegistry.setService(SERVICE_KEYS.RESERVE_LEDGER, reserveLedger.address)
 
   // Grant necessary roles
   await qcData.grantQCManagerRole(qcManager.address)
@@ -246,6 +319,19 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   await qcManager.grantRole(ROLES.QC_ADMIN_ROLE, basicMintingPolicy.address) // Grant role to policy for minting
   await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
   await qcWatchdog.grantRole(ROLES.WATCHDOG_OPERATOR_ROLE, watchdog.address)
+
+  // Grant roles for Automated Decision Framework
+  await reserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
+  await watchdogThresholdActions.grantRole(ROLES.WATCHDOG_ROLE, watchdog.address)
+  await watchdogDAOEscalation.grantRole(ROLES.ESCALATOR_ROLE, watchdogThresholdActions.address)
+  await systemState.grantRole(ROLES.PAUSER_ROLE, watchdogThresholdActions.address)
+  
+  // Connect ThresholdActions to DAO Escalation
+  await watchdogThresholdActions.setDAOEscalation(watchdogDAOEscalation.address)
+  
+  // Grant automated enforcement permissions
+  await qcManager.grantRole(ROLES.ARBITER_ROLE, watchdogAutomatedEnforcement.address)
+  await qcRedeemer.grantRole(ROLES.ARBITER_ROLE, watchdogAutomatedEnforcement.address)
 
   // Transfer ownership of TBTC to the BasicMintingPolicy for minting
   await tbtc.transferOwnership(basicMintingPolicy.address)
@@ -261,6 +347,10 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     basicMintingPolicy,
     basicRedemptionPolicy,
     qcWatchdog,
+    watchdogAutomatedEnforcement,
+    watchdogThresholdActions,
+    watchdogDAOEscalation,
+    reserveLedger,
     tbtc,
     deployer,
     governance,
@@ -726,6 +816,10 @@ export function validateTestFixture(fixture: AccountControlFixture): void {
     "basicMintingPolicy",
     "basicRedemptionPolicy",
     "qcWatchdog",
+    "watchdogAutomatedEnforcement",
+    "watchdogThresholdActions",
+    "watchdogDAOEscalation",
+    "reserveLedger",
     "tbtc",
   ]
 
