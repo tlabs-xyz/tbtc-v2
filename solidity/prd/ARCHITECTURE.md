@@ -180,24 +180,53 @@ direct BasicMintingPolicy integration while maintaining backward compatibility.
   - **Vault Integration**: Auto-minting uses `increaseBalanceAndCall()` to trigger `TBTCVault.receiveBalanceIncrease()`
   - **Shared Infrastructure**: Both regular Bridge and BasicMintingPolicy use the same Bank and TBTCVault infrastructure
 
-### 2.9 V1.1 Watchdog Quorum Architecture
+### 2.9 V1.1 Dual-Path Watchdog Architecture
 
-**CORE COMPONENT**: The V1.1 system implements a configurable M-of-N watchdog consensus
-that provides Byzantine fault tolerance while maintaining gas efficiency through
-direct voting mechanisms and emergency response capabilities.
+**CORE COMPONENT**: The V1.1 system implements a **dual-path architecture** that balances efficiency 
+with security. **90% of watchdog operations** use individual QCWatchdog instances for maximum 
+efficiency, while **critical operations requiring authority** use M-of-N consensus through 
+WatchdogConsensusManager.
 
-#### 2.9.1 WatchdogConsensusManager.sol
+#### 2.9.1 QCWatchdog.sol - Individual Watchdog Operations
 
-**Primary Component**: Implements configurable M-of-N voting for critical operations:
+**Primary Component**: Individual watchdog proxy handling routine operations:
 
-- **Configurable Consensus**: M-of-N voting with default 2-of-5 configuration
-- **Proposal-Based System**: Structured voting on specific operation types
-- **Time-Limited Voting**: 2-hour voting periods with cleanup mechanisms
-- **Four Operation Types**: Status changes, wallet deregistration, redemption defaults, force intervention
-- **Byzantine Fault Tolerance**: Minimum consensus requirements with safety bounds
+- **Role Consolidation**: Single WATCHDOG_OPERATOR_ROLE for all routine operations
+- **Direct Integration**: Proxy pattern for efficient system interaction
+- **Core Operations**: Proof-of-reserves attestation, wallet registration, redemption handling
+- **SPV Verification**: Bitcoin transaction verification for wallet registration
+- **Event Standardization**: Comprehensive event emission for monitoring
 
 ```solidity
-// Core proposal structure
+/// @title QCWatchdog
+/// @dev Proxy contract consolidating multiple system roles under single WATCHDOG_OPERATOR_ROLE
+contract QCWatchdog is AccessControl {
+    bytes32 public constant WATCHDOG_OPERATOR_ROLE = keccak256("WATCHDOG_OPERATOR_ROLE");
+    
+    // Required roles in other contracts:
+    // - ARBITER_ROLE in QCManager and QCRedeemer
+    // - ATTESTER_ROLE in QCReserveLedger
+    // - REGISTRAR_ROLE in QCManager
+}
+```
+
+**Key Features**:
+- **Gas Efficient**: Direct calls without consensus overhead for routine operations
+- **Operational Simplicity**: Single role management for operators
+- **Comprehensive Monitoring**: Tracking for attestations, registrations, and redemptions
+- **SPV Integration**: Bitcoin transaction verification using existing tBTC infrastructure
+
+#### 2.9.2 WatchdogConsensusManager.sol - Critical Consensus Operations
+
+**Consensus Component**: M-of-N voting system for operations requiring authority:
+
+- **Selective Consensus**: Only critical operations requiring multiple authority signatures
+- **Configurable Parameters**: M-of-N voting (default 2-of-5) with safety bounds
+- **Proposal-Based System**: Structured voting on specific operation types
+- **Time-Limited Voting**: 2-hour voting periods with cleanup mechanisms
+- **Byzantine Fault Tolerance**: Tolerates up to (N-1)/3 Byzantine failures
+
+```solidity
 struct Proposal {
     ProposalType proposalType;  // STATUS_CHANGE, WALLET_DEREGISTRATION, etc.
     bytes data;                // Encoded operation parameters
@@ -209,22 +238,60 @@ struct Proposal {
 }
 ```
 
-#### 2.9.2 WatchdogMonitor.sol
+**Consensus-Required Operations**:
+- QC status changes (Active ↔ UnderReview ↔ Revoked)
+- Wallet deregistration requests
+- Redemption default declarations
+- Force intervention scenarios
 
-**Emergency Coordination Component**: Coordinates multiple QCWatchdog instances
-and provides emergency circuit breaker functionality:
+#### 2.9.3 WatchdogMonitor.sol - System Coordination
 
-- **Dual Execution Path**: Consensus routing for active watchdogs, direct execution for operators
-- **Event Compatibility**: Maintains all QCWatchdog events for monitoring systems
-- **Role-Based Access**: Supports existing WATCHDOG_OPERATOR_ROLE permissions
-- **Operation Encoding**: Handles all operation types (attestation, registration, status change, redemption)
+**Coordination Component**: Manages multiple QCWatchdog instances and emergency responses:
 
-#### 2.9.3 Security Features
+- **Watchdog Registration**: Registration and lifecycle management of QCWatchdog instances
+- **Emergency Detection**: Monitors for critical reports requiring immediate action
+- **Threshold-Based Actions**: Automatic emergency pause when threshold reached (3+ reports in 1 hour)
+- **Cross-Instance Coordination**: Ensures consistent behavior across multiple watchdogs
 
+**Emergency Response System**:
+- **Critical Report Tracking**: Aggregates reports from multiple watchdog instances
+- **Automatic Emergency Pause**: Triggers when CRITICAL_REPORTS_THRESHOLD exceeded
+- **Recovery Procedures**: Clear emergency states once issues resolved
+
+#### 2.9.4 Dual-Path Operation Flow
+
+**Routine Operations (90% of watchdog activity)**:
+```
+QCWatchdog → Direct System Integration
+- Attestation: QCWatchdog → QCReserveLedger
+- Registration: QCWatchdog → QCManager (with SPV proof)
+- Redemption Fulfillment: QCWatchdog → QCRedeemer
+```
+
+**Critical Operations (10% requiring authority)**:
+```
+Watchdog → WatchdogConsensusManager → Proposal → Voting → Execution
+- Status Changes: Require M-of-N consensus before execution
+- Wallet Deregistration: Require consensus approval
+- Default Declarations: Require consensus validation
+```
+
+**Emergency Scenarios**:
+```
+Multiple Watchdogs → WatchdogMonitor → Emergency Detection → Automatic Response
+- Critical Reports: Aggregated across all watchdog instances
+- Emergency Pause: Triggered automatically at threshold
+- Recovery: Coordinated through WatchdogMonitor
+```
+
+#### 2.9.5 Security Features
+
+- **Role Separation**: Individual operations vs. consensus-required operations
 - **Reentrancy Protection**: All execution functions protected by OpenZeppelin's ReentrancyGuard
-- **Access Control**: Role-based permissions with emergency and management roles
+- **Access Control**: Granular role-based permissions with emergency and management roles
 - **Input Validation**: Comprehensive validation of operation parameters and states
-- **Byzantine Fault Tolerance**: Tolerates up to (N-1)/3 Byzantine failures
+- **Byzantine Fault Tolerance**: Consensus operations tolerate up to (N-1)/3 Byzantine failures
+- **Emergency Circuit Breakers**: Automatic response to critical scenarios
 
 ### 2.10 Automated Decision Framework (V1.2 Enhancement)
 
@@ -273,25 +340,32 @@ for deterministic violations while maintaining human oversight for subjective is
 
 ```solidity
 // Enforcement types with cooldown tracking
-mapping(string => mapping(address => uint256)) private lastEnforcement;
-uint256 public enforcementCooldown = 1 hours; // Prevents spam
+mapping(bytes32 => uint256) public lastEnforcementTime;
+uint256 public constant ENFORCEMENT_COOLDOWN = 1 hours; // Prevents spam
 
 // Example deterministic rule
 function enforceReserveCompliance(address qc) external {
-    require(_canEnforce("RESERVE_COMPLIANCE", qc), "Cooldown active");
-    
-    // Check stale attestation (objective: timestamp > threshold)
-    if (reserveLedger.isAttestationStale(qc)) {
-        qcManager.setQCStatus(qc, QCStatus.UnderReview);
-        emit AutomatedStatusChange(qc, QCStatus.Active, QCStatus.UnderReview, 
-                                  "Stale reserve attestation");
+    if (!_canEnforce("RESERVE_COMPLIANCE", qc)) {
+        revert EnforcementCooldownActive();
     }
     
-    // Check collateralization ratio (objective: ratio < 90%)
-    if (reserveLedger.getCollateralizationRatio(qc) < minCollateralRatio) {
-        qcManager.setQCStatus(qc, QCStatus.UnderReview);
-        emit AutomatedStatusChange(qc, QCStatus.Active, QCStatus.UnderReview,
-                                  "Insufficient reserves");
+    (uint256 reserves, bool isStale) = reserveLedger.getReserveBalanceAndStaleness(qc);
+    uint256 minted = qcData.getQCMintedAmount(qc);
+    QCData.QCStatus status = qcData.getQCStatus(qc);
+    
+    // Only act on Active QCs
+    if (status != QCData.QCStatus.Active) return;
+    
+    // Check stale attestation (objective: timestamp > threshold)
+    if (isStale) {
+        qcManager.setQCStatus(qc, QCData.QCStatus.UnderReview, "Stale reserve attestation");
+        emit ReserveComplianceEnforced(qc, reserves, minted, "STALE_ATTESTATION");
+    }
+    
+    // Check collateralization ratio (objective: reserves < minted)
+    if (reserves < minted) {
+        qcManager.setQCStatus(qc, QCData.QCStatus.UnderReview, "Insufficient reserves");
+        emit ReserveComplianceEnforced(qc, reserves, minted, "INSUFFICIENT_RESERVES");
     }
 }
 ```
@@ -300,7 +374,7 @@ function enforceReserveCompliance(address qc) external {
 
 **Threshold Component**: Handles subjective issues requiring human judgment:
 
-- **Report Types**: AnomalousActivity, PolicyViolation, OperationalConcern, SecurityThreat
+- **Report Types**: SUSPICIOUS_ACTIVITY, UNUSUAL_PATTERN, EMERGENCY_SITUATION, OPERATIONAL_CONCERN
 - **Consensus Threshold**: 3+ watchdog reports within 24 hours trigger action
 - **Evidence System**: Machine-interpretable with hash + IPFS URI pattern
 - **Automatic Escalation**: Unresolved issues escalate to DAO after threshold
@@ -353,7 +427,110 @@ struct Report {
 4. **MEV Resistant**: Randomized selection prevents frontrunning
 5. **Gradual Migration**: Can run parallel to V1.1 during transition
 
-### 2.11 Gas Optimization Strategy
+### 2.11 Watchdog Architecture Evolution Journey
+
+**ARCHITECTURAL LEARNING**: The Account Control watchdog system underwent significant evolution 
+from initial design to production implementation, providing key insights into operational 
+efficiency versus security trade-offs.
+
+#### 2.11.1 Initial Design: OptimisticWatchdogConsensus (Deprecated)
+
+**Original Vision**: The initial design attempted to implement a sophisticated optimistic 
+consensus system with complex voting mechanisms and extensive parameterization.
+
+**Key Components (Removed)**:
+- **OptimisticWatchdogConsensus**: Complex voting system with escalating delays
+- **MEV-Resistant Primary Selection**: Blockhash-based randomness for validator selection
+- **Escalating Consensus Delays**: 1h→4h→12h→24h based on objection count
+- **Approval Mechanism**: Byzantine fault tolerance with disputed operation handling
+
+**Why It Was Abandoned**:
+1. **Operational Complexity**: Required extensive coordination between multiple parties
+2. **Gas Inefficiency**: Complex voting mechanisms consumed excessive gas
+3. **Timing Issues**: Escalating delays created poor user experience
+4. **Implementation Overhead**: Significant development and testing complexity
+5. **Real-World Mismatch**: Theoretical security model didn't match practical operations
+
+#### 2.11.2 Simplified Evolution: Dual-Path V1.1 Architecture
+
+**Pragmatic Approach**: The production V1.1 system evolved to a **dual-path model** 
+that separates routine operations from critical consensus operations.
+
+**Key Innovation**: **90% efficiency rule** - recognize that most watchdog operations 
+are routine and don't require consensus, reserving expensive consensus mechanisms 
+for only critical authority decisions.
+
+**Evolutionary Benefits**:
+- **Operational Efficiency**: Individual QCWatchdog instances handle routine operations
+- **Selective Consensus**: WatchdogConsensusManager used only for critical operations
+- **Emergency Response**: WatchdogMonitor provides coordinated emergency responses
+- **Gas Optimization**: Dramatic reduction in transaction costs
+- **Simplified Operations**: Single role management for operators
+
+#### 2.11.3 V1.2 Enhancement: Automated Decision Framework
+
+**Next Evolution**: Address the fundamental limitation that machines cannot interpret 
+subjective human-readable proposals.
+
+**Core Problem Solved**: V1.1 consensus still required human interpretation of proposals, 
+limiting automation. V1.2 introduces **deterministic rule enforcement** for objective 
+violations and **threshold-based escalation** for subjective issues.
+
+**Architectural Progression**:
+```
+V1.0 Complex Consensus → V1.1 Dual-Path → V1.2 Automated Framework
+    (Theoretical)         (Practical)      (Machine-Driven)
+```
+
+#### 2.11.4 Key Architectural Lessons Learned
+
+**1. YAGNI Principle Validation**: "You Aren't Gonna Need It" proved critical. The initial 
+complex design included many theoretical features that weren't needed in practice.
+
+**2. Operational Reality Over Theoretical Security**: Perfect Byzantine fault tolerance 
+is less valuable than practical operational efficiency for institutional use cases.
+
+**3. Progressive Enhancement Strategy**: Start simple (V1.1) and add sophistication 
+(V1.2) based on actual operational needs rather than theoretical requirements.
+
+**4. Clear Separation of Concerns**: Separating routine operations from critical 
+authority decisions dramatically simplifies both code and operations.
+
+**5. Human-Machine Interface Design**: Critical insight that machines need deterministic 
+rules, not human-readable proposals, for effective automation.
+
+#### 2.11.5 Design Patterns That Emerged
+
+**1. Dual-Path Pattern**: Separate routine operations from consensus-required operations
+- Routine: Direct contract calls with single role
+- Critical: Multi-party consensus with voting mechanisms
+
+**2. Layered Automation Pattern**: Three-layer decision framework
+- Layer 1: Deterministic (machine-driven)
+- Layer 2: Threshold-based (human-supervised)
+- Layer 3: Governance (human-driven)
+
+**3. Progressive Security Model**: Start with trust-based approach, evolve to 
+trustless mechanisms as the system matures and requirements become clearer.
+
+**4. Emergency Circuit Breaker Pattern**: Always maintain emergency coordination 
+capabilities even in distributed systems.
+
+#### 2.11.6 Future Evolution Insights
+
+**Migration Strategy**: The modular architecture enables future enhancements without 
+breaking existing operations:
+
+- **V1.3 Cryptographic Proofs**: Add zero-knowledge proofs for reserve attestations
+- **V2.0 Full Automation**: Complete machine-driven operations with minimal human oversight
+- **V2.1 Cross-Chain Integration**: Extend to other blockchain networks
+
+**Scaling Considerations**: Current architecture supports growth through:
+- Horizontal scaling: Multiple QCWatchdog instances
+- Vertical scaling: Enhanced automation in V1.2 framework
+- Network scaling: Cross-chain deployment patterns
+
+### 2.12 Gas Optimization Strategy
 
 **Storage Layout Optimization**:
 
@@ -1073,27 +1250,90 @@ while preserving instant emergency response capabilities.
 - Positive: Enhanced governance transparency, community oversight
 - Negative: Delayed execution for routine operations, increased complexity
 
+### 8.7 ADR-007: Watchdog Consensus Simplification Decision
+
+**Status**: Accepted  
+**Date**: 2025-08-04
+
+**Context**: The initial OptimisticWatchdogConsensus design proved operationally complex and gas-inefficient during implementation, requiring a strategic pivot to a more practical approach.
+
+**Decision**: Replace complex OptimisticWatchdogConsensus with simplified dual-path architecture using QCWatchdog for routine operations and WatchdogConsensusManager for critical consensus operations.
+
+**Rationale**:
+
+- **90% Efficiency Rule**: Analysis showed that 90% of watchdog operations are routine and don't require multi-party consensus
+- **Gas Optimization**: Complex voting mechanisms consumed excessive gas for routine operations
+- **Operational Simplicity**: Single role management (WATCHDOG_OPERATOR_ROLE) reduces operational overhead
+- **Selective Consensus**: Reserve expensive consensus mechanisms only for critical authority decisions
+- **User Experience**: Eliminate escalating delays (1h→4h→12h→24h) that created poor UX
+- **YAGNI Principle**: Remove theoretical features that weren't needed in practice
+
+**Implementation Details**:
+
+- **QCWatchdog**: Individual proxy contracts for routine operations (attestation, registration, fulfillment)
+- **WatchdogConsensusManager**: M-of-N voting system for critical operations (status changes, defaults)
+- **WatchdogMonitor**: Coordination layer for emergency responses and multi-instance management
+- **Preserved Security**: Critical operations still require consensus while routine operations gain efficiency
+
+**Consequences**:
+
+- Positive: Dramatic gas reduction, simplified operations, better user experience, maintained security for critical operations
+- Negative: Less theoretical Byzantine fault tolerance for routine operations, architectural complexity from dual-path design
+
+**Migration Impact**: This decision enabled the V1.2 Automated Decision Framework by establishing the foundational dual-path pattern that separates deterministic operations from consensus-requiring operations.
+
 ## 9. Deployment Architecture & System Capacity
 
-### 9.1 Phased Deployment Strategy
+### 9.1 Account Control Deployment Strategy
 
-**Phase 1: Foundation Deployment**
+**Deployment Overview**: Account Control system deploys as an extension to the existing 
+tBTC v2 infrastructure using scripts 95-101, following the established numbered 
+deployment pattern.
 
-- Core Libraries: QCDataTypes, QCMath, QCEvents, QCValidation
-- Risk Assessment: QCRiskAssessment
-- Testing Infrastructure: Mock contracts, test utilities, integration helpers
+**Phase 1: Core Infrastructure (Scripts 95-97)**
 
-**Phase 2: Core Logic Deployment**
+**Script 95**: `deploy_account_control_core.ts`
+- QCManager: Business logic for QC lifecycle management
+- QCData: Data storage contract for QC and wallet information
+- QCMinter: Entry point for minting operations
+- QCRedeemer: Entry point for redemption operations
+- ProtocolRegistry: Service locator for modular architecture
 
-- Storage Management: QCStorageManager
-- Oracle Integration: QCOracleManager
-- Integration Testing: Component integration tests, oracle consensus testing
+**Script 96**: `deploy_account_control_state.ts`
+- SystemState: Global state and emergency controls
+- QCReserveLedger: Reserve attestation tracking
+- SPVValidator: Bitcoin transaction verification
 
-**Phase 3: Direct Bank Integration**
+**Script 97**: `deploy_account_control_policies.ts`
+- BasicMintingPolicy: Direct Bank integration for minting
+- BasicRedemptionPolicy: Redemption fulfillment and default handling
 
-- Policy Integration: BasicMintingPolicy with direct Bank calls
-- System Configuration: Parameter initialization, role assignments, Bank authorization
-- End-to-End Testing: Complete workflow testing, security validation, performance benchmarking
+**Phase 2: Watchdog System (Script 98)**
+
+**Script 98**: `deploy_account_control_watchdog.ts`
+- WatchdogConsensusManager: M-of-N consensus for critical operations
+- WatchdogMonitor: Coordinates multiple QCWatchdog instances
+- QCWatchdog: Individual watchdog proxy for routine operations
+
+**Phase 3: System Configuration (Script 99)**
+
+**Script 99**: `configure_account_control_system.ts`
+- Role assignments and permissions
+- Contract authorizations and integrations
+- Parameter initialization
+- Bank authorization for BasicMintingPolicy
+
+**Phase 4: V1.2 Automated Framework (Scripts 100-101)**
+
+**Script 100**: `deploy_automated_decision_framework.ts`
+- WatchdogAutomatedEnforcement: Layer 1 deterministic enforcement
+- WatchdogThresholdActions: Layer 2 threshold-based actions
+- WatchdogDAOEscalation: Layer 3 governance escalation
+
+**Script 101**: `configure_automated_decision_framework.ts`
+- Framework configuration and role assignments
+- Integration with existing V1.1 system
+- Automated framework activation
 
 ### 9.2 System Capacity Design
 
@@ -1108,16 +1348,31 @@ while preserving instant emergency response capabilities.
 
 ### 9.3 Deployment Scripts Architecture
 
-**Hardhat Deploy Pattern**:
+**Hardhat Deploy Pattern**: Account Control follows the established tBTC v2 numbered 
+deployment convention, using scripts 95-101 for the complete system.
 
 ```typescript
-// Following tBTC v2 numbered deployment pattern
+// Account Control Deployment Scripts (95-101)
 deploy/
-├── 50_deploy_qc_libraries.ts
-├── 51_deploy_qc_storage.ts
-├── 52_deploy_qc_oracle.ts
-├── 53_deploy_qc_bridge.ts
-└── 54_configure_qc_system.ts
+├── 95_deploy_account_control_core.ts          // Core contracts
+├── 96_deploy_account_control_state.ts         // State management
+├── 97_deploy_account_control_policies.ts      // Policy contracts
+├── 98_deploy_account_control_watchdog.ts      // Watchdog system
+├── 99_configure_account_control_system.ts     // System configuration
+├── 100_deploy_automated_decision_framework.ts // V1.2 framework
+└── 101_configure_automated_decision_framework.ts // Framework config
+```
+
+**Integration with Existing Scripts**: Account Control integrates with existing 
+tBTC infrastructure deployed in earlier scripts (00-94):
+
+- **Script 30**: `deploy_spv_validator.ts` - SPV infrastructure for Bitcoin verification
+- **Script 05**: `deploy_bank.ts` - Bank contract for balance management
+- **Script 07**: `deploy_tbtc_vault.ts` - Vault contract for token minting
+
+**Dependency Chain**:
+```
+Scripts 00-94 (tBTC Infrastructure) → Scripts 95-99 (Account Control V1.1) → Scripts 100-101 (V1.2 Framework)
 ```
 
 **Environment-Specific Configuration**:

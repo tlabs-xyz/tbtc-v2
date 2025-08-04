@@ -8,7 +8,7 @@
 
 ### Components
 
-1. **SingleWatchdog** - Individual watchdog instances (existing)
+1. **QCWatchdog** - Individual watchdog instances for routine operations
 2. **WatchdogConsensusManager** - M-of-N consensus for critical operations
 3. **WatchdogMonitor** - Coordinates multiple watchdog instances
 4. **Emergency System** - Automatic circuit breaker
@@ -25,7 +25,7 @@
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   SingleWatchdog│    │   SingleWatchdog│    │   SingleWatchdog│
+│   QCWatchdog    │    │   QCWatchdog    │    │   QCWatchdog    │
 │   Instance #1   │    │   Instance #2   │    │   Instance #3   │
 │                 │    │                 │    │                 │
 │   Operator A    │    │   Operator B    │    │   Operator C    │

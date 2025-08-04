@@ -38,7 +38,7 @@ describe("WatchdogAutomatedEnforcement", () => {
     qcRedeemer = await ethers.getContract("QCRedeemer")
     qcData = await ethers.getContract("QCData")
     systemState = await ethers.getContract("SystemState")
-    reserveLedger = await ethers.getContract("ReserveLedger")
+    reserveLedger = await ethers.getContract("QCReserveLedger")
 
     return {
       automatedEnforcement,

@@ -1,8 +1,8 @@
 # Account Control Implementation Guide
 
-**Document Version**: 1.0  
-**Date**: 2025-07-11  
-**Architecture**: Direct Bank Integration  
+**Document Version**: 1.1  
+**Date**: 2025-08-04  
+**Architecture**: V1.1 Dual-Path + V1.2 Automated Framework  
 **Purpose**: Code patterns, deployment procedures, and configuration management  
 **Related Documents**: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [REQUIREMENTS.md](REQUIREMENTS.md), [FLOWS.md](FLOWS.md)
 
