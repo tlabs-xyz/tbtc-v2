@@ -15,20 +15,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const qcData = await deployments.get("QCData")
   const systemState = await deployments.get("SystemState")
   
-  // Check if ReserveLedger exists (it might be deployed separately)
-  let reserveLedger
-  try {
-    reserveLedger = await deployments.get("ReserveLedger")
-  } catch (e) {
-    log("ReserveLedger not found, deploying placeholder...")
-    // Deploy a simple placeholder for ReserveLedger
-    reserveLedger = await deploy("ReserveLedger", {
-      from: deployer,
-      args: [],
-      log: true,
-      skipIfAlreadyDeployed: true,
-    })
-  }
+  // Get the existing QCReserveLedger (already deployed in earlier scripts)
+  const qcReserveLedger = await deployments.get("QCReserveLedger")
 
   // 1. Deploy WatchdogAutomatedEnforcement (Layer 1)
   log("Deploying WatchdogAutomatedEnforcement...")
@@ -39,7 +27,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       qcRedeemer.address,
       qcData.address,
       systemState.address,
-      reserveLedger.address,
+      qcReserveLedger.address,
     ],
     log: true,
     skipIfAlreadyDeployed: true,
