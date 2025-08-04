@@ -56,6 +56,13 @@ contract SystemState is AccessControl {
     uint256 public minMintAmount; // Minimum amount for minting operations
     uint256 public maxMintAmount; // Maximum amount for single minting operation
 
+    /// @dev Automated enforcement parameters
+    uint256 public minCollateralRatio; // Minimum collateral ratio percentage (e.g., 90 for 90%)
+    uint256 public walletInactivityPeriod; // Time after which wallets are considered inactive
+    uint256 public qcInactivityPeriod; // Time after which QCs are considered inactive
+    uint256 public failureThreshold; // Number of failures before enforcement action
+    uint256 public failureWindow; // Time window for counting failures
+
     /// @dev Emergency parameters
     address public emergencyCouncil; // Emergency council address
     uint256 public emergencyPauseDuration; // Maximum duration for emergency pauses
@@ -145,6 +152,37 @@ contract SystemState is AccessControl {
         address indexed updatedBy
     );
 
+    /// @dev Emitted when automated enforcement parameters are updated
+    event MinCollateralRatioUpdated(
+        uint256 indexed oldRatio,
+        uint256 indexed newRatio,
+        address indexed updatedBy
+    );
+
+    event WalletInactivityPeriodUpdated(
+        uint256 indexed oldPeriod,
+        uint256 indexed newPeriod,
+        address indexed updatedBy
+    );
+
+    event QCInactivityPeriodUpdated(
+        uint256 indexed oldPeriod,
+        uint256 indexed newPeriod,
+        address indexed updatedBy
+    );
+
+    event FailureThresholdUpdated(
+        uint256 indexed oldThreshold,
+        uint256 indexed newThreshold,
+        address indexed updatedBy
+    );
+
+    event FailureWindowUpdated(
+        uint256 indexed oldWindow,
+        uint256 indexed newWindow,
+        address indexed updatedBy
+    );
+
     /// @dev Events for role management are inherited from AccessControl
 
     // =================== MODIFIERS ===================
@@ -175,6 +213,13 @@ contract SystemState is AccessControl {
         minMintAmount = 0.01 ether; // Minimum 0.01 tBTC
         maxMintAmount = 1000 ether; // Maximum 1000 tBTC per transaction
         emergencyPauseDuration = 7 days; // Emergency pauses last max 7 days
+
+        // Set automated enforcement defaults
+        minCollateralRatio = 90; // 90% minimum collateral ratio
+        walletInactivityPeriod = 90 days; // Wallets inactive after 90 days
+        qcInactivityPeriod = 30 days; // QCs inactive after 30 days
+        failureThreshold = 3; // 3 failures trigger enforcement
+        failureWindow = 7 days; // Count failures over 7 days
     }
 
     // =================== PAUSE FUNCTIONS ===================
@@ -360,6 +405,99 @@ contract SystemState is AccessControl {
 
         emit EmergencyCouncilUpdated(oldCouncil, newCouncil, msg.sender);
     }
+
+    // =================== AUTOMATED ENFORCEMENT PARAMETERS ===================
+
+    /// @notice Update minimum collateral ratio
+    /// @param newRatio The new minimum collateral ratio percentage (e.g., 90 for 90%)
+    function setMinCollateralRatio(uint256 newRatio)
+        external
+        onlyRole(PARAMETER_ADMIN_ROLE)
+    {
+        if (newRatio == 0 || newRatio > 200) revert InvalidAmount(); // Max 200%
+        
+        uint256 oldRatio = minCollateralRatio;
+        minCollateralRatio = newRatio;
+        
+        emit MinCollateralRatioUpdated(oldRatio, newRatio, msg.sender);
+    }
+
+    /// @notice Update wallet inactivity period
+    /// @param newPeriod The new inactivity period in seconds
+    function setWalletInactivityPeriod(uint256 newPeriod)
+        external
+        onlyRole(PARAMETER_ADMIN_ROLE)
+    {
+        if (newPeriod == 0) revert InvalidDuration();
+        if (newPeriod > 365 days) revert DurationTooLong(newPeriod, 365 days);
+        
+        uint256 oldPeriod = walletInactivityPeriod;
+        walletInactivityPeriod = newPeriod;
+        
+        emit WalletInactivityPeriodUpdated(oldPeriod, newPeriod, msg.sender);
+    }
+
+    /// @notice Update QC inactivity period
+    /// @param newPeriod The new inactivity period in seconds
+    function setQCInactivityPeriod(uint256 newPeriod)
+        external
+        onlyRole(PARAMETER_ADMIN_ROLE)
+    {
+        if (newPeriod == 0) revert InvalidDuration();
+        if (newPeriod > 180 days) revert DurationTooLong(newPeriod, 180 days);
+        
+        uint256 oldPeriod = qcInactivityPeriod;
+        qcInactivityPeriod = newPeriod;
+        
+        emit QCInactivityPeriodUpdated(oldPeriod, newPeriod, msg.sender);
+    }
+
+    /// @notice Update failure threshold
+    /// @param newThreshold The new failure threshold count
+    function setFailureThreshold(uint256 newThreshold)
+        external
+        onlyRole(PARAMETER_ADMIN_ROLE)
+    {
+        if (newThreshold == 0 || newThreshold > 10) revert InvalidThreshold();
+        
+        uint256 oldThreshold = failureThreshold;
+        failureThreshold = newThreshold;
+        
+        emit FailureThresholdUpdated(oldThreshold, newThreshold, msg.sender);
+    }
+
+    /// @notice Update failure counting window
+    /// @param newWindow The new failure counting window in seconds
+    function setFailureWindow(uint256 newWindow)
+        external
+        onlyRole(PARAMETER_ADMIN_ROLE)
+    {
+        if (newWindow == 0) revert InvalidDuration();
+        if (newWindow > 30 days) revert DurationTooLong(newWindow, 30 days);
+        
+        uint256 oldWindow = failureWindow;
+        failureWindow = newWindow;
+        
+        emit FailureWindowUpdated(oldWindow, newWindow, msg.sender);
+    }
+
+    /// @notice Emergency pause for a specific QC (called by automated systems)
+    /// @param qc The QC address to pause
+    function emergencyPause(address qc) external onlyRole(PAUSER_ROLE) {
+        // This function would be called by WatchdogThresholdActions
+        // For now, it's a placeholder that could trigger QC-specific pauses
+        // Implementation would depend on how QC-specific pauses are handled
+        
+        emit EmergencyActionTaken(qc, "EMERGENCY_PAUSE", msg.sender, block.timestamp);
+    }
+
+    /// @dev Emergency action event
+    event EmergencyActionTaken(
+        address indexed target,
+        bytes32 indexed action,
+        address indexed triggeredBy,
+        uint256 timestamp
+    );
 
     // =================== VIEW FUNCTIONS ===================
 
