@@ -17,7 +17,6 @@ import {
   WatchdogAutomatedEnforcement,
   WatchdogThresholdActions,
   WatchdogDAOEscalation,
-  ReserveLedger,
 } from "../../typechain"
 
 /**
@@ -44,7 +43,6 @@ export const SERVICE_KEYS = {
   WATCHDOG_AUTOMATED_ENFORCEMENT: ethers.utils.id("WATCHDOG_AUTOMATED_ENFORCEMENT"),
   WATCHDOG_THRESHOLD_ACTIONS: ethers.utils.id("WATCHDOG_THRESHOLD_ACTIONS"),
   WATCHDOG_DAO_ESCALATION: ethers.utils.id("WATCHDOG_DAO_ESCALATION"),
-  RESERVE_LEDGER: ethers.utils.id("RESERVE_LEDGER"),
 }
 
 // Role constants
@@ -130,7 +128,6 @@ export interface AccountControlFixture {
   watchdogAutomatedEnforcement: WatchdogAutomatedEnforcement
   watchdogThresholdActions: WatchdogThresholdActions
   watchdogDAOEscalation: WatchdogDAOEscalation
-  reserveLedger: ReserveLedger
 
   // TBTC token
   tbtc: TBTC
@@ -223,10 +220,6 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   )
   await qcWatchdog.deployed()
 
-  // Deploy ReserveLedger
-  const ReserveLedgerFactory = await ethers.getContractFactory("ReserveLedger")
-  const reserveLedger = await ReserveLedgerFactory.deploy()
-  await reserveLedger.deployed()
 
   // Deploy Automated Decision Framework contracts
   const WatchdogAutomatedEnforcementFactory = await ethers.getContractFactory(
@@ -237,7 +230,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     qcRedeemer.address,
     qcData.address,
     systemState.address,
-    reserveLedger.address
+    qcReserveLedger.address
   )
   await watchdogAutomatedEnforcement.deployed()
 
@@ -310,7 +303,6 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     SERVICE_KEYS.WATCHDOG_DAO_ESCALATION,
     watchdogDAOEscalation.address
   )
-  await protocolRegistry.setService(SERVICE_KEYS.RESERVE_LEDGER, reserveLedger.address)
 
   // Grant necessary roles
   await qcData.grantQCManagerRole(qcManager.address)
@@ -350,7 +342,6 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     watchdogAutomatedEnforcement,
     watchdogThresholdActions,
     watchdogDAOEscalation,
-    reserveLedger,
     tbtc,
     deployer,
     governance,
@@ -819,7 +810,6 @@ export function validateTestFixture(fixture: AccountControlFixture): void {
     "watchdogAutomatedEnforcement",
     "watchdogThresholdActions",
     "watchdogDAOEscalation",
-    "reserveLedger",
     "tbtc",
   ]
 

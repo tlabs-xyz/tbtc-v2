@@ -7,7 +7,7 @@ import "./QCManager.sol";
 import "./QCRedeemer.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
-import "./ReserveLedger.sol";
+import "./QCReserveLedger.sol";
 
 /// @title WatchdogAutomatedEnforcement
 /// @notice Layer 1: Deterministic enforcement for objective violations
@@ -21,7 +21,7 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
     QCRedeemer public immutable qcRedeemer;
     QCData public immutable qcData;
     SystemState public immutable systemState;
-    ReserveLedger public immutable reserveLedger;
+    QCReserveLedger public immutable reserveLedger;
 
     // Tracking for pattern detection
     mapping(address => uint256) public failureCount;
@@ -93,7 +93,7 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
         qcRedeemer = QCRedeemer(_qcRedeemer);
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
-        reserveLedger = ReserveLedger(_reserveLedger);
+        reserveLedger = QCReserveLedger(_reserveLedger);
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MANAGER_ROLE, msg.sender);
@@ -109,7 +109,7 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
         }
 
         (uint256 reserves, bool isStale) = reserveLedger.getReserveBalanceAndStaleness(qc);
-        uint256 minted = qcData.getMintedAmount(qc);
+        uint256 minted = qcData.getQCMintedAmount(qc);
         QCData.QCStatus status = qcData.getQCStatus(qc);
 
         // Only act on Active QCs

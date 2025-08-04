@@ -30,13 +30,12 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
   // Check for new automated framework contracts (optional deployment)
   let automatedFrameworkDeployed = false
-  let watchdogAutomatedEnforcement, watchdogThresholdActions, watchdogDAOEscalation, reserveLedger
+  let watchdogAutomatedEnforcement, watchdogThresholdActions, watchdogDAOEscalation
   
   try {
     watchdogAutomatedEnforcement = await get("WatchdogAutomatedEnforcement")
     watchdogThresholdActions = await get("WatchdogThresholdActions")
     watchdogDAOEscalation = await get("WatchdogDAOEscalation")
-    reserveLedger = await get("ReserveLedger")
     automatedFrameworkDeployed = true
     log("✅ Automated Decision Framework detected - will configure alongside legacy system")
   } catch (e) {
@@ -61,7 +60,6 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const WATCHDOG_AUTOMATED_ENFORCEMENT_KEY = ethers.utils.id("WATCHDOG_AUTOMATED_ENFORCEMENT")
   const WATCHDOG_THRESHOLD_ACTIONS_KEY = ethers.utils.id("WATCHDOG_THRESHOLD_ACTIONS")
   const WATCHDOG_DAO_ESCALATION_KEY = ethers.utils.id("WATCHDOG_DAO_ESCALATION")
-  const RESERVE_LEDGER_KEY = ethers.utils.id("RESERVE_LEDGER")
 
   log("Step 1: Registering all services in ProtocolRegistry...")
 
@@ -179,14 +177,6 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
       "setService",
       WATCHDOG_DAO_ESCALATION_KEY,
       watchdogDAOEscalation.address
-    )
-
-    await execute(
-      "ProtocolRegistry",
-      { from: deployer, log: true },
-      "setService",
-      RESERVE_LEDGER_KEY,
-      reserveLedger.address
     )
   }
 
@@ -460,7 +450,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log("   - WatchdogConsensusManager, WatchdogMonitor, ProtocolRegistry")
   if (automatedFrameworkDeployed) {
     log("   - WatchdogAutomatedEnforcement, WatchdogThresholdActions")
-    log("   - WatchdogDAOEscalation, ReserveLedger")
+    log("   - WatchdogDAOEscalation")
   }
   log("")
   log("3. Transfer PAUSER_ROLE in SystemState:")

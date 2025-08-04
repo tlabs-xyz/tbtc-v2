@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.21;
+pragma solidity 0.8.17;
 
 /// @title IWatchdogDAOEscalation
 /// @notice Interface for the DAO escalation component of the watchdog system
