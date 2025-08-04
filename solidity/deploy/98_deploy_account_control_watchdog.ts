@@ -42,6 +42,8 @@ const func: DeployFunction = async function DeployAccountControlWatchdog(
   log("- Multiple independent QCWatchdog instances")
   log("- Emergency pause with 3-report threshold")
   log("- Clean separation of monitoring vs consensus")
+  log("")
+  log("Note: Automated Decision Framework will be deployed in script 100-101")
 }
 
 export default func
