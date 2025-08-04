@@ -1,8 +1,8 @@
 # Account Control Architecture for tBTC v2
 
-**Document Version**: 1.0  
-**Date**: 2025-07-11  
-**Architecture**: Direct Bank Integration  
+**Document Version**: 1.1  
+**Date**: 2025-08-04  
+**Architecture**: V1.1 Dual-Path + V1.2 Automated Framework  
 **Status**: Production Ready
 
 ---
@@ -48,7 +48,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 
 - **🏦 Direct Bank Integration**: Seamless integration with proven Bank/Vault infrastructure
 - **🔧 Modular Architecture**: Policy-driven contracts enable future upgrades without disruption
-- **👁️ Single Watchdog**: DAO-appointed entity for Proof-of-Reserves attestations
+- **👁️ Dual-Path Watchdog**: Individual QCWatchdog instances + M-of-N consensus for critical operations
 - **🛡️ Segregated Reserves**: Individual QC reserves prevent systemic gridlock
 - **⚡ Simple State Machine**: Clean 3-state QC model (Active, UnderReview, Revoked)
 
@@ -65,14 +65,17 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 
 ### System Components
 
-| Component              | Purpose                  | Key Features                                      |
-| ---------------------- | ------------------------ | ------------------------------------------------- |
-| **BasicMintingPolicy** | Direct Bank integration  | Auto-minting, capacity validation, error handling |
-| **ProtocolRegistry**   | Central service registry | Component upgrades, dependency management         |
-| **QCManager**          | Business logic           | Stateless QC management, capacity calculations    |
-| **QCData**             | Storage layer            | Pure storage, gas-optimized, audit-friendly       |
-| **QCMinter**           | Stable entry point       | Policy delegation, emergency pause                |
-| **QCRedeemer**         | Redemption engine        | Lifecycle management, default handling            |
+| Component                       | Purpose                      | Key Features                                      |
+| ------------------------------- | ---------------------------- | ------------------------------------------------- |
+| **BasicMintingPolicy**          | Direct Bank integration      | Auto-minting, capacity validation, error handling |
+| **ProtocolRegistry**            | Central service registry     | Component upgrades, dependency management         |
+| **QCManager**                   | Business logic               | Stateless QC management, capacity calculations    |
+| **QCData**                      | Storage layer                | Pure storage, gas-optimized, audit-friendly       |
+| **QCMinter**                    | Stable entry point           | Policy delegation, emergency pause                |
+| **QCRedeemer**                  | Redemption engine            | Lifecycle management, default handling            |
+| **QCWatchdog**                  | Individual watchdog proxy    | Routine operations, SPV verification              |
+| **WatchdogConsensusManager**    | M-of-N consensus             | Critical operations voting, Byzantine fault tolerance |
+| **WatchdogAutomatedEnforcement** | V1.2 automated rules        | Deterministic enforcement, 90%+ automation       |
 
 ### Integration with Existing tBTC v2
 

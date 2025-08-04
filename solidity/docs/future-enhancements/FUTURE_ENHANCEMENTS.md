@@ -18,7 +18,7 @@ The following architectural principles guide all enhancement ideas:
 
 ✅ **Modular Contract System**: ProtocolRegistry enables individual component upgrades  
 ✅ **Policy-Driven Evolution**: Core contracts delegate to upgradeable Policy contracts  
-✅ **Single Watchdog Model**: Trusted DAO-appointed entity with multiple roles  
+✅ **Dual-Path Watchdog Model**: V1.1 QCWatchdog + WatchdogConsensusManager, V1.2 Automated Framework  
 ✅ **Data/Logic Separation**: QCData.sol (storage) vs QCManager.sol (stateless logic)  
 ✅ **Simple State Models**: 3-state QC model (Active, UnderReview, Revoked)  
 ✅ **Independent Deployment**: New contract suite without modifying existing tBTC v2

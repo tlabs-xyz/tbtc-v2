@@ -1,8 +1,8 @@
 # Account Control User Flows and Sequences
 
-**Document Version**: 1.0  
-**Date**: 2025-07-11  
-**Architecture**: Direct Bank Integration  
+**Document Version**: 1.1  
+**Date**: 2025-08-04  
+**Architecture**: V1.1 Dual-Path + V1.2 Automated Framework  
 **Purpose**: User journeys and sequence diagrams for Account Control system  
 **Related Documents**: [README.md](README.md), [REQUIREMENTS.md](REQUIREMENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION.md](IMPLEMENTATION.md)
 
@@ -40,7 +40,9 @@ This document provides a complete inventory of user flows in the tBTC v2 Account
 - **QCMinter/QCRedeemer**: Entry points for minting/redemption
 - **Policy Contracts**: Upgradeable business logic (BasicMintingPolicy, BasicRedemptionPolicy)
 - **QCReserveLedger**: Reserve attestation management
-- **SingleWatchdog**: Multi-role watchdog service
+- **QCWatchdog**: Individual watchdog instances for routine operations
+- **WatchdogConsensusManager**: M-of-N consensus for critical operations
+- **WatchdogAutomatedEnforcement**: V1.2 automated rule enforcement
 
 ---
 
