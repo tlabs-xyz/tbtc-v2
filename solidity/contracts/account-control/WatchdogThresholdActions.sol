@@ -296,6 +296,11 @@ contract WatchdogThresholdActions is AccessControl, ReentrancyGuard {
         return count;
     }
 
+    /// @notice Aggregate evidence hashes from all reports for a specific issue
+    /// @dev Collects all evidence hashes submitted by watchdogs for the given issue into an encoded array.
+    ///      This aggregated evidence is passed to DAO proposals for review.
+    /// @param issueId The unique identifier of the issue
+    /// @return Encoded array of evidence hashes (bytes32[])
     function _aggregateEvidence(bytes32 issueId) internal view returns (bytes memory) {
         Report[] memory issueReports = reports[issueId];
         bytes32[] memory evidenceHashes = new bytes32[](issueReports.length);
@@ -307,6 +312,10 @@ contract WatchdogThresholdActions is AccessControl, ReentrancyGuard {
         return abi.encode(evidenceHashes);
     }
 
+    /// @notice Reset the reporting state for an issue after action execution
+    /// @dev Clears all watchdog report flags and deletes the reports array.
+    ///      This allows fresh reporting for the same issue after cooldown period.
+    /// @param issueId The unique identifier of the issue to reset
     function _resetReportingState(bytes32 issueId) internal {
         // Clear hasReported mapping for all watchdogs
         Report[] memory issueReports = reports[issueId];
