@@ -87,7 +87,7 @@ contract QCManager is AccessControl {
         address indexed qc,
         string btcAddress,
         address indexed requestedBy,
-        uint256 indexed timestamp
+        uint256 timestamp
     );
 
     /// @dev Emitted when solvency check is performed
@@ -96,7 +96,7 @@ contract QCManager is AccessControl {
         bool indexed solvent,
         uint256 mintedAmount,
         uint256 reserveBalance,
-        address indexed checkedBy,
+        address checkedBy,
         uint256 timestamp
     );
 
@@ -120,9 +120,9 @@ contract QCManager is AccessControl {
     /// @dev Emitted when QC is emergency paused
     event QCEmergencyPaused(
         address indexed qc,
-        bytes32 reason,
+        bytes32 indexed reason,
         address indexed pausedBy,
-        uint256 indexed timestamp
+        uint256 timestamp
     );
 
     /// @dev Emitted when reserve balance is updated

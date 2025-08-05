@@ -3,6 +3,7 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 import "./QCManager.sol";
 import "./QCRedeemer.sol";
 import "./QCData.sol";
@@ -12,7 +13,7 @@ import "./QCReserveLedger.sol";
 /// @title WatchdogAutomatedEnforcement
 /// @notice Layer 1: Deterministic enforcement for objective violations
 /// @dev Handles 90%+ of decisions that are objectively measurable without consensus
-contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
+contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard, Pausable {
     bytes32 public constant WATCHDOG_ROLE = keccak256("WATCHDOG_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
@@ -32,6 +33,9 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
     // Rate limiting for enforcement calls
     mapping(bytes32 => uint256) public lastEnforcementTime;
     uint256 public constant ENFORCEMENT_COOLDOWN = 1 hours;
+
+    // Emergency pause functionality
+    bool public emergencyDisabled;
 
     // Events for monitoring and transparency
     event AutomatedAction(
@@ -73,6 +77,12 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
         uint256 timeWindow
     );
 
+    event EmergencyDisabledSet(
+        bool disabled,
+        address indexed setBy,
+        uint256 timestamp
+    );
+
     // Custom errors
     error InvalidConfiguration();
     error EnforcementCooldownActive();
@@ -81,6 +91,7 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
     error NotTimedOut();
     error WalletNotInactive();
     error UnauthorizedEnforcement();
+    error EmergencyDisabled();
 
     constructor(
         address _qcManager,
@@ -99,11 +110,19 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
         _grantRole(MANAGER_ROLE, msg.sender);
     }
 
+    // =================== MODIFIERS ===================
+
+    /// @notice Modifier to check if emergency is disabled
+    modifier notEmergencyDisabled() {
+        if (emergencyDisabled) revert EmergencyDisabled();
+        _;
+    }
+
     // =================== RESERVE COMPLIANCE ENFORCEMENT ===================
 
     /// @notice Enforce reserve compliance for a QC
     /// @param qc The QC address to check
-    function enforceReserveCompliance(address qc) external {
+    function enforceReserveCompliance(address qc) external notEmergencyDisabled {
         if (!_canEnforce("RESERVE_COMPLIANCE", qc)) {
             revert EnforcementCooldownActive();
         }
@@ -148,7 +167,7 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
 
     /// @notice Enforce redemption timeout for a specific redemption
     /// @param redemptionId The redemption ID to check
-    function enforceRedemptionTimeout(bytes32 redemptionId) external {
+    function enforceRedemptionTimeout(bytes32 redemptionId) external notEmergencyDisabled {
         QCRedeemer.Redemption memory redemption = qcRedeemer.getRedemption(redemptionId);
         
         // Must be pending
@@ -183,7 +202,7 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
 
     /// @notice Enforce wallet inactivity deregistration
     /// @param btcAddress The Bitcoin address to check
-    function enforceWalletInactivity(string calldata btcAddress) external {
+    function enforceWalletInactivity(string calldata btcAddress) external notEmergencyDisabled {
         uint256 lastActivity = _getLastWalletActivity(btcAddress);
         // Note: This would need to be implemented based on QCData wallet status tracking
         // For now, using a placeholder implementation
@@ -215,7 +234,7 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
 
     /// @notice Enforce operational compliance for a QC
     /// @param qc The QC address to check
-    function enforceOperationalCompliance(address qc) external {
+    function enforceOperationalCompliance(address qc) external notEmergencyDisabled {
         if (!_canEnforce("OPERATIONAL_COMPLIANCE", qc)) {
             revert EnforcementCooldownActive();
         }
@@ -263,8 +282,12 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
     // =================== BATCH ENFORCEMENT ===================
 
     /// @notice Batch enforce reserve compliance for multiple QCs
-    /// @param qcs Array of QC addresses to check
-    function batchEnforceReserveCompliance(address[] calldata qcs) external {
+    /// @dev Iterates through the array of QC addresses and attempts to enforce compliance on each.
+    ///      Uses try-catch to ensure that a failure on one QC doesn't prevent checking others.
+    ///      This is gas-intensive and should be called with reasonable array sizes.
+    /// @param qcs Array of QC addresses to check for reserve compliance
+    /// @custom:security-note Caller should ensure array size is reasonable to avoid gas limit issues
+    function batchEnforceReserveCompliance(address[] calldata qcs) external notEmergencyDisabled {
         for (uint256 i = 0; i < qcs.length; i++) {
             try this.enforceReserveCompliance(qcs[i]) {
                 // Success, continue
@@ -276,8 +299,11 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
     }
 
     /// @notice Batch enforce redemption timeouts
-    /// @param redemptionIds Array of redemption IDs to check
-    function batchEnforceRedemptionTimeouts(bytes32[] calldata redemptionIds) external {
+    /// @dev Iterates through redemption IDs and enforces timeout on each that has exceeded the timeout period.
+    ///      Uses try-catch to ensure one failed enforcement doesn't block others.
+    /// @param redemptionIds Array of redemption IDs to check for timeout enforcement
+    /// @custom:security-note Gas costs scale linearly with array size; consider pagination for large batches
+    function batchEnforceRedemptionTimeouts(bytes32[] calldata redemptionIds) external notEmergencyDisabled {
         for (uint256 i = 0; i < redemptionIds.length; i++) {
             try this.enforceRedemptionTimeout(redemptionIds[i]) {
                 // Success, continue
@@ -290,6 +316,11 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
 
     // =================== INTERNAL HELPER FUNCTIONS ===================
 
+    /// @notice Check if an enforcement action can be performed (not in cooldown)
+    /// @dev Verifies that the cooldown period has elapsed since the last enforcement
+    /// @param actionType The type of enforcement action as a string identifier
+    /// @param target The target address for the enforcement action
+    /// @return True if the action can be enforced, false if still in cooldown
     function _canEnforce(string memory actionType, address target) internal view returns (bool) {
         bytes32 key = keccak256(abi.encodePacked(actionType, target));
         return block.timestamp > lastEnforcementTime[key] + ENFORCEMENT_COOLDOWN;
@@ -434,7 +465,19 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
     /// @notice Emergency disable enforcement for maintenance
     /// @param disabled True to disable enforcement
     function setEmergencyDisabled(bool disabled) external onlyRole(MANAGER_ROLE) {
-        // Implementation would add emergency disable functionality
-        // For now, this is a placeholder for future emergency controls
+        emergencyDisabled = disabled;
+        emit EmergencyDisabledSet(disabled, msg.sender, block.timestamp);
+    }
+
+    /// @notice Pause all contract operations
+    /// @dev Uses OpenZeppelin's Pausable pattern for standard pause functionality
+    function pause() external onlyRole(MANAGER_ROLE) {
+        _pause();
+    }
+
+    /// @notice Unpause all contract operations
+    /// @dev Uses OpenZeppelin's Pausable pattern for standard unpause functionality
+    function unpause() external onlyRole(MANAGER_ROLE) {
+        _unpause();
     }
 }
