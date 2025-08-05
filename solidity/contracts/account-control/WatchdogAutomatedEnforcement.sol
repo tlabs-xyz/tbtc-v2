@@ -344,15 +344,44 @@ contract WatchdogAutomatedEnforcement is AccessControl, ReentrancyGuard {
     }
 
     function _getLastWalletActivity(string memory btcAddress) internal view returns (uint256) {
-        // Placeholder implementation - would need to track wallet activity
-        // This could be implemented by monitoring wallet registration timestamps
-        // and last transaction times from QCData
-        return block.timestamp - 100 days; // Placeholder
+        // Check if wallet is registered
+        if (!qcData.isWalletRegistered(btcAddress)) {
+            return 0;
+        }
+        
+        // Get the wallet owner to access registration data
+        address qc = qcData.getWalletOwner(btcAddress);
+        if (qc == address(0)) {
+            return 0;
+        }
+        
+        // For now, we use the registration time as the last activity
+        // In a production system, this would need to track:
+        // 1. Last redemption fulfillment through this wallet
+        // 2. Last reserve attestation that included this wallet
+        // 3. Last Bitcoin transaction time (from SPV proofs)
+        
+        // Since QCData doesn't expose wallet registration time directly,
+        // we return a conservative estimate based on wallet status
+        QCData.WalletStatus status = qcData.getWalletStatus(btcAddress);
+        
+        // If wallet is active, assume it's been used recently
+        if (status == QCData.WalletStatus.Active) {
+            // Return current time minus 30 days as a conservative estimate
+            // This ensures active wallets won't be flagged as inactive
+            return block.timestamp - 30 days;
+        } else if (status == QCData.WalletStatus.PendingDeRegistration) {
+            // Wallet pending deregistration - assume longer inactivity
+            return block.timestamp - 60 days;
+        } else {
+            // Inactive or deregistered - assume very old activity
+            return block.timestamp - 120 days;
+        }
     }
 
     function _getWalletOwner(string memory btcAddress) internal view returns (address) {
-        // Placeholder implementation - would need to look up wallet owner from QCData
-        return address(0); // Placeholder
+        // Look up wallet owner from QCData
+        return qcData.getWalletOwner(btcAddress);
     }
 
     // =================== VIEW FUNCTIONS ===================
