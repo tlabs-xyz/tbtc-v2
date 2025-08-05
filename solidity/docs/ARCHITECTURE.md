@@ -473,7 +473,7 @@ The system deploys through numbered scripts ensuring proper dependency resolutio
 4. `98_deploy_account_control_watchdog.ts` - V1.1 watchdog consensus system
 5. `99_configure_account_control_system.ts` - Final system configuration
 
-**V1.2 Automation Framework (Scripts 100-101)**:
+**V1.2 Automation Framework (Scripts 100-102)**:
 6. `100_deploy_automated_decision_framework.ts` - Three-layer automation system
 7. `101_configure_automated_decision_framework.ts` - Role assignments and parameters
 
