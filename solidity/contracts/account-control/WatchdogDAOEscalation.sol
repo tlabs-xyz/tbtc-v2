@@ -366,6 +366,13 @@ contract WatchdogDAOEscalation is AccessControl, ReentrancyGuard {
         ));
     }
 
+    /// @notice Generate a human-readable description for the DAO proposal
+    /// @dev Converts report type enum to string and formats a descriptive message for DAO members.
+    ///      This helps DAO participants understand the issue without diving into technical details.
+    /// @param reportType The type of report (0-3 corresponding to ReportType enum)
+    /// @param target The address of the QC or contract being reported
+    /// @param evidence The aggregated evidence data (unused in description but passed for context)
+    /// @return A formatted string description suitable for DAO proposal
     function _generateDescription(
         uint8 reportType,
         address target,
@@ -388,6 +395,11 @@ contract WatchdogDAOEscalation is AccessControl, ReentrancyGuard {
         ));
     }
 
+    /// @notice Convert an address to its hexadecimal string representation
+    /// @dev Converts address to lowercase hex string with "0x" prefix.
+    ///      Used for generating human-readable DAO proposal descriptions.
+    /// @param addr The address to convert
+    /// @return The hexadecimal string representation of the address (42 characters including 0x)
     function _addressToString(address addr) internal pure returns (string memory) {
         bytes32 value = bytes32(uint256(uint160(addr)));
         bytes memory alphabet = "0123456789abcdef";
