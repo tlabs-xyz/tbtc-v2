@@ -181,14 +181,14 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Current Design (v2.0)**:
 - **Oracle Problem**: ReserveOracle provides multi-attester consensus for reserve balances
-- **Observation Problem**: WatchdogSubjectiveReporting enables transparent reporting via events
+- **Observation Problem**: WatchdogReporting enables transparent reporting via events
 - **Decision Problem**: Direct DAO action without intermediary contracts
 - **Enforcement**: WatchdogEnforcer allows permissionless triggering of objective violations
 
 **Key Components**:
 - **WatchdogReasonCodes**: Machine-readable violation codes for automated validation
 - **ReserveOracle**: Median consensus from 3+ attesters, eliminates single trust point
-- **WatchdogSubjectiveReporting**: Simple event emission for DAO monitoring
+- **WatchdogReporting**: Simple event emission for DAO monitoring
 - **WatchdogEnforcer**: Anyone can trigger enforcement with valid reason codes
 
 **Acceptance Criteria**:

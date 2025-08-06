@@ -44,7 +44,7 @@ This document provides concrete, step-by-step remediation strategies for critica
 ```yaml
 Current Contracts Analysis:
   ReserveOracle.sol: ✅ Oracle consensus (KEEP)
-  WatchdogSubjectiveReporting.sol: ✅ Event reporting (KEEP)  
+  WatchdogReporting.sol: ✅ Event reporting (KEEP)  
   WatchdogEnforcer.sol: ✅ Objective enforcement (KEEP)
   WatchdogReasonCodes.sol: ✅ Standard codes (KEEP)
   
@@ -61,7 +61,7 @@ Current Contracts Analysis:
 contracts/
 ├── watchdog/
 │   ├── ReserveOracle.sol           // Multi-attester consensus
-│   ├── WatchdogSubjectiveReporting.sol // Event-based reporting  
+│   ├── WatchdogReporting.sol // Event-based reporting  
 │   ├── WatchdogEnforcer.sol        // Permissionless enforcement
 │   └── WatchdogReasonCodes.sol     // Machine-readable codes
 └── core/
@@ -366,7 +366,7 @@ The watchdog system provides monitoring through a simplified 4-contract architec
 
 1. WatchdogReasonCodes Library
 2. ReserveOracle Contract  
-3. WatchdogSubjectiveReporting Contract
+3. WatchdogReporting Contract
 4. WatchdogEnforcer Contract
 
 <!-- AFTER - CORRECTED -->
@@ -377,7 +377,7 @@ The watchdog system provides monitoring through these core contracts:
 ### Watchdog-Specific Contracts (4)
 1. **WatchdogReasonCodes Library** - Machine-readable violation codes
 2. **ReserveOracle Contract** - Multi-attester consensus for reserves
-3. **WatchdogSubjectiveReporting Contract** - Transparent observation reporting  
+3. **WatchdogReporting Contract** - Transparent observation reporting  
 4. **WatchdogEnforcer Contract** - Permissionless objective enforcement
 
 ### Supporting Account Control Contracts (10)
@@ -400,7 +400,7 @@ graph TB
     subgraph "Watchdog System (4 contracts)"
         WRC[WatchdogReasonCodes]
         RO[ReserveOracle]  
-        WSR[WatchdogSubjectiveReporting]
+        WSR[WatchdogReporting]
         WE[WatchdogEnforcer]
     end
     
@@ -1223,7 +1223,7 @@ The Account Control system implements QC functionality through these contracts:
 ### Watchdog-Specific Contracts (4)
 1. **WatchdogReasonCodes.sol** - Machine-readable violation codes library
 2. **ReserveOracle.sol** - Multi-attester consensus for reserve attestations  
-3. **WatchdogSubjectiveReporting.sol** - Event-based subjective reporting
+3. **WatchdogReporting.sol** - Event-based subjective reporting
 4. **WatchdogEnforcer.sol** - Permissionless objective violation enforcement
 
 ### Core Account Control Infrastructure (10+)
@@ -1298,7 +1298,7 @@ function _calculateMedian(uint256[] memory values, uint256 length) internal pure
 
 **Additional Algorithmic Issues:**
 - WatchdogEnforcer hardcodes contract addresses instead of using interfaces
-- No batching in WatchdogSubjectiveReporting for multiple reports
+- No batching in WatchdogReporting for multiple reports
 - Linear search in QCReserveLedger history operations
 
 ### **Target State**
@@ -1387,7 +1387,7 @@ contract WatchdogEnforcer is AccessControl {
 
 #### **Step 9.3: Implement Batch Operations**
 ```solidity
-// WatchdogSubjectiveReporting.sol - Add batch reporting
+// WatchdogReporting.sol - Add batch reporting
 function reportMultipleObservations(
     address[] calldata targets,
     ObservationType[] calldata obsTypes,
@@ -1719,7 +1719,7 @@ False Claims Analysis:
 ```yaml
 Low Complexity (✅):
   - WatchdogReasonCodes: Simple constants library
-  - WatchdogSubjectiveReporting: Basic event emission
+  - WatchdogReporting: Basic event emission
 
 Medium Complexity (⚠️):
   - ReserveOracle: Consensus logic with median calculation

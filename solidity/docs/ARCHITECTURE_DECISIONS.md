@@ -36,7 +36,7 @@ Critical issue identified: **Machines cannot interpret human-readable strings** 
 Migrate to a simplified 4-contract architecture based on the **Three-Problem Framework**:
 
 1. **Oracle Problem** → `ReserveOracle` (multi-attester consensus)
-2. **Observation Problem** → `WatchdogSubjectiveReporting` (transparent reporting)
+2. **Observation Problem** → `WatchdogReporting` (transparent reporting)
 3. **Decision Problem** → Direct DAO action (no intermediary)
 4. **Enforcement** → `WatchdogEnforcer` (permissionless with reason codes)
 
