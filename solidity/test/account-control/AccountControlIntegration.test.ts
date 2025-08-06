@@ -667,21 +667,16 @@ describe("Account Control System - Integration Test", () => {
     })
   })
 
-  describe("QCBridge Integration", () => {
-    it("should enable minting via TBTCVault after QCBridge deposit", async () => {
-      // This test verifies the complete integration flow:
-      // 1. BasicMintingPolicy creates Bank balance via QCBridge
-      // 2. User can then call TBTCVault.mint() to consume Bank balance
-      // 3. User receives tBTC tokens through standard Vault flow
-
-      // Note: This test is a placeholder for the QCBridge integration
-      // Full implementation would require:
-      // - Deploy Bank, TBTCVault, and QCBridge contracts
-      // - Update BasicMintingPolicy to use QCBridge
-      // - Configure proper access controls
-      // - Test the complete flow from QC → Bank → TBTCVault → tBTC
-
-      // For now, we verify the existing direct minting still works
+  describe("Direct QC Minting Integration", () => {
+    it("should enable direct QC minting through QCMinter", async () => {
+      // This test verifies the current direct minting integration flow:
+      // 1. QC registers with sufficient capacity
+      // 2. Watchdog attests QC reserves
+      // 3. User requests mint through QCMinter
+      // 4. User receives tBTC tokens directly
+      //
+      // NOTE: Future QCBridge integration would replace this direct minting
+      // with a flow through Bank → TBTCVault → tBTC tokens
       const totalSupplyBefore = await tbtc.totalSupply()
 
       // Grant MINTER_ROLE to user on QCMinter
@@ -711,6 +706,41 @@ describe("Account Control System - Integration Test", () => {
       expect(totalSupplyAfter).to.equal(
         totalSupplyBefore.add(ethers.utils.parseEther("1"))
       )
+
+      // Verify QC minted amount was updated
+      const qcInfo = await qcData.getQC(qcAddress.address)
+      expect(qcInfo.totalMintedAmount).to.equal(ethers.utils.parseEther("1"))
+    })
+
+    it("should handle QC capacity limits properly", async () => {
+      // Setup QC with limited capacity
+      await qcData.registerQC(
+        qcAddress.address,
+        ethers.utils.parseEther("2") // Only 2 tBTC capacity
+      )
+      await qcWatchdog
+        .connect(watchdog)
+        .attestReserves(qcAddress.address, ethers.utils.parseEther("5"))
+
+      // Grant MINTER_ROLE to user
+      const QC_MINTER_ROLE = await qcMinter.MINTER_ROLE()
+      await qcMinter.grantRole(QC_MINTER_ROLE, user.address)
+
+      // First mint should succeed
+      await qcMinter
+        .connect(user)
+        .requestQCMint(qcAddress.address, ethers.utils.parseEther("1"))
+
+      // Second mint pushing over capacity should fail
+      await expect(
+        qcMinter
+          .connect(user)
+          .requestQCMint(qcAddress.address, ethers.utils.parseEther("2"))
+      ).to.be.reverted
+
+      // Verify only the first mint succeeded
+      const userBalance = await tbtc.balanceOf(user.address)
+      expect(userBalance).to.equal(ethers.utils.parseEther("1"))
     })
   })
 

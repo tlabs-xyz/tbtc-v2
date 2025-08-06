@@ -43,6 +43,41 @@ ATTESTER_ROLE          → Submit reserve attestations
 - **Median Calculation**: Resistant to single outlier manipulation
 - **No Admin Override**: All updates must go through consensus
 
+### 6. QC-Specific Emergency Controls (SystemState)
+- **Individual QC Pausing**: Target specific qualified custodians without affecting others
+- **Reason Code Tracking**: Emergency actions include machine-readable reason codes
+- **Reversible Controls**: Both pause and unpause functions available
+- **Time-Limited Duration**: Automatic expiry after `emergencyPauseDuration` (default 7 days)
+- **Integration Ready**: Modifier `qcNotEmergencyPaused` for other contracts to check status
+
+#### Implementation Details
+```solidity
+// Primary emergency pause function with reason tracking
+function emergencyPauseQC(address qc, bytes32 reason) external onlyRole(PAUSER_ROLE)
+
+// Unpause function for recovery
+function emergencyUnpauseQC(address qc) external onlyRole(PAUSER_ROLE)
+
+// Status checking functions
+function isQCEmergencyPaused(address qc) external view returns (bool)
+function isQCEmergencyPauseExpired(address qc) external view returns (bool)
+function getQCPauseTimestamp(address qc) external view returns (uint256)
+```
+
+#### Common Reason Codes
+- `INSUFFICIENT_COLLATERAL`: Below minimum collateral ratio
+- `STALE_ATTESTATIONS`: Reserve attestations too old
+- `COMPLIANCE_VIOLATION`: Regulatory or compliance issue
+- `SECURITY_INCIDENT`: Security breach or suspicious activity
+- `TECHNICAL_FAILURE`: System malfunction or bug
+- `GENERIC_EMERGENCY_PAUSE`: Default for backward compatibility
+
+#### Integration Points
+- **WatchdogEnforcer**: Calls `emergencyPauseQC()` for automated violations
+- **QCMinter/QCRedeemer**: Check `qcNotEmergencyPaused` modifier before operations
+- **Monitoring Systems**: Listen for `QCEmergencyPaused` events for alerts
+- **DAO Governance**: Can revoke PAUSER_ROLE if emergency powers abused
+
 ---
 
 ## Trust Assumptions & Requirements
