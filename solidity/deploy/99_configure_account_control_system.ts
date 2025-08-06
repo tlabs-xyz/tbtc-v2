@@ -9,10 +9,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const { deployer } = await getNamedAccounts()
   const { log, get, execute } = deployments
 
-  log("Configuring Account Control System...")
-
-  // Phase 5: System Configuration
-  log("Phase 5: Configuring Complete System")
+  log("Configuring Account Control System with Simplified Watchdog...")
 
   // Get all deployed contracts
   const protocolRegistry = await get("ProtocolRegistry")
@@ -24,478 +21,197 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const qcReserveLedger = await get("QCReserveLedger")
   const basicMintingPolicy = await get("BasicMintingPolicy")
   const basicRedemptionPolicy = await get("BasicRedemptionPolicy")
-  const watchdogConsensusManager = await get("WatchdogConsensusManager")
-  const watchdogMonitor = await get("WatchdogMonitor")
   const tbtc = await get("TBTC")
 
-  // Check for new automated framework contracts (optional deployment)
-  let automatedFrameworkDeployed = false
-  let watchdogAutomatedEnforcement, watchdogThresholdActions, watchdogDAOEscalation
-  
-  try {
-    watchdogAutomatedEnforcement = await get("WatchdogAutomatedEnforcement")
-    watchdogThresholdActions = await get("WatchdogThresholdActions")
-    watchdogDAOEscalation = await get("WatchdogDAOEscalation")
-    automatedFrameworkDeployed = true
-    log("✅ Automated Decision Framework detected - will configure alongside legacy system")
-  } catch (e) {
-    log("ℹ️  Automated Decision Framework not deployed - configuring legacy system only")
-  }
+  // Get simplified watchdog contracts
+  const reserveOracle = await get("ReserveOracle")
+  const subjectiveReporting = await get("WatchdogSubjectiveReporting")
+  const watchdogEnforcer = await get("WatchdogEnforcer")
 
-  // Generate service keys (same as in contracts)
+  // Generate service keys
   const QC_DATA_KEY = ethers.utils.id("QC_DATA")
   const SYSTEM_STATE_KEY = ethers.utils.id("SYSTEM_STATE")
   const QC_MANAGER_KEY = ethers.utils.id("QC_MANAGER")
   const QC_RESERVE_LEDGER_KEY = ethers.utils.id("QC_RESERVE_LEDGER")
   const MINTING_POLICY_KEY = ethers.utils.id("MINTING_POLICY")
   const REDEMPTION_POLICY_KEY = ethers.utils.id("REDEMPTION_POLICY")
-  const QC_MINTER_KEY = ethers.utils.id("QC_MINTER")
-  const QC_REDEEMER_KEY = ethers.utils.id("QC_REDEEMER")
-  const TBTC_TOKEN_KEY = ethers.utils.id("TBTC_TOKEN")
-  // Watchdog System keys
-  const WATCHDOG_CONSENSUS_MANAGER_KEY = ethers.utils.id("WATCHDOG_CONSENSUS_MANAGER")
-  const WATCHDOG_MONITOR_KEY = ethers.utils.id("WATCHDOG_MONITOR")
+  const RESERVE_ORACLE_KEY = ethers.utils.id("RESERVE_ORACLE")
+  const SUBJECTIVE_REPORTING_KEY = ethers.utils.id("SUBJECTIVE_REPORTING")
+  const WATCHDOG_ENFORCER_KEY = ethers.utils.id("WATCHDOG_ENFORCER")
+
+  // Step 1: Register all services in ProtocolRegistry
+  log("Step 1: Registering services in ProtocolRegistry...")
   
-  // Automated Framework service keys (if deployed)
-  const WATCHDOG_AUTOMATED_ENFORCEMENT_KEY = ethers.utils.id("WATCHDOG_AUTOMATED_ENFORCEMENT")
-  const WATCHDOG_THRESHOLD_ACTIONS_KEY = ethers.utils.id("WATCHDOG_THRESHOLD_ACTIONS")
-  const WATCHDOG_DAO_ESCALATION_KEY = ethers.utils.id("WATCHDOG_DAO_ESCALATION")
+  const services = [
+    { key: QC_DATA_KEY, address: qcData.address, name: "QCData" },
+    { key: SYSTEM_STATE_KEY, address: systemState.address, name: "SystemState" },
+    { key: QC_MANAGER_KEY, address: qcManager.address, name: "QCManager" },
+    { key: QC_RESERVE_LEDGER_KEY, address: qcReserveLedger.address, name: "QCReserveLedger" },
+    { key: MINTING_POLICY_KEY, address: basicMintingPolicy.address, name: "BasicMintingPolicy" },
+    { key: REDEMPTION_POLICY_KEY, address: basicRedemptionPolicy.address, name: "BasicRedemptionPolicy" },
+    { key: RESERVE_ORACLE_KEY, address: reserveOracle.address, name: "ReserveOracle" },
+    { key: SUBJECTIVE_REPORTING_KEY, address: subjectiveReporting.address, name: "WatchdogSubjectiveReporting" },
+    { key: WATCHDOG_ENFORCER_KEY, address: watchdogEnforcer.address, name: "WatchdogEnforcer" },
+  ]
 
-  log("Step 1: Registering all services in ProtocolRegistry...")
-
-  // Register all services in ProtocolRegistry
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    QC_DATA_KEY,
-    qcData.address
-  )
-
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    SYSTEM_STATE_KEY,
-    systemState.address
-  )
-
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    QC_MANAGER_KEY,
-    qcManager.address
-  )
-
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    QC_RESERVE_LEDGER_KEY,
-    qcReserveLedger.address
-  )
-
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    MINTING_POLICY_KEY,
-    basicMintingPolicy.address
-  )
-
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    REDEMPTION_POLICY_KEY,
-    basicRedemptionPolicy.address
-  )
-
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    QC_MINTER_KEY,
-    qcMinter.address
-  )
-
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    QC_REDEEMER_KEY,
-    qcRedeemer.address
-  )
-
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    TBTC_TOKEN_KEY,
-    tbtc.address
-  )
-
-  // Register Watchdog System services
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    WATCHDOG_CONSENSUS_MANAGER_KEY,
-    watchdogConsensusManager.address
-  )
-
-  await execute(
-    "ProtocolRegistry",
-    { from: deployer, log: true },
-    "setService",
-    WATCHDOG_MONITOR_KEY,
-    watchdogMonitor.address
-  )
-
-  // Register Automated Framework services (if deployed)
-  if (automatedFrameworkDeployed) {
+  for (const service of services) {
     await execute(
       "ProtocolRegistry",
       { from: deployer, log: true },
       "setService",
-      WATCHDOG_AUTOMATED_ENFORCEMENT_KEY,
-      watchdogAutomatedEnforcement.address
+      service.key,
+      service.address
     )
-
-    await execute(
-      "ProtocolRegistry",
-      { from: deployer, log: true },
-      "setService",
-      WATCHDOG_THRESHOLD_ACTIONS_KEY,
-      watchdogThresholdActions.address
-    )
-
-    await execute(
-      "ProtocolRegistry",
-      { from: deployer, log: true },
-      "setService",
-      WATCHDOG_DAO_ESCALATION_KEY,
-      watchdogDAOEscalation.address
-    )
+    log(`  ✅ Registered ${service.name}`)
   }
 
-  log("Step 2: Configuring access control roles...")
+  // Step 2: Configure Oracle and Reserve Ledger integration
+  log("Step 2: Configuring Oracle integration with Reserve Ledger...")
+  
+  // Set oracle address in QCReserveLedger
+  await execute(
+    "QCReserveLedger",
+    { from: deployer, log: true },
+    "setReserveOracle",
+    reserveOracle.address
+  )
+  log("  ✅ Oracle address set in QCReserveLedger")
 
-  // Grant DATA_MANAGER_ROLE to QCManager in QCData
-  const DATA_MANAGER_ROLE = ethers.utils.id("DATA_MANAGER_ROLE")
+  // Grant ATTESTER_ROLE to oracle for consensus attestations
+  const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
+  await execute(
+    "QCReserveLedger",
+    { from: deployer, log: true },
+    "grantRole",
+    ATTESTER_ROLE,
+    reserveOracle.address
+  )
+  log("  ✅ ATTESTER_ROLE granted to ReserveOracle")
+
+  // Step 3: Configure QCManager roles
+  log("Step 3: Configuring QCManager roles...")
+  
+  // Grant QC_MANAGER_ROLE to QCData
+  const QC_MANAGER_ROLE = ethers.utils.id("QC_MANAGER_ROLE")
   await execute(
     "QCData",
     { from: deployer, log: true },
     "grantRole",
-    DATA_MANAGER_ROLE,
+    QC_MANAGER_ROLE,
     qcManager.address
   )
+  log("  ✅ QC_MANAGER_ROLE granted to QCManager in QCData")
 
-  // Grant QC_ADMIN_ROLE to BasicMintingPolicy in QCManager
-  const QC_ADMIN_ROLE = ethers.utils.id("QC_ADMIN_ROLE")
+  // Grant MINTER_ROLE to QCMinter
+  const MINTER_ROLE = ethers.utils.id("MINTER_ROLE")
   await execute(
-    "QCManager",
+    "TBTC",
     { from: deployer, log: true },
     "grantRole",
-    QC_ADMIN_ROLE,
-    basicMintingPolicy.address
-  )
-
-  // Grant MINTER_ROLE to BasicMintingPolicy in TBTC token (skip in test mode)
-  if (!hre.network.tags.allowStubs) {
-    const MINTER_ROLE = ethers.utils.id("MINTER_ROLE")
-    await execute(
-      "TBTC",
-      { from: deployer, log: true },
-      "grantRole",
-      MINTER_ROLE,
-      basicMintingPolicy.address
-    )
-  } else {
-    log("Skipping TBTC grantRole in test mode")
-  }
-
-  // Grant MINTER_ROLE to QCMinter in BasicMintingPolicy (for defense-in-depth)
-  const POLICY_MINTER_ROLE = ethers.utils.id("MINTER_ROLE")
-  await execute(
-    "BasicMintingPolicy",
-    { from: deployer, log: true },
-    "grantRole",
-    POLICY_MINTER_ROLE,
+    MINTER_ROLE,
     qcMinter.address
   )
+  log("  ✅ MINTER_ROLE granted to QCMinter in TBTC")
 
-  // Grant REDEEMER_ROLE to QCRedeemer in BasicRedemptionPolicy (for defense-in-depth)
-  const POLICY_REDEEMER_ROLE = ethers.utils.id("REDEEMER_ROLE")
+  // Grant BURNER_ROLE to QCRedeemer
+  const BURNER_ROLE = ethers.utils.id("BURNER_ROLE")
   await execute(
-    "BasicRedemptionPolicy",
+    "TBTC",
     { from: deployer, log: true },
     "grantRole",
-    POLICY_REDEEMER_ROLE,
+    BURNER_ROLE,
     qcRedeemer.address
   )
+  log("  ✅ BURNER_ROLE granted to QCRedeemer in TBTC")
 
-  log("Step 3: Setting up Watchdog System roles...")
-
-  // Grant ARBITER_ROLE to WatchdogConsensusManager in QCManager (for status changes)
+  // Step 4: Configure Watchdog Enforcer permissions
+  log("Step 4: Configuring Watchdog Enforcer permissions...")
+  
+  // Grant ARBITER_ROLE to WatchdogEnforcer for setting QC status
   const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
   await execute(
     "QCManager",
     { from: deployer, log: true },
     "grantRole",
     ARBITER_ROLE,
-    watchdogConsensusManager.address
+    watchdogEnforcer.address
   )
+  log("  ✅ ARBITER_ROLE granted to WatchdogEnforcer")
 
-  // Grant ARBITER_ROLE to WatchdogConsensusManager in QCRedeemer (for redemption defaults)
+  // Step 5: Set initial system parameters
+  log("Step 5: Setting initial system parameters...")
+  
+  // Set staleness threshold (7 days)
   await execute(
-    "QCRedeemer",
+    "SystemState",
     { from: deployer, log: true },
-    "grantRole",
-    ARBITER_ROLE,
-    watchdogConsensusManager.address
+    "setStaleThreshold",
+    7 * 24 * 60 * 60 // 7 days in seconds
   )
-
-  // Configure Automated Framework roles (if deployed)
-  if (automatedFrameworkDeployed) {
-    log("Step 3.5: Setting up Automated Framework roles...")
-
-    // Grant ARBITER_ROLE to WatchdogAutomatedEnforcement in QCManager
-    await execute(
-      "QCManager",
-      { from: deployer, log: true },
-      "grantRole",
-      ARBITER_ROLE,
-      watchdogAutomatedEnforcement.address
-    )
-
-    // Grant ARBITER_ROLE to WatchdogAutomatedEnforcement in QCRedeemer
-    await execute(
-      "QCRedeemer",
-      { from: deployer, log: true },
-      "grantRole",
-      ARBITER_ROLE,
-      watchdogAutomatedEnforcement.address
-    )
-
-    // Configure SystemState for automated enforcement
-    await execute(
-      "SystemState",
-      { from: deployer, log: true },
-      "setMinCollateralRatio",
-      90 // 90%
-    )
-
-    await execute(
-      "SystemState",
-      { from: deployer, log: true },
-      "setFailureThreshold",
-      3 // 3 failures
-    )
-
-    await execute(
-      "SystemState",
-      { from: deployer, log: true },
-      "setFailureWindow",
-      7 * 24 * 3600 // 7 days
-    )
-
-    log("✅ Automated Framework configured for parallel operation")
-  }
-
-  // Configure watchdog system roles
-  const MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")
-  const WATCHDOG_OPERATOR_ROLE = ethers.utils.id("WATCHDOG_OPERATOR_ROLE")
-
-  // Grant manager roles to deployer (should be transferred to governance later)
+  log("  ✅ Stale threshold set to 7 days")
+  
+  // Set redemption timeout (48 hours)
   await execute(
-    "WatchdogConsensusManager",
+    "SystemState",
     { from: deployer, log: true },
-    "grantRole",
-    MANAGER_ROLE,
-    deployer
+    "setRedemptionTimeout",
+    48 * 60 * 60 // 48 hours in seconds
   )
-
+  log("  ✅ Redemption timeout set to 48 hours")
+  
+  // Set minting amounts
   await execute(
-    "WatchdogMonitor",
+    "SystemState",
     { from: deployer, log: true },
-    "grantRole",
-    MANAGER_ROLE,
-    deployer
+    "setMinMintAmount",
+    ethers.utils.parseUnits("0.01", 18) // 0.01 tBTC minimum
   )
-
-  log("Step 3: Configuring governance roles...")
+  log("  ✅ Min mint amount set to 0.01 tBTC")
   
-  // Get governance account
-  const { governance } = await getNamedAccounts()
-  
-  // Grant QC_GOVERNANCE_ROLE to governance for QC registration
-  const QC_GOVERNANCE_ROLE = ethers.utils.id("QC_GOVERNANCE_ROLE")
-  if (governance && governance !== deployer) {
-    log(`Granting QC_GOVERNANCE_ROLE to governance: ${governance}`)
-    await execute(
-      "QCManager",
-      { from: deployer, log: true },
-      "grantRole",
-      QC_GOVERNANCE_ROLE,
-      governance
-    )
-  } else {
-    log("Warning: No separate governance account configured. QC_GOVERNANCE_ROLE remains with deployer.")
-    log("Remember to transfer this role to DAO governance before production!")
-  }
-  
-  log("Step 3.1: Setting up initial watchdog operators...")
-  
-  // Grant WATCHDOG_OPERATOR_ROLE to initial operators for testing
-  // These should be replaced with actual watchdog operator addresses in production
-  
-  // Add deployer as initial watchdog operator for testing (remove in production)
   await execute(
-    "WatchdogMonitor",
+    "SystemState",
     { from: deployer, log: true },
-    "grantRole",
-    WATCHDOG_OPERATOR_ROLE,
-    deployer
+    "setMaxMintAmount",
+    ethers.utils.parseUnits("100", 18) // 100 tBTC maximum
   )
+  log("  ✅ Max mint amount set to 100 tBTC")
 
-  // Add governance as initial watchdog operator if different from deployer
-  if (governance && governance !== deployer) {
-    await execute(
-      "WatchdogMonitor",
-      { from: deployer, log: true },
-      "grantRole",
-      WATCHDOG_OPERATOR_ROLE,
-      governance
-    )
-  }
-
-  log("⚠️  Initial watchdog operators configured for testing. Deploy QCWatchdog instances and register them in WatchdogMonitor before production!")
-
-  log("Step 4: Configuring system parameters...")
-
-  // Set initial system parameters (optional - using defaults)
-  // These can be adjusted later by governance
-  log("Using default system parameters (can be adjusted by governance)")
-
-  log("Step 5: Verifying system configuration...")
-
-  // Verify WatchdogConsensusManager state
-  const consensusManagerContract = await ethers.getContractAt(
-    "WatchdogConsensusManager",
-    watchdogConsensusManager.address
+  // Set collateral ratio (90%)
+  await execute(
+    "SystemState",
+    { from: deployer, log: true },
+    "setMinCollateralRatio",
+    90 // 90% minimum collateral
   )
-  const consensusParams = await consensusManagerContract.getConsensusParams()
-  
-  // Verify WatchdogMonitor state
-  const monitorContract = await ethers.getContractAt(
-    "WatchdogMonitor",
-    watchdogMonitor.address
-  )
-  const activeWatchdogCount = await monitorContract.getActiveWatchdogCount()
+  log("  ✅ Min collateral ratio set to 90%")
 
-  log(`✅ WatchdogConsensusManager state:`)
-  log(`   - Required votes (M): ${consensusParams.required}`)
-  log(`   - Total watchdogs (N): ${consensusParams.total}`)
-  log(`   - Voting period: ${consensusParams.period / 3600} hours`)
-  
-  log(`✅ WatchdogMonitor state:`)
-  log(`   - Active watchdog instances: ${activeWatchdogCount}`)
-  log(`   - Emergency threshold: 3 critical reports`)
-
-  log("Phase 5 completed: Account Control system fully configured")
   log("")
-  log("=== ACCOUNT CONTROL SYSTEM V1.1 DEPLOYMENT SUMMARY ===")
-  log(`ProtocolRegistry: ${protocolRegistry.address}`)
-  log(`QCMinter: ${qcMinter.address}`)
-  log(`QCRedeemer: ${qcRedeemer.address}`)
-  log(`QCData: ${qcData.address}`)
-  log(`SystemState: ${systemState.address}`)
-  log(`QCManager: ${qcManager.address}`)
-  log(`QCReserveLedger: ${qcReserveLedger.address}`)
-  log(`BasicMintingPolicy: ${basicMintingPolicy.address}`)
-  log(`BasicRedemptionPolicy: ${basicRedemptionPolicy.address}`)
+  log("✨ Account Control System configuration complete!")
   log("")
-  log("=== WATCHDOG SYSTEM ===")
-  log(`WatchdogConsensusManager: ${watchdogConsensusManager.address}`)
-  log(`WatchdogMonitor: ${watchdogMonitor.address}`)
+  log("System Overview:")
+  log("  Core Components:")
+  log(`    - ProtocolRegistry: ${protocolRegistry.address}`)
+  log(`    - QCManager: ${qcManager.address}`)
+  log(`    - QCData: ${qcData.address}`)
+  log(`    - QCMinter: ${qcMinter.address}`)
+  log(`    - QCRedeemer: ${qcRedeemer.address}`)
   log("")
-  log("System is ready for:")
-  log("1. QC registration via QCManager")
-  log("2. Policy upgrades via ProtocolRegistry")
-  log("3. Multiple independent watchdog deployment")
-  log("4. M-of-N consensus for critical operations")
-  log("5. Emergency monitoring and automatic pause")
-  log("6. Integration with existing tBTC v2")
+  log("  Watchdog Components:")
+  log(`    - ReserveOracle: ${reserveOracle.address}`)
+  log(`    - SubjectiveReporting: ${subjectiveReporting.address}`)
+  log(`    - WatchdogEnforcer: ${watchdogEnforcer.address}`)
   log("")
-  log("Features:")
-  log("- Configurable M-of-N consensus (default: 2-of-5)")
-  log("- Independent QCWatchdog instances")
-  log("- Emergency pause with 3-report threshold")
-  log("- Clean separation of monitoring vs consensus")
-  log("- Minimal complexity, maximum security")
+  log("  Policies:")
+  log(`    - MintingPolicy: ${basicMintingPolicy.address}`)
+  log(`    - RedemptionPolicy: ${basicRedemptionPolicy.address}`)
   log("")
-  log("=== IMPORTANT: PRODUCTION DEPLOYMENT STEPS ===")
-  log("After deployment, the following role transfers MUST be performed:")
-  log("")
-  log("1. Transfer QC_GOVERNANCE_ROLE in QCManager:")
-  log("   - Current: deployer (or governance if configured)")
-  log("   - Transfer to: DAO governance contract")
-  log("   - Purpose: Allows DAO to register new QCs")
-  log("")
-  log("2. Transfer DEFAULT_ADMIN_ROLE in all contracts to governance:")
-  log("   - QCManager, QCData, QCReserveLedger, QCRedeemer")
-  log("   - SystemState, BasicMintingPolicy, BasicRedemptionPolicy")
-  log("   - WatchdogConsensusManager, WatchdogMonitor, ProtocolRegistry")
-  if (automatedFrameworkDeployed) {
-    log("   - WatchdogAutomatedEnforcement, WatchdogThresholdActions")
-    log("   - WatchdogDAOEscalation")
-  }
-  log("")
-  log("3. Transfer PAUSER_ROLE in SystemState:")
-  log("   - Current: deployer")
-  log("   - Transfer to: Emergency multisig or DAO")
-  log("")
-  log("4. Deploy and register production QCWatchdog instances:")
-  log("   - Deploy QCWatchdog for each watchdog operator")
-  log("   - Register each instance via WatchdogMonitor.registerWatchdog()")
-  log("   - Grant WATCHDOG_ROLE to operators in WatchdogConsensusManager")
-  log("   - Remove test operators (deployer)")
-  if (automatedFrameworkDeployed) {
-    log("")
-    log("4b. Configure Automated Framework for production:")
-    log("   - Grant ENFORCER_ROLE to watchdog operators in WatchdogAutomatedEnforcement")
-    log("   - Grant WATCHDOG_ROLE to operators in WatchdogThresholdActions")
-    log("   - Configure enforcement cooldowns and thresholds")
-    log("   - Update watchdog software to use automated framework")
-  }
-  log("")
-  log("5. Configure consensus parameters:")
-  log("   - Adjust M and N values based on deployed watchdog count")
-  log("   - Use WatchdogConsensusManager.updateConsensusParams()")
-  if (automatedFrameworkDeployed) {
-    log("   - Configure threshold requirements in WatchdogThresholdActions")
-  }
-  log("")
-  log("6. Grant MINTER_ROLE in QCMinter to registered QCs")
-  log("")
-  log("Remember: Until these transfers are complete, the system is NOT")
-  log("under DAO control and should NOT be used in production!")
-  
-  if (automatedFrameworkDeployed) {
-    log("")
-    log("=== AUTOMATED DECISION FRAMEWORK STATUS ===")
-    log("✅ Deployed and configured for parallel operation")
-    log("✅ 90%+ automation rate for deterministic violations")
-    log("✅ MEV-resistant operation selection")
-    log("✅ Machine-interpretable evidence system")
-    log("")
-    log("The legacy consensus system and automated framework can run in parallel")
-    log("during the migration period. See WATCHDOG_MIGRATION_GUIDE.md for details.")
-  }
+  log("Next steps:")
+  log("  1. Grant WATCHDOG_ROLE to authorized watchdog addresses")
+  log("  2. Grant ATTESTER_ROLE to oracle attesters")
+  log("  3. Register initial QCs via QCManager")
 }
 
+func.tags = ["ConfigureSystem", "Configuration"]
+func.dependencies = ["SimplifiedWatchdog", "QCManager", "QCData", "QCMinter", "QCRedeemer", "SystemState", "ProtocolRegistry"]
+
 export default func
-func.tags = ["AccountControlConfig", "SystemConfiguration", "V1.1Configuration"]
-func.dependencies = ["AccountControlWatchdog", "SPVValidator"]
