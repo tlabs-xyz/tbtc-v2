@@ -42,6 +42,9 @@ contract SystemState is AccessControl {
     error RedemptionIsPaused();
     error RegistryOperationsArePaused();
     error WalletRegistrationIsPaused();
+    error QCIsEmergencyPaused(address qc);
+    error QCNotEmergencyPaused(address qc);
+    error QCEmergencyPauseExpired(address qc);
 
     /// @dev Global pause flags for granular emergency controls
     bool public isMintingPaused;
@@ -65,6 +68,8 @@ contract SystemState is AccessControl {
     address public emergencyCouncil; // Emergency council address
     uint256 public emergencyPauseDuration; // Maximum duration for emergency pauses
     mapping(bytes32 => uint256) public pauseTimestamps; // Tracks when pauses were activated
+    mapping(address => bool) public qcEmergencyPauses; // Tracks QC-specific emergency pauses
+    mapping(address => uint256) public qcPauseTimestamps; // Tracks when QCs were emergency paused
 
     // =================== STANDARDIZED EVENTS ===================
 
@@ -156,7 +161,6 @@ contract SystemState is AccessControl {
         uint256 indexed newRatio,
         address indexed updatedBy
     );
-
 
     event FailureThresholdUpdated(
         uint256 indexed oldThreshold,
@@ -399,14 +403,13 @@ contract SystemState is AccessControl {
         external
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
-        if (newRatio == 0 || newRatio > 200) revert InvalidAmount(); // Max 200%
-        
+        if (newRatio < 100 || newRatio > 200) revert InvalidAmount(); // Min 100%, Max 200%
+
         uint256 oldRatio = minCollateralRatio;
         minCollateralRatio = newRatio;
-        
+
         emit MinCollateralRatioUpdated(oldRatio, newRatio, msg.sender);
     }
-
 
     /// @notice Update failure threshold
     /// @param newThreshold The new failure threshold count
@@ -415,10 +418,10 @@ contract SystemState is AccessControl {
         onlyRole(PARAMETER_ADMIN_ROLE)
     {
         if (newThreshold == 0 || newThreshold > 10) revert InvalidThreshold();
-        
+
         uint256 oldThreshold = failureThreshold;
         failureThreshold = newThreshold;
-        
+
         emit FailureThresholdUpdated(oldThreshold, newThreshold, msg.sender);
     }
 
@@ -430,29 +433,117 @@ contract SystemState is AccessControl {
     {
         if (newWindow == 0) revert InvalidDuration();
         if (newWindow > 30 days) revert DurationTooLong(newWindow, 30 days);
-        
+
         uint256 oldWindow = failureWindow;
         failureWindow = newWindow;
-        
+
         emit FailureWindowUpdated(oldWindow, newWindow, msg.sender);
     }
 
     /// @notice Emergency pause for a specific QC (called by automated systems)
-    /// @param qc The QC address to pause
-    function emergencyPause(address qc) external onlyRole(PAUSER_ROLE) {
-        // This function is called by threshold monitoring contracts
-        // For now, it's a placeholder that could trigger QC-specific pauses
-        // Implementation would depend on how QC-specific pauses are handled
+    /// @dev This function provides granular emergency control for individual QCs without
+    ///      affecting the entire system. It's designed to be called by:
+    ///      - WatchdogEnforcer contracts for automated violation detection
+    ///      - Emergency council for manual incident response
+    ///      - Threshold monitoring contracts for automated risk management
+    /// 
+    /// @param qc The QC address to pause - must be a valid non-zero address
+    /// @param reason Machine-readable reason code for the pause. Common codes:
+    ///               - keccak256("INSUFFICIENT_COLLATERAL") - Below minimum ratio
+    ///               - keccak256("STALE_ATTESTATIONS") - Reserve data too old
+    ///               - keccak256("COMPLIANCE_VIOLATION") - Regulatory issue
+    ///               - keccak256("SECURITY_INCIDENT") - Security breach
+    ///               - keccak256("TECHNICAL_FAILURE") - System malfunction
+    /// 
+    /// @custom:security Only callable by PAUSER_ROLE holders (emergency council)
+    /// @custom:events Emits QCEmergencyPaused and EmergencyActionTaken events
+    /// @custom:integration Other contracts should check qcNotEmergencyPaused modifier
+    /// 
+    /// Example usage in WatchdogEnforcer:
+    /// ```solidity
+    /// if (reserves < minCollateral) {
+    ///     systemState.emergencyPauseQC(qc, keccak256("INSUFFICIENT_COLLATERAL"));
+    /// }
+    /// ```
+    function emergencyPauseQC(address qc, bytes32 reason) 
+        external 
+        onlyRole(PAUSER_ROLE) 
+    {
+        if (qc == address(0)) revert InvalidCouncilAddress();
+        if (qcEmergencyPauses[qc]) revert QCIsEmergencyPaused(qc);
         
-        emit EmergencyActionTaken(qc, "EMERGENCY_PAUSE", msg.sender, block.timestamp);
+        qcEmergencyPauses[qc] = true;
+        qcPauseTimestamps[qc] = block.timestamp;
+        
+        emit QCEmergencyPaused(qc, msg.sender, block.timestamp, reason);
+        emit EmergencyActionTaken(
+            qc,
+            "QC_EMERGENCY_PAUSE",
+            msg.sender,
+            block.timestamp
+        );
     }
 
-    /// @dev Emergency action event
+    /// @notice Remove emergency pause from a specific QC
+    /// @dev This function allows recovery from emergency situations by unpausing a QC.
+    ///      Should be called after:
+    ///      - The underlying issue has been resolved
+    ///      - QC has been validated as safe to resume operations  
+    ///      - Appropriate monitoring has been restored
+    /// 
+    /// @param qc The QC address to unpause - must be currently paused
+    /// 
+    /// @custom:security Only callable by PAUSER_ROLE holders (emergency council)
+    /// @custom:validation Reverts if QC is not currently emergency paused
+    /// @custom:events Emits QCEmergencyUnpaused and EmergencyActionTaken events
+    /// @custom:cleanup Removes pause timestamp to prevent stale data
+    /// 
+    /// Example recovery procedure:
+    /// ```solidity
+    /// // After verifying QC has fixed compliance issues
+    /// systemState.emergencyUnpauseQC(problematicQC);
+    /// // QC can now resume normal operations
+    /// ```
+    function emergencyUnpauseQC(address qc) external onlyRole(PAUSER_ROLE) {
+        if (!qcEmergencyPauses[qc]) revert QCNotEmergencyPaused(qc);
+        
+        qcEmergencyPauses[qc] = false;
+        delete qcPauseTimestamps[qc];
+        
+        emit QCEmergencyUnpaused(qc, msg.sender, block.timestamp);
+        emit EmergencyActionTaken(
+            qc,
+            "QC_EMERGENCY_UNPAUSE",
+            msg.sender,
+            block.timestamp
+        );
+    }
+
+    /// @notice Deprecated function - use emergencyPauseQC instead
+    /// @param qc The QC address to pause
+    function emergencyPause(address qc) external onlyRole(PAUSER_ROLE) {
+        emergencyPauseQC(qc, "GENERIC_EMERGENCY_PAUSE");
+    }
+
+    /// @dev Emergency action events
     event EmergencyActionTaken(
         address indexed target,
         bytes32 indexed action,
         address indexed triggeredBy,
         uint256 timestamp
+    );
+
+    event QCEmergencyPaused(
+        address indexed qc,
+        address indexed triggeredBy,
+        uint256 indexed timestamp,
+        bytes32 reason
+    );
+
+    event QCEmergencyUnpaused(
+        address indexed qc,
+        address indexed triggeredBy,
+        uint256 indexed timestamp
     );
 
     // =================== VIEW FUNCTIONS ===================
@@ -502,5 +593,43 @@ contract SystemState is AccessControl {
         uint256 pauseTime = pauseTimestamps[pauseKey];
         if (pauseTime == 0) return false;
         return block.timestamp > pauseTime + emergencyPauseDuration;
+    }
+
+    /// @notice Check if a QC is currently emergency paused
+    /// @param qc The QC address to check
+    /// @return paused True if the QC is emergency paused
+    function isQCEmergencyPaused(address qc) external view returns (bool paused) {
+        return qcEmergencyPauses[qc];
+    }
+
+    /// @notice Check if a QC's emergency pause has expired
+    /// @param qc The QC address to check
+    /// @return expired True if the QC's emergency pause has expired
+    function isQCEmergencyPauseExpired(address qc) 
+        external 
+        view 
+        returns (bool expired) 
+    {
+        uint256 pauseTime = qcPauseTimestamps[qc];
+        if (pauseTime == 0) return false;
+        return block.timestamp > pauseTime + emergencyPauseDuration;
+    }
+
+    /// @notice Get QC pause timestamp
+    /// @param qc The QC address
+    /// @return timestamp When the QC was paused (0 if not paused)
+    function getQCPauseTimestamp(address qc) 
+        external 
+        view 
+        returns (uint256 timestamp) 
+    {
+        return qcPauseTimestamps[qc];
+    }
+
+    /// @notice Modifier to check if QC operations are allowed
+    /// @param qc The QC address to check
+    modifier qcNotEmergencyPaused(address qc) {
+        if (qcEmergencyPauses[qc]) revert QCIsEmergencyPaused(qc);
+        _;
     }
 }
