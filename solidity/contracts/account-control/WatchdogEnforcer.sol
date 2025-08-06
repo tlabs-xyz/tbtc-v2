@@ -35,8 +35,7 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
     QCData public immutable qcData;
     SystemState public immutable systemState;
     
-    // Configuration
-    uint256 public minCollateralRatio = 90; // 90% minimum collateral ratio
+    // Configuration - minCollateralRatio is now read from SystemState
     
     // Events
     event ObjectiveViolationEnforced(
@@ -95,8 +94,6 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
             (violated, failureReason) = _checkReserveViolation(qc);
         } else if (reasonCode == WatchdogReasonCodes.STALE_ATTESTATIONS) {
             (violated, failureReason) = _checkStaleAttestations(qc);
-        } else if (reasonCode == WatchdogReasonCodes.ZERO_RESERVES) {
-            (violated, failureReason) = _checkZeroReserves(qc);
         } else {
             revert InvalidReasonCode();
         }
@@ -122,7 +119,7 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         }
         
         uint256 minted = qcData.getQCMintedAmount(qc);
-        uint256 requiredReserves = (minted * minCollateralRatio) / 100;
+        uint256 requiredReserves = (minted * systemState.minCollateralRatio()) / 100;
         
         if (reserves < requiredReserves) {
             return (true, "");
@@ -140,23 +137,6 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         }
         
         return (false, "Attestations are fresh");
-    }
-    
-    /// @notice Check if QC has zero reserves but minted tokens
-    function _checkZeroReserves(address qc) internal view returns (bool violated, string memory reason) {
-        (uint256 reserves, bool isStale) = reserveLedger.getReserveBalanceAndStaleness(qc);
-        
-        if (isStale) {
-            return (false, "Reserves are stale, cannot determine violation");
-        }
-        
-        uint256 minted = qcData.getQCMintedAmount(qc);
-        
-        if (reserves == 0 && minted > 0) {
-            return (true, "");
-        }
-        
-        return (false, "QC has reserves or no minted tokens");
     }
     
     /// @notice Execute enforcement action based on violation type
@@ -187,8 +167,6 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
             return _checkReserveViolation(qc);
         } else if (reasonCode == WatchdogReasonCodes.STALE_ATTESTATIONS) {
             return _checkStaleAttestations(qc);
-        } else if (reasonCode == WatchdogReasonCodes.ZERO_RESERVES) {
-            return _checkZeroReserves(qc);
         }
         
         return (false, "Unknown reason code");
@@ -226,10 +204,4 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         }
     }
     
-    /// @notice Update minimum collateral ratio (Admin only)
-    /// @param newRatio New minimum collateral ratio (percentage)
-    function setMinCollateralRatio(uint256 newRatio) external onlyRole(MANAGER_ROLE) {
-        require(newRatio >= 50 && newRatio <= 150, "Invalid ratio range");
-        minCollateralRatio = newRatio;
-    }
 }
