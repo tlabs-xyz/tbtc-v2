@@ -26,6 +26,7 @@ contract QCManager is AccessControl {
     bytes32 public constant QC_ADMIN_ROLE = keccak256("QC_ADMIN_ROLE");
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
+    bytes32 public constant WATCHDOG_ENFORCER_ROLE = keccak256("WATCHDOG_ENFORCER_ROLE");
 
     // Custom errors for gas-efficient reverts
     error InvalidQCAddress();
@@ -79,6 +80,14 @@ contract QCManager is AccessControl {
         QCData.QCStatus indexed newStatus,
         bytes32 reason,
         address changedBy,
+        uint256 timestamp
+    );
+    
+    event QCStatusChangeRequested(
+        address indexed qc,
+        QCData.QCStatus indexed requestedStatus,
+        bytes32 reason,
+        address indexed requester,
         uint256 timestamp
     );
 
@@ -245,7 +254,9 @@ contract QCManager is AccessControl {
 
     // =================== OPERATIONAL FUNCTIONS ===================
 
-    /// @notice Change QC status
+    /// @notice Change QC status with full authority (ARBITER_ROLE only)
+    /// @dev ARBITER_ROLE has full authority to make any valid status transition.
+    ///      This is typically used by governance or emergency response.
     /// @param qc The address of the QC
     /// @param newStatus The new status for the QC
     /// @param reason The reason for the status change
@@ -254,20 +265,60 @@ contract QCManager is AccessControl {
         QCData.QCStatus newStatus,
         bytes32 reason
     ) external onlyRole(ARBITER_ROLE) onlyWhenNotPaused("registry") {
+        _executeStatusChange(qc, newStatus, reason, "ARBITER");
+    }
+    
+    /// @notice Request status change from WatchdogEnforcer (WATCHDOG_ENFORCER_ROLE only)
+    /// @dev WATCHDOG_ENFORCER_ROLE has LIMITED authority - can ONLY set QCs to UnderReview.
+    ///      This is used when objective violations are detected (insufficient reserves, etc.)
+    /// @param qc The address of the QC
+    /// @param newStatus The new status (must be UnderReview for watchdog enforcer)
+    /// @param reason The reason code for the status change
+    function requestStatusChange(
+        address qc,
+        QCData.QCStatus newStatus,
+        bytes32 reason
+    ) external onlyRole(WATCHDOG_ENFORCER_ROLE) onlyWhenNotPaused("registry") {
+        // AUTHORITY VALIDATION: WatchdogEnforcer can only set QCs to UnderReview
+        require(newStatus == QCData.QCStatus.UnderReview, "WatchdogEnforcer can only set UnderReview status");
+        
+        emit QCStatusChangeRequested(qc, newStatus, reason, msg.sender, block.timestamp);
+        _executeStatusChange(qc, newStatus, reason, "WATCHDOG_ENFORCER");
+    }
+    
+    /// @notice Internal function that executes all status changes with full validation
+    /// @dev Implements Checks-Effects-Interactions pattern:
+    ///      1. CHECKS: Validate QC exists, transition is valid
+    ///      2. EFFECTS: Update state in QCData
+    ///      3. INTERACTIONS: Emit events
+    /// @param qc The address of the QC
+    /// @param newStatus The new status
+    /// @param reason The reason for the change
+    /// @param authority The type of authority making the change (for logging)
+    function _executeStatusChange(
+        address qc,
+        QCData.QCStatus newStatus,
+        bytes32 reason,
+        string memory authority
+    ) private {
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
+        
+        // CHECKS: Validate inputs and current state
         if (!qcData.isQCRegistered(qc)) {
             revert QCNotRegistered(qc);
         }
 
         QCData.QCStatus oldStatus = qcData.getQCStatus(qc);
 
-        // Validate status transitions
+        // Validate status transitions according to state machine rules
         if (!_isValidStatusTransition(oldStatus, newStatus)) {
             revert InvalidStatusTransition(oldStatus, newStatus);
         }
 
+        // EFFECTS: Update state before any external interactions
         qcData.setQCStatus(qc, newStatus, reason);
 
+        // INTERACTIONS: Emit events after state is updated
         emit QCStatusChanged(
             qc,
             oldStatus,
@@ -449,7 +500,7 @@ contract QCManager is AccessControl {
 
         solvent = reserveBalance >= mintedAmount;
 
-        // If insolvent, change status to UnderReview
+        // If insolvent, change status to UnderReview 
         if (!solvent && qcData.getQCStatus(qc) == QCData.QCStatus.Active) {
             bytes32 reason = "UNDERCOLLATERALIZED";
             qcData.setQCStatus(qc, QCData.QCStatus.UnderReview, reason);
@@ -517,21 +568,36 @@ contract QCManager is AccessControl {
     /// @param oldStatus The current status
     /// @param newStatus The proposed new status
     /// @return valid True if the transition is valid
+    /// @notice Validate status transitions according to business state machine rules
+    /// @dev STATE MACHINE RULES:
+    ///      - Active ↔ UnderReview (bidirectional)
+    ///      - Active → Revoked (terminal)
+    ///      - UnderReview → Revoked (terminal)
+    ///      - Revoked → (nothing) (terminal state)
+    /// @param oldStatus The current status
+    /// @param newStatus The requested new status
+    /// @return valid True if the transition is allowed
     function _isValidStatusTransition(
         QCData.QCStatus oldStatus,
         QCData.QCStatus newStatus
     ) private pure returns (bool valid) {
-        // Active ↔ UnderReview, any → Revoked
+        // No-op transitions are always valid
+        if (oldStatus == newStatus) return true;
+        
+        // Define valid transitions based on current state
         if (oldStatus == QCData.QCStatus.Active) {
+            // Active can go to UnderReview (temporary) or Revoked (permanent)
             return
                 newStatus == QCData.QCStatus.UnderReview ||
                 newStatus == QCData.QCStatus.Revoked;
         } else if (oldStatus == QCData.QCStatus.UnderReview) {
+            // UnderReview can go back to Active (resolved) or to Revoked (permanent)
             return
                 newStatus == QCData.QCStatus.Active ||
                 newStatus == QCData.QCStatus.Revoked;
         } else if (oldStatus == QCData.QCStatus.Revoked) {
-            return false; // No transitions from Revoked
+            // Terminal state - no transitions allowed
+            return false;
         }
         return false;
     }
