@@ -1,8 +1,8 @@
 # tBTC v2 Account Control - Requirements Specification
 
-**Document Version**: 3.1  
-**Date**: 2025-08-04  
-**Architecture**: V1.1 Dual-Path + V1.2 Automated Framework  
+**Document Version**: 4.0  
+**Date**: 2025-08-06  
+**Architecture**: Simplified Watchdog System (Post-Migration)  
 **Purpose**: Complete requirements specification (source of truth)  
 **Related Documents**: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION.md](IMPLEMENTATION.md), [FLOWS.md](FLOWS.md)
 
@@ -43,7 +43,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 - **Primary**: Qualified Custodians (regulated institutional entities)
 - **Secondary**: tBTC token holders, DeFi protocol integrators
-- **Operational**: tBTC DAO governance, Watchdog, system administrators
+- **Operational**: tBTC DAO governance, Oracle attesters, Watchdog reporters, system administrators
 
 ---
 
@@ -176,25 +176,26 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 ### 3.4 Reserve Management
 
-#### 3.4.1 Dual-Path Watchdog Architecture (REQ-FUNC-RES-001)
-**Requirement**: The system MUST implement dual-path watchdog architecture for operational efficiency
+#### 3.4.1 Simplified Watchdog Architecture (REQ-FUNC-RES-001)
+**Requirement**: The system MUST implement a simplified watchdog architecture based on the Three-Problem Framework
 
-**V1.1 Dual-Path Design**:
-- **Individual Operations**: QCWatchdog instances handle 90% of routine operations (attestation, registration, fulfillment)
-- **Consensus Operations**: WatchdogConsensusManager handles critical authority decisions (status changes, defaults)
-- **Emergency Coordination**: WatchdogMonitor coordinates multiple instances with automatic emergency response
-- **Selective Consensus**: M-of-N voting (default 2-of-5) only for operations requiring authority
+**Current Design (v2.0)**:
+- **Oracle Problem**: ReserveOracle provides multi-attester consensus for reserve balances
+- **Observation Problem**: WatchdogSubjectiveReporting enables transparent reporting via events
+- **Decision Problem**: Direct DAO action without intermediary contracts
+- **Enforcement**: WatchdogEnforcer allows permissionless triggering of objective violations
 
-**V1.2 Automated Framework**:
-- **Layer 1 (Deterministic)**: WatchdogAutomatedEnforcement for objective rule violations (90%+ automation)
-- **Layer 2 (Threshold)**: WatchdogThresholdActions for subjective issues (3+ reports → action)
-- **Layer 3 (Governance)**: WatchdogDAOEscalation for complex decisions requiring DAO intervention
+**Key Components**:
+- **WatchdogReasonCodes**: Machine-readable violation codes for automated validation
+- **ReserveOracle**: Median consensus from 3+ attesters, eliminates single trust point
+- **WatchdogSubjectiveReporting**: Simple event emission for DAO monitoring
+- **WatchdogEnforcer**: Anyone can trigger enforcement with valid reason codes
 
 **Acceptance Criteria**:
-- Individual QCWatchdog instances can execute routine operations without consensus delay
-- Critical operations (status changes, defaults) require M-of-N consensus approval
-- Automated enforcement executes deterministic rules without human intervention
-- Emergency scenarios trigger automatic responses via WatchdogMonitor
+- Multiple attesters submit reserve balances, oracle calculates median
+- Machine-readable reason codes enable automated validation
+- Subjective reports emit events for DAO monitoring
+- Permissionless enforcement of objective violations (INSUFFICIENT_RESERVES, STALE_ATTESTATIONS)
 - All operations protected by ReentrancyGuard and comprehensive access control
 - V1.2 framework achieves 90%+ automation for measurable violations
 
@@ -341,9 +342,10 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 - **DEFAULT_ADMIN_ROLE**: DAO governance (grant/revoke roles)
 - **MINTER_ROLE**: QCMinter contract (request minting operations)
-- **ATTESTER_ROLE**: Watchdog (submit reserve attestations)
-- **REGISTRAR_ROLE**: Watchdog (finalize wallet registrations)
-- **ARBITER_ROLE**: Watchdog (QC status changes, default flagging)
+- **ATTESTER_ROLE**: ReserveOracle and individual attesters (submit reserve attestations)
+- **REGISTRAR_ROLE**: Authorized entities (finalize wallet registrations)
+- **ARBITER_ROLE**: WatchdogEnforcer (objective violation enforcement)
+- **WATCHDOG_ROLE**: Subjective reporters (submit observations)
 - **PAUSER_ROLE**: Emergency Council (granular function pausing)
 
 **Acceptance Criteria**:
@@ -396,10 +398,10 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 #### 5.4.1 Watchdog Security (REQ-SEC-WATCHDOG-001)
 
-- **Single Trusted Entity**: DAO-appointed Watchdog with multiple roles
-- **Role Consolidation**: ATTESTER_ROLE, REGISTRAR_ROLE, ARBITER_ROLE in one entity
-- **DAO Oversight**: Emergency replacement procedures through governance
-- **Backup Procedures**: Failover mechanisms for Watchdog unavailability
+- **Distributed Trust**: Multiple attesters for oracle consensus (no single point of failure)
+- **Permissionless Enforcement**: Anyone can trigger objective violations with valid proof
+- **Transparent Reporting**: All subjective observations emit public events
+- **DAO Oversight**: Direct governance action on reports without intermediaries
 
 #### 5.4.2 Emergency Response (REQ-SEC-EMERGENCY-001)
 
@@ -520,10 +522,10 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 #### 7.2.1 Watchdog Integration (REQ-INT-WATCHDOG-001)
 
-- **Role Assignment**: Single entity with ATTESTER_ROLE, REGISTRAR_ROLE, ARBITER_ROLE
+- **Oracle Attesters**: Multiple entities submit reserve attestations for consensus
+- **Subjective Reporters**: Watchdogs submit observations via events
 - **Data Sources**: Integration with Bitcoin blockchain explorers
-- **Response Times**: Real-time monitoring with appropriate response SLAs
-- **Backup Systems**: DAO oversight and replacement mechanisms
+- **Permissionless Enforcement**: Anyone can trigger violations with proof
 
 #### 7.2.2 Monitoring Integration (REQ-INT-MON-001)
 

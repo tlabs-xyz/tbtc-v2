@@ -1,8 +1,8 @@
 # tBTC v2 Account Control Implementation Guide
 
-**Document Version**: 2.0  
-**Date**: 2025-08-04  
-**Architecture**: V1.1 Dual-Path + V1.2 Automated Framework  
+**Document Version**: 3.0  
+**Date**: 2025-08-06  
+**Architecture**: Simplified Watchdog System  
 **Purpose**: Comprehensive implementation guide covering code patterns, deployment, configuration, and role management
 
 ---
