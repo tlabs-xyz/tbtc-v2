@@ -507,7 +507,7 @@ uint256 public constant MIN_ATTESTERS = 3;     // Minimum for consensus
 uint256 public attestationWindow = 1 hours;    // Collection window
 
 // SystemState (used by WatchdogEnforcer)
-uint256 public minCollateralRatio = 90;        // 90% minimum
+uint256 public minCollateralRatio = 100;       // 100% minimum
 uint256 public staleThreshold = 7 days;        // Attestation staleness
 uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
 
