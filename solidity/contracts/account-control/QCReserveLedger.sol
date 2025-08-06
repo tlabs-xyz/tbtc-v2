@@ -96,9 +96,6 @@ contract QCReserveLedger is AccessControl {
         _attemptConsensus(qc);
     }
     
-    // Administrative updates removed - all balance updates must go through consensus
-    // This ensures single source of truth and prevents bypassing the trust model
-    
     /// @notice Get reserve balance and staleness for a QC
     /// @param qc The QC address
     /// @return balance The last consensus balance
