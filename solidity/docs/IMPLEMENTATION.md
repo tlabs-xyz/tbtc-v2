@@ -663,7 +663,7 @@ contract SystemState {
     
     // Reserve parameters
     uint256 public staleThreshold = 24 hours;           // Attestation staleness
-    uint256 public minCollateralRatio = 90;             // 90% minimum
+    uint256 public minCollateralRatio = 100;            // 100% minimum
     
     // Redemption parameters
     uint256 public redemptionTimeout = 48 hours;        // Fulfillment deadline
@@ -695,7 +695,7 @@ ConsensusParams memory params = ConsensusParams({
 **V1.2 Automation Configuration**:
 ```solidity
 // WatchdogAutomatedEnforcement parameters
-uint256 public minCollateralRatio = 90;        // 90% minimum
+uint256 public minCollateralRatio = 100;       // 100% minimum
 uint256 public staleThreshold = 24 hours;      // Attestation staleness
 uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
 
