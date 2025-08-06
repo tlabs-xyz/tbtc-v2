@@ -484,7 +484,7 @@ contract SystemState is AccessControl {
     /// @notice Emergency pause for a specific QC (called by automated systems)
     /// @param qc The QC address to pause
     function emergencyPause(address qc) external onlyRole(PAUSER_ROLE) {
-        // This function would be called by WatchdogThresholdActions
+        // This function is called by threshold monitoring contracts
         // For now, it's a placeholder that could trigger QC-specific pauses
         // Implementation would depend on how QC-specific pauses are handled
         
