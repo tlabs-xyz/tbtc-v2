@@ -33,13 +33,13 @@ const func: DeployFunction = async function DeploySimplifiedWatchdog(
   })
   log(`✅ ReserveOracle deployed at ${reserveOracle.address}`)
 
-  // Deploy WatchdogSubjectiveReporting
-  log("Deploying WatchdogSubjectiveReporting...")
-  const subjectiveReporting = await deploy("WatchdogSubjectiveReporting", {
+  // Deploy WatchdogReporting
+  log("Deploying WatchdogReporting...")
+  const watchdogReporting = await deploy("WatchdogReporting", {
     from: deployer,
     log: true,
   })
-  log(`✅ WatchdogSubjectiveReporting deployed at ${subjectiveReporting.address}`)
+  log(`✅ WatchdogReporting deployed at ${watchdogReporting.address}`)
 
   // Deploy WatchdogEnforcer with library link
   log("Deploying WatchdogEnforcer...")
@@ -63,7 +63,7 @@ const func: DeployFunction = async function DeploySimplifiedWatchdog(
   log("Deployed contracts:")
   log(`  - WatchdogReasonCodes: ${watchdogReasonCodes.address}`)
   log(`  - ReserveOracle: ${reserveOracle.address}`)
-  log(`  - WatchdogSubjectiveReporting: ${subjectiveReporting.address}`)
+  log(`  - WatchdogReporting: ${watchdogReporting.address}`)
   log(`  - WatchdogEnforcer: ${watchdogEnforcer.address}`)
   log("")
   log("Next steps: Run 99_configure_simplified_watchdog.ts to configure roles and connections")

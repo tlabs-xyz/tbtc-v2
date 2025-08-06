@@ -4,10 +4,10 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-/// @title WatchdogSubjectiveReporting
-/// @notice Simple transparent reporting system for subjective watchdog observations
+/// @title WatchdogReporting
+/// @notice Simple transparent reporting system for watchdog observations
 /// @dev Watchdogs report observations. DAO monitors events and acts directly via governance.
-contract WatchdogSubjectiveReporting is AccessControl, ReentrancyGuard {
+contract WatchdogReporting is AccessControl, ReentrancyGuard {
     bytes32 public constant WATCHDOG_ROLE = keccak256("WATCHDOG_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     
