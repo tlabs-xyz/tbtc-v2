@@ -56,7 +56,7 @@ function getConsensusReserves(address qc) external view returns (uint256)
 
 ---
 
-### 3. WatchdogSubjectiveReporting Contract
+### 3. WatchdogReporting Contract
 
 **Purpose**: Transparent reporting of subjective observations
 

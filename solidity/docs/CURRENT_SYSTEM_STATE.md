@@ -42,7 +42,7 @@ The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tB
 |-----------|---------|--------|
 | **WatchdogReasonCodes** | Machine-readable violation codes | ✅ Implemented |
 | **ReserveOracle** | Multi-attester consensus for reserves | ✅ Implemented |
-| **WatchdogSubjectiveReporting** | Transparent event-based reporting | ✅ Implemented |
+| **WatchdogReporting** | Transparent event-based reporting | ✅ Implemented |
 | **WatchdogEnforcer** | Permissionless violation enforcement | ✅ Implemented |
 
 ### Removed in Migration
