@@ -82,7 +82,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 | ------------------------------- | ---------------------------- | ------------------------------------------------- |
 | **WatchdogReasonCodes**         | Machine-readable violations  | Standardized codes for automated validation       |
 | **ReserveOracle**               | Multi-attester consensus     | Median calculation, eliminates single trust point |
-| **WatchdogSubjectiveReporting** | Transparent reporting        | Simple event emission for DAO monitoring          |
+| **WatchdogReporting** | Transparent reporting        | Simple event emission for DAO monitoring          |
 | **WatchdogEnforcer**            | Permissionless enforcement   | Anyone can trigger objective violations           |
 
 ### Integration with Existing tBTC v2
@@ -177,7 +177,7 @@ We identified three distinct problems requiring different solutions:
    - Multiple attesters submit reserve balances, median calculation prevents manipulation
 
 2. **Observation Problem** (Subjective Concerns)  
-   - Solution: Simple transparent reporting via `WatchdogSubjectiveReporting`
+   - Solution: Simple transparent reporting via `WatchdogReporting`
    - Watchdogs report observations, DAO monitors events and investigates
 
 3. **Decision Problem** (Governance Actions)

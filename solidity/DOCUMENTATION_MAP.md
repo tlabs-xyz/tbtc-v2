@@ -75,7 +75,7 @@
 - `account-control/WatchdogReasonCodes.sol` - Machine-readable codes
 - `account-control/ReserveOracle.sol` - Multi-attester consensus
 - `account-control/WatchdogEnforcer.sol` - Permissionless enforcement
-- `account-control/WatchdogSubjectiveReporting.sol` - Event reporting
+- `account-control/WatchdogReporting.sol` - Event reporting
 
 #### Policies
 - `account-control/policies/BasicMintingPolicy.sol` - Direct Bank integration
