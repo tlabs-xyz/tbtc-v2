@@ -106,6 +106,12 @@ struct Report {
 - Checks objective violations only
 - Sets QC status on violation detection
 
+**Expected Usage Pattern**:
+- **Primary callers**: Watchdogs who continuously monitor QC compliance
+- **Secondary callers**: Automated monitoring systems, community members, other participants
+- **Resilience design**: Permissionless nature ensures system integrity even if watchdogs fail to act
+- **Operational flow**: Watchdogs monitor → detect violations → enforce → log transparency events
+
 **Enforcement Flow**:
 ```solidity
 function enforceObjectiveViolation(address qc, bytes32 reasonCode) external {
@@ -115,10 +121,19 @@ function enforceObjectiveViolation(address qc, bytes32 reasonCode) external {
 }
 ```
 
+**Monitoring Functions**:
+```solidity
+// For watchdogs to check violations before enforcing
+function checkViolation(address qc, bytes32 reasonCode) external view returns (bool violated, string memory reason)
+
+// For efficient batch monitoring by watchdogs
+function batchCheckViolations(address[] calldata qcs, bytes32 reasonCode) external view returns (address[] memory violatedQCs)
+```
+
 **Supported Violations**:
-- INSUFFICIENT_RESERVES
-- STALE_ATTESTATIONS
-- ZERO_RESERVES
+- INSUFFICIENT_RESERVES: QC reserves below minimum collateral ratio
+- STALE_ATTESTATIONS: Reserve attestations are too old
+- ZERO_RESERVES: QC has zero reserves but outstanding minted tokens
 
 ---
 
@@ -136,8 +151,15 @@ Watchdogs → SubjectiveReporting → Events → DAO Monitoring → Governance A
 
 ### Objective Enforcement Flow
 ```
-Anyone → WatchdogEnforcer → Validation → QCManager Status Update
+Watchdogs (Primary) → WatchdogEnforcer → Validation → QCManager Status Update
+Community/Systems (Fallback) → WatchdogEnforcer → Validation → QCManager Status Update
 ```
+
+**Typical Workflow**:
+1. Watchdogs continuously monitor QCs using `checkViolation()` or `batchCheckViolations()`
+2. Upon detecting violations, watchdogs call `enforceObjectiveViolation()`
+3. If watchdogs are inactive, any participant can step in to enforce violations
+4. All enforcement attempts are logged for transparency and monitoring
 
 ---
 
