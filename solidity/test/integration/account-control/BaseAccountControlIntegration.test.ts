@@ -39,7 +39,7 @@ export abstract class BaseAccountControlIntegration {
   protected qcRedeemer: QCRedeemer
   protected basicMintingPolicy: BasicMintingPolicy
   protected basicRedemptionPolicy: BasicRedemptionPolicy
-  protected qcReserveLedger: QCReserveLedger
+  protected qcQCReserveLedger: QCReserveLedger
   protected qcWatchdog: QCWatchdog
   protected qcBridge: QCBridge
   protected bank: FakeContract<Bank>
@@ -173,10 +173,10 @@ export abstract class BaseAccountControlIntegration {
 
     // Deploy QCReserveLedger
     const QCReserveLedger = await ethers.getContractFactory("QCReserveLedger")
-    this.qcReserveLedger = await QCReserveLedger.deploy(
+    this.qcQCReserveLedger = await QCReserveLedger.deploy(
       this.protocolRegistry.address
     )
-    await this.qcReserveLedger.deployed()
+    await this.qcQCReserveLedger.deployed()
 
     // Deploy QCWatchdog
     const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
@@ -218,7 +218,7 @@ export abstract class BaseAccountControlIntegration {
       .connect(this.deployer)
       .setService(
         this.SERVICE_KEYS.QC_RESERVE_LEDGER,
-        this.qcReserveLedger.address
+        this.qcQCReserveLedger.address
       )
 
     await this.protocolRegistry
@@ -237,7 +237,7 @@ export abstract class BaseAccountControlIntegration {
       .grantRole(this.ROLES.DEFAULT_ADMIN_ROLE, this.governance.address)
 
     // Grant watchdog roles
-    await this.qcReserveLedger
+    await this.qcQCReserveLedger
       .connect(this.deployer)
       .grantRole(this.ROLES.ATTESTER_ROLE, this.watchdog.address)
 

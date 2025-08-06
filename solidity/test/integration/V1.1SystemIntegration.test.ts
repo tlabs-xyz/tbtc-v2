@@ -36,7 +36,7 @@ describe("V1.1 System Integration Tests", () => {
   let qcWatchdog2: QCWatchdog
   let qcWatchdog3: QCWatchdog
   let qcManager: QCManager
-  let qcReserveLedger: QCReserveLedger
+  let qcQCReserveLedger: QCReserveLedger
   let qcRedeemer: QCRedeemer
   let watchdogMonitor: WatchdogMonitor
   let watchdogConsensusManager: WatchdogConsensusManager
@@ -57,7 +57,7 @@ describe("V1.1 System Integration Tests", () => {
 
     // Get deployed contracts
     qcManager = await helpers.contracts.getContract("QCManager")
-    qcReserveLedger = await helpers.contracts.getContract("QCReserveLedger") 
+    qcQCReserveLedger = await helpers.contracts.getContract("QCReserveLedger") 
     qcRedeemer = await helpers.contracts.getContract("QCRedeemer")
     watchdogMonitor = await helpers.contracts.getContract("WatchdogMonitor")
     watchdogConsensusManager = await helpers.contracts.getContract("WatchdogConsensusManager")
@@ -70,19 +70,19 @@ describe("V1.1 System Integration Tests", () => {
     const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
     qcWatchdog1 = await QCWatchdog.deploy(
       qcManager.address,
-      qcReserveLedger.address,
+      qcQCReserveLedger.address,
       qcRedeemer.address,
       systemState.address
     )
     qcWatchdog2 = await QCWatchdog.deploy(
       qcManager.address,
-      qcReserveLedger.address,
+      qcQCReserveLedger.address,
       qcRedeemer.address,
       systemState.address
     )
     qcWatchdog3 = await QCWatchdog.deploy(
       qcManager.address,
-      qcReserveLedger.address,
+      qcQCReserveLedger.address,
       qcRedeemer.address,
       systemState.address
     )
@@ -204,11 +204,11 @@ describe("V1.1 System Integration Tests", () => {
       await expect(
         qcWatchdog1.connect(watchdog1).attestReserves(qc1.address, reserves)
       )
-        .to.emit(qcReserveLedger, "ReservesAttested")
+        .to.emit(qcQCReserveLedger, "ReservesAttested")
         .withArgs(qc1.address, reserves)
 
       // Check current reserves
-      const currentReserves = await qcReserveLedger.getCurrentReserves(qc1.address)
+      const currentReserves = await qcQCReserveLedger.getCurrentReserves(qc1.address)
       expect(currentReserves).to.equal(reserves)
 
       // Fast forward past staleness period
@@ -216,7 +216,7 @@ describe("V1.1 System Integration Tests", () => {
 
       // Reserves should now be stale
       await expect(
-        qcReserveLedger.getCurrentReserves(qc1.address)
+        qcQCReserveLedger.getCurrentReserves(qc1.address)
       ).to.be.revertedWith("Reserves attestation is stale")
 
       // Fresh attestation
@@ -224,7 +224,7 @@ describe("V1.1 System Integration Tests", () => {
       await qcWatchdog2.connect(watchdog2).attestReserves(qc1.address, newReserves)
 
       // Should work again
-      const updatedReserves = await qcReserveLedger.getCurrentReserves(qc1.address)
+      const updatedReserves = await qcQCReserveLedger.getCurrentReserves(qc1.address)
       expect(updatedReserves).to.equal(newReserves)
     })
   })
@@ -333,14 +333,14 @@ describe("V1.1 System Integration Tests", () => {
       await qcWatchdog1.connect(watchdog1).attestReserves(qc3.address, reserves)
 
       // Verify reserves in ledger
-      const currentReserves = await qcReserveLedger.getCurrentReserves(qc3.address)
+      const currentReserves = await qcQCReserveLedger.getCurrentReserves(qc3.address)
       expect(currentReserves).to.equal(reserves)
 
       // Deactivate QC
       await qcManager.connect(governance).deactivateQC(qc3.address)
 
       // Should still be able to read reserves (but QC is inactive)
-      const reservesAfter = await qcReserveLedger.getCurrentReserves(qc3.address)
+      const reservesAfter = await qcQCReserveLedger.getCurrentReserves(qc3.address)
       expect(reservesAfter).to.equal(reserves)
 
       // But new operations should fail
@@ -406,7 +406,7 @@ describe("V1.1 System Integration Tests", () => {
       await Promise.all([tx1, tx2, tx3])
 
       // The last successful attestation should be the current value
-      const currentReserves = await qcReserveLedger.getCurrentReserves(qc1.address)
+      const currentReserves = await qcQCReserveLedger.getCurrentReserves(qc1.address)
       expect([reserves1, reserves2, reserves3]).to.include(currentReserves)
     })
 

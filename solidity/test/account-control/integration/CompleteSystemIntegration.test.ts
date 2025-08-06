@@ -48,7 +48,7 @@ describe("Complete System Integration Tests", () => {
   let qcData: QCData
   let qcMinter: QCMinter
   let qcRedeemer: QCRedeemer
-  let qcReserveLedger: QCReserveLedger
+  let qcQCReserveLedger: QCReserveLedger
   let basicMintingPolicy: BasicMintingPolicy
   let basicRedemptionPolicy: BasicRedemptionPolicy
   let qcWatchdog: QCWatchdog
@@ -85,7 +85,7 @@ describe("Complete System Integration Tests", () => {
     qcData = fixture.qcData
     qcMinter = fixture.qcMinter
     qcRedeemer = fixture.qcRedeemer
-    qcReserveLedger = fixture.qcReserveLedger
+    qcQCReserveLedger = fixture.qcQCReserveLedger
     basicMintingPolicy = fixture.basicMintingPolicy
     basicRedemptionPolicy = fixture.basicRedemptionPolicy
     qcWatchdog = fixture.qcWatchdog
@@ -230,11 +230,11 @@ describe("Complete System Integration Tests", () => {
       expect(await qcData.isWalletRegistered(TEST_DATA.BTC_ADDRESSES.TEST)).to.be.true
 
       // 3. Reserve Attestation
-      await qcReserveLedger
+      await qcQCReserveLedger
         .connect(fixture.watchdog)
         .submitReserveAttestation(qcAddress.address, reserveBalance)
 
-      const [balance, isStale] = await qcReserveLedger.getReserveBalanceAndStaleness(
+      const [balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(
         qcAddress.address
       )
       expect(balance).to.equal(reserveBalance)
@@ -293,7 +293,7 @@ describe("Complete System Integration Tests", () => {
           protocolRegistry,
           qcData,
           qcManager,
-          qcReserveLedger,
+          qcQCReserveLedger,
           systemState,
           qcMinter,
           qcRedeemer,
@@ -396,7 +396,7 @@ describe("Complete System Integration Tests", () => {
           protocolRegistry,
           qcData,
           qcManager,
-          qcReserveLedger,
+          qcQCReserveLedger,
           systemState,
           qcMinter,
           qcRedeemer,
@@ -495,7 +495,7 @@ describe("Complete System Integration Tests", () => {
           protocolRegistry,
           qcData,
           qcManager,
-          qcReserveLedger,
+          qcQCReserveLedger,
           systemState,
           qcMinter,
           qcRedeemer,
@@ -600,7 +600,7 @@ describe("Complete System Integration Tests", () => {
           protocolRegistry,
           qcData,
           qcManager,
-          qcReserveLedger,
+          qcQCReserveLedger,
           systemState,
           qcMinter,
           qcRedeemer,
@@ -646,19 +646,19 @@ describe("Complete System Integration Tests", () => {
 
     it("should handle permission changes across contracts", async () => {
       // 1. Initial state - watchdog can attest
-      await qcReserveLedger
+      await qcQCReserveLedger
         .connect(fixture.watchdog)
         .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("600"))
 
       // 2. Revoke attester role
-      await qcReserveLedger.revokeRole(
+      await qcQCReserveLedger.revokeRole(
         ROLES.ATTESTER_ROLE,
         fixture.watchdog.address
       )
 
       // 3. Future attestations fail
       await expect(
-        qcReserveLedger
+        qcQCReserveLedger
           .connect(fixture.watchdog)
           .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("700"))
       ).to.be.revertedWith("AccessControl")
@@ -677,7 +677,7 @@ describe("Complete System Integration Tests", () => {
           protocolRegistry,
           qcData,
           qcManager,
-          qcReserveLedger,
+          qcQCReserveLedger,
           systemState,
           qcMinter,
           qcRedeemer,
@@ -755,7 +755,7 @@ describe("Complete System Integration Tests", () => {
           protocolRegistry,
           qcData,
           qcManager,
-          qcReserveLedger,
+          qcQCReserveLedger,
           systemState,
           qcMinter,
           qcRedeemer,
@@ -825,7 +825,7 @@ describe("Complete System Integration Tests", () => {
           protocolRegistry,
           qcData,
           qcManager,
-          qcReserveLedger,
+          qcQCReserveLedger,
           systemState,
           qcMinter,
           qcRedeemer,
@@ -850,7 +850,7 @@ describe("Complete System Integration Tests", () => {
           protocolRegistry,
           qcData,
           qcManager,
-          qcReserveLedger,
+          qcQCReserveLedger,
           systemState,
           qcMinter,
           qcRedeemer,
@@ -943,7 +943,7 @@ describe("Complete System Integration Tests", () => {
           protocolRegistry,
           qcData,
           qcManager,
-          qcReserveLedger,
+          qcQCReserveLedger,
           systemState,
           qcMinter,
           qcRedeemer,
@@ -968,7 +968,7 @@ describe("Complete System Integration Tests", () => {
       // Multiple attestations
       for (let i = 0; i < 5; i++) {
         operations.push(
-          qcReserveLedger
+          qcQCReserveLedger
             .connect(fixture.watchdog)
             .submitReserveAttestation(
               qcAddress.address,
@@ -995,7 +995,7 @@ describe("Complete System Integration Tests", () => {
       expect(results.length).to.equal(8)
 
       // Final state should be consistent
-      const [finalBalance] = await qcReserveLedger.getReserveBalanceAndStaleness(
+      const [finalBalance] = await qcQCReserveLedger.getReserveBalanceAndStaleness(
         qcAddress.address
       )
       expect(finalBalance).to.be.gt(reserveBalance)
@@ -1007,7 +1007,7 @@ describe("Complete System Integration Tests", () => {
           protocolRegistry,
           qcData,
           qcManager,
-          qcReserveLedger,
+          qcQCReserveLedger,
           systemState,
           qcMinter,
           qcRedeemer,

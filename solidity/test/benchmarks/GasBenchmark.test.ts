@@ -49,7 +49,7 @@ describe("Gas Optimization Benchmarks - V1.1 Watchdog System", () => {
   let qcData: QCData
   let qcMinter: QCMinter
   let qcRedeemer: QCRedeemer
-  let qcReserveLedger: QCReserveLedger
+  let qcQCReserveLedger: QCReserveLedger
   let basicMintingPolicy: BasicMintingPolicy
   let basicRedemptionPolicy: BasicRedemptionPolicy
   let qcWatchdog: QCWatchdog
@@ -98,7 +98,7 @@ describe("Gas Optimization Benchmarks - V1.1 Watchdog System", () => {
     qcManager = await QCManager.deploy(protocolRegistry.address)
 
     const QCReserveLedger = await ethers.getContractFactory("QCReserveLedger")
-    qcReserveLedger = await QCReserveLedger.deploy(protocolRegistry.address)
+    qcQCReserveLedger = await QCReserveLedger.deploy(protocolRegistry.address)
 
     const QCMinter = await ethers.getContractFactory("QCMinter")
     qcMinter = await QCMinter.deploy(protocolRegistry.address)
@@ -148,7 +148,7 @@ describe("Gas Optimization Benchmarks - V1.1 Watchdog System", () => {
     await protocolRegistry.setService(ethers.utils.id("QC_DATA"), qcData.address)
     await protocolRegistry.setService(ethers.utils.id("SYSTEM_STATE"), systemState.address)
     await protocolRegistry.setService(ethers.utils.id("QC_MANAGER"), qcManager.address)
-    await protocolRegistry.setService(ethers.utils.id("QC_RESERVE_LEDGER"), qcReserveLedger.address)
+    await protocolRegistry.setService(ethers.utils.id("QC_RESERVE_LEDGER"), qcQCReserveLedger.address)
     await protocolRegistry.setService(ethers.utils.id("MINTING_POLICY"), basicMintingPolicy.address)
     await protocolRegistry.setService(ethers.utils.id("REDEMPTION_POLICY"), basicRedemptionPolicy.address)
     await protocolRegistry.setService(ethers.utils.id("QC_MINTER"), qcMinter.address)
@@ -162,7 +162,7 @@ describe("Gas Optimization Benchmarks - V1.1 Watchdog System", () => {
     await qcManager.grantRole(await qcManager.ARBITER_ROLE(), qcWatchdog.address)
     await qcManager.grantRole(await qcManager.REGISTRAR_ROLE(), qcWatchdog.address)
     await qcRedeemer.grantRole(await qcRedeemer.ARBITER_ROLE(), watchdogConsensusManager.address)
-    await qcReserveLedger.grantRole(await qcReserveLedger.ATTESTER_ROLE(), qcWatchdog.address)
+    await qcQCReserveLedger.grantRole(await qcQCReserveLedger.ATTESTER_ROLE(), qcWatchdog.address)
     await basicMintingPolicy.grantRole(await basicMintingPolicy.MINTER_ROLE(), qcMinter.address)
     await basicRedemptionPolicy.grantRole(await basicRedemptionPolicy.REDEEMER_ROLE(), qcRedeemer.address)
 
@@ -188,7 +188,7 @@ describe("Gas Optimization Benchmarks - V1.1 Watchdog System", () => {
       qcData,
       qcMinter,
       qcRedeemer,
-      qcReserveLedger,
+      qcQCReserveLedger,
       basicMintingPolicy,
       basicRedemptionPolicy,
       qcWatchdog,
@@ -227,7 +227,7 @@ describe("Gas Optimization Benchmarks - V1.1 Watchdog System", () => {
       const oldGas = await simulateOldArchitectureGas("attestReserves")
       
       // New architecture - individual operation
-      const tx = await qcReserveLedger.connect(watchdog1).submitAttestation(
+      const tx = await qcQCReserveLedger.connect(watchdog1).submitAttestation(
         qcAddress.address,
         reserveBalance,
         ethers.utils.formatBytes32String("PROOF")
@@ -284,7 +284,7 @@ describe("Gas Optimization Benchmarks - V1.1 Watchdog System", () => {
       const oldGas = await simulateOldArchitectureGas("minting")
       
       // Setup minting prerequisites
-      await qcReserveLedger.connect(watchdog1).submitAttestation(
+      await qcQCReserveLedger.connect(watchdog1).submitAttestation(
         qcAddress.address,
         reserveBalance,
         ethers.utils.formatBytes32String("PROOF")

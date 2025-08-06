@@ -27,7 +27,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const qcManager = await get("QCManager")
   const qcData = await get("QCData")
   const systemState = await get("SystemState")
-  const qcReserveLedger = await get("QCReserveLedger")
+  const qcQCReserveLedger = await get("QCReserveLedger")
 
   // Register Bank and TBTCVault in ProtocolRegistry for BasicMintingPolicy
   await execute(

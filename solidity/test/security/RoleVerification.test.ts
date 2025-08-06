@@ -34,7 +34,7 @@ describe("Role-Based Access Control Security Tests", () => {
   let qcData: QCData
   let qcMinter: QCMinter
   let qcRedeemer: QCRedeemer
-  let qcReserveLedger: QCReserveLedger
+  let qcQCReserveLedger: QCReserveLedger
   let basicMintingPolicy: BasicMintingPolicy
   let basicRedemptionPolicy: BasicRedemptionPolicy
   let watchdogConsensusManager: WatchdogConsensusManager
@@ -75,7 +75,7 @@ describe("Role-Based Access Control Security Tests", () => {
     qcManager = await QCManager.deploy(protocolRegistry.address)
 
     const QCReserveLedger = await ethers.getContractFactory("QCReserveLedger")
-    qcReserveLedger = await QCReserveLedger.deploy(protocolRegistry.address)
+    qcQCReserveLedger = await QCReserveLedger.deploy(protocolRegistry.address)
 
     const QCMinter = await ethers.getContractFactory("QCMinter")
     qcMinter = await QCMinter.deploy(protocolRegistry.address)
@@ -124,7 +124,7 @@ describe("Role-Based Access Control Security Tests", () => {
       qcData,
       qcMinter,
       qcRedeemer,
-      qcReserveLedger,
+      qcQCReserveLedger,
       basicMintingPolicy,
       basicRedemptionPolicy,
       watchdogConsensusManager,
@@ -209,7 +209,7 @@ describe("Role-Based Access Control Security Tests", () => {
       // Setup protocol registry
       await protocolRegistry.setService(ethers.utils.id("QC_DATA"), qcData.address)
       await protocolRegistry.setService(ethers.utils.id("SYSTEM_STATE"), systemState.address)
-      await protocolRegistry.setService(ethers.utils.id("QC_RESERVE_LEDGER"), qcReserveLedger.address)
+      await protocolRegistry.setService(ethers.utils.id("QC_RESERVE_LEDGER"), qcQCReserveLedger.address)
       
       // Grant QC_MANAGER_ROLE to QCManager
       await qcData.grantRole(QC_MANAGER_ROLE, qcManager.address)
