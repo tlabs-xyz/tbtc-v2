@@ -58,8 +58,6 @@ contract SystemState is AccessControl {
 
     /// @dev Automated enforcement parameters
     uint256 public minCollateralRatio; // Minimum collateral ratio percentage (e.g., 90 for 90%)
-    uint256 public walletInactivityPeriod; // Time after which wallets are considered inactive
-    uint256 public qcInactivityPeriod; // Time after which QCs are considered inactive
     uint256 public failureThreshold; // Number of failures before enforcement action
     uint256 public failureWindow; // Time window for counting failures
 
@@ -159,17 +157,6 @@ contract SystemState is AccessControl {
         address indexed updatedBy
     );
 
-    event WalletInactivityPeriodUpdated(
-        uint256 indexed oldPeriod,
-        uint256 indexed newPeriod,
-        address indexed updatedBy
-    );
-
-    event QCInactivityPeriodUpdated(
-        uint256 indexed oldPeriod,
-        uint256 indexed newPeriod,
-        address indexed updatedBy
-    );
 
     event FailureThresholdUpdated(
         uint256 indexed oldThreshold,
@@ -216,8 +203,6 @@ contract SystemState is AccessControl {
 
         // Set automated enforcement defaults
         minCollateralRatio = 90; // 90% minimum collateral ratio
-        walletInactivityPeriod = 90 days; // Wallets inactive after 90 days
-        qcInactivityPeriod = 30 days; // QCs inactive after 30 days
         failureThreshold = 3; // 3 failures trigger enforcement
         failureWindow = 7 days; // Count failures over 7 days
     }
@@ -422,35 +407,6 @@ contract SystemState is AccessControl {
         emit MinCollateralRatioUpdated(oldRatio, newRatio, msg.sender);
     }
 
-    /// @notice Update wallet inactivity period
-    /// @param newPeriod The new inactivity period in seconds
-    function setWalletInactivityPeriod(uint256 newPeriod)
-        external
-        onlyRole(PARAMETER_ADMIN_ROLE)
-    {
-        if (newPeriod == 0) revert InvalidDuration();
-        if (newPeriod > 365 days) revert DurationTooLong(newPeriod, 365 days);
-        
-        uint256 oldPeriod = walletInactivityPeriod;
-        walletInactivityPeriod = newPeriod;
-        
-        emit WalletInactivityPeriodUpdated(oldPeriod, newPeriod, msg.sender);
-    }
-
-    /// @notice Update QC inactivity period
-    /// @param newPeriod The new inactivity period in seconds
-    function setQCInactivityPeriod(uint256 newPeriod)
-        external
-        onlyRole(PARAMETER_ADMIN_ROLE)
-    {
-        if (newPeriod == 0) revert InvalidDuration();
-        if (newPeriod > 180 days) revert DurationTooLong(newPeriod, 180 days);
-        
-        uint256 oldPeriod = qcInactivityPeriod;
-        qcInactivityPeriod = newPeriod;
-        
-        emit QCInactivityPeriodUpdated(oldPeriod, newPeriod, msg.sender);
-    }
 
     /// @notice Update failure threshold
     /// @param newThreshold The new failure threshold count

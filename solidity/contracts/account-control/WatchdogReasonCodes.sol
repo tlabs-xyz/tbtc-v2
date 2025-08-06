@@ -23,13 +23,6 @@ library WatchdogReasonCodes {
     /// @dev Current time > redemption request time + timeout
     bytes32 public constant REDEMPTION_TIMEOUT = keccak256("REDEMPTION_TIMEOUT");
     
-    /// @notice Wallet has been inactive beyond threshold
-    /// @dev No operations for longer than inactivity period
-    bytes32 public constant WALLET_INACTIVE = keccak256("WALLET_INACTIVE");
-    
-    /// @notice QC has been inactive beyond threshold
-    /// @dev No minting/redemption operations for extended period
-    bytes32 public constant QC_INACTIVE = keccak256("QC_INACTIVE");
     
     /// @notice QC has exceeded failure threshold
     /// @dev Failure count > threshold within time window
@@ -87,8 +80,6 @@ library WatchdogReasonCodes {
         return reasonCode == INSUFFICIENT_RESERVES ||
                reasonCode == STALE_ATTESTATIONS ||
                reasonCode == REDEMPTION_TIMEOUT ||
-               reasonCode == WALLET_INACTIVE ||
-               reasonCode == QC_INACTIVE ||
                reasonCode == REPEATED_FAILURES ||
                reasonCode == DECLINING_RESERVES ||
                reasonCode == ZERO_RESERVES ||
@@ -104,8 +95,6 @@ library WatchdogReasonCodes {
         if (reasonCode == INSUFFICIENT_RESERVES) return "Insufficient reserves";
         if (reasonCode == STALE_ATTESTATIONS) return "Stale attestations";
         if (reasonCode == REDEMPTION_TIMEOUT) return "Redemption timeout";
-        if (reasonCode == WALLET_INACTIVE) return "Wallet inactive";
-        if (reasonCode == QC_INACTIVE) return "QC inactive";
         if (reasonCode == REPEATED_FAILURES) return "Repeated failures";
         if (reasonCode == DECLINING_RESERVES) return "Declining reserves";
         if (reasonCode == ZERO_RESERVES) return "Zero reserves";
