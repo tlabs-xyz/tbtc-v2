@@ -15,13 +15,7 @@ const func: DeployFunction = async function DeployQCReserveLedger(
   const qcData = await get("QCData")
   const systemState = await get("SystemState")
 
-  // Deploy WatchdogReasonCodes library
-  log("Deploying WatchdogReasonCodes library...")
-  const watchdogReasonCodes = await deploy("WatchdogReasonCodes", {
-    from: deployer,
-    log: true,
-  })
-  log(`✅ WatchdogReasonCodes deployed at ${watchdogReasonCodes.address}`)
+  // WatchdogReasonCodes library no longer needed - reason codes inlined in WatchdogEnforcer
 
   // Deploy QCReserveLedger (unified oracle + ledger)
   log("Deploying QCReserveLedger...")
@@ -40,7 +34,7 @@ const func: DeployFunction = async function DeployQCReserveLedger(
   })
   log(`✅ WatchdogReporting deployed at ${watchdogReporting.address}`)
 
-  // Deploy WatchdogEnforcer with library link
+  // Deploy WatchdogEnforcer (reason codes now inlined, no library needed)
   log("Deploying WatchdogEnforcer...")
   const watchdogEnforcer = await deploy("WatchdogEnforcer", {
     from: deployer,
@@ -50,9 +44,6 @@ const func: DeployFunction = async function DeployQCReserveLedger(
       qcData.address,
       systemState.address,
     ],
-    libraries: {
-      WatchdogReasonCodes: watchdogReasonCodes.address,
-    },
     log: true,
   })
   log(`✅ WatchdogEnforcer deployed at ${watchdogEnforcer.address}`)
@@ -60,10 +51,10 @@ const func: DeployFunction = async function DeployQCReserveLedger(
   log("✨ QCReserveLedger System deployment complete!")
   log("")
   log("Deployed contracts:")
-  log(`  - WatchdogReasonCodes: ${watchdogReasonCodes.address}`)
   log(`  - QCReserveLedger: ${reserveLedger.address}`)
   log(`  - WatchdogReporting: ${watchdogReporting.address}`)
   log(`  - WatchdogEnforcer: ${watchdogEnforcer.address}`)
+  log("  - Note: WatchdogReasonCodes library removed - reason codes now inlined")
   log("")
   log("Next steps: Run 99_configure_account_control_system.ts to configure roles and connections")
 }
