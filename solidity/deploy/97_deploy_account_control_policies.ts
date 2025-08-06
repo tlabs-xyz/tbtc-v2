@@ -57,4 +57,4 @@ func.tags = [
   "BasicMintingPolicy",
   "BasicRedemptionPolicy",
 ]
-func.dependencies = ["AccountControlState"]
+func.dependencies = ["AccountControlState", "Bank", "TBTCVault", "TBTC"]
