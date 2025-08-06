@@ -85,7 +85,7 @@ The following contracts were removed during the watchdog simplification:
 ### System Parameters
 ```solidity
 // Reserve Management
-minCollateralRatio: 90%         // Minimum reserves vs minted
+minCollateralRatio: 100%        // Minimum reserves vs minted
 staleThreshold: 7 days          // Max age for attestations
 attestationWindow: 1 hour       // Oracle collection window
 

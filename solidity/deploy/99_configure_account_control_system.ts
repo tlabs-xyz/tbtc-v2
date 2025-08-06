@@ -39,16 +39,40 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
   // Step 1: Register all services in ProtocolRegistry
   log("Step 1: Registering services in ProtocolRegistry...")
-  
+
   const services = [
     { key: QC_DATA_KEY, address: qcData.address, name: "QCData" },
-    { key: SYSTEM_STATE_KEY, address: systemState.address, name: "SystemState" },
+    {
+      key: SYSTEM_STATE_KEY,
+      address: systemState.address,
+      name: "SystemState",
+    },
     { key: QC_MANAGER_KEY, address: qcManager.address, name: "QCManager" },
-    { key: QC_RESERVE_LEDGER_KEY, address: reserveLedger.address, name: "QCReserveLedger" },
-    { key: MINTING_POLICY_KEY, address: basicMintingPolicy.address, name: "BasicMintingPolicy" },
-    { key: REDEMPTION_POLICY_KEY, address: basicRedemptionPolicy.address, name: "BasicRedemptionPolicy" },
-    { key: WATCHDOG_REPORTING_KEY, address: watchdogReporting.address, name: "WatchdogSubjectiveReporting" },
-    { key: WATCHDOG_ENFORCER_KEY, address: watchdogEnforcer.address, name: "WatchdogEnforcer" },
+    {
+      key: QC_RESERVE_LEDGER_KEY,
+      address: reserveLedger.address,
+      name: "QCReserveLedger",
+    },
+    {
+      key: MINTING_POLICY_KEY,
+      address: basicMintingPolicy.address,
+      name: "BasicMintingPolicy",
+    },
+    {
+      key: REDEMPTION_POLICY_KEY,
+      address: basicRedemptionPolicy.address,
+      name: "BasicRedemptionPolicy",
+    },
+    {
+      key: WATCHDOG_REPORTING_KEY,
+      address: watchdogReporting.address,
+      name: "WatchdogSubjectiveReporting",
+    },
+    {
+      key: WATCHDOG_ENFORCER_KEY,
+      address: watchdogEnforcer.address,
+      name: "WatchdogEnforcer",
+    },
   ]
 
   for (const service of services) {
@@ -64,7 +88,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
   // Step 2: Configure QCReserveLedger roles
   log("Step 2: Configuring QCReserveLedger roles...")
-  
+
   // Grant MANAGER_ROLE to QCManager for administrative updates
   const MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")
   await execute(
@@ -75,7 +99,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     qcManager.address
   )
   log("  ✅ MANAGER_ROLE granted to QCManager in QCReserveLedger")
-  
+
   // Grant ATTESTER_ROLE to relevant attesters (can be expanded later)
   const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
   // For now, grant to deployer for testing
@@ -90,7 +114,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
   // Step 3: Configure QCManager roles
   log("Step 3: Configuring QCManager roles...")
-  
+
   // Grant QC_MANAGER_ROLE to QCData
   const QC_MANAGER_ROLE = ethers.utils.id("QC_MANAGER_ROLE")
   await execute(
@@ -126,7 +150,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
   // Step 4: Configure Watchdog Enforcer permissions
   log("Step 4: Configuring Watchdog Enforcer permissions...")
-  
+
   // Grant ARBITER_ROLE to WatchdogEnforcer for setting QC status
   const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
   await execute(
@@ -140,7 +164,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
   // Step 5: Set initial system parameters
   log("Step 5: Setting initial system parameters...")
-  
+
   // Set staleness threshold (7 days)
   await execute(
     "SystemState",
@@ -149,7 +173,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     7 * 24 * 60 * 60 // 7 days in seconds
   )
   log("  ✅ Stale threshold set to 7 days")
-  
+
   // Set redemption timeout (48 hours)
   await execute(
     "SystemState",
@@ -158,7 +182,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     48 * 60 * 60 // 48 hours in seconds
   )
   log("  ✅ Redemption timeout set to 48 hours")
-  
+
   // Set minting amounts
   await execute(
     "SystemState",
@@ -167,7 +191,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     ethers.utils.parseUnits("0.01", 18) // 0.01 tBTC minimum
   )
   log("  ✅ Min mint amount set to 0.01 tBTC")
-  
+
   await execute(
     "SystemState",
     { from: deployer, log: true },
@@ -176,14 +200,14 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   )
   log("  ✅ Max mint amount set to 100 tBTC")
 
-  // Set collateral ratio (90%)
+  // Set collateral ratio (100%)
   await execute(
     "SystemState",
     { from: deployer, log: true },
     "setMinCollateralRatio",
-    90 // 90% minimum collateral
+    100 // 100% minimum collateral
   )
-  log("  ✅ Min collateral ratio set to 90%")
+  log("  ✅ Min collateral ratio set to 100%")
 
   log("")
   log("✨ Account Control System configuration complete!")
@@ -212,6 +236,14 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 }
 
 func.tags = ["ConfigureSystem", "Configuration"]
-func.dependencies = ["SimplifiedWatchdog", "QCManager", "QCData", "QCMinter", "QCRedeemer", "SystemState", "ProtocolRegistry"]
+func.dependencies = [
+  "SimplifiedWatchdog",
+  "QCManager",
+  "QCData",
+  "QCMinter",
+  "QCRedeemer",
+  "SystemState",
+  "ProtocolRegistry",
+]
 
 export default func
