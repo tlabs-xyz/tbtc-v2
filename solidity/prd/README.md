@@ -1,8 +1,8 @@
 # Account Control Architecture for tBTC v2
 
-**Document Version**: 1.1  
-**Date**: 2025-08-04  
-**Architecture**: V1.1 Dual-Path + V1.2 Automated Framework  
+**Document Version**: 2.0  
+**Date**: 2025-08-06  
+**Architecture**: Simplified Watchdog System (Post-Migration)  
 **Status**: Production Ready
 
 ---
@@ -24,9 +24,11 @@ Welcome to the Account Control system documentation. This feature extends tBTC v
 
 | Document                                                       | Purpose                      | Audience                |
 | -------------------------------------------------------------- | ---------------------------- | ----------------------- |
-| **[../docs/WATCHDOG_GUIDE.md](../docs/WATCHDOG_GUIDE.md)** | Complete watchdog system guide | Watchdog operators, DevOps |
+| **[../docs/CURRENT_SYSTEM_STATE.md](../docs/CURRENT_SYSTEM_STATE.md)** | Current system state (truth source) | All stakeholders |
+| **[../docs/WATCHDOG_FINAL_ARCHITECTURE.md](../docs/WATCHDOG_FINAL_ARCHITECTURE.md)** | Watchdog system architecture | Technical teams |
 | **[../docs/future-enhancements/FUTURE_ENHANCEMENTS.md](../docs/future-enhancements/FUTURE_ENHANCEMENTS.md)**           | V2 roadmap and enhancements  | Product, architects     |
 | **[RESEARCH.md](RESEARCH.md)**                                 | Background research findings | Researchers, architects |
+| **[../DOCUMENTATION_MAP.md](../DOCUMENTATION_MAP.md)** | Complete documentation navigation | All stakeholders |
 
 ---
 
@@ -65,6 +67,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 
 ### System Components
 
+#### Core Account Control
 | Component                       | Purpose                      | Key Features                                      |
 | ------------------------------- | ---------------------------- | ------------------------------------------------- |
 | **BasicMintingPolicy**          | Direct Bank integration      | Auto-minting, capacity validation, error handling |
@@ -73,9 +76,14 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 | **QCData**                      | Storage layer                | Pure storage, gas-optimized, audit-friendly       |
 | **QCMinter**                    | Stable entry point           | Policy delegation, emergency pause                |
 | **QCRedeemer**                  | Redemption engine            | Lifecycle management, default handling            |
-| **QCWatchdog**                  | Individual watchdog proxy    | Routine operations, SPV verification              |
-| **WatchdogConsensusManager**    | M-of-N consensus             | Critical operations voting, Byzantine fault tolerance |
-| **WatchdogAutomatedEnforcement** | V1.2 automated rules        | Deterministic enforcement, 90%+ automation       |
+
+#### Simplified Watchdog System (v2.0)
+| Component                       | Purpose                      | Key Features                                      |
+| ------------------------------- | ---------------------------- | ------------------------------------------------- |
+| **WatchdogReasonCodes**         | Machine-readable violations  | Standardized codes for automated validation       |
+| **ReserveOracle**               | Multi-attester consensus     | Median calculation, eliminates single trust point |
+| **WatchdogSubjectiveReporting** | Transparent reporting        | Simple event emission for DAO monitoring          |
+| **WatchdogEnforcer**            | Permissionless enforcement   | Anyone can trigger objective violations           |
 
 ### Integration with Existing tBTC v2
 
@@ -152,12 +160,36 @@ The system deploys as an **independent contract suite** without modifying existi
 - **Gas Efficiency**: Direct integration reduces transaction costs
 - **Reduced Risk**: Fewer contracts in the critical path
 
-### Why Single Watchdog?
+### Watchdog System Migration (v2.0)
 
-- **Operational Simplicity**: Clear responsibility and accountability
-- **Faster Response**: No consensus delays for critical operations
-- **DAO Oversight**: Watchdog appointed and monitored by DAO
-- **Future Evolution**: Clear path to M-of-N decentralization in V2
+#### The Problem with v1.x
+The original watchdog system had fundamental issues:
+- **Machine Interpretation Problem**: Contracts expected machines to interpret human-readable strings
+- **Single Point of Trust**: One attester for critical reserve attestations
+- **Over-Complexity**: 6+ overlapping contracts with unclear responsibilities
+- **State Machine Overhead**: Complex voting and escalation for objective facts
+
+#### The Solution: Three-Problem Framework
+We identified three distinct problems requiring different solutions:
+
+1. **Oracle Problem** (Objective Facts)
+   - Solution: Multi-attester consensus via `ReserveOracle`
+   - Multiple attesters submit reserve balances, median calculation prevents manipulation
+
+2. **Observation Problem** (Subjective Concerns)  
+   - Solution: Simple transparent reporting via `WatchdogSubjectiveReporting`
+   - Watchdogs report observations, DAO monitors events and investigates
+
+3. **Decision Problem** (Governance Actions)
+   - Solution: Direct DAO action without intermediary contracts
+   - DAO observes reports, discusses off-chain, takes action directly
+
+#### Migration Benefits
+- **33% Fewer Contracts**: 6 old contracts → 4 new contracts
+- **Machine-Readable**: Reason codes enable automated validation
+- **Trust Distribution**: No single points of failure
+- **Permissionless Enforcement**: Anyone can trigger objective violations
+- **Gas Optimization**: Minimal state, fewer cross-contract calls
 
 ### Why Policy-Driven Architecture?
 
@@ -188,6 +220,8 @@ The system deploys as an **independent contract suite** without modifying existi
 | Version | Date       | Changes                                    |
 | ------- | ---------- | ------------------------------------------ |
 | 1.0     | 2025-07-11 | Initial consolidated documentation release |
+| 1.1     | 2025-08-04 | Dual-path watchdog + automated framework  |
+| 2.0     | 2025-08-06 | Simplified watchdog migration complete    |
 
 ---
 
