@@ -13,7 +13,7 @@ const func: DeployFunction = async function DeploySimplifiedWatchdog(
   // Get required contracts
   const qcManager = await get("QCManager")
   const qcData = await get("QCData")
-  const qcReserveLedger = await get("QCReserveLedger")
+  const qcQCReserveLedger = await get("QCReserveLedger")
   const systemState = await get("SystemState")
 
   // Deploy WatchdogReasonCodes library
@@ -28,7 +28,7 @@ const func: DeployFunction = async function DeploySimplifiedWatchdog(
   log("Deploying ReserveOracle...")
   const reserveOracle = await deploy("ReserveOracle", {
     from: deployer,
-    args: [qcReserveLedger.address],
+    args: [qcQCReserveLedger.address],
     log: true,
   })
   log(`✅ ReserveOracle deployed at ${reserveOracle.address}`)
@@ -46,7 +46,7 @@ const func: DeployFunction = async function DeploySimplifiedWatchdog(
   const watchdogEnforcer = await deploy("WatchdogEnforcer", {
     from: deployer,
     args: [
-      qcReserveLedger.address,
+      qcQCReserveLedger.address,
       qcManager.address,
       qcData.address,
       systemState.address,

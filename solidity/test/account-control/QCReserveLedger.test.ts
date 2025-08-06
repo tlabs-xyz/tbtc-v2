@@ -1,9 +1,9 @@
 import { expect } from "chai"
 import { ethers, deployments, getNamedAccounts } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import { ReserveLedger } from "../../typechain"
+import { QCReserveLedger } from "../../typechain"
 
-describe("ReserveLedger", () => {
+describe("QCReserveLedger", () => {
   let deployer: SignerWithAddress
   let attester1: SignerWithAddress
   let attester2: SignerWithAddress
@@ -11,14 +11,14 @@ describe("ReserveLedger", () => {
   let attester4: SignerWithAddress
   let qcAddress: SignerWithAddress
   let qcManager: SignerWithAddress
-  let reserveLedger: ReserveLedger
+  let reserveLedger: QCReserveLedger
 
   const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
   const MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
 
   beforeEach(async () => {
-    await deployments.fixture(["ReserveLedger"])
+    await deployments.fixture(["QCReserveLedger"])
     
     const accounts = await getNamedAccounts()
     deployer = await ethers.getSigner(accounts.deployer)
@@ -31,11 +31,11 @@ describe("ReserveLedger", () => {
     qcAddress = signers[5]
     qcManager = signers[6]
     
-    const ReserveLedgerDeployment = await deployments.get("ReserveLedger")
+    const QCReserveLedgerDeployment = await deployments.get("QCReserveLedger")
     reserveLedger = await ethers.getContractAt(
-      "ReserveLedger",
-      ReserveLedgerDeployment.address
-    ) as ReserveLedger
+      "QCReserveLedger",
+      QCReserveLedgerDeployment.address
+    ) as QCReserveLedger
     
     // Grant roles
     await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester1.address)

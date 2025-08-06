@@ -3,10 +3,10 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
-/// @title ReserveLedger
+/// @title QCReserveLedger
 /// @notice Unified contract for reserve attestation and consensus
 /// @dev Combines oracle consensus and ledger storage in a single atomic operation
-contract ReserveLedger is AccessControl {
+contract QCReserveLedger is AccessControl {
     bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     

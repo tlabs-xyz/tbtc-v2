@@ -8,7 +8,7 @@ import {
   ProtocolRegistry,
   QCData,
   SystemState,
-  ReserveLedger,
+  QCReserveLedger,
   SPVValidator,
 } from "../../typechain"
 
@@ -27,7 +27,7 @@ describe("QCManager", () => {
   let protocolRegistry: ProtocolRegistry
   let mockQcData: FakeContract<QCData>
   let mockSystemState: FakeContract<SystemState>
-  let mockQcReserveLedger: FakeContract<ReserveLedger>
+  let mockQcQCReserveLedger: FakeContract<QCReserveLedger>
   let mockSpvValidator: FakeContract<SPVValidator>
 
   // Service keys
@@ -105,7 +105,7 @@ describe("QCManager", () => {
     // Create mock contracts
     mockQcData = await smock.fake<QCData>("QCData")
     mockSystemState = await smock.fake<SystemState>("SystemState")
-    mockQcReserveLedger = await smock.fake<ReserveLedger>("ReserveLedger")
+    mockQcQCReserveLedger = await smock.fake<QCReserveLedger>("QCReserveLedger")
     mockSpvValidator = await smock.fake<SPVValidator>("SPVValidator")
 
     // Register services
@@ -113,7 +113,7 @@ describe("QCManager", () => {
     await protocolRegistry.setService(SYSTEM_STATE_KEY, mockSystemState.address)
     await protocolRegistry.setService(
       QC_RESERVE_LEDGER_KEY,
-      mockQcReserveLedger.address
+      mockQcQCReserveLedger.address
     )
     await protocolRegistry.setService(
       SPV_VALIDATOR_KEY,
@@ -129,7 +129,7 @@ describe("QCManager", () => {
     mockQcData.getWalletOwner.returns(qcAddress.address)
     mockQcData.getQCMintedAmount.returns(mintedAmount)
     mockQcData.getMaxMintingCapacity.returns(ethers.utils.parseEther("5000"))
-    mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+    mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
       reserveBalance,
       false,
     ])
@@ -627,7 +627,7 @@ describe("QCManager", () => {
       it("should update reserve ledger", async () => {
         const sufficientBalance = mintedAmount.add(ethers.utils.parseEther("1"))
         expect(
-          mockQcReserveLedger.submitReserveAttestation
+          mockQcQCReserveLedger.submitReserveAttestation
         ).to.have.been.calledWith(qcAddress.address, sufficientBalance)
       })
     })
@@ -689,7 +689,7 @@ describe("QCManager", () => {
     context("when QC is active with fresh reserves", () => {
       beforeEach(async () => {
         mockQcData.getQCStatus.returns(0) // Active
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
           reserveBalance,
           false,
         ])
@@ -721,7 +721,7 @@ describe("QCManager", () => {
     context("when reserves are stale", () => {
       beforeEach(async () => {
         mockQcData.getQCStatus.returns(0) // Active
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
           reserveBalance,
           true,
         ])
@@ -738,7 +738,7 @@ describe("QCManager", () => {
     context("when minted amount exceeds reserves", () => {
       beforeEach(async () => {
         mockQcData.getQCStatus.returns(0) // Active
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
           reserveBalance,
           false,
         ])
@@ -758,7 +758,7 @@ describe("QCManager", () => {
     beforeEach(async () => {
       mockQcData.isQCRegistered.returns(true)
       mockQcData.getQCStatus.returns(0) // Active
-      mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+      mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
         reserveBalance,
         false,
       ])
@@ -796,7 +796,7 @@ describe("QCManager", () => {
     context("when QC is insolvent", () => {
       beforeEach(async () => {
         const insufficientReserves = mintedAmount.sub(1)
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
           insufficientReserves,
           false,
         ])
@@ -1075,7 +1075,7 @@ describe("QCManager", () => {
       })
 
       it("should be solvent when reserves exactly equal minted amount", async () => {
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
           ethers.utils.parseEther("10"), // Exactly equal
           false,
         ])
@@ -1093,7 +1093,7 @@ describe("QCManager", () => {
       })
 
       it("should be insolvent when reserves are 1 wei less than minted amount", async () => {
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
           ethers.utils.parseEther("10").sub(1), // 1 wei less
           false,
         ])
@@ -1120,7 +1120,7 @@ describe("QCManager", () => {
         mockQcData.isQCRegistered.returns(true)
         mockQcData.getQCStatus.returns(1) // UnderReview
         mockQcData.getQCMintedAmount.returns(ethers.utils.parseEther("10"))
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
           ethers.utils.parseEther("5"), // Insufficient reserves
           false,
         ])

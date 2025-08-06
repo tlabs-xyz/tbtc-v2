@@ -35,7 +35,7 @@ describe("Account Control System - Integration Test", () => {
   let qcData: QCData
   let systemState: SystemState
   let qcManager: QCManager
-  let qcReserveLedger: QCReserveLedger
+  let qcQCReserveLedger: QCReserveLedger
   let basicMintingPolicy: BasicMintingPolicy
   let basicRedemptionPolicy: BasicRedemptionPolicy
   let qcWatchdog: QCWatchdog
@@ -154,10 +154,10 @@ describe("Account Control System - Integration Test", () => {
     const QCReserveLedgerFactory = await ethers.getContractFactory(
       "QCReserveLedger"
     )
-    qcReserveLedger = await QCReserveLedgerFactory.deploy(
+    qcQCReserveLedger = await QCReserveLedgerFactory.deploy(
       protocolRegistry.address
     )
-    await qcReserveLedger.deployed()
+    await qcQCReserveLedger.deployed()
 
     const BasicMintingPolicyFactory = await ethers.getContractFactory(
       "BasicMintingPolicy"
@@ -195,7 +195,7 @@ describe("Account Control System - Integration Test", () => {
     await protocolRegistry.setService(QC_MANAGER_KEY, qcManager.address)
     await protocolRegistry.setService(
       QC_RESERVE_LEDGER_KEY,
-      qcReserveLedger.address
+      qcQCReserveLedger.address
     )
     await protocolRegistry.setService(
       MINTING_POLICY_KEY,
@@ -230,7 +230,7 @@ describe("Account Control System - Integration Test", () => {
     await bank.setAuthorizedBalanceIncreaser(basicMintingPolicy.address, true)
 
     // Setup Watchdog roles
-    await qcReserveLedger.grantRole(ATTESTER_ROLE, qcWatchdog.address)
+    await qcQCReserveLedger.grantRole(ATTESTER_ROLE, qcWatchdog.address)
     await qcManager.grantRole(REGISTRAR_ROLE, qcWatchdog.address)
     await qcManager.grantRole(ARBITER_ROLE, qcWatchdog.address)
     await qcRedeemer.grantRole(ARBITER_ROLE, qcWatchdog.address)
@@ -258,7 +258,7 @@ describe("Account Control System - Integration Test", () => {
       expect(qcData.address).to.be.properAddress
       expect(systemState.address).to.be.properAddress
       expect(qcManager.address).to.be.properAddress
-      expect(qcReserveLedger.address).to.be.properAddress
+      expect(qcQCReserveLedger.address).to.be.properAddress
       expect(basicMintingPolicy.address).to.be.properAddress
       expect(basicRedemptionPolicy.address).to.be.properAddress
       expect(qcWatchdog.address).to.be.properAddress
@@ -275,7 +275,7 @@ describe("Account Control System - Integration Test", () => {
         qcManager.address
       )
       expect(await protocolRegistry.getService(QC_RESERVE_LEDGER_KEY)).to.equal(
-        qcReserveLedger.address
+        qcQCReserveLedger.address
       )
       expect(await protocolRegistry.getService(MINTING_POLICY_KEY)).to.equal(
         basicMintingPolicy.address
@@ -286,7 +286,7 @@ describe("Account Control System - Integration Test", () => {
     })
 
     it("should verify Watchdog has necessary roles", async () => {
-      const hasAttesterRole = await qcReserveLedger.hasRole(
+      const hasAttesterRole = await qcQCReserveLedger.hasRole(
         ATTESTER_ROLE,
         qcWatchdog.address
       )
@@ -383,7 +383,7 @@ describe("Account Control System - Integration Test", () => {
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
-      const attestation = await qcReserveLedger.getCurrentAttestation(
+      const attestation = await qcQCReserveLedger.getCurrentAttestation(
         qcAddress.address
       )
       expect(attestation.balance).to.equal(initialReserveBalance)
@@ -402,7 +402,7 @@ describe("Account Control System - Integration Test", () => {
         .attestReserves(qcAddress.address, initialReserveBalance)
 
       // Initially not stale
-      const isStale = await qcReserveLedger.isAttestationStale(
+      const isStale = await qcQCReserveLedger.isAttestationStale(
         qcAddress.address
       )
       expect(isStale).to.be.false

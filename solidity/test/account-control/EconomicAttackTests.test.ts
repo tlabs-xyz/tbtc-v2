@@ -70,7 +70,7 @@ describe("Economic Attack Tests", () => {
      */
     context("Flash Loan Minting Capacity Manipulation", () => {
       it("should prevent flash loan attack on reserve attestation", async () => {
-        const { qcReserveLedger, basicMintingPolicy, watchdog, qcAddress } =
+        const { qcQCReserveLedger, basicMintingPolicy, watchdog, qcAddress } =
           fixture
 
         // Setup: Attacker gets flash loan
@@ -82,14 +82,14 @@ describe("Economic Attack Tests", () => {
 
         // Step 1: Attacker attempts to submit inflated reserve attestation
         await expect(
-          qcReserveLedger
+          qcQCReserveLedger
             .connect(attacker)
             .submitReserveAttestation(qcAddress.address, inflatedReserves)
         ).to.be.revertedWith("AccessControl: account") // Should require ATTESTER_ROLE
 
         // Step 2: Even if attacker had ATTESTER_ROLE, minting should be atomic
         // and not allow mid-transaction balance manipulation
-        await qcReserveLedger
+        await qcQCReserveLedger
           .connect(watchdog)
           .submitReserveAttestation(qcAddress.address, inflatedReserves)
 
@@ -106,7 +106,7 @@ describe("Economic Attack Tests", () => {
 
       it("should detect and prevent reserve attestation timing manipulation", async () => {
         const {
-          qcReserveLedger,
+          qcQCReserveLedger,
           qcManager,
           qcData,
           basicMintingPolicy,
@@ -126,12 +126,12 @@ describe("Economic Attack Tests", () => {
         const reserves1 = ethers.utils.parseEther("100")
         const reserves2 = ethers.utils.parseEther("1") // Much less than minted amount (50 ETH)
 
-        await qcReserveLedger
+        await qcQCReserveLedger
           .connect(watchdog)
           .submitReserveAttestation(qcAddress.address, reserves1)
 
         // Immediate second attestation (flash loan scenario)
-        await qcReserveLedger
+        await qcQCReserveLedger
           .connect(watchdog)
           .submitReserveAttestation(qcAddress.address, reserves2)
 
@@ -356,7 +356,7 @@ describe("Economic Attack Tests", () => {
 
     context("Reserve Attestation Front-Running", () => {
       it("should prevent manipulation of reserve attestation ordering", async () => {
-        const { qcReserveLedger, watchdog, qcAddress } = fixture
+        const { qcQCReserveLedger, watchdog, qcAddress } = fixture
 
         // Scenario: Multiple reserve attestations in same block
         const reserves1 = ethers.utils.parseEther("10")
@@ -364,16 +364,16 @@ describe("Economic Attack Tests", () => {
 
         // The system should handle multiple attestations correctly
         // Latest should win, but both should be valid operations
-        await qcReserveLedger
+        await qcQCReserveLedger
           .connect(watchdog)
           .submitReserveAttestation(qcAddress.address, reserves1)
-        await qcReserveLedger
+        await qcQCReserveLedger
           .connect(watchdog)
           .submitReserveAttestation(qcAddress.address, reserves2)
 
         // Use the correct function name and destructure the return values
         const [finalBalance, isStale] =
-          await qcReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+          await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
         expect(finalBalance).to.equal(reserves2) // Latest attestation should be used
         expect(isStale).to.be.false // Should not be stale immediately after submission
       })
