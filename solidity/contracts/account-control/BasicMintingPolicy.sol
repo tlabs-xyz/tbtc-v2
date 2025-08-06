@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/IMintingPolicy.sol";
 import "./ProtocolRegistry.sol";
 import "./QCManager.sol";
@@ -21,7 +22,7 @@ import "../token/TBTC.sol";
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - MINTER_ROLE: Can request minting of tBTC tokens (typically granted to QCMinter contract)
-contract BasicMintingPolicy is IMintingPolicy, AccessControl {
+contract BasicMintingPolicy is IMintingPolicy, AccessControl, ReentrancyGuard {
     error InvalidQCAddress();
     error InvalidUserAddress();
     error InvalidAmount();
@@ -126,6 +127,7 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
 
     /// @notice Request minting with direct Bank integration for seamless user experience
     /// @dev Validates QC capacity, directly creates Bank balance, and triggers TBTCVault minting
+    ///      SECURITY: nonReentrant protects against reentrancy via Bank.increaseBalanceAndCall
     /// @param qc The address of the Qualified Custodian
     /// @param user The address receiving the tBTC tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
@@ -134,7 +136,7 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         address qc,
         address user,
         uint256 amount
-    ) external override onlyRole(MINTER_ROLE) returns (bytes32 mintId) {
+    ) external override onlyRole(MINTER_ROLE) nonReentrant returns (bytes32 mintId) {
         // Validate inputs
         if (qc == address(0)) revert InvalidQCAddress();
         if (user == address(0)) revert InvalidUserAddress();

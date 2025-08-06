@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./WatchdogReasonCodes.sol";
 import "./QCReserveLedger.sol";
 import "./QCManager.sol";
@@ -23,7 +24,7 @@ import "./SystemState.sol";
 ///      2. Upon detecting violations, watchdogs call enforceObjectiveViolation()
 ///      3. If watchdogs are offline/inactive, any participant can enforce violations
 ///      4. All enforcement attempts are logged via events for transparency
-contract WatchdogEnforcer is AccessControl {
+contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
     using WatchdogReasonCodes for bytes32;
     
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
@@ -77,9 +78,10 @@ contract WatchdogEnforcer is AccessControl {
     /// @dev While anyone can call this function, it is primarily intended for watchdogs who
     ///      continuously monitor the system and detect violations. The permissionless nature
     ///      ensures system resilience - if watchdogs fail to act, anyone can step in.
+    ///      SECURITY: nonReentrant protects against malicious QCs calling back during enforcement
     /// @param qc The Qualified Custodian address
     /// @param reasonCode The machine-readable reason code
-    function enforceObjectiveViolation(address qc, bytes32 reasonCode) external {
+    function enforceObjectiveViolation(address qc, bytes32 reasonCode) external nonReentrant {
         // Verify this is an objective violation
         if (!reasonCode.isObjectiveViolation()) {
             revert NotObjectiveViolation();
