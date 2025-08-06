@@ -333,8 +333,4 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl, ReentrancyGuard {
         qcManager.updateQCMintedAmount(qc, currentMinted + amount);
     }
 
-    /// @notice Check Bank authorization efficiently
-    function checkBankAuthorization() external view returns (bool isAuthorized) {
-        return bank.authorizedBalanceIncreasers(address(this));
-    }
 }
