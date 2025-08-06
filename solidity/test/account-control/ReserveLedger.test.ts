@@ -42,6 +42,7 @@ describe("ReserveLedger", () => {
     await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester2.address)
     await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester3.address)
     await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester4.address)
+    await reserveLedger.connect(deployer).grantRole(MANAGER_ROLE, qcManager.address)
   })
 
   describe("Initialization", () => {
@@ -79,7 +80,7 @@ describe("ReserveLedger", () => {
     it("should revert if balance is zero", async () => {
       await expect(
         reserveLedger.connect(attester1).submitAttestation(qcAddress.address, 0)
-      ).to.be.revertedWithCustomError(reserveLedger, "InvalidBalance")
+      ).to.be.revertedWith("InvalidBalance")
     })
   })
 
@@ -223,7 +224,7 @@ describe("ReserveLedger", () => {
     it("should revert if balance is zero", async () => {
       await expect(
         reserveLedger.connect(qcManager).updateReserveBalance(qcAddress.address, 0)
-      ).to.be.revertedWithCustomError(reserveLedger, "InvalidBalance")
+      ).to.be.revertedWith("InvalidBalance")
     })
   })
 
@@ -247,7 +248,7 @@ describe("ReserveLedger", () => {
       it("should revert if threshold is zero", async () => {
         await expect(
           reserveLedger.connect(deployer).setConsensusThreshold(0)
-        ).to.be.revertedWithCustomError(reserveLedger, "InvalidThreshold")
+        ).to.be.revertedWith("InvalidThreshold")
       })
     })
     
@@ -270,7 +271,7 @@ describe("ReserveLedger", () => {
       it("should revert if timeout is zero", async () => {
         await expect(
           reserveLedger.connect(deployer).setAttestationTimeout(0)
-        ).to.be.revertedWithCustomError(reserveLedger, "InvalidTimeout")
+        ).to.be.revertedWith("InvalidTimeout")
       })
     })
     
@@ -287,7 +288,7 @@ describe("ReserveLedger", () => {
       it("should revert if staleness is zero", async () => {
         await expect(
           reserveLedger.connect(deployer).setMaxStaleness(0)
-        ).to.be.revertedWithCustomError(reserveLedger, "InvalidTimeout")
+        ).to.be.revertedWith("InvalidTimeout")
       })
       
       it("should revert if not manager", async () => {
