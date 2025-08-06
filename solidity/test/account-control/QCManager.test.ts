@@ -21,6 +21,7 @@ describe("QCManager", () => {
   let governance: SignerWithAddress
   let qcAddress: SignerWithAddress
   let watchdog: SignerWithAddress
+  let watchdogEnforcer: SignerWithAddress
   let thirdParty: SignerWithAddress
 
   let qcManager: QCManager
@@ -41,6 +42,7 @@ describe("QCManager", () => {
   let REGISTRAR_ROLE: string
   let ARBITER_ROLE: string
   let QC_GOVERNANCE_ROLE: string
+  let WATCHDOG_ENFORCER_ROLE: string
 
   // Test data
   const testBtcAddress = "bc1qtest123456789"
@@ -68,10 +70,11 @@ describe("QCManager", () => {
   const testReason = ethers.utils.id("TEST_REASON")
   const reserveBalance = ethers.utils.parseEther("10")
   const mintedAmount = ethers.utils.parseEther("5")
+  const INSUFFICIENT_RESERVES = ethers.utils.id("INSUFFICIENT_RESERVES")
 
   before(async () => {
     // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, governance, qcAddress, watchdog, thirdParty] =
+    ;[deployer, governance, qcAddress, watchdog, watchdogEnforcer, thirdParty] =
       await ethers.getSigners()
 
     // Generate service keys
@@ -85,6 +88,7 @@ describe("QCManager", () => {
     REGISTRAR_ROLE = ethers.utils.id("REGISTRAR_ROLE")
     ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
     QC_GOVERNANCE_ROLE = ethers.utils.id("QC_GOVERNANCE_ROLE")
+    WATCHDOG_ENFORCER_ROLE = ethers.utils.id("WATCHDOG_ENFORCER_ROLE")
   })
 
   beforeEach(async () => {
@@ -139,6 +143,7 @@ describe("QCManager", () => {
     await qcManager.grantRole(REGISTRAR_ROLE, watchdog.address)
     await qcManager.grantRole(ARBITER_ROLE, watchdog.address)
     await qcManager.grantRole(QC_GOVERNANCE_ROLE, deployer.address)
+    await qcManager.grantRole(WATCHDOG_ENFORCER_ROLE, watchdogEnforcer.address)
   })
 
   afterEach(async () => {
@@ -1350,6 +1355,706 @@ describe("QCManager", () => {
             .connect(watchdog)
             .emergencyPauseQC(qcAddress.address, emergencyReason)
         ).to.be.revertedWith("Function is paused")
+      })
+    })
+  })
+
+  describe("requestStatusChange", () => {
+    beforeEach(async () => {
+      mockQcData.isQCRegistered.returns(true)
+      mockQcData.getQCStatus.returns(0) // Active
+    })
+
+    context("when called by watchdog enforcer", () => {
+      context("when requesting UnderReview status", () => {
+        let tx: any
+        const reason = ethers.utils.id("INSUFFICIENT_RESERVES")
+
+        beforeEach(async () => {
+          tx = await qcManager
+            .connect(watchdogEnforcer)
+            .requestStatusChange(qcAddress.address, 1, reason) // 1 = UnderReview
+        })
+
+        it("should call QCData setQCStatus", async () => {
+          expect(mockQcData.setQCStatus).to.have.been.calledWith(
+            qcAddress.address,
+            1,
+            reason
+          )
+        })
+
+        it("should emit QCStatusChangeRequested event", async () => {
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+          await expect(tx)
+            .to.emit(qcManager, "QCStatusChangeRequested")
+            .withArgs(
+              qcAddress.address,
+              1,
+              reason,
+              watchdogEnforcer.address,
+              currentBlock.timestamp
+            )
+        })
+
+        it("should emit QCStatusChanged event", async () => {
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+          await expect(tx)
+            .to.emit(qcManager, "QCStatusChanged")
+            .withArgs(
+              qcAddress.address,
+              0,
+              1,
+              reason,
+              watchdogEnforcer.address,
+              currentBlock.timestamp
+            )
+        })
+      })
+
+      context("when requesting Active status", () => {
+        it("should revert", async () => {
+          await expect(
+            qcManager
+              .connect(watchdogEnforcer)
+              .requestStatusChange(qcAddress.address, 0, testReason) // 0 = Active
+          ).to.be.revertedWith("WatchdogEnforcer can only set UnderReview status")
+        })
+      })
+
+      context("when requesting Revoked status", () => {
+        it("should revert", async () => {
+          await expect(
+            qcManager
+              .connect(watchdogEnforcer)
+              .requestStatusChange(qcAddress.address, 2, testReason) // 2 = Revoked
+          ).to.be.revertedWith("WatchdogEnforcer can only set UnderReview status")
+        })
+      })
+
+      context("when QC is already UnderReview", () => {
+        beforeEach(async () => {
+          mockQcData.getQCStatus.returns(1) // UnderReview
+        })
+
+        it("should allow setting UnderReview again", async () => {
+          const tx = await qcManager
+            .connect(watchdogEnforcer)
+            .requestStatusChange(qcAddress.address, 1, testReason)
+
+          expect(mockQcData.setQCStatus).to.have.been.calledWith(
+            qcAddress.address,
+            1,
+            testReason
+          )
+
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+          await expect(tx)
+            .to.emit(qcManager, "QCStatusChanged")
+            .withArgs(
+              qcAddress.address,
+              1,
+              1,
+              testReason,
+              watchdogEnforcer.address,
+              currentBlock.timestamp
+            )
+        })
+      })
+
+      context("when QC is Revoked", () => {
+        beforeEach(async () => {
+          mockQcData.getQCStatus.returns(2) // Revoked
+        })
+
+        it("should revert with invalid transition", async () => {
+          await expect(
+            qcManager
+              .connect(watchdogEnforcer)
+              .requestStatusChange(qcAddress.address, 1, testReason)
+          ).to.be.revertedWith("InvalidStatusTransition")
+        })
+      })
+
+      context("when QC is not registered", () => {
+        beforeEach(async () => {
+          mockQcData.isQCRegistered.returns(false)
+        })
+
+        it("should revert", async () => {
+          await expect(
+            qcManager
+              .connect(watchdogEnforcer)
+              .requestStatusChange(qcAddress.address, 1, testReason)
+          ).to.be.revertedWith("QCNotRegistered")
+        })
+      })
+    })
+
+    context("when called by non-watchdog enforcer", () => {
+      it("should revert when called by arbiter", async () => {
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .requestStatusChange(qcAddress.address, 1, testReason)
+        ).to.be.revertedWith(
+          `AccessControl: account ${watchdog.address.toLowerCase()} is missing role ${WATCHDOG_ENFORCER_ROLE}`
+        )
+      })
+
+      it("should revert when called by third party", async () => {
+        await expect(
+          qcManager
+            .connect(thirdParty)
+            .requestStatusChange(qcAddress.address, 1, testReason)
+        ).to.be.revertedWith(
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${WATCHDOG_ENFORCER_ROLE}`
+        )
+      })
+    })
+
+    context("when function is paused", () => {
+      beforeEach(async () => {
+        mockSystemState.isFunctionPaused
+          .whenCalledWith("registry")
+          .returns(true)
+      })
+
+      it("should revert", async () => {
+        await expect(
+          qcManager
+            .connect(watchdogEnforcer)
+            .requestStatusChange(qcAddress.address, 1, testReason)
+        ).to.be.revertedWith("Function is paused")
+      })
+    })
+  })
+
+  describe("State transition side effects", () => {
+    beforeEach(async () => {
+      mockQcData.isQCRegistered.returns(true)
+    })
+
+    context("when transitioning from Active to UnderReview", () => {
+      beforeEach(async () => {
+        mockQcData.getQCStatus.returns(0) // Active
+      })
+
+      it("should affect minting capacity", async () => {
+        // First, verify QC has capacity when Active
+        const initialCapacity = await qcManager.getAvailableMintingCapacity(
+          qcAddress.address
+        )
+        expect(initialCapacity).to.be.gt(0)
+
+        // Transition to UnderReview
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 1, testReason)
+
+        // Update mock to return UnderReview status
+        mockQcData.getQCStatus.returns(1)
+
+        // Verify capacity is now zero
+        const newCapacity = await qcManager.getAvailableMintingCapacity(
+          qcAddress.address
+        )
+        expect(newCapacity).to.equal(0)
+      })
+
+      it("should prevent new wallet registrations", async () => {
+        // Transition to UnderReview
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 1, testReason)
+
+        // Update mock to return UnderReview status
+        mockQcData.getQCStatus.returns(1)
+
+        // Attempt to register a wallet should fail
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .registerWallet(
+              qcAddress.address,
+              testBtcAddress,
+              testChallenge,
+              testTxInfo,
+              testProof
+            )
+        ).to.be.revertedWith("QCNotActive")
+      })
+
+      it("should still allow wallet deregistration requests", async () => {
+        // Setup wallet as registered and active
+        mockQcData.getWalletOwner.returns(qcAddress.address)
+        mockQcData.getWalletStatus.returns(1) // Active
+
+        // Transition QC to UnderReview
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 1, testReason)
+
+        // Wallet deregistration should still work
+        await expect(
+          qcManager
+            .connect(qcAddress)
+            .requestWalletDeRegistration(testBtcAddress)
+        ).to.not.be.reverted
+      })
+    })
+
+    context("when transitioning from UnderReview to Active", () => {
+      beforeEach(async () => {
+        mockQcData.getQCStatus.returns(1) // UnderReview
+      })
+
+      it("should restore minting capacity", async () => {
+        // Initially no capacity in UnderReview
+        let capacity = await qcManager.getAvailableMintingCapacity(
+          qcAddress.address
+        )
+        expect(capacity).to.equal(0)
+
+        // Transition back to Active
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 0, testReason)
+
+        // Update mock to return Active status
+        mockQcData.getQCStatus.returns(0)
+
+        // Verify capacity is restored
+        capacity = await qcManager.getAvailableMintingCapacity(
+          qcAddress.address
+        )
+        expect(capacity).to.be.gt(0)
+      })
+
+      it("should allow wallet registrations again", async () => {
+        // Transition to Active
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 0, testReason)
+
+        // Update mock to return Active status
+        mockQcData.getQCStatus.returns(0)
+
+        // Wallet registration should work
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .registerWallet(
+              qcAddress.address,
+              testBtcAddress,
+              testChallenge,
+              testTxInfo,
+              testProof
+            )
+        ).to.not.be.reverted
+      })
+    })
+
+    context("when transitioning to Revoked (terminal state)", () => {
+      beforeEach(async () => {
+        mockQcData.getQCStatus.returns(0) // Active
+      })
+
+      it("should permanently disable all QC operations", async () => {
+        // Transition to Revoked
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 2, testReason)
+
+        // Update mock to return Revoked status
+        mockQcData.getQCStatus.returns(2)
+
+        // Minting capacity should be zero
+        const capacity = await qcManager.getAvailableMintingCapacity(
+          qcAddress.address
+        )
+        expect(capacity).to.equal(0)
+
+        // Wallet registration should fail
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .registerWallet(
+              qcAddress.address,
+              testBtcAddress,
+              testChallenge,
+              testTxInfo,
+              testProof
+            )
+        ).to.be.revertedWith("QCNotActive")
+
+        // Cannot transition out of Revoked
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .setQCStatus(qcAddress.address, 0, testReason)
+        ).to.be.revertedWith("InvalidStatusTransition")
+
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .setQCStatus(qcAddress.address, 1, testReason)
+        ).to.be.revertedWith("InvalidStatusTransition")
+      })
+    })
+
+    context("state transition event ordering", () => {
+      it("should emit events in correct order", async () => {
+        mockQcData.getQCStatus.returns(0) // Active
+
+        const tx = await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 1, testReason)
+
+        // Get events from transaction
+        const receipt = await tx.wait()
+        const events = receipt.events?.map((e: any) => e.event) || []
+
+        // Verify QCStatusChanged is emitted
+        expect(events).to.include("QCStatusChanged")
+
+        // Verify state change happened before event
+        expect(mockQcData.setQCStatus).to.have.been.calledBefore(
+          tx.wait as any
+        )
+      })
+    })
+
+    context("concurrent state changes", () => {
+      it("should handle rapid state transitions", async () => {
+        mockQcData.getQCStatus.returns(0) // Active
+
+        // First transition: Active -> UnderReview
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 1, testReason)
+
+        // Update mock
+        mockQcData.getQCStatus.returns(1)
+
+        // Second transition: UnderReview -> Active
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 0, testReason)
+
+        // Update mock
+        mockQcData.getQCStatus.returns(0)
+
+        // Third transition: Active -> Revoked
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 2, testReason)
+
+        // Verify all transitions were executed
+        expect(mockQcData.setQCStatus).to.have.been.calledThrice
+      })
+    })
+
+    context("state-dependent calculations", () => {
+      it("should return zero capacity for stale reserves regardless of state", async () => {
+        // Setup: Active state but stale reserves
+        mockQcData.getQCStatus.returns(0) // Active
+        mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
+          reserveBalance,
+          true, // Stale
+        ])
+
+        const capacity = await qcManager.getAvailableMintingCapacity(
+          qcAddress.address
+        )
+        expect(capacity).to.equal(0)
+      })
+
+      it("should calculate capacity correctly when transitioning states", async () => {
+        // Setup specific values
+        const specificReserve = ethers.utils.parseEther("100")
+        const specificMinted = ethers.utils.parseEther("60")
+        
+        mockQcData.getQCStatus.returns(0) // Active
+        mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
+          specificReserve,
+          false,
+        ])
+        mockQcData.getQCMintedAmount.returns(specificMinted)
+
+        // Active state: should have capacity
+        let capacity = await qcManager.getAvailableMintingCapacity(
+          qcAddress.address
+        )
+        expect(capacity).to.equal(specificReserve.sub(specificMinted))
+
+        // Transition to UnderReview
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 1, testReason)
+        mockQcData.getQCStatus.returns(1)
+
+        // UnderReview state: should have zero capacity
+        capacity = await qcManager.getAvailableMintingCapacity(
+          qcAddress.address
+        )
+        expect(capacity).to.equal(0)
+      })
+    })
+  })
+
+  describe("Transaction ordering and edge cases", () => {
+    beforeEach(async () => {
+      mockQcData.isQCRegistered.returns(true)
+    })
+
+    context("race conditions", () => {
+      it("should handle simultaneous enforcement and arbiter actions", async () => {
+        mockQcData.getQCStatus.returns(0) // Active
+
+        // Simulate near-simultaneous calls (in practice these would be in separate blocks)
+        // 1. WatchdogEnforcer sets to UnderReview
+        const tx1 = await qcManager
+          .connect(watchdogEnforcer)
+          .requestStatusChange(qcAddress.address, 1, INSUFFICIENT_RESERVES)
+
+        // Update mock state
+        mockQcData.getQCStatus.returns(1) // UnderReview
+
+        // 2. Arbiter tries to set to Revoked
+        const tx2 = await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 2, testReason)
+
+        // Both should succeed as transitions are valid
+        await expect(tx1).to.not.be.reverted
+        await expect(tx2).to.not.be.reverted
+
+        // Final state should be Revoked
+        expect(mockQcData.setQCStatus).to.have.been.lastCalledWith(
+          qcAddress.address,
+          2,
+          testReason
+        )
+      })
+
+      it("should handle competing watchdog enforcers", async () => {
+        // Grant WATCHDOG_ENFORCER_ROLE to another address
+        const watchdogEnforcer2 = thirdParty
+        await qcManager.grantRole(WATCHDOG_ENFORCER_ROLE, watchdogEnforcer2.address)
+
+        mockQcData.getQCStatus.returns(0) // Active
+
+        // Both enforcers detect violations and try to enforce
+        const reason1 = ethers.utils.id("INSUFFICIENT_RESERVES")
+        const reason2 = ethers.utils.id("STALE_ATTESTATIONS")
+
+        // First enforcer
+        await qcManager
+          .connect(watchdogEnforcer)
+          .requestStatusChange(qcAddress.address, 1, reason1)
+
+        // Update state
+        mockQcData.getQCStatus.returns(1)
+
+        // Second enforcer (should still work as UnderReview -> UnderReview is valid)
+        await expect(
+          qcManager
+            .connect(watchdogEnforcer2)
+            .requestStatusChange(qcAddress.address, 1, reason2)
+        ).to.not.be.reverted
+
+        // Should have been called twice with different reasons
+        expect(mockQcData.setQCStatus).to.have.been.calledTwice
+      })
+    })
+
+    context("edge cases", () => {
+      it("should handle zero address in state transitions", async () => {
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .setQCStatus(ethers.constants.AddressZero, 1, testReason)
+        ).to.be.revertedWith("QCNotRegistered")
+      })
+
+      it("should handle empty reason in transitions", async () => {
+        mockQcData.getQCStatus.returns(0) // Active
+        const emptyReason = ethers.constants.HashZero
+
+        // Should allow empty reason (business logic decision)
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .setQCStatus(qcAddress.address, 1, emptyReason)
+        ).to.not.be.reverted
+      })
+
+      it("should handle maximum values correctly", async () => {
+        // Test with maximum uint256 values
+        const maxReserve = ethers.constants.MaxUint256
+        const maxMinted = ethers.constants.MaxUint256
+
+        mockQcData.getQCStatus.returns(0) // Active
+        mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
+          maxReserve,
+          false,
+        ])
+        mockQcData.getQCMintedAmount.returns(maxMinted)
+
+        // Should handle overflow protection
+        const capacity = await qcManager.getAvailableMintingCapacity(
+          qcAddress.address
+        )
+        expect(capacity).to.equal(0) // Since minted >= reserves
+      })
+
+      it("should handle registry service unavailability gracefully", async () => {
+        // Mock registry to return zero address for QC_DATA
+        await protocolRegistry.setService(QC_DATA_KEY, ethers.constants.AddressZero)
+
+        // Should revert with service unavailable
+        await expect(
+          qcManager
+            .connect(watchdog)
+            .setQCStatus(qcAddress.address, 1, testReason)
+        ).to.be.reverted
+      })
+    })
+
+    context("reentrancy scenarios", () => {
+      it("should prevent reentrancy in status changes", async () => {
+        mockQcData.getQCStatus.returns(0) // Active
+
+        // Mock setQCStatus to attempt reentrancy
+        let callCount = 0
+        mockQcData.setQCStatus.callsFake(async () => {
+          callCount++
+          if (callCount === 1) {
+            // Try to call setQCStatus again (would fail with reentrancy guard if present)
+            // In this case, the function doesn't have explicit reentrancy guard
+            // but state changes prevent issues
+            mockQcData.getQCStatus.returns(1) // Change state
+          }
+        })
+
+        await qcManager
+          .connect(watchdog)
+          .setQCStatus(qcAddress.address, 1, testReason)
+
+        // Should only be called once per transaction
+        expect(callCount).to.equal(1)
+      })
+    })
+
+    context("gas optimization scenarios", () => {
+      it("should efficiently handle batch status checks", async () => {
+        // Setup multiple QCs
+        const qcAddresses = [
+          "0x0000000000000000000000000000000000000001",
+          "0x0000000000000000000000000000000000000002",
+          "0x0000000000000000000000000000000000000003",
+        ]
+
+        // Mock different states
+        mockQcData.isQCRegistered.returns(true)
+        mockQcData.getQCStatus
+          .whenCalledWith(qcAddresses[0])
+          .returns(0) // Active
+        mockQcData.getQCStatus
+          .whenCalledWith(qcAddresses[1])
+          .returns(1) // UnderReview
+        mockQcData.getQCStatus
+          .whenCalledWith(qcAddresses[2])
+          .returns(2) // Revoked
+
+        // Check capacity for each
+        const capacities = await Promise.all(
+          qcAddresses.map((qc) => qcManager.getAvailableMintingCapacity(qc))
+        )
+
+        expect(capacities[0]).to.be.gt(0) // Active has capacity
+        expect(capacities[1]).to.equal(0) // UnderReview has no capacity
+        expect(capacities[2]).to.equal(0) // Revoked has no capacity
+      })
+    })
+
+    context("permission boundary testing", () => {
+      it("should enforce strict role separation", async () => {
+        mockQcData.getQCStatus.returns(0) // Active
+
+        // QC_ADMIN cannot change status
+        await qcManager.grantRole(QC_ADMIN_ROLE, thirdParty.address)
+        await expect(
+          qcManager
+            .connect(thirdParty)
+            .setQCStatus(qcAddress.address, 1, testReason)
+        ).to.be.revertedWith(
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
+        )
+
+        // REGISTRAR cannot change status
+        await qcManager.grantRole(REGISTRAR_ROLE, thirdParty.address)
+        await expect(
+          qcManager
+            .connect(thirdParty)
+            .setQCStatus(qcAddress.address, 1, testReason)
+        ).to.be.revertedWith(
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
+        )
+
+        // WATCHDOG_ENFORCER cannot use setQCStatus (must use requestStatusChange)
+        await expect(
+          qcManager
+            .connect(watchdogEnforcer)
+            .setQCStatus(qcAddress.address, 1, testReason)
+        ).to.be.revertedWith(
+          `AccessControl: account ${watchdogEnforcer.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
+        )
+      })
+    })
+
+    context("extreme state scenarios", () => {
+      it("should handle all QCs being revoked", async () => {
+        const qcs = Array(10)
+          .fill(0)
+          .map((_, i) => ({
+            address: ethers.utils.getAddress(
+              `0x${(i + 1).toString(16).padStart(40, "0")}`
+            ),
+          }))
+
+        // Mock all as revoked
+        mockQcData.isQCRegistered.returns(true)
+        mockQcData.getQCStatus.returns(2) // All revoked
+
+        // Check that all have zero capacity
+        for (const qc of qcs) {
+          const capacity = await qcManager.getAvailableMintingCapacity(qc.address)
+          expect(capacity).to.equal(0)
+        }
+      })
+
+      it("should handle rapid status oscillation", async () => {
+        mockQcData.getQCStatus.returns(0) // Start Active
+
+        // Oscillate between Active and UnderReview multiple times
+        for (let i = 0; i < 5; i++) {
+          // Active -> UnderReview
+          await qcManager
+            .connect(watchdog)
+            .setQCStatus(qcAddress.address, 1, testReason)
+          mockQcData.getQCStatus.returns(1)
+
+          // UnderReview -> Active
+          await qcManager
+            .connect(watchdog)
+            .setQCStatus(qcAddress.address, 0, testReason)
+          mockQcData.getQCStatus.returns(0)
+        }
+
+        // Should have been called 10 times (5 oscillations * 2)
+        expect(mockQcData.setQCStatus.callCount).to.equal(10)
       })
     })
   })

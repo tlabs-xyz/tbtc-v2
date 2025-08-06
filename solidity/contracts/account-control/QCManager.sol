@@ -563,10 +563,6 @@ contract QCManager is AccessControl {
         }
     }
 
-    /// @dev Validate status transitions according to the simple 3-state model
-    /// @param oldStatus The current status
-    /// @param newStatus The proposed new status
-    /// @return valid True if the transition is valid
     /// @notice Validate status transitions according to business state machine rules
     /// @dev STATE MACHINE RULES:
     ///      - Active ↔ UnderReview (bidirectional)
@@ -676,17 +672,9 @@ contract QCManager is AccessControl {
             revert QCWouldBecomeInsolvent(newBalance, mintedAmount);
         }
 
-        // Check if QCReserveLedger service is available
-        if (!protocolRegistry.hasService(QC_RESERVE_LEDGER_KEY)) {
-            revert QCReserveLedgerNotAvailable();
-        }
-
-        // Update reserve ledger with new balance
-        address ledgerAddress = protocolRegistry.getService(
-            QC_RESERVE_LEDGER_KEY
-        );
-        QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
-        reserveLedger.updateReserveBalance(qc, newBalance);
+        // NOTE: Reserve balance updates happen through the attestation process
+        // in QCReserveLedger, not through direct updates. This function only
+        // validates solvency for the wallet deregistration process.
 
         emit ReserveBalanceUpdated(
             qc,
