@@ -32,13 +32,13 @@ const func: DeployFunction = async function DeployReserveLedger(
   })
   log(`✅ ReserveLedger deployed at ${reserveLedger.address}`)
 
-  // Deploy WatchdogSubjectiveReporting
-  log("Deploying WatchdogSubjectiveReporting...")
-  const watchdogReporting = await deploy("WatchdogSubjectiveReporting", {
+  // Deploy WatchdogReporting
+  log("Deploying WatchdogReporting...")
+  const watchdogReporting = await deploy("WatchdogReporting", {
     from: deployer,
     log: true,
   })
-  log(`✅ WatchdogSubjectiveReporting deployed at ${watchdogReporting.address}`)
+  log(`✅ WatchdogReporting deployed at ${watchdogReporting.address}`)
 
   // Deploy WatchdogEnforcer with library link
   log("Deploying WatchdogEnforcer...")
@@ -62,7 +62,7 @@ const func: DeployFunction = async function DeployReserveLedger(
   log("Deployed contracts:")
   log(`  - WatchdogReasonCodes: ${watchdogReasonCodes.address}`)
   log(`  - ReserveLedger: ${reserveLedger.address}`)
-  log(`  - WatchdogSubjectiveReporting: ${watchdogReporting.address}`)
+  log(`  - WatchdogReporting: ${watchdogReporting.address}`)
   log(`  - WatchdogEnforcer: ${watchdogEnforcer.address}`)
   log("")
   log("Next steps: Run 99_configure_account_control_system.ts to configure roles and connections")
