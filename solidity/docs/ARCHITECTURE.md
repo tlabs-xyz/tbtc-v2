@@ -1,25 +1,26 @@
 # tBTC v2 Account Control System Architecture
 
-**Document Version**: 2.0  
-**Date**: 2025-08-04  
+**Document Version**: 3.0  
+**Date**: 2025-08-06  
 **Status**: Production Ready  
-**Purpose**: Comprehensive technical architecture specification for V1.1 production system with V1.2 automation framework
+**Purpose**: Comprehensive technical architecture specification with simplified watchdog system
 
 ---
 
 ## Executive Summary
 
-The tBTC v2 Account Control system enables **Qualified Custodians** (regulated institutional entities) to mint tBTC tokens against their Bitcoin reserves through **direct Bank integration**. The system implements a sophisticated dual-path architecture:
+The tBTC v2 Account Control system enables **Qualified Custodians** (regulated institutional entities) to mint tBTC tokens against their Bitcoin reserves through **direct Bank integration**. The system implements a simplified watchdog architecture based on the Three-Problem Framework:
 
-- **V1.1 Production System**: Configurable M-of-N consensus for critical operations with 90% independent watchdog operations
-- **V1.2 Automation Framework**: Three-layer automated decision system achieving 90%+ automation
+- **Oracle Problem**: Multi-attester consensus for objective facts (reserve balances)
+- **Observation Problem**: Transparent reporting of subjective concerns via events
+- **Decision Problem**: Direct DAO governance without intermediary contracts
 
 ### Core Architectural Principles
 
 1. **Direct Integration**: Leverage existing Bank/Vault infrastructure without abstraction layers
 2. **Modular Design**: Policy-driven contracts enable evolution without breaking core interfaces  
 3. **Data/Logic Separation**: Clear separation between storage (QCData) and business logic (QCManager)
-4. **Dual-Path Watchdog Model**: Independent operations + targeted consensus for authority decisions
+4. **Simplified Watchdog**: Machine-readable codes, distributed trust, permissionless enforcement
 5. **Future-Proof Interfaces**: Stable core contracts with upgradeable policy implementations
 
 ---
@@ -28,12 +29,11 @@ The tBTC v2 Account Control system enables **Qualified Custodians** (regulated i
 
 1. [System Architecture Overview](#system-architecture-overview)
 2. [Smart Contract Architecture](#smart-contract-architecture)
-3. [V1.1 Watchdog System](#v11-watchdog-system)
-4. [V1.2 Automated Framework](#v12-automated-framework)
-5. [Protocol Integration](#protocol-integration)
-6. [Security Model](#security-model)
-7. [Deployment Architecture](#deployment-architecture)
-8. [Future Enhancements](#future-enhancements)
+3. [Simplified Watchdog System](#simplified-watchdog-system)
+4. [Protocol Integration](#protocol-integration)
+5. [Security Model](#security-model)
+6. [Deployment Architecture](#deployment-architecture)
+7. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -177,184 +177,111 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 
 ---
 
-## V1.1 Watchdog System
+## Simplified Watchdog System
 
-### Dual-Path Architecture Principle
+### Three-Problem Framework
 
-**Core Principle**: Independent operations for data, consensus for authority, automatic responses for emergencies.
+**Core Principle**: Different problems require different solutions - oracle consensus for facts, transparent reporting for observations, direct DAO action for decisions.
 
-The V1.1 system categorizes operations into two paths:
-- **Independent Path (90%)**: Data submission, SPV verification, routine attestations
-- **Consensus Path (10%)**: Authority decisions requiring M-of-N agreement
+The system separates concerns into:
+- **Oracle Problem**: Multi-attester consensus for objective facts
+- **Observation Problem**: Individual transparent reporting for subjective concerns
+- **Decision Problem**: Direct DAO governance without intermediaries
 
 ### Architecture Components
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   QCWatchdog    │    │   QCWatchdog    │    │   QCWatchdog    │
-│   Instance #1   │    │   Instance #2   │    │   Instance #3   │
-│   (Operator A)  │    │   (Operator B)  │    │   (Operator C)  │
+│   Attester #1   │    │   Attester #2   │    │   Attester #3   │
+│                 │    │                 │    │                 │
 └─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
           │                      │                      │
           └──────────────────────┼──────────────────────┘
                                  │
                     ┌────────────▼────────────┐
-                    │    WatchdogMonitor      │
-                    │  • Registers watchdogs  │
-                    │  • Emergency monitoring │
-                    │  • Critical reports     │
+                    │    ReserveOracle        │
+                    │  • Collects attestations│
+                    │  • Calculates median    │
+                    │  • Pushes consensus     │
                     └────────────┬────────────┘
                                  │
-                    ┌────────────▼────────────┐
-                    │ WatchdogConsensusManager│
-                    │  • M-of-N consensus     │
-                    │  • Status changes       │
-                    │  • Critical decisions   │ 
-                    └─────────────────────────┘
+        ┌────────────────────────┼────────────────────────┐
+        ▼                        ▼                        ▼
+┌──────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│QCReserveLedger│    │WatchdogEnforcer  │    │SubjectiveReporting│
+│ • Stores data │    │ • Permissionless │    │ • Event emission │
+│ • Solvency    │    │ • Reason codes   │    │ • DAO monitoring │
+└──────────────┘    └──────────────────┘    └──────────────────┘
 ```
 
-### 1. QCWatchdog.sol (Individual Instances)
+### 1. ReserveOracle.sol
 
-**Purpose**: Individual watchdog operations for independent execution
+**Purpose**: Multi-attester consensus for reserve balances
 
-**Independent Operations** (90% of workload):
-- `attestReserves()` - Reserve balance attestations
-- `registerWalletWithProof()` - Wallet registration with SPV proof
-- `recordRedemptionFulfillment()` - Redemption completion with proof
-- `raiseConcern()` - General concern reporting
+**Key Operations**:
+- `submitAttestation(address qc, uint256 balance)` - Attesters submit observations
+- `getConsensusReserves(address qc)` - Returns median consensus
+- Automatic push to QCReserveLedger when threshold met
 
 **Key Features**:
-- Deployed independently by each operator
-- No coordination required for routine operations
-- Direct QC API integration for efficiency
-- Geographic and organizational distribution
+- Minimum 3 attesters required for consensus
+- Median calculation prevents manipulation
+- No single point of trust
+- Byzantine fault tolerance
 
-### 2. WatchdogConsensusManager.sol (M-of-N Consensus)
+### 2. WatchdogEnforcer.sol
 
-**Purpose**: M-of-N consensus for critical operations requiring group authority
+**Purpose**: Permissionless enforcement of objective violations
 
-**Consensus Operations** (10% of workload):
-1. **STATUS_CHANGE** - QC status modifications (Active ↔ UnderReview ↔ Revoked)
-2. **WALLET_DEREGISTRATION** - Remove wallet from QC (prevents griefing)
-3. **REDEMPTION_DEFAULT** - Flag redemption as defaulted (triggers penalties)
-4. **FORCE_INTERVENTION** - Manual override operations (emergency governance)
+**Enforcement Operations**:
+- `enforceObjectiveViolation(address qc, bytes32 reasonCode)` - Anyone can trigger
+- Validates reason code is objective (machine-verifiable)
+- Checks violation condition against current state
+- Updates QC status if violation confirmed
 
-**Configuration Parameters**:
+**Supported Violations**:
 ```solidity
-uint256 public requiredVotes = 2;      // M (required votes)
-uint256 public totalWatchdogs = 5;     // N (total watchdog count)
-uint256 public votingPeriod = 2 hours; // Voting window
+bytes32 constant INSUFFICIENT_RESERVES = keccak256("INSUFFICIENT_RESERVES");
+bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
+bytes32 constant ZERO_RESERVES = keccak256("ZERO_RESERVES");
+bytes32 constant REDEMPTION_TIMEOUT = keccak256("REDEMPTION_TIMEOUT");
 ```
 
-**Parameter Bounds**:
+### 3. WatchdogSubjectiveReporting.sol
+
+**Purpose**: Transparent reporting of subjective observations
+
+**Report Structure**:
 ```solidity
-uint256 public constant MIN_REQUIRED_VOTES = 2;
-uint256 public constant MAX_REQUIRED_VOTES = 7;
-uint256 public constant MIN_VOTING_PERIOD = 1 hours;
-uint256 public constant MAX_VOTING_PERIOD = 24 hours;
+struct Report {
+    uint256 id;
+    address watchdog;
+    address target;
+    ObservationType obsType;
+    string description;
+    bytes32[] evidenceHashes;  // Max 20 hashes
+    uint256 timestamp;
+    uint256 supportCount;
+}
 ```
-
-### 3. WatchdogMonitor.sol (Coordination & Emergency)
-
-**Purpose**: Coordinates multiple independent QCWatchdog instances and emergency responses
 
 **Key Features**:
-- Watchdog instance registration and lifecycle management
-- Emergency circuit breaker (3 critical reports → automatic pause)
-- Report validity tracking (1-hour window)
-- Clean separation between monitoring and consensus
-
-**Emergency System**:
-```solidity
-uint256 public constant CRITICAL_REPORTS_THRESHOLD = 3;
-uint256 public constant REPORT_VALIDITY_PERIOD = 1 hours;
-```
+- Simple event emission for DAO monitoring
+- Support mechanism for validation
+- Evidence stored as hashes (actual content via REST API)
+- No complex state machines or escalation
 
 ---
 
-## V1.2 Automated Framework
+### 4. WatchdogReasonCodes.sol
 
-### Three-Layer Decision System
+**Purpose**: Machine-readable violation codes
 
-The V1.2 framework transforms watchdog operations from subjective voting to objective enforcement with clear DAO escalation:
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         90%+ Automated Operations                   │
-├─────────────────────┬─────────────────────┬─────────────────────────┤
-│   Layer 1           │   Layer 2           │   Layer 3               │
-│   Deterministic     │   Threshold-Based   │   DAO Escalation       │
-│   Enforcement       │   Actions           │                         │
-├─────────────────────┼─────────────────────┼─────────────────────────┤
-│                     │                     │                         │
-│ • Reserve checks    │ • 3+ reports needed │ • Governance proposals  │
-│ • Timeout detection │ • Evidence required │ • Community decisions   │
-│ • Inactivity rules  │ • Cooldown periods  │ • Complex judgments     │
-│ • SPV validation    │ • Auto-escalation   │                         │
-│                     │                     │                         │
-│ Response: <1 min    │ Response: <1 hour   │ Response: Days/weeks    │
-└─────────────────────┴─────────────────────┴─────────────────────────┘
-```
-
-### Layer 1: WatchdogAutomatedEnforcement.sol
-
-**Purpose**: Handle all objective, measurable conditions without consensus
-
-**Fully Automated Checks**:
-```solidity
-function enforceReserveCompliance(address qc) external {
-    (uint256 reserves, bool isStale) = reserveLedger.getReserveBalanceAndStaleness(qc);
-    uint256 minted = qcData.getMintedAmount(qc);
-    
-    // Stale attestation check
-    if (isStale) {
-        qcManager.setQCStatus(qc, QCData.QCStatus.UnderReview, "STALE_ATTESTATIONS");
-        return;
-    }
-    
-    // Insufficient reserves check
-    if (reserves * 100 < minted * minCollateralRatio) {
-        qcManager.setQCStatus(qc, QCData.QCStatus.UnderReview, "INSUFFICIENT_RESERVES");
-    }
-}
-
-function enforceRedemptionTimeout(bytes32 redemptionId) external {
-    // Automatic timeout enforcement
-    require(block.timestamp > r.requestTime + redemptionTimeout, "Not timed out");
-    redeemer.flagDefaultedRedemption(redemptionId, "TIMEOUT");
-}
-```
-
-### Layer 2: WatchdogThresholdActions.sol
-
-**Purpose**: Collect reports on non-deterministic issues, act at threshold
-
-**Report Types**:
-```solidity
-enum ReportType {
-    SUSPICIOUS_ACTIVITY,
-    UNUSUAL_PATTERN, 
-    EMERGENCY_SITUATION,
-    OPERATIONAL_CONCERN
-}
-```
-
-**Threshold Logic**:
-```solidity
-uint256 public constant REPORT_THRESHOLD = 3;
-uint256 public constant REPORT_WINDOW = 24 hours;
-uint256 public constant COOLDOWN_PERIOD = 7 days;
-```
-
-### Layer 3: WatchdogDAOEscalation.sol
-
-**Purpose**: Create DAO proposals for all non-deterministic decisions
-
-**Escalation Process**:
-1. Threshold reached in Layer 2
-2. Automatic DAO proposal creation
-3. Community governance decision
-4. Proposal execution
+**Key Features**:
+- Standardized bytes32 constants for all violations
+- Clear separation of objective (90%) vs subjective (10%)
+- Enables automated validation without human interpretation
+- Gas-efficient compared to string comparisons
 
 ---
 
@@ -383,20 +310,20 @@ TBTCVault.receiveBalanceIncrease() → Auto-mint tBTC
 
 **System Role Hierarchy**:
 ```
-WatchdogConsensusManager:
+ReserveOracle:
+├── Multiple ATTESTER_ROLE holders submit attestations
+├── Oracle has ATTESTER_ROLE in QCReserveLedger
+└── Pushes consensus automatically
+
+WatchdogEnforcer:
 ├── ARBITER_ROLE in QCManager (for status changes)
-├── ARBITER_ROLE in QCRedeemer (for redemption defaults)
-└── WATCHDOG_ROLE granted to operators
+├── Permissionless enforcement (anyone can call)
+└── Uses machine-readable reason codes
 
-WatchdogMonitor:
-├── MANAGER_ROLE controls watchdog registration
-├── WATCHDOG_OPERATOR_ROLE for critical reports
-└── Grants WATCHDOG_ROLE in WatchdogConsensusManager
-
-QCWatchdog (multiple instances):
-├── Independent operations (no special roles)
-├── ATTESTER_ROLE in QCReserveLedger
-└── REGISTRAR_ROLE in QCManager
+WatchdogSubjectiveReporting:
+├── WATCHDOG_ROLE for submitting reports
+├── Emits events for DAO monitoring
+└── No direct contract interactions
 ```
 
 ### ProtocolRegistry Usage
@@ -573,29 +500,23 @@ V3.0 Fully Autonomous (AI-driven)
 
 ### System-Wide Defaults
 
-**V1.1 Watchdog System**:
+**Simplified Watchdog System**:
 ```solidity
-// WatchdogConsensusManager
-uint256 public requiredVotes = 2;              // M value
-uint256 public totalWatchdogs = 5;             // N value  
-uint256 public votingPeriod = 2 hours;         // Voting window
+// ReserveOracle
+uint256 public constant MIN_ATTESTERS = 3;     // Minimum for consensus
+uint256 public attestationWindow = 1 hours;    // Collection window
 
-// WatchdogMonitor
-uint256 public constant CRITICAL_REPORTS_THRESHOLD = 3; // Emergency trigger
-uint256 public constant REPORT_VALIDITY_PERIOD = 1 hour; // Report freshness
-```
-
-**V1.2 Automated Framework**:
-```solidity
-// WatchdogAutomatedEnforcement
+// SystemState (used by WatchdogEnforcer)
 uint256 public minCollateralRatio = 90;        // 90% minimum
-uint256 public staleThreshold = 24 hours;      // Attestation staleness
+uint256 public staleThreshold = 7 days;        // Attestation staleness
 uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
 
-// WatchdogThresholdActions
-uint256 public constant REPORT_THRESHOLD = 3;  // Reports needed
-uint256 public constant REPORT_WINDOW = 24 hours; // Time window
-uint256 public constant COOLDOWN_PERIOD = 7 days; // Between actions
+// WatchdogSubjectiveReporting
+uint256 public constant MAX_EVIDENCE_PER_REPORT = 20; // Evidence hashes
+mapping(ObservationType => uint256) supportThresholds:
+  SECURITY_OBSERVATION => 0    // Immediate
+  COMPLIANCE_QUESTION => 1     // 1 supporter
+  Others => 3                  // 3 supporters
 ```
 
 ### Environment-Specific Tuning

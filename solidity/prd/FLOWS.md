@@ -1,8 +1,8 @@
 # Account Control User Flows and Sequences
 
-**Document Version**: 1.1  
-**Date**: 2025-08-04  
-**Architecture**: V1.1 Dual-Path + V1.2 Automated Framework  
+**Document Version**: 2.0  
+**Date**: 2025-08-06  
+**Architecture**: Simplified Watchdog System  
 **Purpose**: User journeys and sequence diagrams for Account Control system  
 **Related Documents**: [README.md](README.md), [REQUIREMENTS.md](REQUIREMENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION.md](IMPLEMENTATION.md)
 
@@ -29,7 +29,8 @@ This document provides a complete inventory of user flows in the tBTC v2 Account
 
 - **Qualified Custodians (QCs)**: Regulated entities holding Bitcoin reserves
 - **End Users**: Individuals minting/redeeming tBTC through QCs
-- **Watchdog**: Single trusted entity providing attestations and arbitration
+- **Oracle Attesters**: Multiple entities providing reserve attestations
+- **Watchdog Reporters**: Entities reporting subjective observations
 - **DAO Governance**: Decentralized governance managing system parameters
 - **Emergency Council**: Entity with pause/unpause capabilities
 
@@ -40,9 +41,9 @@ This document provides a complete inventory of user flows in the tBTC v2 Account
 - **QCMinter/QCRedeemer**: Entry points for minting/redemption
 - **Policy Contracts**: Upgradeable business logic (BasicMintingPolicy, BasicRedemptionPolicy)
 - **QCReserveLedger**: Reserve attestation management
-- **QCWatchdog**: Individual watchdog instances for routine operations
-- **WatchdogConsensusManager**: M-of-N consensus for critical operations
-- **WatchdogAutomatedEnforcement**: V1.2 automated rule enforcement
+- **ReserveOracle**: Multi-attester consensus for reserve balances
+- **WatchdogEnforcer**: Permissionless enforcement of objective violations
+- **WatchdogSubjectiveReporting**: Transparent reporting via events
 
 ---
 
@@ -122,24 +123,26 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 
 **Flow ID**: `RESERVE-ATTEST-001`  
 **Priority**: Critical  
-**Participants**: Watchdog, QC
+**Participants**: Oracle Attesters, QC
 
 #### 3.2.1 Happy Path
 
-1. **Watchdog Monitors QC Addresses**
+1. **Attesters Monitor QC Addresses**
 
-   - Off-chain monitoring of all registered Bitcoin addresses
-   - Calculate total reserves across all QC wallets
+   - Multiple attesters monitor registered Bitcoin addresses off-chain
+   - Each calculates total reserves across all QC wallets
 
-2. **Strategic Attestation Submission**
+2. **Oracle Consensus Submission**
 
-   - Watchdog calls `QCReserveLedger.submitAttestation(qc, totalReserves, timestamp)`
-   - Attestation triggers solvency verification
-   - QC remains `Active` if solvent (reserves >= minted tBTC)
-   - Events: `ReserveAttestationSubmitted`, `QCSolvencyVerified`
+   - Each attester calls `ReserveOracle.submitAttestation(qc, balance)`
+   - Oracle collects attestations until threshold met (minimum 3)
+   - Median consensus calculated automatically
+   - Oracle pushes consensus to `QCReserveLedger.recordConsensusAttestation()`
+   - Events: `AttestationSubmitted`, `ConsensusReached`, `QCSolvencyVerified`
 
 3. **Automated Status Management**
-   - If undercollateralized: QC status changes to `UnderReview`
+   - Anyone can call `WatchdogEnforcer.enforceObjectiveViolation()` if undercollateralized
+   - If violation confirmed: QC status changes to `UnderReview`
    - Minting capabilities suspended
    - Event: `QCStatusChanged`
 
@@ -379,23 +382,23 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 - Validate emergency response time
 - Test system recovery procedures
 
-### 5.2 Watchdog Replacement Flow
+### 5.2 Oracle Attester Management Flow
 
-**Flow ID**: `WATCHDOG-REPLACE-001`  
+**Flow ID**: `ORACLE-MANAGE-001`  
 **Priority**: High  
 **Participants**: DAO Governance
 
-#### 5.2.1 Watchdog Rotation
+#### 5.2.1 Attester Addition/Removal
 
-1. **Deploy New Watchdog**
+1. **Add Attester**
 
-   - Deploy new SingleWatchdog contract
-   - Update ProtocolRegistry
+   - DAO grants ATTESTER_ROLE to entity via `ReserveOracle.grantRole()`
+   - Minimum 3 attesters maintained at all times
 
-2. **Role Transfer**
-   - Revoke roles from old watchdog
-   - Grant roles to new watchdog
-   - Verify service continuity
+2. **Remove Attester**
+   - DAO revokes ATTESTER_ROLE from entity
+   - Ensure minimum attester count maintained
+   - Verify consensus still achievable
 
 **Script Requirements**:
 
