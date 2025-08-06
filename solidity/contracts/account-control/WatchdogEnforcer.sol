@@ -10,7 +10,19 @@ import "./SystemState.sol";
 
 /// @title WatchdogEnforcer
 /// @notice Automated enforcement of objective violations without requiring consensus
-/// @dev Anyone can trigger enforcement for objective violations, making the system permissionless
+/// @dev Anyone can trigger enforcement for objective violations, making the system permissionless.
+///      
+///      EXPECTED USAGE PATTERN:
+///      - Primary callers: Watchdogs who continuously monitor QC compliance
+///      - Secondary callers: Automated monitoring systems, community members, or other participants
+///      - The permissionless design ensures system resilience: if watchdogs fail to act,
+///        anyone can step in to enforce violations and maintain system integrity
+///      
+///      OPERATIONAL FLOW:
+///      1. Watchdogs monitor QCs using checkViolation() or batchCheckViolations()
+///      2. Upon detecting violations, watchdogs call enforceObjectiveViolation()
+///      3. If watchdogs are offline/inactive, any participant can enforce violations
+///      4. All enforcement attempts are logged via events for transparency
 contract WatchdogEnforcer is AccessControl {
     using WatchdogReasonCodes for bytes32;
     
@@ -62,6 +74,9 @@ contract WatchdogEnforcer is AccessControl {
     }
     
     /// @notice Enforce an objective violation (PERMISSIONLESS)
+    /// @dev While anyone can call this function, it is primarily intended for watchdogs who
+    ///      continuously monitor the system and detect violations. The permissionless nature
+    ///      ensures system resilience - if watchdogs fail to act, anyone can step in.
     /// @param qc The Qualified Custodian address
     /// @param reasonCode The machine-readable reason code
     function enforceObjectiveViolation(address qc, bytes32 reasonCode) external {
@@ -149,7 +164,9 @@ contract WatchdogEnforcer is AccessControl {
         qcManager.setQCStatus(qc, QCData.QCStatus.UnderReview, reasonCode);
     }
     
-    /// @notice Check if a violation exists without enforcing
+    /// @notice Check if a violation exists without enforcing (read-only)
+    /// @dev This function is useful for watchdogs and monitoring systems to detect
+    ///      violations before deciding whether to call enforceObjectiveViolation()
     /// @param qc The Qualified Custodian address
     /// @param reasonCode The reason code to check
     /// @return violated Whether the violation exists
@@ -175,6 +192,8 @@ contract WatchdogEnforcer is AccessControl {
     }
     
     /// @notice Batch check multiple QCs for violations
+    /// @dev Efficient function for watchdogs to scan multiple QCs in a single call
+    ///      to identify which ones require enforcement action
     /// @param qcs Array of QC addresses to check
     /// @param reasonCode The reason code to check
     /// @return violatedQCs Array of QCs that have violations
