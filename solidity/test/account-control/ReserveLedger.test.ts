@@ -47,10 +47,8 @@ describe("ReserveLedger", () => {
   describe("Initialization", () => {
     it("should set correct initial values", async () => {
       expect(await reserveLedger.consensusThreshold()).to.equal(3)
-      expect(await reserveLedger.attestationTimeout()).to.equal(3600) // 1 hour
-      expect(await reserveLedger.minReportingFrequency()).to.equal(1800) // 30 minutes
-      expect(await reserveLedger.maxConsecutiveMisses()).to.equal(3)
-      expect(await reserveLedger.freshnessBonus()).to.equal(300) // 5 minutes
+      expect(await reserveLedger.attestationTimeout()).to.equal(21600) // 6 hours
+      expect(await reserveLedger.maxStaleness()).to.equal(86400) // 24 hours
       expect(await reserveLedger.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true
       expect(await reserveLedger.hasRole(MANAGER_ROLE, deployer.address)).to.be.true
     })
@@ -276,132 +274,76 @@ describe("ReserveLedger", () => {
       })
     })
     
-    describe("setMinReportingFrequency", () => {
-      it("should allow manager to update minimum reporting frequency", async () => {
+    describe("setMaxStaleness", () => {
+      it("should allow manager to update max staleness", async () => {
         await expect(
-          reserveLedger.connect(deployer).setMinReportingFrequency(900) // 15 minutes
-        ).to.emit(reserveLedger, "MinReportingFrequencyUpdated")
-          .withArgs(1800, 900)
+          reserveLedger.connect(deployer).setMaxStaleness(172800) // 48 hours
+        ).to.emit(reserveLedger, "MaxStalenessUpdated")
+          .withArgs(86400, 172800)
         
-        expect(await reserveLedger.minReportingFrequency()).to.equal(900)
+        expect(await reserveLedger.maxStaleness()).to.equal(172800)
       })
       
-      it("should revert if frequency is zero", async () => {
+      it("should revert if staleness is zero", async () => {
         await expect(
-          reserveLedger.connect(deployer).setMinReportingFrequency(0)
-        ).to.be.revertedWithCustomError(reserveLedger, "InvalidTimeout")
-      })
-      
-      it("should revert if frequency is too long", async () => {
-        await expect(
-          reserveLedger.connect(deployer).setMinReportingFrequency(3601) // > 1 hour
+          reserveLedger.connect(deployer).setMaxStaleness(0)
         ).to.be.revertedWithCustomError(reserveLedger, "InvalidTimeout")
       })
       
       it("should revert if not manager", async () => {
         await expect(
-          reserveLedger.connect(attester1).setMinReportingFrequency(900)
+          reserveLedger.connect(attester1).setMaxStaleness(172800)
         ).to.be.revertedWith(`AccessControl: account ${attester1.address.toLowerCase()} is missing role ${MANAGER_ROLE}`)
       })
     })
   })
 
-  describe("Attester Activity Tracking", () => {
-    it("should track attester activity correctly", async () => {
-      // First submission - attester should be active
-      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+  describe("Staleness Tracking", () => {
+    it("should detect stale reserve data", async () => {
+      // Initially stale (never updated)
+      let [isStale, timeSinceUpdate] = await reserveLedger.isReserveStale(qcAddress.address)
+      expect(isStale).to.be.true
+      expect(timeSinceUpdate).to.equal(ethers.constants.MaxUint256)
       
-      const [isActive, lastReport, missedReports] = await reserveLedger.getAttesterStatus(qcAddress.address, attester1.address)
-      expect(isActive).to.be.true
-      expect(missedReports).to.equal(0)
-    })
-    
-    it("should track consecutive missed reports", async () => {
-      // First submission
-      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
-      
-      // Advance time by more than minReportingFrequency
-      await ethers.provider.send("evm_increaseTime", [1801]) // 30 minutes + 1 second
-      await ethers.provider.send("evm_mine", [])
-      
-      // Check missed reports before next submission
-      await reserveLedger.updateInactiveAttesters(qcAddress.address)
-      
-      // Submit late
-      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
-      
-      const [isActive, lastReport, missedReports] = await reserveLedger.getAttesterStatus(qcAddress.address, attester1.address)
-      expect(isActive).to.be.true
-      expect(missedReports).to.equal(0) // Reset because they reported
-    })
-    
-    it("should mark attester as inactive after too many missed reports", async () => {
-      // First submission
-      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
-      
-      // Advance time by more than maxConsecutiveMisses * minReportingFrequency
-      await ethers.provider.send("evm_increaseTime", [5401]) // 3 * 30 minutes + 1 second
-      await ethers.provider.send("evm_mine", [])
-      
-      // Update inactive attesters
-      await expect(
-        reserveLedger.updateInactiveAttesters(qcAddress.address)
-      ).to.emit(reserveLedger, "AttesterMarkedInactive")
-        .withArgs(attester1.address, qcAddress.address, 3)
-      
-      const [isActive, lastReport, missedReports] = await reserveLedger.getAttesterStatus(qcAddress.address, attester1.address)
-      expect(isActive).to.be.false
-      expect(missedReports).to.equal(3)
-    })
-    
-    it("should reactivate inactive attester when they report", async () => {
-      // Setup: make attester inactive
-      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
-      await ethers.provider.send("evm_increaseTime", [5401])
-      await ethers.provider.send("evm_mine", [])
-      await reserveLedger.updateInactiveAttesters(qcAddress.address)
-      
-      // Verify inactive
-      let [isActive] = await reserveLedger.getAttesterStatus(qcAddress.address, attester1.address)
-      expect(isActive).to.be.false
-      
-      // Reactivate by submitting new attestation
-      await expect(
-        reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("110"))
-      ).to.emit(reserveLedger, "AttesterReactivated")
-        .withArgs(attester1.address, qcAddress.address)
-      
-      // Verify active again
-      const result2 = await reserveLedger.getAttesterStatus(qcAddress.address, attester1.address)
-      isActive = result2[0]
-      expect(isActive).to.be.true
-    })
-    
-    it("should only count active attesters for consensus", async () => {
-      // Setup: 4 attesters submit
+      // Submit consensus
       await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
       await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
       await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
-      await reserveLedger.connect(attester4).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
       
-      // Make attester1 inactive
-      await ethers.provider.send("evm_increaseTime", [5401])
+      // Should be fresh now
+      ;[isStale, timeSinceUpdate] = await reserveLedger.isReserveStale(qcAddress.address)
+      expect(isStale).to.be.false
+      expect(timeSinceUpdate).to.be.lt(10) // Less than 10 seconds
+      
+      // Advance time beyond maxStaleness (24 hours)
+      await ethers.provider.send("evm_increaseTime", [86401])
       await ethers.provider.send("evm_mine", [])
-      await reserveLedger.updateInactiveAttesters(qcAddress.address)
       
-      // Attester2, 3, 4 submit fresh attestations
-      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("110"))
-      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("110"))
+      // Should be stale now
+      ;[isStale, timeSinceUpdate] = await reserveLedger.isReserveStale(qcAddress.address)
+      expect(isStale).to.be.true
+      expect(timeSinceUpdate).to.be.gt(86400)
+    })
+    
+    it("should report staleness in getReserveBalanceAndStaleness", async () => {
+      // Submit consensus
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
       
-      // This should trigger consensus with only 2 active attesters (not enough)
-      // So consensus should not be reached
-      const [balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
-      expect(balance).to.equal(0) // No consensus yet
+      // Should be fresh
+      let [balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(ethers.utils.parseEther("100"))
+      expect(isStale).to.be.false
       
-      // Now attester4 submits, reaching threshold
-      await expect(
-        reserveLedger.connect(attester4).submitAttestation(qcAddress.address, ethers.utils.parseEther("110"))
-      ).to.emit(reserveLedger, "ConsensusReached")
+      // Advance time beyond maxStaleness
+      await ethers.provider.send("evm_increaseTime", [86401])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Should be stale but balance preserved
+      ;[balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(ethers.utils.parseEther("100"))
+      expect(isStale).to.be.true
     })
   })
 
@@ -422,8 +364,8 @@ describe("ReserveLedger", () => {
       // Submit first attestation
       await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
       
-      // Advance time beyond timeout
-      await ethers.provider.send("evm_increaseTime", [3601])
+      // Advance time beyond attestation timeout (6 hours)
+      await ethers.provider.send("evm_increaseTime", [21601])
       await ethers.provider.send("evm_mine", [])
       
       // Submit two more attestations
