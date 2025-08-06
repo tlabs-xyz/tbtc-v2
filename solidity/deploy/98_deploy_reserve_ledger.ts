@@ -15,8 +15,6 @@ const func: DeployFunction = async function DeployQCReserveLedger(
   const qcData = await get("QCData")
   const systemState = await get("SystemState")
 
-  // WatchdogReasonCodes library no longer needed - reason codes inlined in WatchdogEnforcer
-
   // Deploy QCReserveLedger (unified oracle + ledger)
   log("Deploying QCReserveLedger...")
   const reserveLedger = await deploy("QCReserveLedger", {
