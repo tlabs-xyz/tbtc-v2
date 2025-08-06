@@ -14,7 +14,6 @@ import "./interfaces/ISPVValidator.sol";
 /// Contains all business logic for managing QCs, reading from and writing to
 /// QCData and SystemState via the central ProtocolRegistry. Manages QC status
 /// changes, wallet registration flows, and integrates with role-based access control.
-/// V1.1: Simplified with instant governance for all actions, relying on RBAC for security.
 ///
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update system configurations
@@ -603,9 +602,8 @@ contract QCManager is AccessControl {
     }
 
     /// @dev Verify wallet control via SPV proof using SPV validator
-    /// @dev DESIGN NOTE: We use SPVValidator to access Bridge's SPV infrastructure
-    ///      without modifying the production Bridge contract. This maintains the
-    ///      same security guarantees while avoiding deployment risks.
+    /// @dev Uses SPVValidator to access Bridge's SPV infrastructure for
+    ///      Bitcoin transaction verification with same security guarantees.
     /// @param qc The QC address claiming wallet control
     /// @param btcAddress The Bitcoin address being claimed
     /// @param challenge The expected challenge string
