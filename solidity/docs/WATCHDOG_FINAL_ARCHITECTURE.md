@@ -9,7 +9,7 @@
 
 ## System Overview
 
-The watchdog system provides monitoring and enforcement for the tBTC v2 protocol through a simplified 4-contract architecture that clearly separates oracle consensus, objective enforcement, and subjective reporting.
+The watchdog system provides monitoring and enforcement for the tBTC v2 protocol through 4 watchdog-specific contracts that handle consensus, enforcement, and reporting within a larger 14-contract account control system.
 
 ---
 
@@ -33,26 +33,27 @@ bytes32 constant REDEMPTION_TIMEOUT = keccak256("REDEMPTION_TIMEOUT");
 
 ---
 
-### 2. ReserveOracle Contract
+### 2. QCReserveLedger Contract
 
-**Purpose**: Multi-attester consensus for reserve balances
+**Purpose**: Multi-attester consensus and reserve balance storage
 
 **Key Features**:
 - Accepts attestations from multiple sources
-- Calculates median consensus
-- Pushes consensus to QCReserveLedger
+- Calculates median consensus internally
+- Stores consensus reserve balances
 - Eliminates single point of trust
 
 **Core Functions**:
 ```solidity
 function submitAttestation(address qc, uint256 balance) external onlyRole(ATTESTER_ROLE)
-function getConsensusReserves(address qc) external view returns (uint256)
+function getReserveBalanceAndStaleness(address qc) external view returns (uint256, bool)
 ```
 
 **Consensus Mechanism**:
-- Minimum 3 attesters required
-- Median calculation for robustness
+- Minimum 3 attesters required (configurable)
+- Insertion sort + median calculation for robustness
 - Auto-triggers when threshold met
+- Efficient O(n) median for small attester sets (≤10)
 
 ---
 
@@ -141,7 +142,7 @@ function batchCheckViolations(address[] calldata qcs, bytes32 reasonCode) extern
 
 ### Reserve Attestation Flow
 ```
-Attesters → ReserveOracle → Consensus → QCReserveLedger → Enforcement
+Attesters → QCReserveLedger (internal consensus) → Enforcement
 ```
 
 ### Subjective Reporting Flow
@@ -194,7 +195,7 @@ GET /evidence/{hash}
 
 | Role | Purpose | Contracts |
 |------|---------|-----------|
-| ATTESTER_ROLE | Submit reserve attestations | ReserveOracle |
+| ATTESTER_ROLE | Submit reserve attestations | QCReserveLedger |
 | WATCHDOG_ROLE | Report subjective observations | SubjectiveReporting |
 | ARBITER_ROLE | Update QC status | WatchdogEnforcer → QCManager |
 | DAO_ROLE | Governance decisions | Direct action |
@@ -208,7 +209,7 @@ GET /evidence/{hash}
 
 ## Data Flow Diagrams
 
-### Oracle Consensus Flow
+### Reserve Consensus Flow
 ```
 ┌──────────┐    ┌──────────┐    ┌──────────┐
 │Attester 1│    │Attester 2│    │Attester 3│
@@ -218,14 +219,9 @@ GET /evidence/{hash}
              │               │
              ▼               ▼
       ┌─────────────────────────┐
-      │    ReserveOracle        │
+      │   QCReserveLedger       │
       │  - Collect attestations │
       │  - Calculate median     │
-      └───────────┬─────────────┘
-                  │
-                  ▼
-      ┌─────────────────────────┐
-      │   QCReserveLedger       │
       │  - Store consensus      │
       │  - Track history        │
       └─────────────────────────┘
@@ -302,7 +298,7 @@ GET /evidence/{hash}
 
 ## Comparison with Original System
 
-| Aspect | Original (6 watchdog contracts) | Simplified (4 contracts) |
+| Aspect | Original (6 watchdog contracts) | Current (4 watchdog contracts) |
 |--------|-------------------------|--------------------------|
 | Complexity | High - overlapping logic | Low - clear separation |
 | Trust Model | Single attester | Multi-attester consensus |
@@ -331,16 +327,40 @@ GET /evidence/{hash}
 
 ## Conclusion
 
-The simplified watchdog system successfully addresses the core problems identified in the original design:
+The watchdog system successfully addresses the core problems identified in the original design:
 
 1. **Machine Interpretation**: Solved with reason codes
-2. **Trust Distribution**: Solved with oracle consensus
-3. **Over-Complexity**: Solved with focused contracts
+2. **Trust Distribution**: Solved with multi-attester consensus in QCReserveLedger
+3. **Over-Complexity**: Solved with focused watchdog contracts
 4. **Integration Gaps**: Solved with clean interfaces
 
-The result is a system that is:
-- **Simpler**: 33% fewer contracts
+## Complete Account Control System
+
+The 4 watchdog contracts operate within a broader **14-contract account control system**:
+
+### Watchdog-Specific Contracts (4)
+- WatchdogReasonCodes.sol - Machine-readable violation codes
+- QCReserveLedger.sol - Multi-attester consensus and storage
+- WatchdogReporting.sol - Subjective observation reporting
+- WatchdogEnforcer.sol - Permissionless objective enforcement
+
+### Core Account Control Infrastructure (10)
+- QCManager.sol - QC lifecycle management
+- QCData.sol - QC state and data storage
+- BasicMintingPolicy.sol - Direct Bank integration for minting
+- BasicRedemptionPolicy.sol - Redemption policy implementation
+- QCMinter.sol - User-facing minting interface
+- QCRedeemer.sol - User-facing redemption interface
+- SystemState.sol - Global system parameters
+- ProtocolRegistry.sol - Service discovery and upgrades
+- SPVValidator.sol - Bitcoin SPV proof validation
+- BitcoinAddressUtils.sol - Bitcoin address utilities
+
+**Total System**: 14 contracts + 3 interfaces = **17 total files**
+
+The result is a watchdog subsystem that is:
+- **Focused**: 4 contracts handle watchdog concerns specifically
 - **Clearer**: Single responsibility per contract
-- **Safer**: No single points of failure
-- **Efficient**: Optimized gas usage
+- **Safer**: No single points of failure in consensus
+- **Efficient**: Optimized algorithms (insertion sort for small sets)
 - **Maintainable**: Clean, documented architecture
