@@ -1,7 +1,7 @@
 # Account Control Future Enhancements
 
 **Document Version**: 1.0  
-**Date**: 2025-07-11  
+**Date**: 2025-08-06  
 **Architecture**: Direct Bank Integration  
 **Purpose**: V2 roadmap and enhancement planning for Account Control system  
 **Related Documents**: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [REQUIREMENTS.md](REQUIREMENTS.md)
@@ -18,8 +18,9 @@ The following architectural principles guide all enhancement ideas:
 
 ✅ **Modular Contract System**: ProtocolRegistry enables individual component upgrades  
 ✅ **Policy-Driven Evolution**: Core contracts delegate to upgradeable Policy contracts  
-✅ **Dual-Path Watchdog Model**: V1.1 QCWatchdog + WatchdogConsensusManager, V1.2 Automated Framework  
+✅ **Simplified Watchdog Architecture**: 4-contract system with clear separation of concerns  
 ✅ **Data/Logic Separation**: QCData.sol (storage) vs QCManager.sol (stateless logic)  
+✅ **Unified Reserve Management**: Single ReserveLedger contract with atomic consensus+storage  
 ✅ **Simple State Models**: 3-state QC model (Active, UnderReview, Revoked)  
 ✅ **Independent Deployment**: New contract suite without modifying existing tBTC v2
 
@@ -138,48 +139,34 @@ function batchCreditQCBackedDeposits(
 
 ### 2.3 Strategic Attestation Cost Optimization
 
-**Enhancement**: Batch multiple attestations to reduce gas costs
+**Status**: ✅ **IMPLEMENTED** - Multi-attester consensus with batch optimization built into ReserveLedger
+
+**Current Implementation**: The unified ReserveLedger contract already provides:
+- Multi-attester consensus mechanism (3+ attesters)
+- Atomic attestation submission and consensus calculation
+- Efficient storage patterns for multiple QC updates
+
+**Additional Enhancement**: Further batch optimization for cross-QC attestations
 
 ```solidity
-contract QCReserveLedger {
-  struct BatchAttestation {
-    address[] qcs;
-    uint256[] balances;
-    uint256 timestamp;
-  }
-
-  function submitBatchAttestation(
+contract ReserveLedger {
+  function submitBatchAttestations(
     address[] calldata qcs,
     uint256[] calldata balances
   ) external onlyRole(ATTESTER_ROLE) {
     require(qcs.length == balances.length, "Array length mismatch");
-
-    uint256 timestamp = block.timestamp;
+    
     for (uint256 i = 0; i < qcs.length; i++) {
-      reserveAttestations[qcs[i]] = ReserveAttestation({
-        balance: balances[i],
-        timestamp: timestamp,
-        attester: msg.sender,
-        isVerified: true
-      });
-
-      emit ReserveAttestationSubmitted(
-        msg.sender,
-        qcs[i],
-        balances[i],
-        timestamp
-      );
+      submitAttestation(qcs[i], balances[i]);
     }
   }
 }
-
 ```
 
 **Benefits**:
-
-- Reduces gas costs for multiple QC updates
-- More efficient Watchdog operations
-- Better scalability
+- ✅ Already achieved: Multi-attester consensus reduces single points of failure
+- ✅ Already achieved: Atomic operations reduce gas costs
+- Future: Cross-QC batch operations for further optimization
 
 ## 3. Storage and Performance Optimizations
 
@@ -444,81 +431,48 @@ function initiateMultiSigDeposit(
 
 ```
 
-## 6. Watchdog Service Improvements
+## 6. Watchdog System Status
 
-### 6.1 Watchdog Heartbeat Mechanism
+### 6.1 Current Implementation
 
-**Enhancement**: Add liveness checking for the single Watchdog
+**Status**: ✅ **IMPLEMENTED** - Simplified 4-contract watchdog system
 
-```solidity
-contract WatchdogLivenessMonitor {
-  uint256 public constant HEARTBEAT_INTERVAL = 1 hours;
-  uint256 public lastHeartbeat;
-  address public watchdog;
+**Current Architecture**:
+- **ReserveLedger**: Multi-attester consensus (replaces single watchdog model)
+- **WatchdogReporting**: Transparent subjective observation reporting
+- **WatchdogEnforcer**: Permissionless objective violation enforcement
+- **WatchdogReasonCodes**: Machine-readable violation codes
 
-  modifier onlyAliveWatchdog() {
-    require(
-      block.timestamp - lastHeartbeat <= HEARTBEAT_INTERVAL,
-      "Watchdog unresponsive"
-    );
-    require(msg.sender == watchdog, "Only watchdog");
-    _;
-  }
+**Key Improvements Already Achieved**:
+- ✅ **Decentralized Consensus**: 3+ attesters eliminate single points of failure
+- ✅ **Clear Separation**: Objective enforcement vs subjective reporting
+- ✅ **Transparency**: All observations reported via events for DAO monitoring
+- ✅ **Permissionless Enforcement**: Anyone can enforce objective violations
 
-  function heartbeat() external {
-    require(msg.sender == watchdog, "Only watchdog");
-    lastHeartbeat = block.timestamp;
-  }
-}
+### 6.2 Future Multi-Attester Enhancements
 
-```
-
-**Benefits**:
-
-- Early detection of Watchdog failures
-- Enables emergency procedures
-- Maintains system reliability
-
-### 6.2 Future M-of-N Watchdog Interface Preparation
-
-**Enhancement**: Prepare for future Watchdog decentralization
+**Enhancement**: Extend current multi-attester model
 
 ```solidity
-interface IWatchdogOracle {
-  function submitAttestation(
-    address qc,
-    uint256 balance,
-    bytes calldata signature
-  ) external;
-
-  function getConsensusAttestation(address qc)
-    external
-    view
-    returns (uint256 balance, uint256 confidence);
-}
-
-// V1 implementation delegates to single Watchdog
-contract SingleWatchdogOracle is IWatchdogOracle {
-  address public trustedWatchdog;
-
-  function submitAttestation(
-    address qc,
-    uint256 balance,
-    bytes calldata
-  ) external override {
-    require(msg.sender == trustedWatchdog, "Only trusted watchdog");
-    // Delegate to QCReserveLedger
-    reserveLedger.submitReserveAttestation(qc, balance);
+// Current ReserveLedger already supports multiple attesters
+contract ReserveLedger {
+  uint256 public consensusThreshold = 3; // Configurable
+  mapping(address => mapping(address => PendingAttestation)) public pendingAttestations;
+  
+  function submitAttestation(address qc, uint256 balance) external onlyRole(ATTESTER_ROLE) {
+    // Automatic consensus calculation when threshold met
+    if (getPendingAttesterCount(qc) + 1 >= consensusThreshold) {
+      uint256 consensusBalance = calculateConsensus(qc, balance);
+      updateReserveBalance(qc, consensusBalance);
+    }
   }
 }
-
 ```
 
-**Benefits**:
-
-- Future-proofs for decentralization
-- Maintains interface stability
-- Enables gradual migration
+**Benefits** (Beyond Current Implementation):
+- Dynamic threshold adjustment
+- Weighted attester voting
+- Geographic distribution requirements
 
 ## 7. Policy Contract Enhancements
 
@@ -856,9 +810,24 @@ contract AccountControlTestHelper {
 - Consistent test scenarios
 - Better regression testing
 
-## 13. Future V2 Preparation
+## 13. Migration Status and V2 Preparation
 
-### 13.1 Collateralization Interface Preparation
+### 13.1 Recent Migrations Completed
+
+**Status**: ✅ **COMPLETED** - Major architectural consolidation
+
+**Completed Migrations**:
+- ✅ **ReserveOracle + QCReserveLedger → ReserveLedger**: Unified atomic consensus+storage
+- ✅ **WatchdogSubjectiveReporting → WatchdogReporting**: Simplified transparent reporting
+- ✅ **Complex Watchdog System → 4-Contract Architecture**: Based on Three-Problem Framework
+
+**Migration Benefits Achieved**:
+- Eliminated dual interface problems
+- Reduced gas costs through atomic operations
+- Simplified maintenance and upgrades
+- Improved security through clear separation of concerns
+
+### 13.2 Future Collateralization Interface Preparation
 
 **Enhancement**: Prepare interface for future collateralized policies
 
@@ -911,11 +880,11 @@ Based on potential impact, complexity, and strategic importance:
 ### 1. **High Priority**
 
 - **Service Versioning Support** (Section 1.1): Enables safe policy upgrades
-- **Cryptographic Proof-of-Reserves** (Section 5.1): Critical security enhancement
+- **Cryptographic Proof-of-Reserves** (Section 5.1): Critical security enhancement  
 - **Batch Operations Support** (Section 2.2): Gas optimization for scaling
 - **Emergency Pause Granularity** (Section 5.2): Essential operational control
-- **Watchdog Heartbeat Mechanism** (Section 6.1): System reliability assurance
 - **L2 Integration** (Section 8.1): Cross-chain scaling necessity
+- ✅ ~~**Watchdog Heartbeat Mechanism**: Replaced by multi-attester consensus system~~
 
 ### 2. **Medium Priority**
 
@@ -925,7 +894,7 @@ Based on potential impact, complexity, and strategic importance:
 - **On-Chain Metrics Collection** (Section 11.1): Operational monitoring
 - **Enhanced Time-Locked Governance** (Section 5.3): Extended security controls
 - **Dynamic Fee Models** (Section 9.1): Economic flexibility
-- **Strategic Attestation Cost Optimization** (Section 2.3): Operational efficiency
+- ✅ ~~**Strategic Attestation Cost Optimization**: Implemented via ReserveLedger consensus~~
 
 ### 3. **Low Priority**
 
@@ -952,7 +921,7 @@ Based on potential impact, complexity, and strategic importance:
 1. Deploy core contracts with service versioning support
 2. Implement cryptographic proof-of-reserves
 3. Add emergency pause granularity
-4. Deploy watchdog heartbeat mechanism
+4. ✅ ~~Deploy watchdog heartbeat mechanism~~ **COMPLETED**: Multi-attester consensus system deployed
 
 ### Phase 2: Performance & Monitoring (3-6 months)
 
@@ -975,14 +944,33 @@ Based on potential impact, complexity, and strategic importance:
 3. Advanced governance features
 4. V2 preparation interfaces
 
-## Conclusion
+## Document Status and Next Steps
 
-This comprehensive enhancement roadmap represents the evolution of the tBTC v2 system from its current Account Control implementation to a full-featured, scalable Bitcoin-backed token protocol. The enhancements maintain strict adherence to the modular, policy-driven architecture while addressing:
+### Recent Achievements (2025-08-06 Update)
+
+This document has been updated to reflect major architectural improvements completed:
+
+✅ **Watchdog System Simplified**: Migrated from complex dual-path model to 4-contract architecture  
+✅ **Reserve Consensus Implemented**: Multi-attester system eliminates single points of failure  
+✅ **Atomic Operations**: ReserveLedger unification reduces gas costs and complexity  
+✅ **Transparent Reporting**: Event-based watchdog observations for DAO governance  
+
+### Roadmap Evolution
+
+This comprehensive enhancement roadmap now represents the evolution from the **current simplified architecture** to a full-featured, scalable Bitcoin-backed token protocol. The enhancements maintain strict adherence to the modular, policy-driven architecture while addressing:
 
 - **Operational Excellence**: Better monitoring, testing, and deployment capabilities
-- **Security Enhancements**: Granular controls, cryptographic proofs, and validation systems
+- **Security Enhancements**: Granular controls, cryptographic proofs, and validation systems  
 - **Performance Optimization**: Gas efficiency and scalability improvements
-- **Future-Proofing**: V2 preparation while maintaining V1 simplicity and compatibility
+- **Future-Proofing**: V2 preparation while maintaining current simplicity and compatibility
 - **Ecosystem Growth**: DeFi integration and cross-chain expansion capabilities
 
-The modular architecture of the system makes these enhancements feasible without major system overhauls, enabling gradual implementation based on DAO governance decisions and operational needs. All enhancements preserve the core principles of policy-driven evolution, single watchdog operation, and independent deployment from existing tBTC infrastructure.
+The modular architecture makes these enhancements feasible without major system overhauls, enabling gradual implementation based on DAO governance decisions and operational needs. All enhancements preserve the core principles of policy-driven evolution, **multi-attester consensus**, and independent deployment from existing tBTC infrastructure.
+
+### Priority Updates
+
+Given the successful watchdog migration, priorities should focus on:
+1. **Service versioning** for safe policy upgrades
+2. **Cryptographic proof-of-reserves** to further enhance security
+3. **L2 integration** for cross-chain scaling
+4. **Gas optimization** through enhanced storage patterns
