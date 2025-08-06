@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// @dev Combines oracle consensus and ledger storage in a single atomic operation
 contract QCReserveLedger is AccessControl {
     bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
-    // MANAGER_ROLE removed - all updates must go through consensus
     
     struct ReserveData {
         uint256 balance;
