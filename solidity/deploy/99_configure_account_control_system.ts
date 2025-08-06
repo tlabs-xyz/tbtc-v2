@@ -25,7 +25,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
   // Get simplified watchdog contracts
   const reserveOracle = await get("ReserveOracle")
-  const subjectiveReporting = await get("WatchdogSubjectiveReporting")
+  const watchdogReporting = await get("WatchdogReporting")
   const watchdogEnforcer = await get("WatchdogEnforcer")
 
   // Generate service keys
@@ -36,7 +36,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const MINTING_POLICY_KEY = ethers.utils.id("MINTING_POLICY")
   const REDEMPTION_POLICY_KEY = ethers.utils.id("REDEMPTION_POLICY")
   const RESERVE_ORACLE_KEY = ethers.utils.id("RESERVE_ORACLE")
-  const SUBJECTIVE_REPORTING_KEY = ethers.utils.id("SUBJECTIVE_REPORTING")
+  const WATCHDOG_REPORTING_KEY = ethers.utils.id("WATCHDOG_REPORTING")
   const WATCHDOG_ENFORCER_KEY = ethers.utils.id("WATCHDOG_ENFORCER")
 
   // Step 1: Register all services in ProtocolRegistry
@@ -50,7 +50,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     { key: MINTING_POLICY_KEY, address: basicMintingPolicy.address, name: "BasicMintingPolicy" },
     { key: REDEMPTION_POLICY_KEY, address: basicRedemptionPolicy.address, name: "BasicRedemptionPolicy" },
     { key: RESERVE_ORACLE_KEY, address: reserveOracle.address, name: "ReserveOracle" },
-    { key: SUBJECTIVE_REPORTING_KEY, address: subjectiveReporting.address, name: "WatchdogSubjectiveReporting" },
+    { key: WATCHDOG_REPORTING_KEY, address: watchdogReporting.address, name: "WatchdogReporting" },
     { key: WATCHDOG_ENFORCER_KEY, address: watchdogEnforcer.address, name: "WatchdogEnforcer" },
   ]
 
@@ -198,7 +198,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log("")
   log("  Watchdog Components:")
   log(`    - ReserveOracle: ${reserveOracle.address}`)
-  log(`    - SubjectiveReporting: ${subjectiveReporting.address}`)
+  log(`    - WatchdogReporting: ${watchdogReporting.address}`)
   log(`    - WatchdogEnforcer: ${watchdogEnforcer.address}`)
   log("")
   log("  Policies:")
