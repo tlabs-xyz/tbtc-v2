@@ -23,10 +23,15 @@ const func: DeployFunction = async function DeployAccountControlPolicies(
     waitConfirmations: helpers.network?.confirmations || 1,
   })
 
+  // Get required contracts for BasicMintingPolicy
+  const bank = await get("Bank")
+  const tbtcVault = await get("TBTCVault")
+  const tbtc = await get("TBTC")
+  
   // Deploy BasicMintingPolicy - Upgradeable minting policy
   const basicMintingPolicy = await deploy("BasicMintingPolicy", {
     from: deployer,
-    args: [protocolRegistry.address],
+    args: [bank.address, tbtcVault.address, tbtc.address, protocolRegistry.address],
     log: true,
     waitConfirmations: helpers.network?.confirmations || 1,
   })
