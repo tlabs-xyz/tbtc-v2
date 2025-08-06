@@ -36,8 +36,6 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
     QCData public immutable qcData;
     SystemState public immutable systemState;
     
-    // Configuration - minCollateralRatio is now read from SystemState
-    
     // Events
     event ObjectiveViolationEnforced(
         address indexed qc,
