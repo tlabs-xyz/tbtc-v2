@@ -118,7 +118,9 @@ The research revealed that Account Control could be implemented as an independen
 
 ### Watchdog Consensus Simplification
 
-**Research Findings**: The initial OptimisticWatchdogConsensus design was abandoned during development in favor of a simplified dual-path architecture.
+**Research Findings**: The initial OptimisticWatchdogConsensus design was abandoned during development. After further analysis, the dual-path architecture was also replaced with an even simpler Three-Problem Framework in v2.0.
+
+**Note**: This research is preserved for historical context. The current system uses ReserveOracle for multi-attester consensus and WatchdogSubjectiveReporting for transparent observation reporting.
 
 #### Key Insights from Implementation
 
