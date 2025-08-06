@@ -18,14 +18,13 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const qcData = await get("QCData")
   const systemState = await get("SystemState")
   const qcManager = await get("QCManager")
-  const qcReserveLedger = await get("QCReserveLedger")
+  const reserveLedger = await get("ReserveLedger")
   const basicMintingPolicy = await get("BasicMintingPolicy")
   const basicRedemptionPolicy = await get("BasicRedemptionPolicy")
   const tbtc = await get("TBTC")
 
   // Get simplified watchdog contracts
-  const reserveOracle = await get("ReserveOracle")
-  const watchdogReporting = await get("WatchdogReporting")
+  const watchdogReporting = await get("WatchdogSubjectiveReporting")
   const watchdogEnforcer = await get("WatchdogEnforcer")
 
   // Generate service keys
@@ -35,7 +34,6 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const QC_RESERVE_LEDGER_KEY = ethers.utils.id("QC_RESERVE_LEDGER")
   const MINTING_POLICY_KEY = ethers.utils.id("MINTING_POLICY")
   const REDEMPTION_POLICY_KEY = ethers.utils.id("REDEMPTION_POLICY")
-  const RESERVE_ORACLE_KEY = ethers.utils.id("RESERVE_ORACLE")
   const WATCHDOG_REPORTING_KEY = ethers.utils.id("WATCHDOG_REPORTING")
   const WATCHDOG_ENFORCER_KEY = ethers.utils.id("WATCHDOG_ENFORCER")
 
@@ -46,11 +44,10 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     { key: QC_DATA_KEY, address: qcData.address, name: "QCData" },
     { key: SYSTEM_STATE_KEY, address: systemState.address, name: "SystemState" },
     { key: QC_MANAGER_KEY, address: qcManager.address, name: "QCManager" },
-    { key: QC_RESERVE_LEDGER_KEY, address: qcReserveLedger.address, name: "QCReserveLedger" },
+    { key: QC_RESERVE_LEDGER_KEY, address: reserveLedger.address, name: "ReserveLedger" },
     { key: MINTING_POLICY_KEY, address: basicMintingPolicy.address, name: "BasicMintingPolicy" },
     { key: REDEMPTION_POLICY_KEY, address: basicRedemptionPolicy.address, name: "BasicRedemptionPolicy" },
-    { key: RESERVE_ORACLE_KEY, address: reserveOracle.address, name: "ReserveOracle" },
-    { key: WATCHDOG_REPORTING_KEY, address: watchdogReporting.address, name: "WatchdogReporting" },
+    { key: WATCHDOG_REPORTING_KEY, address: watchdogReporting.address, name: "WatchdogSubjectiveReporting" },
     { key: WATCHDOG_ENFORCER_KEY, address: watchdogEnforcer.address, name: "WatchdogEnforcer" },
   ]
 
@@ -65,28 +62,31 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     log(`  ✅ Registered ${service.name}`)
   }
 
-  // Step 2: Configure Oracle and Reserve Ledger integration
-  log("Step 2: Configuring Oracle integration with Reserve Ledger...")
+  // Step 2: Configure ReserveLedger roles
+  log("Step 2: Configuring ReserveLedger roles...")
   
-  // Set oracle address in QCReserveLedger
+  // Grant MANAGER_ROLE to QCManager for administrative updates
+  const MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")
   await execute(
-    "QCReserveLedger",
+    "ReserveLedger",
     { from: deployer, log: true },
-    "setReserveOracle",
-    reserveOracle.address
+    "grantRole",
+    MANAGER_ROLE,
+    qcManager.address
   )
-  log("  ✅ Oracle address set in QCReserveLedger")
-
-  // Grant ATTESTER_ROLE to oracle for consensus attestations
+  log("  ✅ MANAGER_ROLE granted to QCManager in ReserveLedger")
+  
+  // Grant ATTESTER_ROLE to relevant attesters (can be expanded later)
   const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
+  // For now, grant to deployer for testing
   await execute(
-    "QCReserveLedger",
+    "ReserveLedger",
     { from: deployer, log: true },
     "grantRole",
     ATTESTER_ROLE,
-    reserveOracle.address
+    deployer
   )
-  log("  ✅ ATTESTER_ROLE granted to ReserveOracle")
+  log("  ✅ ATTESTER_ROLE granted to deployer for testing")
 
   // Step 3: Configure QCManager roles
   log("Step 3: Configuring QCManager roles...")
