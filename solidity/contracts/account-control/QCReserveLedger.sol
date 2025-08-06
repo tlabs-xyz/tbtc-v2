@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// @dev Combines oracle consensus and ledger storage in a single atomic operation
 contract QCReserveLedger is AccessControl {
     bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
-    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    // MANAGER_ROLE removed - all updates must go through consensus
     
     struct ReserveData {
         uint256 balance;
@@ -71,7 +71,7 @@ contract QCReserveLedger is AccessControl {
     
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(MANAGER_ROLE, msg.sender);
+        // Only admin role needed - attesters granted separately
     }
     
     /// @notice Submit an attestation for a QC's reserve balance
@@ -97,21 +97,8 @@ contract QCReserveLedger is AccessControl {
         _attemptConsensus(qc);
     }
     
-    /// @notice Admin function to directly update reserve balance
-    /// @dev Used by QCManager for administrative updates (wallet registration/deregistration)
-    /// @param qc The QC address
-    /// @param balance The new reserve balance
-    function updateReserveBalance(address qc, uint256 balance) external onlyRole(MANAGER_ROLE) {
-        if (balance == 0) revert InvalidBalance();
-        
-        uint256 oldBalance = reserves[qc].balance;
-        reserves[qc] = ReserveData({
-            balance: balance,
-            lastUpdateTimestamp: block.timestamp
-        });
-        
-        emit ReserveUpdated(qc, oldBalance, balance, block.timestamp);
-    }
+    // Administrative updates removed - all balance updates must go through consensus
+    // This ensures single source of truth and prevents bypassing the trust model
     
     /// @notice Get reserve balance and staleness for a QC
     /// @param qc The QC address
@@ -130,7 +117,7 @@ contract QCReserveLedger is AccessControl {
     
     /// @notice Update consensus threshold
     /// @param newThreshold New number of attestations required
-    function setConsensusThreshold(uint256 newThreshold) external onlyRole(MANAGER_ROLE) {
+    function setConsensusThreshold(uint256 newThreshold) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newThreshold == 0) revert InvalidThreshold();
         uint256 oldThreshold = consensusThreshold;
         consensusThreshold = newThreshold;
@@ -139,7 +126,7 @@ contract QCReserveLedger is AccessControl {
     
     /// @notice Update attestation timeout
     /// @param newTimeout New timeout in seconds
-    function setAttestationTimeout(uint256 newTimeout) external onlyRole(MANAGER_ROLE) {
+    function setAttestationTimeout(uint256 newTimeout) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newTimeout == 0) revert InvalidTimeout();
         uint256 oldTimeout = attestationTimeout;
         attestationTimeout = newTimeout;
@@ -148,7 +135,7 @@ contract QCReserveLedger is AccessControl {
     
     /// @notice Update maximum staleness period
     /// @param newStaleness New staleness threshold in seconds
-    function setMaxStaleness(uint256 newStaleness) external onlyRole(MANAGER_ROLE) {
+    function setMaxStaleness(uint256 newStaleness) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newStaleness == 0) revert InvalidTimeout();
         uint256 oldStaleness = maxStaleness;
         maxStaleness = newStaleness;
