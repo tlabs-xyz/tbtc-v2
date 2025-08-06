@@ -142,9 +142,7 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
     
     /// @notice Execute enforcement action based on violation type
     function _executeEnforcement(address qc, bytes32 reasonCode) internal {
-        // All objective violations result in UnderReview status
-        // This is a conservative approach - can be refined later
-        // Use centralized state management to prevent race conditions
+        // All objective violations trigger UnderReview status through QCManager
         qcManager.requestStatusChange(qc, QCData.QCStatus.UnderReview, reasonCode);
     }
     

@@ -70,7 +70,6 @@ contract QCReserveLedger is AccessControl {
     
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        // Only admin role needed - attesters granted separately
     }
     
     /// @notice Submit an attestation for a QC's reserve balance
