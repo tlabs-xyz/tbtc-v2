@@ -12,8 +12,8 @@
 The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tBTC against their Bitcoin reserves through direct Bank integration. Following a recent migration, the system now uses a simplified watchdog architecture based on the Three-Problem Framework.
 
 **Key Statistics**:
-- **Core Contracts**: 10 (QC management) + 4 (watchdog)
-- **Trust Model**: Multi-attester consensus (no single points of failure)
+- **Core Contracts**: 10 (QC management) + 3 (watchdog)
+- **Trust Model**: Multi-attester consensus (no single points of failure) 
 - **Architecture**: Direct Bank integration with modular policies
 - **Gas Savings**: ~50% vs abstraction layer approach
 
@@ -30,7 +30,7 @@ The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tB
 | **QCData** | Isolated storage layer | ✅ Deployed |
 | **QCMinter** | Minting entry point | ✅ Deployed |
 | **QCRedeemer** | Redemption management | ✅ Deployed |
-| **QCReserveLedger** | Reserve attestation storage | ✅ Deployed |
+| **QCReserveLedger** | Unified reserve attestation and consensus | ✅ Deployed |
 | **BasicMintingPolicy** | Direct Bank integration | ✅ Deployed |
 | **BasicRedemptionPolicy** | Redemption policy logic | ✅ Deployed |
 | **SystemState** | Global parameters and pausing | ✅ Deployed |
@@ -41,7 +41,6 @@ The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tB
 | Component | Purpose | Status |
 |-----------|---------|--------|
 | **WatchdogReasonCodes** | Machine-readable violation codes | ✅ Implemented |
-| **ReserveOracle** | Multi-attester consensus for reserves | ✅ Implemented |
 | **WatchdogReporting** | Transparent event-based reporting | ✅ Implemented |
 | **WatchdogEnforcer** | Permissionless violation enforcement | ✅ Implemented |
 
