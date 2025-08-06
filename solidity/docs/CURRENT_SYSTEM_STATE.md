@@ -112,6 +112,20 @@ supportThresholds: {
 - **MINTER_ROLE**: QCMinter contract
 - **PAUSER_ROLE**: Emergency council
 
+### Operational Expectations
+
+**WatchdogEnforcer Usage Pattern**:
+- **Primary Operation**: Watchdogs continuously monitor QCs and call enforcement functions
+- **Fallback Mechanism**: Permissionless design allows anyone to enforce violations if watchdogs fail
+- **Monitoring Flow**: Watchdogs use `checkViolation()` and `batchCheckViolations()` for efficient scanning
+- **Enforcement Flow**: Upon detecting violations, watchdogs call `enforceObjectiveViolation()`
+- **Transparency**: All enforcement attempts logged via events for DAO monitoring
+
+**Expected Actors**:
+- **Primary**: Watchdogs with WATCHDOG_ROLE who monitor system health
+- **Secondary**: Automated monitoring systems, community members, other participants
+- **Resilience**: System integrity maintained even if primary actors are inactive
+
 ---
 
 ## Integration Points

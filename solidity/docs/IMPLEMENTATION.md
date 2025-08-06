@@ -698,7 +698,6 @@ ConsensusParams memory params = ConsensusParams({
 uint256 public minCollateralRatio = 90;        // 90% minimum
 uint256 public staleThreshold = 24 hours;      // Attestation staleness
 uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
-uint256 public qcInactivityPeriod = 30 days;   // QC inactivity threshold
 
 // WatchdogThresholdActions parameters
 uint256 public constant REPORT_THRESHOLD = 3;  // Reports needed
