@@ -257,7 +257,7 @@ describe("ReserveLedger", () => {
         await expect(
           reserveLedger.connect(deployer).setAttestationTimeout(7200)
         ).to.emit(reserveLedger, "AttestationTimeoutUpdated")
-          .withArgs(3600, 7200)
+          .withArgs(21600, 7200)
         
         expect(await reserveLedger.attestationTimeout()).to.equal(7200)
       })
