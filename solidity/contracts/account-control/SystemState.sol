@@ -4,15 +4,40 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /// @title SystemState
-/// @dev Global system state and emergency controls.
-/// Holds global parameters and emergency controls (e.g., pause flags),
-/// providing a single, auditable location for system-wide state.
-/// Implements granular pause mechanisms for surgical response to threats.
+/// @dev Global system state and emergency controls for the tBTC v2 Account Control system.
+/// 
+/// This contract serves as the central control plane for emergency response and system-wide
+/// parameters. It provides both granular function-level pauses and QC-specific emergency
+/// controls to enable surgical responses to threats while minimizing system-wide impact.
 ///
-/// Role definitions:
-/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and set emergency council
-/// - PARAMETER_ADMIN_ROLE: Can update all system parameters
-/// - PAUSER_ROLE: Can pause/unpause system functions
+/// ## Emergency Control Architecture
+/// 
+/// ### Global Pause Mechanisms
+/// - **Function-Specific Pauses**: Can pause minting, redemption, registry, wallet registration independently
+/// - **Time-Limited Duration**: All pauses expire automatically after emergencyPauseDuration (default 7 days)
+/// - **No Global Kill Switch**: Intentional design to prevent single points of failure
+/// 
+/// ### QC-Specific Emergency Controls  
+/// - **Individual QC Pausing**: Target specific qualified custodians without affecting others
+/// - **Reason Code Tracking**: Machine-readable reason codes for automated integration
+/// - **Reversible Operations**: Both pause and unpause functions for incident response
+/// - **Integration Ready**: Provides modifier for other contracts to check pause status
+/// 
+/// ### Integration with Watchdog System
+/// - **Automated Triggering**: WatchdogEnforcer calls emergencyPauseQC() for violations
+/// - **Threshold Monitoring**: Automated systems monitor collateral ratios and attestation staleness  
+/// - **Event-Driven Monitoring**: Comprehensive event logging for off-chain monitoring systems
+/// 
+/// ## Role Definitions
+/// - **DEFAULT_ADMIN_ROLE**: Can grant/revoke roles and set emergency council
+/// - **PARAMETER_ADMIN_ROLE**: Can update all system parameters within bounds
+/// - **PAUSER_ROLE**: Can pause/unpause system functions and individual QCs
+/// 
+/// ## Security Features
+/// - **Role-Based Access Control**: All emergency functions protected by OpenZeppelin AccessControl
+/// - **Parameter Bounds Validation**: Hard-coded limits prevent malicious parameter changes
+/// - **Comprehensive Event Logging**: Full audit trail for all emergency actions
+/// - **Expiry Mechanisms**: Automatic recovery from time-limited emergency states
 contract SystemState is AccessControl {
     bytes32 public constant PARAMETER_ADMIN_ROLE =
         keccak256("PARAMETER_ADMIN_ROLE");
@@ -627,7 +652,25 @@ contract SystemState is AccessControl {
     }
 
     /// @notice Modifier to check if QC operations are allowed
-    /// @param qc The QC address to check
+    /// @dev This modifier should be used by all contracts that perform QC-specific operations
+    ///      to ensure they respect emergency pause states. It integrates seamlessly with
+    ///      existing access control patterns.
+    /// 
+    /// @param qc The QC address to check for emergency pause status
+    /// 
+    /// @custom:integration Add this modifier to QC-specific functions:
+    /// ```solidity
+    /// function mintFromQC(address qc, uint256 amount) 
+    ///     external 
+    ///     qcNotEmergencyPaused(qc)
+    ///     onlyRole(MINTER_ROLE)
+    /// {
+    ///     // Minting logic here - will revert if QC is emergency paused
+    /// }
+    /// ```
+    /// 
+    /// @custom:error Reverts with QCIsEmergencyPaused(qc) if QC is paused
+    /// @custom:gas Low gas cost check - just reads from storage mapping
     modifier qcNotEmergencyPaused(address qc) {
         if (qcEmergencyPauses[qc]) revert QCIsEmergencyPaused(qc);
         _;
