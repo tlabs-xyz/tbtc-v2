@@ -211,33 +211,29 @@ contract ReserveLedger is AccessControl {
         emit ReserveUpdated(qc, oldBalance, consensusBalance, block.timestamp);
     }
     
-    /// @dev Calculate median using quickselect algorithm
+    /// @dev Calculate median using insertion sort (efficient for small arrays)
     function _calculateMedian(uint256[] memory values, uint256 length) internal pure returns (uint256) {
+        require(length <= 10, "Too many attesters for consensus");
         if (length == 0) return 0;
         if (length == 1) return values[0];
         
-        // Create a copy for manipulation
-        uint256[] memory sorted = new uint256[](length);
-        for (uint256 i = 0; i < length; i++) {
-            sorted[i] = values[i];
-        }
-        
-        // Simple bubble sort for small arrays (gas efficient for small n)
-        for (uint256 i = 0; i < length - 1; i++) {
-            for (uint256 j = 0; j < length - i - 1; j++) {
-                if (sorted[j] > sorted[j + 1]) {
-                    uint256 temp = sorted[j];
-                    sorted[j] = sorted[j + 1];
-                    sorted[j + 1] = temp;
-                }
+        // Insertion sort - O(n²) worst case, O(n) best case for nearly sorted data
+        // Very efficient for small arrays (n ≤ 10) with good constant factors
+        for (uint256 i = 1; i < length; i++) {
+            uint256 key = values[i];
+            uint256 j = i;
+            while (j > 0 && values[j-1] > key) {
+                values[j] = values[j-1];
+                j--;
             }
+            values[j] = key;
         }
         
         // Return median
         if (length % 2 == 0) {
-            return (sorted[length / 2 - 1] + sorted[length / 2]) / 2;
+            return (values[length / 2 - 1] + values[length / 2]) / 2;
         } else {
-            return sorted[length / 2];
+            return values[length / 2];
         }
     }
     
