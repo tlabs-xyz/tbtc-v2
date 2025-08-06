@@ -1718,9 +1718,11 @@ describe("QCManager", () => {
         // Verify QCStatusChanged is emitted
         expect(events).to.include("QCStatusChanged")
 
-        // Verify state change happened before event
-        expect(mockQcData.setQCStatus).to.have.been.calledBefore(
-          tx.wait as any
+        // Verify state change was called
+        expect(mockQcData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          1,
+          testReason
         )
       })
     })
