@@ -43,7 +43,7 @@ This document provides a complete inventory of user flows in the tBTC v2 Account
 - **QCReserveLedger**: Reserve attestation management
 - **ReserveOracle**: Multi-attester consensus for reserve balances
 - **WatchdogEnforcer**: Permissionless enforcement of objective violations
-- **WatchdogSubjectiveReporting**: Transparent reporting via events
+- **WatchdogReporting**: Transparent reporting via events
 
 ---
 

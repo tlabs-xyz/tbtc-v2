@@ -247,7 +247,7 @@ bytes32 constant ZERO_RESERVES = keccak256("ZERO_RESERVES");
 bytes32 constant REDEMPTION_TIMEOUT = keccak256("REDEMPTION_TIMEOUT");
 ```
 
-### 3. WatchdogSubjectiveReporting.sol
+### 3. WatchdogReporting.sol
 
 **Purpose**: Transparent reporting of subjective observations
 
@@ -320,7 +320,7 @@ WatchdogEnforcer:
 ├── Permissionless enforcement (anyone can call)
 └── Uses machine-readable reason codes
 
-WatchdogSubjectiveReporting:
+WatchdogReporting:
 ├── WATCHDOG_ROLE for submitting reports
 ├── Emits events for DAO monitoring
 └── No direct contract interactions
@@ -511,7 +511,7 @@ uint256 public minCollateralRatio = 90;        // 90% minimum
 uint256 public staleThreshold = 7 days;        // Attestation staleness
 uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
 
-// WatchdogSubjectiveReporting
+// WatchdogReporting
 uint256 public constant MAX_EVIDENCE_PER_REPORT = 20; // Evidence hashes
 mapping(ObservationType => uint256) supportThresholds:
   SECURITY_OBSERVATION => 0    // Immediate
