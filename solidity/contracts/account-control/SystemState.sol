@@ -202,7 +202,7 @@ contract SystemState is AccessControl {
         emergencyPauseDuration = 7 days; // Emergency pauses last max 7 days
 
         // Set automated enforcement defaults
-        minCollateralRatio = 90; // 90% minimum collateral ratio
+        minCollateralRatio = 100; // 100% minimum collateral ratio
         failureThreshold = 3; // 3 failures trigger enforcement
         failureWindow = 7 days; // Count failures over 7 days
     }
