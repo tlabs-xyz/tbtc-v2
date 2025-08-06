@@ -8,7 +8,7 @@ import {
   ProtocolRegistry,
   QCData,
   SystemState,
-  QCReserveLedger,
+  ReserveLedger,
   SPVValidator,
 } from "../../typechain"
 
@@ -27,7 +27,7 @@ describe("QCManager", () => {
   let protocolRegistry: ProtocolRegistry
   let mockQcData: FakeContract<QCData>
   let mockSystemState: FakeContract<SystemState>
-  let mockQcReserveLedger: FakeContract<QCReserveLedger>
+  let mockQcReserveLedger: FakeContract<ReserveLedger>
   let mockSpvValidator: FakeContract<SPVValidator>
 
   // Service keys
@@ -105,7 +105,7 @@ describe("QCManager", () => {
     // Create mock contracts
     mockQcData = await smock.fake<QCData>("QCData")
     mockSystemState = await smock.fake<SystemState>("SystemState")
-    mockQcReserveLedger = await smock.fake<QCReserveLedger>("QCReserveLedger")
+    mockQcReserveLedger = await smock.fake<ReserveLedger>("ReserveLedger")
     mockSpvValidator = await smock.fake<SPVValidator>("SPVValidator")
 
     // Register services
