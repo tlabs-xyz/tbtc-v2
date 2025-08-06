@@ -3,7 +3,7 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./WatchdogReasonCodes.sol";
-import "./interfaces/IQCReserveLedger.sol";
+import "./ReserveLedger.sol";
 import "./QCManager.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
@@ -17,7 +17,7 @@ contract WatchdogEnforcer is AccessControl {
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     
     // External contracts
-    IQCReserveLedger public immutable reserveLedger;
+    ReserveLedger public immutable reserveLedger;
     QCManager public immutable qcManager;
     QCData public immutable qcData;
     SystemState public immutable systemState;
@@ -52,7 +52,7 @@ contract WatchdogEnforcer is AccessControl {
         address _qcData,
         address _systemState
     ) {
-        reserveLedger = IQCReserveLedger(_reserveLedger);
+        reserveLedger = ReserveLedger(_reserveLedger);
         qcManager = QCManager(_qcManager);
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
