@@ -333,19 +333,6 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl, ReentrancyGuard {
         qcManager.updateQCMintedAmount(qc, currentMinted + amount);
     }
 
-    /// @notice Get core contract addresses for verification
-    function getCoreContracts()
-        external
-        view
-        returns (
-            address bankAddress,
-            address vaultAddress,
-            address tokenAddress
-        )
-    {
-        return (address(bank), address(tbtcVault), address(tbtc));
-    }
-
     /// @notice Check Bank authorization efficiently
     function checkBankAuthorization() external view returns (bool isAuthorized) {
         return bank.authorizedBalanceIncreasers(address(this));
