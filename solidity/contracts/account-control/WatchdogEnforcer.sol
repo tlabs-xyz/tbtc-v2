@@ -3,7 +3,6 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "./WatchdogReasonCodes.sol";
 import "./QCReserveLedger.sol";
 import "./QCManager.sol";
 import "./QCData.sol";
@@ -25,7 +24,9 @@ import "./SystemState.sol";
 ///      3. If watchdogs are offline/inactive, any participant can enforce violations
 ///      4. All enforcement attempts are logged via events for transparency
 contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
-    using WatchdogReasonCodes for bytes32;
+    // Reason codes for objective violations
+    bytes32 public constant INSUFFICIENT_RESERVES = keccak256("INSUFFICIENT_RESERVES");
+    bytes32 public constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
     
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     
@@ -82,7 +83,7 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
     /// @param reasonCode The machine-readable reason code
     function enforceObjectiveViolation(address qc, bytes32 reasonCode) external nonReentrant {
         // Verify this is an objective violation
-        if (!reasonCode.isObjectiveViolation()) {
+        if (reasonCode != INSUFFICIENT_RESERVES && reasonCode != STALE_ATTESTATIONS) {
             revert NotObjectiveViolation();
         }
         
@@ -90,9 +91,9 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         string memory failureReason;
         
         // Check specific violation type
-        if (reasonCode == WatchdogReasonCodes.INSUFFICIENT_RESERVES) {
+        if (reasonCode == INSUFFICIENT_RESERVES) {
             (violated, failureReason) = _checkReserveViolation(qc);
-        } else if (reasonCode == WatchdogReasonCodes.STALE_ATTESTATIONS) {
+        } else if (reasonCode == STALE_ATTESTATIONS) {
             (violated, failureReason) = _checkStaleAttestations(qc);
         } else {
             revert InvalidReasonCode();
@@ -159,13 +160,13 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         view 
         returns (bool violated, string memory reason) 
     {
-        if (!reasonCode.isObjectiveViolation()) {
+        if (reasonCode != INSUFFICIENT_RESERVES && reasonCode != STALE_ATTESTATIONS) {
             return (false, "Not an objective violation");
         }
         
-        if (reasonCode == WatchdogReasonCodes.INSUFFICIENT_RESERVES) {
+        if (reasonCode == INSUFFICIENT_RESERVES) {
             return _checkReserveViolation(qc);
-        } else if (reasonCode == WatchdogReasonCodes.STALE_ATTESTATIONS) {
+        } else if (reasonCode == STALE_ATTESTATIONS) {
             return _checkStaleAttestations(qc);
         }
         
@@ -183,7 +184,7 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         view
         returns (address[] memory violatedQCs)
     {
-        if (!reasonCode.isObjectiveViolation()) {
+        if (reasonCode != INSUFFICIENT_RESERVES && reasonCode != STALE_ATTESTATIONS) {
             return new address[](0);
         }
         
