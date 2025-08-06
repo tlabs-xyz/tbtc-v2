@@ -119,7 +119,7 @@ export interface AccountControlFixture {
   systemState: SystemState
   qcMinter: QCMinter
   qcRedeemer: QCRedeemer
-  qcReserveLedger: QCReserveLedger
+  qcQCReserveLedger: QCReserveLedger
   basicMintingPolicy: BasicMintingPolicy
   basicRedemptionPolicy: BasicRedemptionPolicy
   qcWatchdog: QCWatchdog
@@ -189,10 +189,10 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   const QCReserveLedgerFactory = await ethers.getContractFactory(
     "QCReserveLedger"
   )
-  const qcReserveLedger = await QCReserveLedgerFactory.deploy(
+  const qcQCReserveLedger = await QCReserveLedgerFactory.deploy(
     protocolRegistry.address
   )
-  await qcReserveLedger.deployed()
+  await qcQCReserveLedger.deployed()
 
   // Deploy policy contracts
   const BasicMintingPolicyFactory = await ethers.getContractFactory(
@@ -230,7 +230,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     qcRedeemer.address,
     qcData.address,
     systemState.address,
-    qcReserveLedger.address
+    qcQCReserveLedger.address
   )
   await watchdogAutomatedEnforcement.deployed()
 
@@ -274,7 +274,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   )
   await protocolRegistry.setService(
     SERVICE_KEYS.QC_RESERVE_LEDGER,
-    qcReserveLedger.address
+    qcQCReserveLedger.address
   )
   await protocolRegistry.setService(
     SERVICE_KEYS.MINTING_POLICY,
@@ -309,7 +309,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   await qcManager.grantRole(ROLES.REGISTRAR_ROLE, watchdog.address)
   await qcManager.grantRole(ROLES.ARBITER_ROLE, watchdog.address)
   await qcManager.grantRole(ROLES.QC_ADMIN_ROLE, basicMintingPolicy.address) // Grant role to policy for minting
-  await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
+  await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
   await qcWatchdog.grantRole(ROLES.WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
   // Grant roles for Automated Decision Framework
@@ -335,7 +335,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     systemState,
     qcMinter,
     qcRedeemer,
-    qcReserveLedger,
+    qcQCReserveLedger,
     basicMintingPolicy,
     basicRedemptionPolicy,
     qcWatchdog,
@@ -389,10 +389,10 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
   const QCReserveLedgerFactory = await ethers.getContractFactory(
     "QCReserveLedger"
   )
-  const qcReserveLedger = await QCReserveLedgerFactory.deploy(
+  const qcQCReserveLedger = await QCReserveLedgerFactory.deploy(
     protocolRegistry.address
   )
-  await qcReserveLedger.deployed()
+  await qcQCReserveLedger.deployed()
 
   // Deploy policy contracts
   const BasicMintingPolicyFactory = await ethers.getContractFactory(
@@ -446,7 +446,7 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
   )
   await protocolRegistry.setService(
     SERVICE_KEYS.QC_RESERVE_LEDGER,
-    qcReserveLedger.address
+    qcQCReserveLedger.address
   )
   await protocolRegistry.setService(
     SERVICE_KEYS.MINTING_POLICY,
@@ -467,16 +467,16 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
   await qcManager.grantRole(ROLES.REGISTRAR_ROLE, watchdog.address)
   await qcManager.grantRole(ROLES.ARBITER_ROLE, watchdog.address)
   await qcManager.grantRole(ROLES.QC_ADMIN_ROLE, basicMintingPolicy.address) // Grant role to policy for minting
-  await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
+  await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
   await qcWatchdog.grantRole(ROLES.WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
   // Grant roles to QCWatchdog contract so it can call other contracts
   await qcManager.grantRole(ROLES.REGISTRAR_ROLE, qcWatchdog.address)
   await qcManager.grantRole(ROLES.ARBITER_ROLE, qcWatchdog.address)
-  await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, qcWatchdog.address)
+  await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, qcWatchdog.address)
 
   // Grant QCManager the ATTESTER_ROLE so it can update reserves during wallet deregistration
-  await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, qcManager.address)
+  await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, qcManager.address)
 
   // Register SPV validator in protocol registry
   await protocolRegistry.setService(
@@ -493,7 +493,7 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
     systemState,
     qcMinter,
     qcRedeemer,
-    qcReserveLedger,
+    qcQCReserveLedger,
     basicMintingPolicy,
     basicRedemptionPolicy,
     qcWatchdog,
@@ -516,7 +516,7 @@ export async function setupQCWithWallets(
   walletAddresses: string[] = [TEST_DATA.BTC_ADDRESSES.TEST],
   reserveBalance: typeof ethers.BigNumber = TEST_DATA.AMOUNTS.RESERVE_BALANCE
 ) {
-  const { qcData, qcManager, qcReserveLedger, watchdog } = fixture
+  const { qcData, qcManager, qcQCReserveLedger, watchdog } = fixture
 
   // Register QC directly via QCData for testing
   await qcData.registerQC(qcAddress, ethers.utils.parseEther("1000"))
@@ -533,7 +533,7 @@ export async function setupQCWithWallets(
   }, Promise.resolve())
 
   // Submit reserve attestation
-  await qcReserveLedger
+  await qcQCReserveLedger
     .connect(watchdog)
     .submitReserveAttestation(qcAddress, reserveBalance)
 }
@@ -803,7 +803,7 @@ export function validateTestFixture(fixture: AccountControlFixture): void {
     "systemState",
     "qcMinter",
     "qcRedeemer",
-    "qcReserveLedger",
+    "qcQCReserveLedger",
     "basicMintingPolicy",
     "basicRedemptionPolicy",
     "qcWatchdog",

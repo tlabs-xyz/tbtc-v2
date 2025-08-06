@@ -51,7 +51,7 @@ describe("Security Integration Tests", () => {
   let qcData: QCData
   let qcMinter: QCMinter
   let qcRedeemer: QCRedeemer
-  let qcReserveLedger: QCReserveLedger
+  let qcQCReserveLedger: QCReserveLedger
   let basicMintingPolicy: BasicMintingPolicy
   let basicRedemptionPolicy: BasicRedemptionPolicy
   let qcWatchdog: QCWatchdog
@@ -91,7 +91,7 @@ describe("Security Integration Tests", () => {
     qcData = fixture.qcData
     qcMinter = fixture.qcMinter
     qcRedeemer = fixture.qcRedeemer
-    qcReserveLedger = fixture.qcReserveLedger
+    qcQCReserveLedger = fixture.qcQCReserveLedger
     basicMintingPolicy = fixture.basicMintingPolicy
     basicRedemptionPolicy = fixture.basicRedemptionPolicy
     qcWatchdog = fixture.qcWatchdog
@@ -173,7 +173,7 @@ describe("Security Integration Tests", () => {
       .registerWallet(qcAddress.address, TEST_DATA.BTC_ADDRESSES.TEST, challenge, txInfo, proof)
     
     // Submit reserves
-    await qcReserveLedger
+    await qcQCReserveLedger
       .connect(fixture.watchdog)
       .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("5000"))
 
@@ -228,7 +228,7 @@ describe("Security Integration Tests", () => {
       let callbackExecuted = false
 
       // Simulate callback during reserve attestation
-      const originalSubmitAttestation = qcReserveLedger.submitReserveAttestation
+      const originalSubmitAttestation = qcQCReserveLedger.submitReserveAttestation
       
       // Mock to simulate malicious callback
       const mockSubmitAttestation = async (...args: any[]) => {
@@ -236,16 +236,16 @@ describe("Security Integration Tests", () => {
           callbackExecuted = true
           // Attempt reentrant attestation
           await expect(
-            qcReserveLedger
+            qcQCReserveLedger
               .connect(fixture.watchdog)
               .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("6000"))
           ).to.not.be.reverted // Second call should succeed (not reentrant)
         }
-        return originalSubmitAttestation.apply(qcReserveLedger, args)
+        return originalSubmitAttestation.apply(qcQCReserveLedger, args)
       }
 
       // Execute attestation
-      await qcReserveLedger
+      await qcQCReserveLedger
         .connect(fixture.watchdog)
         .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("5500"))
 
@@ -292,7 +292,7 @@ describe("Security Integration Tests", () => {
 
       // Attacker tries to manipulate reserve ledger
       await expect(
-        qcReserveLedger
+        qcQCReserveLedger
           .connect(attacker)
           .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("99999"))
       ).to.be.revertedWith("AccessControl")
@@ -400,26 +400,26 @@ describe("Security Integration Tests", () => {
     it("should prevent reserve manipulation for minting", async () => {
       // Attacker tries to submit false high reserves to enable excessive minting
       await expect(
-        qcReserveLedger
+        qcQCReserveLedger
           .connect(attacker)
           .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("99999"))
       ).to.be.revertedWith("AccessControl")
 
       // Even with accomplice who has attester role
-      await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, accomplice.address)
+      await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, accomplice.address)
       
       // Accomplice submits inflated reserves
-      await qcReserveLedger
+      await qcQCReserveLedger
         .connect(accomplice)
         .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("50000"))
 
       // But other attesters can contradict with real values
-      await qcReserveLedger
+      await qcQCReserveLedger
         .connect(fixture.watchdog)
         .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("5000"))
 
       // System should use most recent or consensus value
-      const [currentReserves] = await qcReserveLedger.getReserveBalanceAndStaleness(
+      const [currentReserves] = await qcQCReserveLedger.getReserveBalanceAndStaleness(
         qcAddress.address
       )
       expect(currentReserves).to.equal(ethers.utils.parseEther("5000"))
@@ -673,7 +673,7 @@ describe("Security Integration Tests", () => {
 
       // Attacker tries to corrupt reserve data
       await expect(
-        qcReserveLedger
+        qcQCReserveLedger
           .connect(attacker)
           .submitReserveAttestation(qcAddress.address, 0)
       ).to.be.revertedWith("AccessControl")
@@ -688,7 +688,7 @@ describe("Security Integration Tests", () => {
       // But can try to exploit time-dependent logic
 
       // Submit attestation
-      await qcReserveLedger
+      await qcQCReserveLedger
         .connect(fixture.watchdog)
         .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("5100"))
 
@@ -696,7 +696,7 @@ describe("Security Integration Tests", () => {
       await helpers.time.increase(86400 + 1) // 24 hours + 1 second
 
       // Check staleness
-      const [, isStale] = await qcReserveLedger.getReserveBalanceAndStaleness(
+      const [, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(
         qcAddress.address
       )
       expect(isStale).to.be.true

@@ -51,7 +51,7 @@ describe("End-to-End User Journeys", () => {
   let qcData: QCData
   let qcMinter: QCMinter
   let qcRedeemer: QCRedeemer
-  let qcReserveLedger: QCReserveLedger
+  let qcQCReserveLedger: QCReserveLedger
   let basicMintingPolicy: BasicMintingPolicy
   let basicRedemptionPolicy: BasicRedemptionPolicy
   let qcWatchdog: QCWatchdog
@@ -94,7 +94,7 @@ describe("End-to-End User Journeys", () => {
     qcData = fixture.qcData
     qcMinter = fixture.qcMinter
     qcRedeemer = fixture.qcRedeemer
-    qcReserveLedger = fixture.qcReserveLedger
+    qcQCReserveLedger = fixture.qcQCReserveLedger
     basicMintingPolicy = fixture.basicMintingPolicy
     basicRedemptionPolicy = fixture.basicRedemptionPolicy
     qcWatchdog = fixture.qcWatchdog
@@ -182,7 +182,7 @@ describe("End-to-End User Journeys", () => {
         protocolRegistry,
         qcData,
         qcManager,
-        qcReserveLedger,
+        qcQCReserveLedger,
         systemState,
         qcMinter,
         qcRedeemer,
@@ -242,7 +242,7 @@ describe("End-to-End User Journeys", () => {
       
       // 2.1 Watchdog updates reserve attestation (simulate BTC price movement)
       const updatedReserves = QC_RESERVE_BALANCE.add(ethers.utils.parseEther("500"))
-      await qcReserveLedger
+      await qcQCReserveLedger
         .connect(fixture.watchdog)
         .submitReserveAttestation(qcAddress.address, updatedReserves)
 
@@ -566,7 +566,7 @@ describe("End-to-End User Journeys", () => {
       
       // 1.1 QC reserves drop dramatically (simulate major loss)
       const criticalReserves = ethers.utils.parseEther("800") // Below total minted
-      await qcReserveLedger
+      await qcQCReserveLedger
         .connect(fixture.watchdog)
         .submitReserveAttestation(qcAddress.address, criticalReserves)
 
@@ -700,7 +700,7 @@ describe("End-to-End User Journeys", () => {
       }
 
       // Wave 3: Watchdog updates reserves during user operations
-      const attestationPromise = qcReserveLedger
+      const attestationPromise = qcQCReserveLedger
         .connect(fixture.watchdog)
         .submitReserveAttestation(
           qcAddress.address,
@@ -725,7 +725,7 @@ describe("End-to-End User Journeys", () => {
       expect(await qcData.getQCMintedAmount(qcAddress.address)).to.equal(totalMinted)
 
       // System remains consistent
-      const [currentReserves] = await qcReserveLedger.getReserveBalanceAndStaleness(
+      const [currentReserves] = await qcQCReserveLedger.getReserveBalanceAndStaleness(
         qcAddress.address
       )
       expect(currentReserves).to.equal(
@@ -762,7 +762,7 @@ describe("End-to-End User Journeys", () => {
       
       // Malicious actor tries to submit false reserve attestation
       await expect(
-        qcReserveLedger
+        qcQCReserveLedger
           .connect(maliciousActor)
           .submitReserveAttestation(
             qcAddress.address,

@@ -18,7 +18,7 @@ const func: DeployFunction = async function DeployAccountControlPolicies(
   // Deploy QCReserveLedger - Reserve attestation system
   const qcReserveLedger = await deploy("QCReserveLedger", {
     from: deployer,
-    args: [protocolRegistry.address],
+    args: [],
     log: true,
     waitConfirmations: helpers.network?.confirmations || 1,
   })

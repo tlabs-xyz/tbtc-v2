@@ -1,14 +1,14 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 
-const func: DeployFunction = async function DeployReserveLedger(
+const func: DeployFunction = async function DeployQCReserveLedger(
   hre: HardhatRuntimeEnvironment
 ) {
   const { getNamedAccounts, deployments } = hre
   const { deployer } = await getNamedAccounts()
   const { deploy, log, get } = deployments
 
-  log("Deploying ReserveLedger System...")
+  log("Deploying QCReserveLedger System...")
 
   // Get required contracts
   const qcManager = await get("QCManager")
@@ -23,14 +23,14 @@ const func: DeployFunction = async function DeployReserveLedger(
   })
   log(`✅ WatchdogReasonCodes deployed at ${watchdogReasonCodes.address}`)
 
-  // Deploy ReserveLedger (unified oracle + ledger)
-  log("Deploying ReserveLedger...")
-  const reserveLedger = await deploy("ReserveLedger", {
+  // Deploy QCReserveLedger (unified oracle + ledger)
+  log("Deploying QCReserveLedger...")
+  const reserveLedger = await deploy("QCReserveLedger", {
     from: deployer,
     args: [],
     log: true,
   })
-  log(`✅ ReserveLedger deployed at ${reserveLedger.address}`)
+  log(`✅ QCReserveLedger deployed at ${reserveLedger.address}`)
 
   // Deploy WatchdogReporting
   log("Deploying WatchdogReporting...")
@@ -57,18 +57,18 @@ const func: DeployFunction = async function DeployReserveLedger(
   })
   log(`✅ WatchdogEnforcer deployed at ${watchdogEnforcer.address}`)
 
-  log("✨ ReserveLedger System deployment complete!")
+  log("✨ QCReserveLedger System deployment complete!")
   log("")
   log("Deployed contracts:")
   log(`  - WatchdogReasonCodes: ${watchdogReasonCodes.address}`)
-  log(`  - ReserveLedger: ${reserveLedger.address}`)
+  log(`  - QCReserveLedger: ${reserveLedger.address}`)
   log(`  - WatchdogReporting: ${watchdogReporting.address}`)
   log(`  - WatchdogEnforcer: ${watchdogEnforcer.address}`)
   log("")
   log("Next steps: Run 99_configure_account_control_system.ts to configure roles and connections")
 }
 
-func.tags = ["ReserveLedger", "Watchdog"]
+func.tags = ["QCReserveLedger", "Watchdog"]
 func.dependencies = ["QCManager", "QCData", "SystemState"]
 
 export default func

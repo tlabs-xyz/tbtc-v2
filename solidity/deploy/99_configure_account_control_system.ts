@@ -18,7 +18,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const qcData = await get("QCData")
   const systemState = await get("SystemState")
   const qcManager = await get("QCManager")
-  const reserveLedger = await get("ReserveLedger")
+  const reserveLedger = await get("QCReserveLedger")
   const basicMintingPolicy = await get("BasicMintingPolicy")
   const basicRedemptionPolicy = await get("BasicRedemptionPolicy")
   const tbtc = await get("TBTC")
@@ -44,7 +44,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     { key: QC_DATA_KEY, address: qcData.address, name: "QCData" },
     { key: SYSTEM_STATE_KEY, address: systemState.address, name: "SystemState" },
     { key: QC_MANAGER_KEY, address: qcManager.address, name: "QCManager" },
-    { key: QC_RESERVE_LEDGER_KEY, address: reserveLedger.address, name: "ReserveLedger" },
+    { key: QC_RESERVE_LEDGER_KEY, address: reserveLedger.address, name: "QCReserveLedger" },
     { key: MINTING_POLICY_KEY, address: basicMintingPolicy.address, name: "BasicMintingPolicy" },
     { key: REDEMPTION_POLICY_KEY, address: basicRedemptionPolicy.address, name: "BasicRedemptionPolicy" },
     { key: WATCHDOG_REPORTING_KEY, address: watchdogReporting.address, name: "WatchdogSubjectiveReporting" },
@@ -62,25 +62,25 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     log(`  ✅ Registered ${service.name}`)
   }
 
-  // Step 2: Configure ReserveLedger roles
-  log("Step 2: Configuring ReserveLedger roles...")
+  // Step 2: Configure QCReserveLedger roles
+  log("Step 2: Configuring QCReserveLedger roles...")
   
   // Grant MANAGER_ROLE to QCManager for administrative updates
   const MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")
   await execute(
-    "ReserveLedger",
+    "QCReserveLedger",
     { from: deployer, log: true },
     "grantRole",
     MANAGER_ROLE,
     qcManager.address
   )
-  log("  ✅ MANAGER_ROLE granted to QCManager in ReserveLedger")
+  log("  ✅ MANAGER_ROLE granted to QCManager in QCReserveLedger")
   
   // Grant ATTESTER_ROLE to relevant attesters (can be expanded later)
   const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
   // For now, grant to deployer for testing
   await execute(
-    "ReserveLedger",
+    "QCReserveLedger",
     { from: deployer, log: true },
     "grantRole",
     ATTESTER_ROLE,
