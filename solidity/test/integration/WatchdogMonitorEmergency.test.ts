@@ -26,7 +26,7 @@ describe("WatchdogMonitor Emergency Detection Tests", () => {
   let watchdogMonitor: WatchdogMonitor
   let systemState: SystemState
   let qcManager: QCManager
-  let qcReserveLedger: QCReserveLedger
+  let qcQCReserveLedger: QCReserveLedger
   let qcRedeemer: QCRedeemer
 
   let qcWatchdog1: QCWatchdog
@@ -44,32 +44,32 @@ describe("WatchdogMonitor Emergency Detection Tests", () => {
     watchdogMonitor = await helpers.contracts.getContract("WatchdogMonitor")
     systemState = await helpers.contracts.getContract("SystemState")
     qcManager = await helpers.contracts.getContract("QCManager")
-    qcReserveLedger = await helpers.contracts.getContract("QCReserveLedger")
+    qcQCReserveLedger = await helpers.contracts.getContract("QCReserveLedger")
     qcRedeemer = await helpers.contracts.getContract("QCRedeemer")
 
     // Deploy watchdog instances
     const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
     qcWatchdog1 = await QCWatchdog.deploy(
       qcManager.address,
-      qcReserveLedger.address,
+      qcQCReserveLedger.address,
       qcRedeemer.address,
       systemState.address
     )
     qcWatchdog2 = await QCWatchdog.deploy(
       qcManager.address,
-      qcReserveLedger.address,
+      qcQCReserveLedger.address,
       qcRedeemer.address,
       systemState.address
     )
     qcWatchdog3 = await QCWatchdog.deploy(
       qcManager.address,
-      qcReserveLedger.address,
+      qcQCReserveLedger.address,
       qcRedeemer.address,
       systemState.address
     )
     qcWatchdog4 = await QCWatchdog.deploy(
       qcManager.address,
-      qcReserveLedger.address,
+      qcQCReserveLedger.address,
       qcRedeemer.address,
       systemState.address
     )

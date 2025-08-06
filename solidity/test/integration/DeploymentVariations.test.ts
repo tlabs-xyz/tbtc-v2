@@ -22,8 +22,8 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
       const qcManager = await deployments.get("QCManager")
       expect(qcManager.address).to.not.equal(ethers.constants.AddressZero)
 
-      const qcReserveLedger = await deployments.get("QCReserveLedger")
-      expect(qcReserveLedger.address).to.not.equal(ethers.constants.AddressZero)
+      const qcQCReserveLedger = await deployments.get("QCReserveLedger")
+      expect(qcQCReserveLedger.address).to.not.equal(ethers.constants.AddressZero)
 
       const qcRedeemer = await deployments.get("QCRedeemer")
       expect(qcRedeemer.address).to.not.equal(ethers.constants.AddressZero)
@@ -84,13 +84,13 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
       // Deploy a QCWatchdog instance
       const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
       const qcManager = await helpers.contracts.getContract("QCManager")
-      const qcReserveLedger = await helpers.contracts.getContract("QCReserveLedger")
+      const qcQCReserveLedger = await helpers.contracts.getContract("QCReserveLedger")
       const qcRedeemer = await helpers.contracts.getContract("QCRedeemer")
       const systemState = await helpers.contracts.getContract("SystemState")
 
       const qcWatchdog = await QCWatchdog.deploy(
         qcManager.address,
-        qcReserveLedger.address,
+        qcQCReserveLedger.address,
         qcRedeemer.address,
         systemState.address
       )
@@ -116,7 +116,7 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
           qc1.address,
           ethers.utils.parseEther("100")
         )
-      ).to.emit(qcReserveLedger, "ReservesAttested")
+      ).to.emit(qcQCReserveLedger, "ReservesAttested")
     })
   })
 
@@ -274,14 +274,14 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
       expect(qcData.isActive).to.be.true
       
       // Can still perform V1.1 operations
-      const qcReserveLedger = await helpers.contracts.getContract("QCReserveLedger")
+      const qcQCReserveLedger = await helpers.contracts.getContract("QCReserveLedger")
       const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
       const qcRedeemer = await helpers.contracts.getContract("QCRedeemer")
       const systemState = await helpers.contracts.getContract("SystemState")
       
       const qcWatchdog = await QCWatchdog.deploy(
         qcManager.address,
-        qcReserveLedger.address,
+        qcQCReserveLedger.address,
         qcRedeemer.address,
         systemState.address
       )
@@ -297,7 +297,7 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
           qc1.address,
           ethers.utils.parseEther("100")
         )
-      ).to.emit(qcReserveLedger, "ReservesAttested")
+      ).to.emit(qcQCReserveLedger, "ReservesAttested")
     })
   })
 

@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./ProtocolRegistry.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
-import "./ReserveLedger.sol";
+import "./QCReserveLedger.sol";
 import "../bridge/BitcoinTx.sol";
 import "./interfaces/ISPVValidator.sol";
 
@@ -589,7 +589,7 @@ contract QCManager is AccessControl {
         address ledgerAddress = protocolRegistry.getService(
             QC_RESERVE_LEDGER_KEY
         );
-        ReserveLedger reserveLedger = ReserveLedger(ledgerAddress);
+        QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
         return reserveLedger.getReserveBalanceAndStaleness(qc);
     }
 
@@ -621,7 +621,7 @@ contract QCManager is AccessControl {
         address ledgerAddress = protocolRegistry.getService(
             QC_RESERVE_LEDGER_KEY
         );
-        ReserveLedger reserveLedger = ReserveLedger(ledgerAddress);
+        QCReserveLedger reserveLedger = QCReserveLedger(ledgerAddress);
         reserveLedger.updateReserveBalance(qc, newBalance);
 
         emit ReserveBalanceUpdated(

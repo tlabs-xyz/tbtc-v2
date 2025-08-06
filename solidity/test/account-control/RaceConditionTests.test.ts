@@ -68,7 +68,7 @@ describe("Race Condition Tests", () => {
      */
     context("Solvency Check During Reserve Updates", () => {
       it("should handle concurrent solvency check with reserve attestation", async () => {
-        const { qcManager, qcReserveLedger, watchdog, qcAddress, qcData } =
+        const { qcManager, qcQCReserveLedger, watchdog, qcAddress, qcData } =
           fixture
 
         // Setup: QC has some minted amount
@@ -87,7 +87,7 @@ describe("Race Condition Tests", () => {
           .verifyQCSolvency(qcAddress.address)
 
         // Immediately update reserves (simulating concurrent operation)
-        const reservePromise = qcReserveLedger
+        const reservePromise = qcQCReserveLedger
           .connect(watchdog)
           .submitReserveAttestation(qcAddress.address, lowReserves)
 
@@ -97,7 +97,7 @@ describe("Race Condition Tests", () => {
         // Final state should be consistent
         const finalStatus = await qcData.getQCStatus(qcAddress.address)
         const [finalReserves] =
-          await qcReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+          await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
 
         // Due to race condition, the solvency check might have read old reserves
         // Run another solvency check to ensure final state consistency
@@ -114,7 +114,7 @@ describe("Race Condition Tests", () => {
       })
 
       it("should prevent inconsistent state from rapid reserve updates", async () => {
-        const { qcReserveLedger, qcManager, watchdog, qcAddress, qcData } =
+        const { qcQCReserveLedger, qcManager, watchdog, qcAddress, qcData } =
           fixture
 
         // Setup: QC with minted amount
@@ -133,7 +133,7 @@ describe("Race Condition Tests", () => {
 
         // Submit rapid reserve updates
         const promises = reserves.map((reserve) =>
-          qcReserveLedger
+          qcQCReserveLedger
             .connect(watchdog)
             .submitReserveAttestation(qcAddress.address, reserve)
         )
@@ -144,7 +144,7 @@ describe("Race Condition Tests", () => {
         await qcManager.connect(watchdog).verifyQCSolvency(qcAddress.address)
 
         const [finalReserves] =
-          await qcReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+          await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
         const finalStatus = await qcData.getQCStatus(qcAddress.address)
 
         // Status should match the final reserve state
@@ -366,7 +366,7 @@ describe("Race Condition Tests", () => {
 
     context("Wallet Deregistration Race Conditions", () => {
       it("should prevent wallet deregistration bypassing solvency checks", async () => {
-        const { qcManager, qcReserveLedger, watchdog, qcAddress, qcData } =
+        const { qcManager, qcQCReserveLedger, watchdog, qcAddress, qcData } =
           fixture
 
         const testWallet = TEST_DATA.BTC_ADDRESSES.TEST
@@ -389,7 +389,7 @@ describe("Race Condition Tests", () => {
           .connect(watchdog)
           .finalizeWalletDeRegistration(testWallet, newReserves)
 
-        const reservePromise = qcReserveLedger
+        const reservePromise = qcQCReserveLedger
           .connect(watchdog)
           .submitReserveAttestation(qcAddress.address, newReserves)
 

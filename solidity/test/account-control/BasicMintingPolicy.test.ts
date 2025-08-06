@@ -34,7 +34,7 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
   let qcManager: QCManager
   let qcData: QCData
   let systemState: SystemState
-  let qcReserveLedger: QCReserveLedger
+  let qcQCReserveLedger: QCReserveLedger
 
   const MINTER_ROLE = ethers.utils.keccak256(
     ethers.utils.toUtf8Bytes("MINTER_ROLE")
@@ -93,10 +93,10 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
     const QCReserveLedgerFactory = await ethers.getContractFactory(
       "QCReserveLedger"
     )
-    qcReserveLedger = await QCReserveLedgerFactory.deploy(
+    qcQCReserveLedger = await QCReserveLedgerFactory.deploy(
       protocolRegistry.address
     )
-    await qcReserveLedger.deployed()
+    await qcQCReserveLedger.deployed()
 
     // Deploy BasicMintingPolicy
     const BasicMintingPolicyFactory = await ethers.getContractFactory(
@@ -127,7 +127,7 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
     await protocolRegistry.setService(QC_MANAGER_KEY, qcManager.address)
     await protocolRegistry.setService(
       QC_RESERVE_LEDGER_KEY,
-      qcReserveLedger.address
+      qcQCReserveLedger.address
     )
     await protocolRegistry.setService(
       MINTING_POLICY_KEY,
@@ -170,11 +170,11 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
       // Simulate reserve attestation (QC has sufficient reserves)
       const QC_RESERVE_LEDGER_KEY = ethers.utils.id("QC_RESERVE_LEDGER")
       const reserveBalance = ethers.utils.parseEther("100") // 100 tBTC reserves
-      await qcReserveLedger.grantRole(
+      await qcQCReserveLedger.grantRole(
         ethers.utils.id("ATTESTER_ROLE"),
         deployer.address
       )
-      await qcReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
+      await qcQCReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
     })
 
     it("should mint tBTC directly through Bank integration", async () => {
@@ -287,11 +287,11 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
 
       // Simulate reserve attestation (QC has sufficient reserves)
       const reserveBalance = ethers.utils.parseEther("100") // 100 tBTC reserves
-      await qcReserveLedger.grantRole(
+      await qcQCReserveLedger.grantRole(
         ethers.utils.id("ATTESTER_ROLE"),
         deployer.address
       )
-      await qcReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
+      await qcQCReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
     })
 
     it("should track mint requests", async () => {
@@ -328,11 +328,11 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
 
       // Simulate reserve attestation (QC has sufficient reserves)
       const reserveBalance = ethers.utils.parseEther("100") // 100 tBTC reserves
-      await qcReserveLedger.grantRole(
+      await qcQCReserveLedger.grantRole(
         ethers.utils.id("ATTESTER_ROLE"),
         deployer.address
       )
-      await qcReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
+      await qcQCReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
     })
 
     it("should use less gas than QCBridge approach", async () => {
@@ -357,11 +357,11 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
     beforeEach(async () => {
       // Simulate reserve attestation (QC has sufficient reserves)
       const reserveBalance = ethers.utils.parseEther("100") // 100 tBTC reserves
-      await qcReserveLedger.grantRole(
+      await qcQCReserveLedger.grantRole(
         ethers.utils.id("ATTESTER_ROLE"),
         deployer.address
       )
-      await qcReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
+      await qcQCReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
     })
 
     it("should only allow MINTER_ROLE to request mints", async () => {

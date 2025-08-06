@@ -29,7 +29,7 @@ describe("Service Lookup Error Handling", () => {
   let mockSpvValidator: FakeContract<SPVValidator>
   let mockQcData: FakeContract<QCData>
   let mockSystemState: FakeContract<SystemState>
-  let mockReserveLedger: FakeContract<QCReserveLedger>
+  let mockQCReserveLedger: FakeContract<QCReserveLedger>
   let mockTbtc: FakeContract<TBTC>
 
   const QC_MANAGER_KEY = ethers.utils.id("QC_MANAGER")
@@ -53,7 +53,7 @@ describe("Service Lookup Error Handling", () => {
     mockSpvValidator = await smock.fake<SPVValidator>("SPVValidator")
     mockQcData = await smock.fake<QCData>("QCData")
     mockSystemState = await smock.fake<SystemState>("SystemState")
-    mockReserveLedger = await smock.fake<QCReserveLedger>("QCReserveLedger")
+    mockQCReserveLedger = await smock.fake<QCReserveLedger>("QCReserveLedger")
     mockTbtc = await smock.fake<TBTC>("TBTC")
 
     // Register services
@@ -217,7 +217,7 @@ describe("Service Lookup Error Handling", () => {
       )
       await protocolRegistry.setService(
         QC_RESERVE_LEDGER_KEY,
-        mockReserveLedger.address
+        mockQCReserveLedger.address
       )
 
       // Setup SPV validator mock
@@ -225,7 +225,7 @@ describe("Service Lookup Error Handling", () => {
       mockSpvValidator.verifyRedemptionFulfillment.returns(true)
 
       // Setup reserve ledger mock
-      mockReserveLedger.getReserveBalanceAndStaleness.returns([
+      mockQCReserveLedger.getReserveBalanceAndStaleness.returns([
         ethers.utils.parseEther("100"),
         false,
       ])
