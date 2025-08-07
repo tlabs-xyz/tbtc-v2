@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 ///      to protect against up to 50% malicious attesters.
 contract QCReserveLedger is AccessControl {
     bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
+    bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
     
     struct ReserveData {
         uint256 balance;
@@ -60,6 +61,13 @@ contract QCReserveLedger is AccessControl {
         uint256 timestamp
     );
     
+    event ForcedConsensusReached(
+        address indexed qc,
+        uint256 consensusBalance,
+        uint256 attestationCount,
+        address indexed arbiter
+    );
+    
     event ConsensusThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
     event AttestationTimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
     event MaxStalenessUpdated(uint256 oldStaleness, uint256 newStaleness);
@@ -71,6 +79,7 @@ contract QCReserveLedger is AccessControl {
     
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(ARBITER_ROLE, msg.sender);
     }
     
     /// @notice Submit an attestation for a QC's reserve balance
@@ -134,6 +143,47 @@ contract QCReserveLedger is AccessControl {
         uint256 oldStaleness = maxStaleness;
         maxStaleness = newStaleness;
         emit MaxStalenessUpdated(oldStaleness, newStaleness);
+    }
+    
+    /// @notice Force consensus with available attestations (emergency use only)
+    /// @dev Only ARBITER can call when consensus cannot be reached naturally.
+    ///      Requires at least one valid attestation to prevent arbitrary updates.
+    /// @param qc The QC address to force consensus for
+    function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) {
+        address[] memory attesters = pendingAttesters[qc];
+        uint256 validCount = 0;
+        uint256[] memory validBalances = new uint256[](attesters.length);
+        
+        // Collect valid attestations within timeout window (same logic as _attemptConsensus)
+        for (uint256 i = 0; i < attesters.length; i++) {
+            PendingAttestation memory attestation = pendingAttestations[qc][attesters[i]];
+            
+            // Check if attestation is still valid (not expired)
+            if (block.timestamp <= attestation.timestamp + attestationTimeout) {
+                validBalances[validCount] = attestation.balance;
+                validCount++;
+            }
+        }
+        
+        // SAFETY: Require at least ONE valid attestation to prevent arbitrary balance setting
+        require(validCount > 0, "No valid attestations to force consensus");
+        
+        // Calculate median of available valid balances
+        uint256 consensusBalance = _calculateMedian(validBalances, validCount);
+        
+        // Update reserve data
+        uint256 oldBalance = reserves[qc].balance;
+        reserves[qc] = ReserveData({
+            balance: consensusBalance,
+            lastUpdateTimestamp: block.timestamp
+        });
+        
+        // Clear pending attestations for this QC
+        _clearPendingAttestations(qc);
+        
+        // Emit both forced consensus and regular reserve update events
+        emit ForcedConsensusReached(qc, consensusBalance, validCount, msg.sender);
+        emit ReserveUpdated(qc, oldBalance, consensusBalance, block.timestamp);
     }
     
     

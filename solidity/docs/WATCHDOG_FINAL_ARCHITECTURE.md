@@ -74,6 +74,20 @@ The single interface consensus-based design is more secure than oracle/ledger se
 3. **Byzantine Fault Tolerance**: Built-in consensus provides stronger security than external oracle
 4. **Gas Efficiency**: No additional contract calls for consensus operations
 
+**Emergency Consensus Mechanism** (Added August 2025):
+- **Function**: `forceConsensus(address qc)` - ARBITER_ROLE only
+- **Purpose**: Break consensus deadlocks when insufficient attestations prevent normal consensus
+- **Safety**: Requires at least 1 valid attestation to prevent arbitrary balance setting
+- **Use Case**: After QC enters UnderReview due to stale attestations, ARBITER can force consensus with available fresh attestations
+- **Workflow**:
+  1. Normal consensus fails (< 3 attestations)
+  2. Reserves become stale after 24 hours
+  3. Anyone calls `enforceObjectiveViolation()` for STALE_ATTESTATIONS
+  4. QC enters UnderReview status
+  5. Attesters can continue submitting fresh attestations
+  6. ARBITER calls `forceConsensus()` using available attestations
+  7. Reserve balance updated, QC can be restored to Active
+
 ---
 
 ### 3. WatchdogEnforcer Contract
