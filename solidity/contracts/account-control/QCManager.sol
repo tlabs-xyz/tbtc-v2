@@ -515,16 +515,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
 
         // If insolvent, change status to UnderReview 
         if (!solvent && qcData.getQCStatus(qc) == QCData.QCStatus.Active) {
-            bytes32 reason = "UNDERCOLLATERALIZED";
-            qcData.setQCStatus(qc, QCData.QCStatus.UnderReview, reason);
-            emit QCStatusChanged(
-                qc,
-                QCData.QCStatus.Active,
-                QCData.QCStatus.UnderReview,
-                reason,
-                msg.sender,
-                block.timestamp
-            );
+            bytes32 reason = keccak256("UNDERCOLLATERALIZED");
+            _executeStatusChange(qc, QCData.QCStatus.UnderReview, reason, "ARBITER");
         }
 
         emit SolvencyCheckPerformed(
