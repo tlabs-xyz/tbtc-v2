@@ -273,27 +273,94 @@ The system separates concerns into:
 - Historical reserve tracking and validation
 - Direct integration with WatchdogEnforcer for violation detection
 
-**Key Operations**:
-- `submitAttestation(address qc, uint256 balance)` - Attesters submit reserve observations
-- `getLatestReserves(address qc)` - Returns latest consensus reserve balance
-- Automatic staleness flagging for monitoring systems
+**Core Functions**:
+```solidity
+function submitAttestation(address qc, uint256 balance) external onlyRole(ATTESTER_ROLE)
+function getReserveBalanceAndStaleness(address qc) external view returns (uint256, bool)
+function getLatestReserves(address qc) external view returns (uint256)
+function isReserveStale(address qc) external view returns (bool isStale, uint256 timeSinceUpdate)
+function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) // Emergency consensus
+```
+
+**Consensus Parameters**:
+- `consensusThreshold`: 3 attestations required (configurable)
+- `attestationTimeout`: 6 hours window for valid attestations  
+- `maxStaleness`: 24 hours before data considered stale
+
+**Consensus Algorithm**:
+- **Byzantine Fault Tolerance**: Median calculation protects against up to 50% malicious attesters
+- **Efficient Implementation**: Insertion sort + median for small attester sets (≤10 attesters)
+- **Threshold Protection**: Requires minimum 3 attestations before any balance update
+- **Atomic Operations**: Consensus and storage happen atomically to prevent inconsistencies
+
+**Emergency Consensus Mechanism**:
+- **Function**: `forceConsensus(address qc)` - ARBITER_ROLE only
+- **Purpose**: Break consensus deadlocks when insufficient attestations prevent normal consensus  
+- **Safety**: Requires at least 1 valid attestation to prevent arbitrary balance setting
+- **Use Case**: After QC enters UnderReview due to stale attestations, ARBITER can force consensus with available fresh attestations
+
+**Emergency Consensus Workflow**:
+1. Normal consensus fails (< 3 attestations)
+2. Reserves become stale after 24 hours
+3. Anyone calls `enforceObjectiveViolation()` for STALE_ATTESTATIONS
+4. QC enters UnderReview status  
+5. Attesters continue submitting fresh attestations
+6. ARBITER calls `forceConsensus()` using available attestations
+7. Reserve balance updated, QC can be restored to Active
 
 ### 2. WatchdogEnforcer.sol
 
-**Purpose**: Automated enforcement of objective violations
+**Purpose**: Automated enforcement of objective violations with time-based escalation
 
 **Key Features**:
 - **Permissionless Design**: Anyone can trigger enforcement for violations
 - **Limited Authority**: Can only set QCs to UnderReview status (human oversight for final decisions)
 - **Objective Only**: Monitors only machine-verifiable conditions
-- **Escalation System**: 45-minute delay for critical violations to allow human intervention
+- **Time-Based Escalation**: 45-minute delay for critical violations before emergency pause
+- **Byzantine Fault Tolerance**: Works with QCReserveLedger consensus data
 
-**Monitored Violations**:
-- Insufficient reserves (collateral ratio violations)
-- Stale attestations (outdated reserve data)  
-- Sustained reserve violations
-- Built-in reason codes (inlined, not separate library)
+**Core Functions**:
+```solidity
+function enforceObjectiveViolation(address qc, bytes32 reasonCode) external
+function checkViolation(address qc, bytes32 reasonCode) external view returns (bool violated, string memory reason)
+function batchCheckViolations(address[] calldata qcs, bytes32 reasonCode) external view returns (address[] memory violatedQCs)
+function checkEscalation(address qc) external // 45-minute escalation trigger
+function clearEscalationTimer(address qc) external // Timer cleanup
+```
 
+**Supported Violations**:
+```solidity
+bytes32 constant INSUFFICIENT_RESERVES = keccak256("INSUFFICIENT_RESERVES");
+bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
+bytes32 constant SUSTAINED_RESERVE_VIOLATION = keccak256("SUSTAINED_RESERVE_VIOLATION");
+```
+
+**Expected Usage Pattern**:
+- **Primary callers**: Watchdogs who continuously monitor QC compliance
+- **Secondary callers**: Automated monitoring systems, community members, other participants
+- **Resilience design**: Permissionless nature ensures system integrity even if watchdogs fail to act
+
+**Escalation Flow**:
+1. Violation detected → QC set to UnderReview (immediate human oversight)
+2. 45-minute grace period for resolution (legal compliance)
+3. If unresolved → automatic emergency pause (safety net)
+
+### System Role Architecture
+
+The watchdog system implements a clear role hierarchy for security and operational separation:
+
+| Role | Purpose | Contracts | Authority |
+|------|---------|-----------|-----------|
+| **ATTESTER_ROLE** | Submit reserve attestations | QCReserveLedger | Submit balance observations |
+| **ARBITER_ROLE** | Emergency consensus & enforcement | QCReserveLedger, WatchdogEnforcer | Force consensus, QC status changes |
+| **PAUSER_ROLE** | Emergency pause controls | SystemState | Emergency pause/unpause QCs |
+| **DEFAULT_ADMIN_ROLE** | System administration | All contracts | Grant/revoke roles |
+
+**Role Design Principles**:
+- **No overlapping definitions** - Each role has distinct, non-overlapping permissions
+- **Clear separation of concerns** - Roles map to specific operational functions
+- **Standardized across contracts** - Consistent role naming and usage patterns
+- **Hierarchical escalation** - Clear escalation path from monitoring → enforcement → emergency action
 
 ---
 
@@ -526,11 +593,45 @@ The tBTC v2 Account Control architecture represents a sophisticated balance of a
 
 The architecture's strength lies in its ability to evolve - from the current v1 production system through automation toward future crypto-economic trust-minimization - all while maintaining interface stability and operational continuity.
 
+## Complete System Overview
+
+The Account Control system consists of:
+
+### Core Account Control Infrastructure (13 contracts)
+- QCManager.sol - QC lifecycle management
+- QCData.sol - QC state and data storage
+- BasicMintingPolicy.sol - Direct Bank integration for minting
+- BasicRedemptionPolicy.sol - Redemption policy implementation
+- QCMinter.sol - User-facing minting interface
+- QCRedeemer.sol - User-facing redemption interface
+- SystemState.sol - Global system parameters and emergency controls
+- ProtocolRegistry.sol - Service discovery and upgrades
+- SPVValidator.sol - Bitcoin SPV proof validation
+- BitcoinAddressUtils.sol - Bitcoin address utilities
+- QCReserveLedger.sol - Multi-attester consensus and storage
+- WatchdogEnforcer.sol - Permissionless objective enforcement
+- WatchdogReasonCodes.sol - Machine-readable violation codes
+
+### Interface Contracts (3 interfaces)
+- IMintingPolicy.sol - Minting policy interface
+- IRedemptionPolicy.sol - Redemption policy interface  
+- ISPVValidator.sol - SPV validation interface
+
+**Total System**: 13 contracts + 3 interfaces = **16 total files**
+
+The result is a comprehensive system that is:
+- **Focused**: Clear separation of concerns between components
+- **Secure**: Multiple validation layers and Byzantine fault tolerance
+- **Efficient**: Direct integration and optimized algorithms
+- **Maintainable**: Clean, well-documented modular architecture
+- **Future-Proof**: Upgradeable policies with stable core interfaces
+
 This comprehensive specification serves as the definitive reference for understanding, deploying, and maintaining the complete Account Control system across all architectural versions and operational environments.
 
 ---
 
 **Document History**:
+- v3.0 (2025-08-06): Final consolidated architecture specification
 - v2.0 (2025-08-04): Consolidated architecture specification
-- Combines: ARCHITECTURE.md, v1 specification, and Future Enhancements
-- Covers: Complete v1 production + automation framework
+- Combines: ARCHITECTURE.md, WATCHDOG_FINAL_ARCHITECTURE.md, v1 specification, and Future Enhancements
+- Covers: Complete v1 production + automation framework + emergency consensus
