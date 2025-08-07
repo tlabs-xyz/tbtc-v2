@@ -552,7 +552,7 @@ The tBTC v2 Account Control architecture represents a sophisticated balance of a
 - **Future-proof evolution** via policy-driven architecture
 - **Comprehensive security** through multiple validation layers
 
-The architecture's strength lies in its ability to evolve - from the current v1 production system through enhanced automation toward future crypto-economic trust-minimization - all while maintaining interface stability and operational continuity.
+The architecture's strength lies in its ability to evolve - from the current v1 production system through automation toward future crypto-economic trust-minimization - all while maintaining interface stability and operational continuity.
 
 This comprehensive specification serves as the definitive reference for understanding, deploying, and maintaining the complete Account Control system across all architectural versions and operational environments.
 
