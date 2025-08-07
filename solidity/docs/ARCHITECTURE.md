@@ -47,15 +47,15 @@ The tBTC v2 Account Control system enables **Qualified Custodians** (regulated i
 │                     │                     │                         │
 ├─────────────────────┼─────────────────────┼─────────────────────────┤
 │                     │                     │                         │
-│ QCManager           │ v1 System:          │ BasicMintingPolicy      │
-│ QCData              │ • QCWatchdog        │                         │
-│ QCMinter            │ • ConsensusManager  │ • Direct Integration    │
-│ QCRedeemer          │ • WatchdogMonitor   │ • 50% Gas Savings       │
-│ QCReserveLedger     │                     │ • Registry-based        │
-│                     │ v1 Framework:       │                         │
-│ • Bitcoin Wallets   │ • AutoEnforcement   │                         │
-│ • Reserve Tracking  │ • ThresholdActions  │                         │
-│ • SPV Verification  │ • DAO Escalation    │                         │
+│ QCManager           │ QCReserveLedger     │ BasicMintingPolicy      │
+│ QCData              │ • Multi-attestation │                         │
+│ QCMinter            │ • Reserve consensus │ • Direct Integration    │
+│ QCRedeemer          │                     │ • 50% Gas Savings       │
+│ SystemState         │ WatchdogEnforcer    │ • Registry-based        │
+│                     │ • Permissionless    │                         │
+│ • Bitcoin Wallets   │ • Objective only    │ BasicRedemptionPolicy   │
+│ • Reserve Tracking  │ • Status updates    │                         │
+│ • SPV Verification  │                     │                         │
 └─────────────────────┴─────────────────────┴─────────────────────────┘
 ```
 
@@ -83,24 +83,34 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   QCMinter      │────│ BasicMintingPolicy│────│   Bank.sol      │
 │  (Entry Point)  │    │ (Direct Integration)│   │ (Existing)      │
-└─────────────────┘    └──────────────────┘    └─────────════════┘
-         │                        │                        │
-         │              ┌─────────────────┐               │
-         └──────────────│ ProtocolRegistry│               │
-                        │ (Service Locator)│               │
-                        └─────────────────┘               │
-                                 │                        │
-              ┌──────────────────┼──────────────────┐     │
-              │                  │                  │     │
-    ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ │
-    │   QCManager     │ │    QCData       │ │  SystemState    │ │
-    │ (Business Logic)│ │   (Storage)     │ │ (Global State)  │ │
-    └─────────────────┘ └─────────────────┘ └─────────────────┘ │
-                                                                │
-                        ┌─────────────────┐                    │
-                        │   TBTCVault     │◄───────────────────┘
-                        │   (Existing)    │
-                        └─────────────────┘
+└─────────┬───────┘    └──────────────────┘    └─────────────────┘
+          │                        │                        │
+          │              ┌─────────────────┐               │
+          └──────────────│ ProtocolRegistry│               │
+                         │ (Service Locator)│               │
+                         └─────────┬───────┘               │
+                                   │                        │
+              ┌────────────────────┼────────────────────┐   │
+              │                    │                    │   │
+    ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐│
+    │   QCManager     │ │    QCData       │ │  SystemState    ││
+    │ (Business Logic)│ │   (Storage)     │ │ (Global State)  ││
+    └─────────┬───────┘ └─────────────────┘ └─────────────────┘│
+              │                                                │
+              │         ┌─────────────────┐                   │
+              │         │QCReserveLedger  │                   │
+              │         │ (Oracle+Storage)│                   │
+              │         └─────────┬───────┘                   │
+              │                   │                           │
+              │         ┌─────────▼───────┐                   │
+              │         │WatchdogEnforcer │                   │
+              │         │ (Enforcement)   │                   │
+              │         └─────────────────┘                   │
+              │                                               │
+    ┌─────────▼───────┐                 ┌─────────────────┐   │
+    │  SPVValidator   │                 │   TBTCVault     │◄──┘
+    │ (BTC Validation)│                 │   (Existing)    │
+    └─────────────────┘                 └─────────────────┘
 ```
 
 ### 1. BasicMintingPolicy.sol (Core Integration)
@@ -173,6 +183,47 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 - Multi-watchdog attestation support
 - Historical reserve tracking
 
+### 4. Supporting Contracts
+
+#### SPVValidator.sol (Bitcoin Transaction Validation)
+**Purpose**: Provides Bitcoin SPV proof validation capabilities for Account Control operations
+
+**Key Features**:
+- Replicates Bridge's proven SPV validation logic without modifying production Bridge
+- Account Control-tailored interface for Bitcoin transaction verification
+- Maintains identical security guarantees as production Bridge
+- Supports wallet control verification and redemption fulfillment validation
+
+#### BitcoinAddressUtils.sol (Address Handling)
+**Purpose**: Utility library for Bitcoin address format handling
+
+**Supported Formats**:
+- P2PKH (Pay-to-Public-Key-Hash) addresses
+- P2SH (Pay-to-Script-Hash) addresses  
+- P2WPKH (Pay-to-Witness-Public-Key-Hash) addresses
+- P2WSH (Pay-to-Witness-Script-Hash) addresses
+- Bridges gap between human-readable addresses and script representations
+
+#### SystemState.sol (Emergency Controls)
+**Purpose**: Global emergency controls and system parameters
+
+**Key Features**:
+- Function-specific pauses (minting, redemption, registry, wallet registration)
+- QC-specific emergency controls with reason code tracking
+- Time-limited emergency pauses (default 7 days) with automatic expiry
+- Integration point for WatchdogEnforcer automated actions
+
+### 5. Interface Contracts
+
+#### IMintingPolicy.sol & IRedemptionPolicy.sol
+- Define standard interfaces for upgradeable policy contracts
+- Enable minting and redemption rule upgrades without changing core contracts
+- Support pluggable business logic architecture
+
+#### ISPVValidator.sol
+- Interface for Bitcoin SPV proof validation operations
+- Standardizes validation requirements across different use cases
+
 ---
 
 ## Simplified Watchdog System
@@ -196,63 +247,53 @@ The system separates concerns into:
           └──────────────────────┼──────────────────────┘
                                  │
                     ┌────────────▼────────────┐
-                    │    ReserveOracle        │
-                    │  • Collects attestations│
-                    │  • Calculates median    │
-                    │  • Pushes consensus     │
+                    │   QCReserveLedger       │
+                    │ • Multi-attester oracle │
+                    │ • Reserve data storage  │
+                    │ • Consensus calculation │
                     └────────────┬────────────┘
                                  │
-        ┌────────────────────────┼────────────────────────┐
-        ▼                        ▼                        ▼
-┌──────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│QCReserveLedger│    │WatchdogEnforcer  │    │SubjectiveReporting│
-│ • Stores data │    │ • Permissionless │    │ • Event emission │
-│ • Solvency    │    │ • Reason codes   │    │ • DAO monitoring │
-└──────────────┘    └──────────────────┘    └──────────────────┘
+                                 ▼
+                    ┌──────────────────┐
+                    │ WatchdogEnforcer │
+                    │ • Permissionless │
+                    │ • Objective only │
+                    │ • Status updates │
+                    └──────────────────┘
 ```
 
-### 1. ReserveOracle.sol
+### 1. QCReserveLedger.sol
 
-**Purpose**: Multi-attester consensus for reserve balances
-
-**Key Operations**:
-- `submitAttestation(address qc, uint256 balance)` - Attesters submit observations
-- `getConsensusReserves(address qc)` - Returns median consensus
-- Automatic push to QCReserveLedger when threshold met
+**Purpose**: Unified multi-attester oracle and reserve data storage
 
 **Key Features**:
-- Minimum 3 attesters required for consensus
-- Median calculation prevents manipulation
-- No single point of trust
-- Byzantine fault tolerance
+- Multi-attester consensus system for reserve balance tracking
+- Byzantine fault tolerance with median calculation from 3+ attesters
+- Staleness detection for outdated attestations
+- Historical reserve tracking and validation
+- Direct integration with WatchdogEnforcer for violation detection
+
+**Key Operations**:
+- `submitAttestation(address qc, uint256 balance)` - Attesters submit reserve observations
+- `getLatestReserves(address qc)` - Returns latest consensus reserve balance
+- Automatic staleness flagging for monitoring systems
 
 ### 2. WatchdogEnforcer.sol
 
-**Purpose**: Permissionless enforcement of objective violations
-
-**Enforcement Operations**:
-- `enforceObjectiveViolation(address qc, bytes32 reasonCode)` - Anyone can trigger
-- Validates reason code is objective (machine-verifiable)
-- Checks violation condition against current state
-- Updates QC status if violation confirmed
-
-**Supported Violations**:
-```solidity
-bytes32 constant INSUFFICIENT_RESERVES = keccak256("INSUFFICIENT_RESERVES");
-bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
-bytes32 constant ZERO_RESERVES = keccak256("ZERO_RESERVES");
-bytes32 constant REDEMPTION_TIMEOUT = keccak256("REDEMPTION_TIMEOUT");
-```
-
-### 3. WatchdogReasonCodes.sol
-
-**Purpose**: Machine-readable violation codes
+**Purpose**: Automated enforcement of objective violations
 
 **Key Features**:
-- Standardized bytes32 constants for all violations
-- Clear separation of objective (90%) vs subjective (10%)
-- Enables automated validation without human interpretation
-- Gas-efficient compared to string comparisons
+- **Permissionless Design**: Anyone can trigger enforcement for violations
+- **Limited Authority**: Can only set QCs to UnderReview status (human oversight for final decisions)
+- **Objective Only**: Monitors only machine-verifiable conditions
+- **Escalation System**: 45-minute delay for critical violations to allow human intervention
+
+**Monitored Violations**:
+- Insufficient reserves (collateral ratio violations)
+- Stale attestations (outdated reserve data)  
+- Sustained reserve violations
+- Built-in reason codes (inlined, not separate library)
+
 
 ---
 
@@ -360,30 +401,28 @@ WatchdogEnforcer:
 The system deploys through numbered scripts ensuring proper dependency resolution:
 
 **Core Infrastructure (Scripts 95-99)**:
-1. `95_deploy_account_control_core.ts` - Core QC management contracts
-2. `96_deploy_account_control_state.ts` - System state and registry
-3. `97_deploy_account_control_policies.ts` - Minting and redemption policies
-4. `98_deploy_account_control_watchdog.ts` - v1 watchdog consensus system
-5. `99_configure_account_control_system.ts` - Final system configuration
+1. `95_deploy_account_control_core.ts` - Core entry points (QCMinter, QCRedeemer, ProtocolRegistry)
+2. `96_deploy_account_control_state.ts` - State management (QCData, SystemState, QCManager)
+3. `97_deploy_account_control_policies.ts` - Policy contracts (BasicMintingPolicy, BasicRedemptionPolicy)
+4. `98_deploy_reserve_ledger.ts` - Reserve tracking and watchdog system (QCReserveLedger, WatchdogEnforcer)
+5. `99_configure_account_control_system.ts` - Role assignments and final configuration
 
-**v1 Automation Framework (Scripts 100-102)**:
-6. `100_deploy_automated_decision_framework.ts` - Three-layer automation system
-7. `101_configure_automated_decision_framework.ts` - Role assignments and parameters
+**Supporting Infrastructure**:
+6. `30_deploy_spv_validator.ts` - Bitcoin transaction validation (SPVValidator)
 
 ### Production Deployment Strategy
 
 **Multi-Environment Approach**:
-1. **Development**: Single watchdog, fast parameters for testing
-2. **Staging**: 2-of-3 consensus, realistic parameters for validation
-3. **Production**: 3-of-5 consensus, secure parameters for mainnet
+1. **Development**: Single attester for QCReserveLedger, fast parameters for testing
+2. **Staging**: Multiple attesters, realistic timing parameters for validation
+3. **Production**: Minimum 3 attesters for Byzantine fault tolerance, secure parameters
 
-**Scaling Considerations**:
+**Reserve Attestation Scaling**:
 ```
-Watchdog Count    Recommended M    Reasoning
-3                 2                67% threshold (2-of-3)
-5                 3                60% threshold (3-of-5)  
-7                 4                57% threshold (4-of-7)
-9                 5                56% threshold (5-of-9)
+Environment    Min Attesters    Consensus Method    Timing
+Development    1               Direct submission    Fast (minutes)
+Staging        2-3             Median calculation   Medium (hours)  
+Production     3+              Byzantine tolerant   Secure (hours)
 ```
 
 ### Geographic Distribution
