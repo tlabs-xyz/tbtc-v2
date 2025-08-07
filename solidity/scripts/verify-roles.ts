@@ -80,8 +80,6 @@ const EXPECTED_ROLES: RoleAssignment[] = [
   { contract: "ProtocolRegistry", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
 ]
 
-// Additional V1.2 contracts (optional)
-const V12_EXPECTED_ROLES: RoleAssignment[] = [
   // WatchdogAutomatedEnforcement
   { contract: "WatchdogAutomatedEnforcement", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
   { contract: "WatchdogAutomatedEnforcement", role: "MANAGER_ROLE", expectedHolders: ["governance"], critical: true },
@@ -94,7 +92,6 @@ const V12_EXPECTED_ROLES: RoleAssignment[] = [
   { contract: "WatchdogDAOEscalation", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
   { contract: "WatchdogDAOEscalation", role: "MANAGER_ROLE", expectedHolders: ["governance"], critical: true },
   { contract: "WatchdogDAOEscalation", role: "ESCALATOR_ROLE", expectedHolders: ["WatchdogThresholdActions"], critical: true },
-]
 
 interface VerificationResult {
   contract: string
@@ -205,8 +202,8 @@ async function verifyRoles(): Promise<void> {
   const warnings: string[] = []
   const deployerPrivileges: string[] = []
 
-  // Check V1.1 roles
-  console.log("Checking V1.1 contracts...")
+  // Check v1 roles
+  console.log("Checking v1 contracts...")
   for (const assignment of EXPECTED_ROLES) {
     const contract = await getContractAddress(assignment.contract)
     if (!contract) {
@@ -264,55 +261,6 @@ async function verifyRoles(): Promise<void> {
     })
   }
 
-  // Check V1.2 roles if deployed
-  console.log("\nChecking V1.2 contracts (if deployed)...")
-  let v12Deployed = false
-  for (const assignment of V12_EXPECTED_ROLES) {
-    const contract = await getContractAddress(assignment.contract)
-    if (!contract) continue
-    
-    v12Deployed = true
-    const contractInstance = await ethers.getContractAt(assignment.contract, contract)
-    const actualHolders = await getRoleHolders(contractInstance, ROLES[assignment.role])
-    const expectedHolders = await resolveExpectedHolders(
-      assignment.expectedHolders,
-      deployer.address,
-      governance?.address || deployer.address
-    )
-
-    // Similar verification logic as above
-    let status: "✅ OK" | "⚠️ WARNING" | "❌ ERROR" = "✅ OK"
-    let message = ""
-
-    const missingHolders = expectedHolders.filter(e => !actualHolders.includes(e))
-    const unexpectedHolders = actualHolders.filter(a => !expectedHolders.includes(a) && a !== deployer.address)
-
-    if (missingHolders.length > 0) {
-      if (assignment.critical) {
-        status = "❌ ERROR"
-        message = `Missing critical role holders: ${missingHolders.join(", ")}`
-        criticalErrors.push(`${assignment.contract}.${getRoleName(assignment.role)}: ${message}`)
-      } else {
-        status = "⚠️ WARNING"
-        message = `Missing optional role holders: ${missingHolders.join(", ")}`
-        warnings.push(`${assignment.contract}.${getRoleName(assignment.role)}: ${message}`)
-      }
-    }
-
-    results.push({
-      contract: assignment.contract,
-      role: assignment.role,
-      roleName: getRoleName(assignment.role),
-      expected: expectedHolders,
-      actual: actualHolders,
-      status,
-      message: message || "All expected holders present"
-    })
-  }
-
-  if (!v12Deployed) {
-    console.log("ℹ️  V1.2 contracts not deployed\n")
-  }
 
   // Generate report
   console.log("\n📊 VERIFICATION REPORT")

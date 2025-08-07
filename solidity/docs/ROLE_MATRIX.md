@@ -343,7 +343,7 @@ The Account Control system implements 17 distinct roles across multiple contract
 4. Cross-contract permissions established
 
 ### Configuration Phase (Scripts 100-101)
-1. V1.2 framework roles configured (if deployed)
+1. v1 framework roles configured
 2. Additional automated enforcement roles
 3. Threshold and escalation permissions
 

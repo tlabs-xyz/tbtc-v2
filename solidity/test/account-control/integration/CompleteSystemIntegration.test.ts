@@ -92,7 +92,7 @@ describe("Complete System Integration Tests", () => {
     systemState = fixture.systemState
     tbtc = fixture.tbtc
 
-    // Deploy additional V1.1 contracts
+    // Deploy additional v1 contracts
     const WatchdogConsensusManagerFactory = await ethers.getContractFactory(
       "WatchdogConsensusManager"
     )
