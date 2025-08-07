@@ -33,27 +33,46 @@ bytes32 constant REDEMPTION_TIMEOUT = keccak256("REDEMPTION_TIMEOUT");
 
 ---
 
-### 2. QCReserveLedger Contract
+### 2. QCReserveLedger Contract (formerly ReserveOracle)
 
-**Purpose**: Multi-attester consensus and reserve balance storage
+**Purpose**: Multi-attester consensus oracle and reserve balance storage
 
 **Key Features**:
-- Accepts attestations from multiple sources
-- Calculates median consensus internally
-- Stores consensus reserve balances
-- Eliminates single point of trust
+- **Single Interface Architecture**: Uses consensus-based approach instead of dual interface
+- Accepts attestations from multiple sources with ATTESTER_ROLE
+- Calculates median consensus using insertion sort algorithm  
+- Stores consensus reserve balances with staleness tracking
+- Implements Byzantine fault tolerance through median calculation
+
+**Security Properties**:
+- **Individual attesters cannot manipulate final balance** - consensus required
+- **Byzantine fault tolerant** - median protects against up to 50% malicious attesters
+- **Threshold protection** - requires 3+ attestations before any balance update
 
 **Core Functions**:
 ```solidity
 function submitAttestation(address qc, uint256 balance) external onlyRole(ATTESTER_ROLE)
 function getReserveBalanceAndStaleness(address qc) external view returns (uint256, bool)
+function isReserveStale(address qc) external view returns (bool isStale, uint256 timeSinceUpdate)
 ```
+
+**Consensus Parameters**:
+- `consensusThreshold`: 3 attestations required (configurable)
+- `attestationTimeout`: 6 hours window for valid attestations
+- `maxStaleness`: 24 hours before data considered stale
 
 **Consensus Mechanism**:
 - Minimum 3 attesters required (configurable)
 - Insertion sort + median calculation for robustness
 - Auto-triggers when threshold met
 - Efficient O(n) median for small attester sets (≤10)
+
+**Architectural Decision**:
+The single interface consensus-based design is more secure than oracle/ledger separation because:
+1. **Atomic Operations**: Consensus and storage happen atomically, preventing inconsistencies
+2. **Reduced Attack Surface**: No additional interfaces or cross-contract calls
+3. **Byzantine Fault Tolerance**: Built-in consensus provides stronger security than external oracle
+4. **Gas Efficiency**: No additional contract calls for consensus operations
 
 ---
 

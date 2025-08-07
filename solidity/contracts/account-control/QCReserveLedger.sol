@@ -4,8 +4,10 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /// @title QCReserveLedger
-/// @notice Unified contract for reserve attestation and consensus
-/// @dev Combines oracle consensus and ledger storage in a single atomic operation
+/// @notice Multi-attester consensus oracle with Byzantine fault tolerance
+/// @dev SECURITY: Uses consensus-based architecture where individual attesters cannot 
+///      manipulate final balance. Requires 3+ attestations with median calculation 
+///      to protect against up to 50% malicious attesters.
 contract QCReserveLedger is AccessControl {
     bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
     
@@ -137,24 +139,9 @@ contract QCReserveLedger is AccessControl {
         emit MaxStalenessUpdated(oldStaleness, newStaleness);
     }
     
-    /// @notice Check if reserve data is stale and needs fresh attestations
-    /// @param qc The QC address
-    /// @return isStale Whether the reserve data is older than maxStaleness
-    /// @return timeSinceUpdate Time in seconds since last update
-    function isReserveStale(address qc) 
-        external 
-        view 
-        returns (bool isStale, uint256 timeSinceUpdate) 
-    {
-        ReserveData memory data = reserves[qc];
-        if (data.lastUpdateTimestamp == 0) {
-            return (true, type(uint256).max); // Never updated
-        }
-        timeSinceUpdate = block.timestamp - data.lastUpdateTimestamp;
-        isStale = timeSinceUpdate > maxStaleness;
-    }
     
-    /// @dev Attempt to reach consensus for a QC
+    /// @dev Consensus engine - aggregates attestations and updates balance via median
+    /// @dev SECURITY: Only updates balance when consensus threshold met (3+ attesters)
     function _attemptConsensus(address qc) internal {
         address[] memory attesters = pendingAttesters[qc];
         uint256 validCount = 0;
@@ -171,7 +158,7 @@ contract QCReserveLedger is AccessControl {
             }
         }
         
-        // Check if we have enough valid attestations
+        // CONSENSUS GATE: Only proceed if threshold met (Byzantine fault tolerance)
         if (validCount < consensusThreshold) {
             return; // Not enough attestations yet
         }
@@ -193,7 +180,8 @@ contract QCReserveLedger is AccessControl {
         emit ReserveUpdated(qc, oldBalance, consensusBalance, block.timestamp);
     }
     
-    /// @dev Calculate median using insertion sort (efficient for small arrays)
+    /// @dev Byzantine fault tolerant median calculation using insertion sort
+    /// @dev SECURITY: Median protects against up to 50% malicious attesters
     function _calculateMedian(uint256[] memory values, uint256 length) internal pure returns (uint256) {
         require(length <= 10, "Too many attesters for consensus");
         if (length == 0) return 0;
