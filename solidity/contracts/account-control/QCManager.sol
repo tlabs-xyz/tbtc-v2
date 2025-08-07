@@ -297,10 +297,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
     }
     
     /// @notice Internal function that executes all status changes with full validation
-    /// @dev Implements Checks-Effects-Interactions pattern:
-    ///      1. CHECKS: Validate QC exists, transition is valid
-    ///      2. EFFECTS: Update state in QCData
-    ///      3. INTERACTIONS: Emit events
     /// @param qc The address of the QC
     /// @param newStatus The new status
     /// @param reason The reason for the change
@@ -313,7 +309,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
     ) private {
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
         
-        // CHECKS: Validate inputs and current state
         if (!qcData.isQCRegistered(qc)) {
             revert QCNotRegistered(qc);
         }
@@ -325,10 +320,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
             revert InvalidStatusTransition(oldStatus, newStatus);
         }
 
-        // EFFECTS: Update state before any external interactions
         qcData.setQCStatus(qc, newStatus, reason);
 
-        // INTERACTIONS: Emit events after state is updated
         emit QCStatusChanged(
             qc,
             oldStatus,
