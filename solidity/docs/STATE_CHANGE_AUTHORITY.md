@@ -41,14 +41,11 @@ All state changes follow the standard Solidity pattern:
 
 ```solidity
 function _executeStatusChange(...) private {
-    // CHECKS: Validate inputs and permissions
     if (!qcData.isQCRegistered(qc)) revert QCNotRegistered(qc);
     if (!_isValidStatusTransition(oldStatus, newStatus)) revert InvalidStatusTransition(...);
     
-    // EFFECTS: Update contract state
     qcData.setQCStatus(qc, newStatus, reason);
     
-    // INTERACTIONS: External calls and events
     emit QCStatusChanged(...);
 }
 ```
@@ -146,7 +143,6 @@ contract QCManager {
         string memory authority
     ) private {
         // Single implementation with full validation
-        // Checks-Effects-Interactions pattern
         // Consistent event emission
     }
     
