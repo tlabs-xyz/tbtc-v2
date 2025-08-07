@@ -157,6 +157,17 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl, ReentrancyGuard {
             );
             revert MintingPaused();
         }
+        if (systemState.isQCEmergencyPaused(qc)) {
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "QC emergency paused",
+                msg.sender,
+                block.timestamp
+            );
+            revert SystemState.QCIsEmergencyPaused(qc);
+        }
         if (
             amount < systemState.minMintAmount() ||
             amount > systemState.maxMintAmount()
