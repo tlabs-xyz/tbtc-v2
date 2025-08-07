@@ -57,7 +57,7 @@
 - **Machine-Readable Codes**: Automated validation
 
 ### Recent Changes (v2.0)
-- Simplified watchdog: 6 contracts → 4 contracts
+- Simplified watchdog: 6 contracts → 3 contracts
 - Multi-attester oracle consensus
 - Permissionless enforcement
 - Event-based reporting

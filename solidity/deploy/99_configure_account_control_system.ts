@@ -24,7 +24,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const tbtc = await get("TBTC")
 
   // Get simplified watchdog contracts
-  const watchdogReporting = await get("WatchdogSubjectiveReporting")
+  const reserveOracle = await get("ReserveOracle")
   const watchdogEnforcer = await get("WatchdogEnforcer")
 
   // Generate service keys
@@ -34,7 +34,6 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const QC_RESERVE_LEDGER_KEY = ethers.utils.id("QC_RESERVE_LEDGER")
   const MINTING_POLICY_KEY = ethers.utils.id("MINTING_POLICY")
   const REDEMPTION_POLICY_KEY = ethers.utils.id("REDEMPTION_POLICY")
-  const WATCHDOG_REPORTING_KEY = ethers.utils.id("WATCHDOG_REPORTING")
   const WATCHDOG_ENFORCER_KEY = ethers.utils.id("WATCHDOG_ENFORCER")
 
   // Step 1: Register all services in ProtocolRegistry
@@ -62,11 +61,6 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
       key: REDEMPTION_POLICY_KEY,
       address: basicRedemptionPolicy.address,
       name: "BasicRedemptionPolicy",
-    },
-    {
-      key: WATCHDOG_REPORTING_KEY,
-      address: watchdogReporting.address,
-      name: "WatchdogSubjectiveReporting",
     },
     {
       key: WATCHDOG_ENFORCER_KEY,
@@ -222,7 +216,6 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log("")
   log("  Watchdog Components:")
   log(`    - ReserveOracle: ${reserveOracle.address}`)
-  log(`    - WatchdogReporting: ${watchdogReporting.address}`)
   log(`    - WatchdogEnforcer: ${watchdogEnforcer.address}`)
   log("")
   log("  Policies:")

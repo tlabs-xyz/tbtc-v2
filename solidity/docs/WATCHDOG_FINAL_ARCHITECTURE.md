@@ -9,7 +9,7 @@
 
 ## System Overview
 
-The watchdog system provides monitoring and enforcement for the tBTC v2 protocol through 4 watchdog-specific contracts that handle consensus, enforcement, and reporting within a larger 14-contract account control system.
+The watchdog system provides monitoring and enforcement for the tBTC v2 protocol through 3 watchdog-specific contracts that handle consensus and enforcement within a larger account control system.
 
 ---
 
@@ -21,7 +21,7 @@ The watchdog system provides monitoring and enforcement for the tBTC v2 protocol
 
 **Key Features**:
 - Standardized violation codes (bytes32 constants)
-- Clear separation of objective (90%) vs subjective (10%) violations
+- Clear separation of objective violations
 - Enables automated watchdog validation
 
 **Example Codes**:
@@ -76,47 +76,7 @@ The single interface consensus-based design is more secure than oracle/ledger se
 
 ---
 
-### 3. WatchdogReporting Contract
-
-**Purpose**: Transparent reporting of subjective observations
-
-**Key Features**:
-- Simple event-based reporting
-- Support mechanism for validation
-- Evidence stored as hash array
-- No complex state machines
-
-**Report Structure**:
-```solidity
-struct Report {
-    uint256 id;
-    address watchdog;
-    address target;
-    ObservationType obsType;
-    string description;
-    bytes32[] evidenceHashes;  // Max 20 hashes
-    uint256 timestamp;
-    uint256 supportCount;
-}
-```
-
-**Observation Types**:
-- SUSPICIOUS_PATTERN
-- OPERATIONAL_CONCERN
-- UNUSUAL_BEHAVIOR
-- COMPLIANCE_QUESTION
-- SECURITY_OBSERVATION
-- GENERAL_CONCERN
-
-**Key Design Decisions**:
-- **No proposedAction**: Watchdogs observe, DAO decides
-- **No severity levels**: Support count provides natural filtering
-- **No rate limiting**: Gas costs and role-gating sufficient
-- **Evidence as hashes**: Actual content via REST API
-
----
-
-### 4. WatchdogEnforcer Contract
+### 3. WatchdogEnforcer Contract
 
 **Purpose**: Permissionless enforcement of objective violations
 
@@ -164,12 +124,7 @@ function batchCheckViolations(address[] calldata qcs, bytes32 reasonCode) extern
 Attesters → QCReserveLedger (internal consensus) → Enforcement
 ```
 
-### Subjective Reporting Flow
-```
-Watchdogs → SubjectiveReporting → Events → DAO Monitoring → Governance Action
-```
-
-### Objective Enforcement Flow
+### Enforcement Flow
 ```
 Watchdogs (Primary) → WatchdogEnforcer → Validation → QCManager Status Update
 Community/Systems (Fallback) → WatchdogEnforcer → Validation → QCManager Status Update
@@ -183,31 +138,6 @@ Community/Systems (Fallback) → WatchdogEnforcer → Validation → QCManager S
 
 ---
 
-## Evidence Storage Architecture
-
-### On-Chain Storage
-- Only evidence hashes (32 bytes each)
-- Maximum 20 evidence items per report
-- Prevents DoS through bounded arrays
-
-### Off-Chain Storage
-- Watchdog REST API serves actual evidence
-- DAO members authenticate to access
-- Evidence indexed by hash
-
-### REST API Specification
-```yaml
-GET /evidence/{hash}
-  authentication: DAO member signature
-  response:
-    hash: string
-    reportId: number
-    content: object
-    signatures: array
-```
-
----
-
 ## Role Architecture
 
 ### System Roles
@@ -215,7 +145,7 @@ GET /evidence/{hash}
 | Role | Purpose | Contracts |
 |------|---------|-----------|
 | ATTESTER_ROLE | Submit reserve attestations | QCReserveLedger |
-| WATCHDOG_ROLE | Report subjective observations | SubjectiveReporting |
+| WATCHDOG_ROLE | Monitor and enforce violations | WatchdogEnforcer |
 | ARBITER_ROLE | Update QC status | WatchdogEnforcer → QCManager |
 | DAO_ROLE | Governance decisions | Direct action |
 
@@ -268,13 +198,11 @@ GET /evidence/{hash}
 ### Trust Model
 - **Reserve Attestations**: Trust distributed across multiple attesters
 - **Objective Enforcement**: Trustless (permissionless with validation)
-- **Subjective Reports**: Trust in individual watchdogs, validated by peers
 - **DAO Actions**: Trust in governance process
 
 ### Attack Vectors Mitigated
 - **Single point of failure**: Oracle consensus requires multiple attesters
-- **Spam attacks**: Role-gating and gas costs
-- **Evidence DoS**: Bounded array size (max 20)
+- **Spam attacks**: Gas costs and validation requirements
 - **Manipulation**: Machine-readable codes prevent interpretation attacks
 
 ---
@@ -282,15 +210,12 @@ GET /evidence/{hash}
 ## Gas Optimization
 
 ### Optimizations Implemented
-- Evidence stored as hashes (32 bytes vs unbounded)
 - No complex state tracking
 - Minimal cross-contract calls
 - Efficient data structures
 
 ### Estimated Gas Costs
 - Submit attestation: ~50,000 gas
-- Report observation: ~80,000 gas
-- Support report: ~30,000 gas
 - Enforce violation: ~60,000 gas
 
 ---
@@ -302,13 +227,6 @@ GET /evidence/{hash}
 - Consensus mechanism: Median
 - Freshness window: 7 days
 
-### Reporting Parameters
-- Max evidence per report: 20
-- Support thresholds:
-  - SECURITY_OBSERVATION: 0 (immediate)
-  - COMPLIANCE_QUESTION: 1
-  - Others: 3
-
 ### Enforcement Parameters
 - Collateral ratio: 90%
 - Staleness threshold: 7 days
@@ -317,12 +235,12 @@ GET /evidence/{hash}
 
 ## Comparison with Original System
 
-| Aspect | Original (6 watchdog contracts) | Current (4 watchdog contracts) |
+| Aspect | Original (6 watchdog contracts) | Current (3 watchdog contracts) |
 |--------|-------------------------|--------------------------|
 | Complexity | High - overlapping logic | Low - clear separation |
 | Trust Model | Single attester | Multi-attester consensus |
 | Enforcement | Role-gated | Permissionless |
-| Subjective Reports | Complex state machines | Simple events |
+| Objective Enforcement | Complex state machines | Permissionless validation |
 | Machine Validation | Human strings | Machine codes |
 | Gas Costs | High - many calls | Low - optimized |
 | Code Size | ~30,000 lines | ~2,000 lines |
@@ -332,9 +250,9 @@ GET /evidence/{hash}
 ## Future Enhancements
 
 ### Potential Improvements
-1. **ZK Proofs**: Privacy-preserving evidence
-2. **Slashing**: Economic penalties for false reports
-3. **Reputation System**: Track watchdog performance
+1. **ZK Proofs**: Privacy-preserving attestations
+2. **Slashing**: Economic penalties for malicious attesters
+3. **Reputation System**: Track attester reliability
 4. **Automated Remediation**: Self-healing for certain violations
 
 ### Upgrade Path
@@ -355,12 +273,11 @@ The watchdog system successfully addresses the core problems identified in the o
 
 ## Complete Account Control System
 
-The 4 watchdog contracts operate within a broader **14-contract account control system**:
+The 3 watchdog contracts operate within a broader account control system:
 
-### Watchdog-Specific Contracts (4)
+### Watchdog-Specific Contracts (3)
 - WatchdogReasonCodes.sol - Machine-readable violation codes
 - QCReserveLedger.sol - Multi-attester consensus and storage
-- WatchdogReporting.sol - Subjective observation reporting
 - WatchdogEnforcer.sol - Permissionless objective enforcement
 
 ### Core Account Control Infrastructure (10)
@@ -375,10 +292,10 @@ The 4 watchdog contracts operate within a broader **14-contract account control 
 - SPVValidator.sol - Bitcoin SPV proof validation
 - BitcoinAddressUtils.sol - Bitcoin address utilities
 
-**Total System**: 14 contracts + 3 interfaces = **17 total files**
+**Total System**: 13 contracts + 3 interfaces = **16 total files**
 
 The result is a watchdog subsystem that is:
-- **Focused**: 4 contracts handle watchdog concerns specifically
+- **Focused**: 3 contracts handle watchdog concerns specifically
 - **Clearer**: Single responsibility per contract
 - **Safer**: No single points of failure in consensus
 - **Efficient**: Optimized algorithms (insertion sort for small sets)
