@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tBTC against their Bitcoin reserves through direct Bank integration. Following a recent migration, the system now uses a simplified watchdog architecture based on the Three-Problem Framework.
+The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tBTC against their Bitcoin reserves through direct Bank integration. The system uses a simplified watchdog architecture based on the Three-Problem Framework.
 
 **Key Statistics**:
 - **Core Contracts**: 10 (QC management) + 3 (watchdog)
@@ -42,17 +42,6 @@ The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tB
 |-----------|---------|--------|
 | **QCReserveLedger** | Multi-attester consensus oracle | ✅ Implemented |
 | **WatchdogEnforcer** | Permissionless violation enforcement (includes reason codes) | ✅ Implemented |
-
-### Removed in Migration
-
-The following contracts were removed during the watchdog simplification:
-- ~~WatchdogAutomatedEnforcement~~ → Replaced by WatchdogEnforcer
-- ~~WatchdogConsensusManager~~ → Replaced by QCReserveLedger
-- ~~WatchdogDAOEscalation~~ → Direct DAO action model
-- ~~WatchdogThresholdActions~~ → Simplified to permissionless enforcement
-- ~~WatchdogMonitor~~ → No longer needed
-- ~~QCWatchdog~~ → Functionality distributed
-- ~~WatchdogReporting~~ → Removed (subjective observations handled off-chain)
 
 ---
 
@@ -152,19 +141,19 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → TBTC Tokens
 
 ---
 
-## Recent Changes (Migration v2.0)
+## System Design Rationale
 
-### What Changed
-1. **Watchdog System**: 6 contracts → 3 contracts (50% reduction)
-2. **Trust Model**: Single watchdog → Multi-attester consensus
-3. **Enforcement**: Role-gated → Permissionless with validation
-4. **Reporting**: Complex state machines → Simple event emission
+### Core Architecture Decisions
+1. **Watchdog System**: 3-contract architecture for clarity and efficiency
+2. **Trust Model**: Multi-attester consensus eliminates single points of failure
+3. **Enforcement**: Permissionless validation enables objective enforcement
+4. **Reporting**: Simple event emission with machine-readable reason codes
 
-### Why It Changed
-- **Machine Interpretation**: Contracts cannot understand human strings
-- **Trust Distribution**: Eliminate single points of failure
-- **Simplification**: Reduce complexity and gas costs
-- **Clear Separation**: Different problems need different solutions
+### Design Principles
+- **Machine-Readable**: System uses structured data instead of human strings
+- **Trust Distribution**: Multiple attesters provide consensus on objective facts
+- **Simplification**: Minimal contracts reduce complexity and gas costs
+- **Clear Separation**: Different problems addressed with focused solutions
 
 ---
 
