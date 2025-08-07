@@ -156,6 +156,17 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   )
   log("  ✅ ARBITER_ROLE granted to WatchdogEnforcer")
 
+  // Grant PAUSER_ROLE to WatchdogEnforcer for emergency pauses (Phase 2)
+  const PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")
+  await execute(
+    "SystemState",
+    { from: deployer, log: true },
+    "grantRole",
+    PAUSER_ROLE,
+    watchdogEnforcer.address
+  )
+  log("  ✅ PAUSER_ROLE granted to WatchdogEnforcer for escalation")
+
   // Step 5: Set initial system parameters
   log("Step 5: Setting initial system parameters...")
 

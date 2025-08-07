@@ -257,6 +257,48 @@ checking the root cause of the supply change and making sure its source is
 actually a proper deposit/redemption and there are no signs of any malicious
 action.
 
+==== Critical violation detected
+
+A *warning system event* indicating that a Qualified Custodian (QC) has 
+triggered a critical violation (insufficient reserves) that has started a 
+45-minute escalation timer. This event is emitted by the WatchdogEnforcer 
+contract and is sent to Sentry hub. The default action is monitoring the QC 
+for resolution within the escalation window. If the violation persists beyond 
+45 minutes, it will automatically escalate to an emergency pause.
+
+*Contract Event*: `CriticalViolationDetected(qc, reasonCode, enforcer, timestamp, escalationDeadline)`
+
+*Monitoring Integration*: Off-chain systems should:
+
+* Set up alerts for approaching escalation deadlines
+* Monitor QC status changes during the escalation window
+* Prepare to call `checkEscalation()` after the 45-minute delay
+
+==== Violation escalated to emergency pause
+
+A *critical system event* indicating that a QC's critical violation has 
+persisted beyond the 45-minute escalation window and has been automatically 
+escalated to an emergency pause. This completely blocks all operations for 
+the specific QC. This event is sent to Sentry hub and requires immediate 
+team action to investigate the underlying issue.
+
+*Contract Event*: `ViolationEscalated(qc, reasonCode, escalator, timestamp)`
+
+*Default Action*: 
+
+* Investigate the root cause of the sustained violation
+* Coordinate with the QC to resolve the underlying issue
+* Manually unpause via emergency council once verified safe
+* Review automated escalation thresholds if false positive
+
+==== Escalation timer cleared
+
+An *informational system event* indicating that a QC's escalation timer has 
+been cleared either due to the QC returning to Active status or manual 
+intervention. This event is directly sent to Discord as a notification.
+
+*Contract Event*: `EscalationTimerCleared(qc, clearedBy, timestamp)`
+
 == Sentry hub
 
 The monitoring and telemetry system uses Sentry as hub for relevant monitoring
