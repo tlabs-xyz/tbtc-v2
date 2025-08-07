@@ -40,9 +40,8 @@ The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tB
 
 | Component | Purpose | Status |
 |-----------|---------|--------|
-| **WatchdogReasonCodes** | Machine-readable violation codes | ✅ Implemented |
 | **QCReserveLedger** | Multi-attester consensus oracle | ✅ Implemented |
-| **WatchdogEnforcer** | Permissionless violation enforcement | ✅ Implemented |
+| **WatchdogEnforcer** | Permissionless violation enforcement (includes reason codes) | ✅ Implemented |
 
 ### Removed in Migration
 
@@ -61,7 +60,7 @@ The following contracts were removed during the watchdog simplification:
 
 ### 1. Two-Problem Framework
 - **Oracle Problem**: Multi-attester consensus for objective facts (solved by QCReserveLedger)
-- **Enforcement Problem**: Permissionless enforcement of objective violations (solved by WatchdogEnforcer)
+- **Enforcement Problem**: Permissionless enforcement of objective violations (solved by WatchdogEnforcer with embedded reason codes)
 
 ### 2. Direct Integration
 - Uses existing Bank/Vault infrastructure
@@ -74,7 +73,7 @@ The following contracts were removed during the watchdog simplification:
 - Permissionless enforcement of violations
 
 ### 4. Machine Readability
-- Standardized bytes32 reason codes
+- Standardized bytes32 reason codes (INSUFFICIENT_RESERVES, STALE_ATTESTATIONS, SUSTAINED_RESERVE_VIOLATION)
 - Automated validation without human interpretation
 - Clear objective vs subjective separation
 
@@ -86,13 +85,13 @@ The following contracts were removed during the watchdog simplification:
 ```solidity
 // Reserve Management
 minCollateralRatio: 100%        // Minimum reserves vs minted
-staleThreshold: 7 days          // Max age for attestations
-attestationWindow: 1 hour       // Oracle collection window
+staleThreshold: 24 hours        // Max age for reserve attestations  
+attestationTimeout: 6 hours     // Oracle collection window
 
 // Operations
-redemptionTimeout: 48 hours     // QC must fulfill within
+redemptionTimeout: 7 days       // QC must fulfill within
 minMintAmount: 0.01 tBTC        // Minimum minting amount
-maxMintAmount: 100 tBTC         // Maximum per transaction
+maxMintAmount: 1000 tBTC        // Maximum per transaction
 ```
 
 ### Role Structure
