@@ -21,7 +21,6 @@
 ### Watchdog System
 - **WATCHDOG_FINAL_ARCHITECTURE.md** - Current watchdog architecture
 - **ORACLE_DESIGN_DECISION.md** - Oracle consensus design rationale
-- **EVIDENCE_STORAGE_FINAL_DESIGN.md** - Evidence handling approach
 
 ### Analysis & Reports
 - **ROLE_MATRIX.md** - Complete role structure
