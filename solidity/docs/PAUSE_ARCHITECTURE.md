@@ -15,6 +15,19 @@ The tBTC v2 Account Control system implements a sophisticated **two-tier pause a
 - **QC-specific emergency pauses** for targeted intervention
 - **No single kill switch** to prevent catastrophic failure modes
 
+### Emergency Response Quick Reference
+
+#### Key Emergency Functions
+- `emergencyPauseQC(address qc, bytes32 reason)` → QC-specific pause (7-day auto-expire)
+- `forceConsensus()` → Override attestation deadlocks (requires ≥1 valid attestation)
+- `pauseMinting()` / `pauseRedemption()` → Global function pauses
+- `checkEscalation(address qc)` → Trigger escalation after 45-minute timer
+
+#### Emergency Authority
+- **PAUSER_ROLE**: Execute pauses (Emergency Council)
+- **ARBITER_ROLE**: Force consensus, resolve disputes
+- **Anyone**: Trigger objective violations via WatchdogEnforcer
+
 ---
 
 ## Table of Contents
@@ -27,6 +40,8 @@ The tBTC v2 Account Control system implements a sophisticated **two-tier pause a
 6. [Integration Patterns](#integration-patterns)
 7. [Security Implications](#security-implications)
 8. [Operational Playbook](#operational-playbook)
+9. [Emergency Scenarios & Solutions](#emergency-scenarios--solutions)
+10. [Implementation Priorities](#implementation-priorities)
 
 ---
 
@@ -595,8 +610,144 @@ async function checkEscalationDue(qc, deadline) {
 
 ---
 
+## Emergency Scenarios & Solutions
+
+### Scenario 1: Attestation System Failure
+**Status**: ✅ **SOLVED** - `forceConsensus()` implemented
+
+**Problem**: Insufficient attesters available, consensus cannot be reached
+**Solution**: ARBITER can force consensus with any available attestation
+**Implementation**: QCReserveLedger.sol:152-187
+
+**Response Procedure**:
+1. Detection: WatchdogEnforcer triggers stale attestation violation
+2. Automatic: QC status → UnderReview (minting paused)
+3. Manual: ARBITER calls `forceConsensus()` with available attestations
+4. Recovery: QC status restored when consensus re-established
+
+### Scenario 2: Coordinated Attack on Multiple QCs
+**Status**: ❌ **NOT IMPLEMENTED** - No batch operations
+
+**Problem**: Multiple QCs compromised simultaneously
+**Current Limitation**: Must pause each QC individually
+
+**Recommended Solution**: Batch operations
+```solidity
+// Proposed functions
+batchSetQCStatus(address[] qcs, QCStatus status, bytes32 reason)
+batchEmergencyPause(address[] qcs, bytes32 reason)
+```
+
+**Current Response Procedure**:
+1. Detection: Multiple QC compromise indicators
+2. Manual: Individual `emergencyPauseQC()` calls per affected QC
+3. Escalation: Consider global minting pause if widespread
+4. Recovery: Individual QC review and restoration
+
+### Scenario 3: Critical Bug in Core Logic
+**Status**: ❌ **NOT IMPLEMENTED** - No live patching
+
+**Problem**: Critical vulnerability discovered in deployed contracts
+**Current Limitation**: Contracts are immutable
+
+**Current Response Procedure**:
+1. Detection: Bug identified in core logic
+2. Manual: Emergency pause of affected functions
+3. Escalation: DAO governance for fix deployment
+4. Recovery: Migration to patched contracts
+
+### Scenario 4: Stale Reserves Recovery
+**Status**: ✅ **SOLVED** - Multiple recovery paths
+
+**Problem**: Reserve attestations become stale
+**Solution**: Automatic detection + manual recovery options
+
+**Response Procedure**:
+1. Automatic: QCs go UnderReview when reserves stale > 24h
+2. Option A: Wait for normal attestation consensus
+3. Option B: ARBITER uses `forceConsensus()` with fresh attestations
+4. Recovery: QC restored to Active status
+
+### Scenario 5: Insufficient Reserves Critical Violation
+**Status**: ✅ **IMPLEMENTED** - Full escalation path
+
+**Problem**: QC reserves fall below required collateral
+**Solution**: 45-minute escalation timer to emergency pause
+
+**Response Procedure**:
+1. Detection: Anyone calls `enforceObjectiveViolation()`
+2. Automatic: QC → UnderReview + 45-minute timer starts
+3. Grace Period: QC can restore reserves within 45 minutes
+4. Escalation: Automatic emergency pause if not resolved
+5. Recovery: ARBITER reviews and potentially restores QC
+
+---
+
+## Implementation Priorities
+
+### Phase 1: Critical Gaps (Immediate)
+1. **Batch Emergency Operations**
+   - Essential for coordinated attack response
+   - Implement `batchEmergencyPause()` and `batchSetQCStatus()`
+   - Gas-limited with appropriate access controls
+
+2. **Enhanced Monitoring Infrastructure**
+   - Real-time escalation timer tracking
+   - Automated alerting for critical violations
+   - Dashboard for emergency response team
+
+3. **Operational Runbooks**
+   - Step-by-step procedures for each scenario
+   - Clear escalation paths and decision trees
+   - Regular drill schedules
+
+### Phase 2: Enhanced Capabilities (Short-term)
+1. **Alternative Attestation Sources**
+   - On-chain proof verification as backup
+   - Integration with additional oracle providers
+   - Automated failover mechanisms
+
+2. **Governance Emergency Framework**
+   - Formalized emergency response team structure
+   - Clear mandate and decision authority
+   - Communication protocols
+
+3. **Testing & Validation**
+   - Comprehensive emergency scenario testing
+   - Stress testing of pause mechanisms
+   - Recovery procedure validation
+
+### Phase 3: Long-term Resilience
+1. **Cross-chain Coordination**
+   - Handle emergencies spanning multiple chains
+   - Unified pause mechanisms where applicable
+   - Coordinated recovery procedures
+
+2. **Economic Attack Defense**
+   - MEV manipulation detection and response
+   - Market manipulation circuit breakers
+   - Dynamic parameter adjustment capabilities
+
+3. **Compliance Framework**
+   - Regulatory-compliant emergency procedures
+   - Audit trail requirements
+   - Reporting mechanisms
+
+---
+
 ## Conclusion
 
-The two-tier pause architecture provides tBTC v2 with sophisticated emergency response capabilities that balance security, availability, and operational flexibility. By avoiding a single kill switch and implementing granular controls, the system can respond proportionally to threats while minimizing disruption to users and maintaining system integrity.
+The two-tier pause architecture, combined with automated enforcement and emergency consensus mechanisms, provides tBTC v2 with sophisticated emergency response capabilities. While some gaps remain (particularly batch operations), the system demonstrates mature security design that balances availability with protection.
 
-This architecture demonstrates mature security design that considers both technical and operational requirements, providing clear paths for incident response while preventing single points of catastrophic failure.
+### Current Strengths
+- ✅ Granular pause controls without kill switch
+- ✅ Automated violation detection and escalation
+- ✅ Emergency consensus for attestation failures
+- ✅ Time-limited pauses prevent permanent lockdown
+
+### Key Improvements Needed
+- ❌ Batch emergency operations for coordinated attacks
+- ❌ Enhanced monitoring and alerting infrastructure
+- ❌ Formalized emergency response procedures
+
+This architecture provides clear paths for incident response while preventing single points of catastrophic failure, demonstrating a thoughtful approach to emergency management in decentralized systems.
