@@ -45,14 +45,12 @@
 |------|-------------|--------|
 | [`WATCHDOG_FINAL_ARCHITECTURE.md`](docs/WATCHDOG_FINAL_ARCHITECTURE.md) | Current watchdog design | Active |
 | [`ORACLE_DESIGN_DECISION.md`](docs/ORACLE_DESIGN_DECISION.md) | Oracle consensus rationale | Active |
-| [`EVIDENCE_STORAGE_FINAL_DESIGN.md`](docs/EVIDENCE_STORAGE_FINAL_DESIGN.md) | Evidence handling design | Active |
 
 #### Analysis & Reports
 | File | Description | Status |
 |------|-------------|--------|
 | [`ROLE_MATRIX.md`](docs/ROLE_MATRIX.md) | Complete role definitions | Active |
 | [`GAS_ANALYSIS_REPORT.md`](docs/GAS_ANALYSIS_REPORT.md) | Gas optimization analysis | Reference |
-| [`DEPLOYMENT_SCRIPT_AUDIT.md`](docs/DEPLOYMENT_SCRIPT_AUDIT.md) | Deployment script review | Reference |
 | [`SLITHER_ANALYSIS_REPORT.md`](docs/SLITHER_ANALYSIS_REPORT.md) | Security analysis results | Reference |
 | [`CODE_REVIEW_CHECKLIST.md`](docs/CODE_REVIEW_CHECKLIST.md) | Review guidelines | Reference |
 
