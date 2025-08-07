@@ -19,7 +19,7 @@
 
 ## Role Overview
 
-The Account Control system implements 16 distinct roles across multiple contracts, following OpenZeppelin's AccessControl pattern.
+The Account Control system implements 17 distinct roles across multiple contracts, following OpenZeppelin's AccessControl pattern.
 
 ### Role Categories
 
@@ -32,11 +32,12 @@ The Account Control system implements 16 distinct roles across multiple contract
    - `PAUSER_ROLE`: Emergency pause capabilities
    - `MINTER_ROLE`: Authorization to mint tBTC
    - `REDEEMER_ROLE`: Process redemption requests
-   - `ARBITER_ROLE`: Handle disputes and status changes
+   - `ARBITER_ROLE`: Handle disputes and full status changes
 
 3. **Watchdog Roles**
    - `WATCHDOG_ROLE`: Participate in consensus voting
    - `WATCHDOG_OPERATOR_ROLE`: Individual watchdog operations
+   - `WATCHDOG_ENFORCER_ROLE`: Limited enforcement (UnderReview only)
    - `ATTESTER_ROLE`: Submit reserve attestations
    - `REGISTRAR_ROLE`: Register Bitcoin wallets
 
@@ -152,17 +153,26 @@ The Account Control system implements 16 distinct roles across multiple contract
 ### ARBITER_ROLE
 - **Purpose**: Authority for disputes and status changes
 - **Capabilities**:
-  - Change QC status
+  - Change QC status (any valid transition)
   - Flag defaulted redemptions
   - Handle dispute resolution
 - **Holders**: 
-  - WatchdogConsensusManager
-  - WatchdogAutomatedEnforcement
-  - Governance (backup)
+  - Governance multisig
+  - Emergency responders
 - **Contracts**: 
   - QCManager
   - QCRedeemer
   - BasicRedemptionPolicy
+
+### WATCHDOG_ENFORCER_ROLE
+- **Purpose**: Limited enforcement authority for objective violations
+- **Capabilities**:
+  - ONLY set QCs to UnderReview status
+  - Cannot set Active or Revoked status
+  - Used for automated enforcement of collateral violations
+- **Holders**: 
+  - WatchdogEnforcer contract (not individuals)
+- **Contracts**: QCManager
 
 ### ATTESTER_ROLE
 - **Purpose**: Submit reserve attestations
@@ -231,7 +241,8 @@ The Account Control system implements 16 distinct roles across multiple contract
 - `QC_ADMIN_ROLE`: QC administration
 - `QC_GOVERNANCE_ROLE`: Governance decisions
 - `REGISTRAR_ROLE`: Wallet registration
-- `ARBITER_ROLE`: Status changes
+- `ARBITER_ROLE`: Status changes (any valid transition)
+- `WATCHDOG_ENFORCER_ROLE`: Limited status changes (only to UnderReview)
 
 ### QCData
 - `DEFAULT_ADMIN_ROLE`: Full control
