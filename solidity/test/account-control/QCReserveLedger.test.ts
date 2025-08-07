@@ -436,4 +436,122 @@ describe("QCReserveLedger", () => {
       await expect(tx).to.emit(reserveLedger, "ConsensusReached")
     })
   })
+
+  describe("forceConsensus", () => {
+    let arbiter: SignerWithAddress
+    const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
+    
+    beforeEach(async () => {
+      arbiter = deployer // deployer has ARBITER_ROLE by default
+    })
+    
+    it("should allow arbiter to force consensus with one attestation", async () => {
+      const balance = ethers.utils.parseEther("100")
+      
+      // Submit only one attestation (below threshold)
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance)
+      
+      // Force consensus
+      const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
+        .withArgs(qcAddress.address, balance, 1, arbiter.address)
+      await expect(tx).to.emit(reserveLedger, "ReserveUpdated")
+      
+      // Verify reserve was updated
+      const [reserveBalance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(balance)
+      expect(isStale).to.be.false
+    })
+    
+    it("should allow arbiter to force consensus with two attestations", async () => {
+      // Submit two different attestations (below threshold)
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("90"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("110"))
+      
+      // Force consensus
+      const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
+      
+      // Verify median was calculated (median of 90, 110 is 100)
+      const [reserveBalance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(ethers.utils.parseEther("100"))
+    })
+    
+    it("should revert if no valid attestations", async () => {
+      // No attestations submitted
+      await expect(
+        reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      ).to.be.revertedWith("No valid attestations to force consensus")
+    })
+    
+    it("should revert if not arbiter", async () => {
+      // Submit attestation
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Try to force consensus without ARBITER_ROLE
+      await expect(
+        reserveLedger.connect(attester1).forceConsensus(qcAddress.address)
+      ).to.be.revertedWith(`AccessControl: account ${attester1.address.toLowerCase()} is missing role ${ARBITER_ROLE}`)
+    })
+    
+    it("should only use valid (non-expired) attestations", async () => {
+      // Submit first attestation
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("50"))
+      
+      // Advance time beyond attestation timeout
+      await ethers.provider.send("evm_increaseTime", [21601]) // 6 hours + 1 second
+      await ethers.provider.send("evm_mine", [])
+      
+      // Submit fresh attestation
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Force consensus should only use the fresh attestation
+      const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
+        .withArgs(qcAddress.address, ethers.utils.parseEther("100"), 1, arbiter.address)
+      
+      const [reserveBalance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(ethers.utils.parseEther("100"))
+    })
+    
+    it("should clear pending attestations after forced consensus", async () => {
+      // Submit attestations
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Force consensus
+      await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // Check that pending attestations were cleared
+      const attestation1 = await reserveLedger.pendingAttestations(qcAddress.address, attester1.address)
+      expect(attestation1.balance).to.equal(0)
+      expect(attestation1.timestamp).to.equal(0)
+    })
+    
+    it("should handle emergency scenario with stale reserves", async () => {
+      // Set up initial reserve
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Advance time to make reserves stale
+      await ethers.provider.send("evm_increaseTime", [86401]) // 24 hours + 1 second
+      await ethers.provider.send("evm_mine", [])
+      
+      // Verify reserves are stale
+      let [balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(isStale).to.be.true
+      
+      // Submit new attestation (but not enough for consensus)
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("150"))
+      
+      // Arbiter forces consensus with available attestation
+      await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // Verify reserves are updated and no longer stale
+      ;[balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(ethers.utils.parseEther("150"))
+      expect(isStale).to.be.false
+    })
+  })
 })
