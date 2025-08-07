@@ -4,6 +4,7 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/IRedemptionPolicy.sol";
 import "./ProtocolRegistry.sol";
+import "./SystemState.sol";
 import "../token/TBTC.sol";
 import "../bridge/BitcoinTx.sol";
 
@@ -43,6 +44,7 @@ contract QCRedeemer is AccessControl {
     bytes32 public constant REDEMPTION_POLICY_KEY =
         keccak256("REDEMPTION_POLICY");
     bytes32 public constant TBTC_TOKEN_KEY = keccak256("TBTC_TOKEN");
+    bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
 
     /// @dev Redemption status enumeration
     enum RedemptionStatus {
@@ -131,6 +133,14 @@ contract QCRedeemer is AccessControl {
                 (addr[0] == 0x62 && addr.length > 1 && addr[1] == 0x63))
         ) {
             revert InvalidBitcoinAddressFormat();
+        }
+
+        // Check if QC is emergency paused
+        SystemState systemState = SystemState(
+            protocolRegistry.getService(SYSTEM_STATE_KEY)
+        );
+        if (systemState.isQCEmergencyPaused(qc)) {
+            revert SystemState.QCIsEmergencyPaused(qc);
         }
 
         IRedemptionPolicy policy = IRedemptionPolicy(

@@ -48,12 +48,12 @@ The tBTC v2 Account Control system enables **Qualified Custodians** (regulated i
 │    (Enhanced)       │   (Dual-Path)       │     (Optimized)         │
 ├─────────────────────┼─────────────────────┼─────────────────────────┤
 │                     │                     │                         │
-│ QCManager           │ V1.1 System:        │ BasicMintingPolicy      │
+│ QCManager           │ v1 System:          │ BasicMintingPolicy      │
 │ QCData              │ • QCWatchdog        │                         │
 │ QCMinter            │ • ConsensusManager  │ • Direct Integration    │
 │ QCRedeemer          │ • WatchdogMonitor   │ • 50% Gas Savings       │
 │ QCReserveLedger     │                     │ • Registry-based        │
-│                     │ V1.2 Framework:     │                         │
+│                     │ v1 Framework:       │                         │
 │ • Bitcoin Wallets   │ • AutoEnforcement   │                         │
 │ • Reserve Tracking  │ • ThresholdActions  │                         │
 │ • SPV Verification  │ • DAO Escalation    │                         │
@@ -364,10 +364,10 @@ The system deploys through numbered scripts ensuring proper dependency resolutio
 1. `95_deploy_account_control_core.ts` - Core QC management contracts
 2. `96_deploy_account_control_state.ts` - System state and registry
 3. `97_deploy_account_control_policies.ts` - Minting and redemption policies
-4. `98_deploy_account_control_watchdog.ts` - V1.1 watchdog consensus system
+4. `98_deploy_account_control_watchdog.ts` - v1 watchdog consensus system
 5. `99_configure_account_control_system.ts` - Final system configuration
 
-**V1.2 Automation Framework (Scripts 100-102)**:
+**v1 Automation Framework (Scripts 100-102)**:
 6. `100_deploy_automated_decision_framework.ts` - Three-layer automation system
 7. `101_configure_automated_decision_framework.ts` - Role assignments and parameters
 
@@ -405,9 +405,9 @@ The modular architecture enables seamless evolution through policy upgrades:
 
 **Current → V2 Migration Path**:
 ```
-V1.1 Dual-Path (Production)
+v1 Dual-Path (Production)
     ↓
-V1.2 Automated Framework (Enhanced)  
+v1 Enhanced Framework  
     ↓
 V2.0 Crypto-Economic (Trust-minimized)
     ↓
@@ -552,7 +552,7 @@ The tBTC v2 Account Control architecture represents a sophisticated balance of a
 - **Future-proof evolution** via policy-driven architecture
 - **Comprehensive security** through multiple validation layers
 
-The architecture's strength lies in its ability to evolve - from the current V1.1 production system through V1.2 automation enhancements toward future crypto-economic trust-minimization - all while maintaining interface stability and operational continuity.
+The architecture's strength lies in its ability to evolve - from the current v1 production system through enhanced automation toward future crypto-economic trust-minimization - all while maintaining interface stability and operational continuity.
 
 This comprehensive specification serves as the definitive reference for understanding, deploying, and maintaining the complete Account Control system across all architectural versions and operational environments.
 
@@ -560,5 +560,5 @@ This comprehensive specification serves as the definitive reference for understa
 
 **Document History**:
 - v2.0 (2025-08-04): Consolidated architecture specification
-- Combines: ARCHITECTURE.md, V1.1 specification, and Future Enhancements
-- Covers: Complete V1.1 production + V1.2 automation framework
+- Combines: ARCHITECTURE.md, v1 specification, and Future Enhancements
+- Covers: Complete v1 production + automation framework
