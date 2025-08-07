@@ -3,7 +3,7 @@ import { expect } from "chai"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { Contract } from "ethers"
 
-describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
+describe("v1 System Deployment Tests", () => {
   let deployer: SignerWithAddress
   let governance: SignerWithAddress
 
@@ -11,13 +11,13 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
     ;({ deployer, governance } = await helpers.signers.getNamedSigners())
   })
 
-  describe("V1.1 Only Deployment", () => {
+  describe("v1 System Deployment", () => {
     beforeEach(async () => {
-      // Deploy only up to script 99 (V1.1 system)
-      await deployments.fixture(["AccountControl"])
+      // Deploy complete v1 system
+      await deployments.fixture(["AccountControl", "AutomatedDecisionFramework"])
     })
 
-    it("should have V1.1 core contracts deployed", async () => {
+    it("should have v1 core contracts deployed", async () => {
       // Core Account Control contracts
       const qcManager = await deployments.get("QCManager")
       expect(qcManager.address).to.not.equal(ethers.constants.AddressZero)
@@ -47,19 +47,19 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
       expect(redemptionPolicy.address).to.not.equal(ethers.constants.AddressZero)
     })
 
-    it("should NOT have V1.2 contracts deployed", async () => {
-      // V1.2 contracts should not exist
-      await expect(deployments.get("WatchdogAutomatedEnforcement"))
-        .to.be.rejectedWith("No deployment found")
+    it("should have v1 automation contracts deployed", async () => {
+      // v1 automation contracts should exist
+      const automatedEnforcement = await deployments.get("WatchdogAutomatedEnforcement")
+      expect(automatedEnforcement.address).to.not.equal(ethers.constants.AddressZero)
 
-      await expect(deployments.get("WatchdogThresholdActions"))
-        .to.be.rejectedWith("No deployment found")
+      const thresholdActions = await deployments.get("WatchdogThresholdActions")
+      expect(thresholdActions.address).to.not.equal(ethers.constants.AddressZero)
 
-      await expect(deployments.get("WatchdogDAOEscalation"))
-        .to.be.rejectedWith("No deployment found")
+      const daoEscalation = await deployments.get("WatchdogDAOEscalation")
+      expect(daoEscalation.address).to.not.equal(ethers.constants.AddressZero)
     })
 
-    it("should have proper V1.1 service registrations", async () => {
+    it("should have proper v1 service registrations", async () => {
       const qcManager = await helpers.contracts.getContract("QCManager")
       const systemState = await helpers.contracts.getContract("SystemState")
 
@@ -78,7 +78,7 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
       expect(redeemerSystemState).to.equal(systemState.address)
     })
 
-    it("should support basic V1.1 operations", async () => {
+    it("should support basic v1 operations", async () => {
       const [watchdog1, qc1] = await helpers.signers.getUnnamedSigners()
       
       // Deploy a QCWatchdog instance
@@ -120,32 +120,7 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
     })
   })
 
-  describe("V1.1 + V1.2 Full Deployment", () => {
-    beforeEach(async () => {
-      // Deploy all contracts including V1.2
-      await deployments.fixture(["AccountControl", "AutomatedDecisionFramework"])
-    })
-
-    it("should have both V1.1 and V1.2 contracts deployed", async () => {
-      // V1.1 contracts
-      const qcManager = await deployments.get("QCManager")
-      expect(qcManager.address).to.not.equal(ethers.constants.AddressZero)
-
-      const watchdogMonitor = await deployments.get("WatchdogMonitor")
-      expect(watchdogMonitor.address).to.not.equal(ethers.constants.AddressZero)
-
-      // V1.2 contracts
-      const automatedEnforcement = await deployments.get("WatchdogAutomatedEnforcement")
-      expect(automatedEnforcement.address).to.not.equal(ethers.constants.AddressZero)
-
-      const thresholdActions = await deployments.get("WatchdogThresholdActions")
-      expect(thresholdActions.address).to.not.equal(ethers.constants.AddressZero)
-
-      const daoEscalation = await deployments.get("WatchdogDAOEscalation")
-      expect(daoEscalation.address).to.not.equal(ethers.constants.AddressZero)
-    })
-
-    it("should have V1.2 contracts properly integrated with V1.1", async () => {
+    it("should have automation contracts properly integrated", async () => {
       const automatedEnforcement = await helpers.contracts.getContract("WatchdogAutomatedEnforcement")
       const thresholdActions = await helpers.contracts.getContract("WatchdogThresholdActions")
       const daoEscalation = await helpers.contracts.getContract("WatchdogDAOEscalation")
@@ -154,7 +129,7 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
       const qcManager = await helpers.contracts.getContract("QCManager")
       const systemState = await helpers.contracts.getContract("SystemState")
 
-      // V1.2 contracts should have proper addresses set
+      // Automation contracts should have proper addresses set
       const enforcementQCManager = await automatedEnforcement.qcManager()
       expect(enforcementQCManager).to.equal(qcManager.address)
 
@@ -170,7 +145,7 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
       expect(daoQCManager).to.equal(qcManager.address)
     })
 
-    it("should have proper role configurations for V1.2", async () => {
+    it("should have proper role configurations for automation", async () => {
       const automatedEnforcement = await helpers.contracts.getContract("WatchdogAutomatedEnforcement")
       const daoEscalation = await helpers.contracts.getContract("WatchdogDAOEscalation")
 
@@ -186,7 +161,7 @@ describe("Deployment Variations Tests (V1.1 only vs V1.1 + V1.2)", () => {
       expect(daoRole).to.not.equal(ethers.constants.HashZero)
     })
 
-    it("should support V1.2 automated operations", async () => {
+    it("should support v1 automated operations", async () => {
       const [watchdog1, qc1] = await helpers.signers.getUnnamedSigners()
       const automatedEnforcement = await helpers.contracts.getContract("WatchdogAutomatedEnforcement")
       const qcManager = await helpers.contracts.getContract("QCManager")

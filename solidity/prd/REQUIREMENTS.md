@@ -195,7 +195,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - Enforcement events provide transparency for DAO monitoring
 - Permissionless enforcement of objective violations (INSUFFICIENT_RESERVES, STALE_ATTESTATIONS)
 - All operations protected by ReentrancyGuard and comprehensive access control
-- V1.2 framework achieves 90%+ automation for measurable violations
+- v1 framework achieves 90%+ automation for measurable violations
 
 #### 3.4.2 Proof-of-Reserves Process (REQ-FUNC-POR-001)
 

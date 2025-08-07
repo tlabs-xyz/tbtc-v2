@@ -45,7 +45,7 @@ The tBTC v2 Account Control system enables **Qualified Custodians** (regulated i
 │                    tBTC v2 Account Control System                   │
 ├─────────────────────┬─────────────────────┬─────────────────────────┤
 │   QC Management     │   Watchdog System   │   Protocol Integration  │
-│    (Enhanced)       │   (Dual-Path)       │     (Optimized)         │
+│                     │                     │                         │
 ├─────────────────────┼─────────────────────┼─────────────────────────┤
 │                     │                     │                         │
 │ QCManager           │ v1 System:          │ BasicMintingPolicy      │
@@ -295,7 +295,7 @@ WatchdogEnforcer:
 
 ### ProtocolRegistry Usage
 
-**Direct Integration** (Gas Optimized):
+**Direct Integration**:
 - Bank contract - Core balance management
 - TBTCVault contract - Token minting/burning
 - TBTC token contract - ERC-20 operations
@@ -405,9 +405,9 @@ The modular architecture enables seamless evolution through policy upgrades:
 
 **Current → V2 Migration Path**:
 ```
-v1 Dual-Path (Production)
+v1 System (Production)
     ↓
-v1 Enhanced Framework  
+v1 Framework  
     ↓
 V2.0 Crypto-Economic (Trust-minimized)
     ↓
@@ -421,7 +421,7 @@ V3.0 Fully Autonomous (AI-driven)
 - **Health Checking**: Automated monitoring integration
 - **Performance Metrics**: Real-time service health monitoring
 
-#### 2. Enhanced Minting Strategies
+#### 2. Advanced Minting Strategies
 - **Strategy Enum**: Replace boolean with flexible options
 - **Batch Operations**: Gas optimization for high-volume QCs
 - **Conditional Minting**: Smart execution based on market conditions
@@ -429,7 +429,7 @@ V3.0 Fully Autonomous (AI-driven)
 #### 3. Advanced Security Features
 - **Cryptographic Proof-of-Reserves**: Replace trust-based attestations
 - **Granular Emergency Controls**: Fine-grained pause mechanisms
-- **Multi-signature Integration**: Enhanced institutional controls
+- **Multi-signature Integration**: Advanced institutional controls
 
 #### 4. DeFi Integration
 - **Liquidity Provision**: QC reserves as DeFi collateral
@@ -447,7 +447,7 @@ V3.0 Fully Autonomous (AI-driven)
 - Service versioning support
 - Cryptographic proof-of-reserves
 - Batch operations support
-- Enhanced emergency controls
+- Advanced emergency controls
 
 **Medium Priority** (12-18 months):
 - Advanced minting strategies
@@ -536,7 +536,7 @@ uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
 
 **Informational Alerts**:
 - Successful policy upgrades
-- New QC onboarding
+- QC onboarding
 - System parameter changes
 - Regular health check reports
 
@@ -544,7 +544,7 @@ uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
 
 ## Conclusion
 
-The tBTC v2 Account Control architecture represents a sophisticated balance of automation, security, and institutional requirements. Through its modular design, dual-path watchdog system, and direct Bank integration, it achieves:
+The tBTC v2 Account Control architecture represents a sophisticated balance of automation, security, and institutional requirements. Through its modular design, watchdog system, and direct Bank integration, it achieves:
 
 - **90%+ operational automation** with human oversight for critical decisions
 - **50% gas cost reduction** through direct protocol integration

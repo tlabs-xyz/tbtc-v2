@@ -30,7 +30,7 @@
 
 ### Archived Documentation
 - **archive/** - Historical documentation preserved for reference
-  - `v1.1-v1.2/` - Old dual-path watchdog system
+  - `v1/` - Watchdog system
   - `watchdog-migration/` - Migration process docs
   - `audit-phases/` - Phase 1-4 summaries
 
