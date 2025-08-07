@@ -4,6 +4,7 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/IMintingPolicy.sol";
 import "./ProtocolRegistry.sol";
+import "./SystemState.sol";
 
 /// @title QCMinter
 /// @notice Stable entry point for tBTC minting with Policy delegation
@@ -20,6 +21,7 @@ contract QCMinter is AccessControl {
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant MINTING_POLICY_KEY = keccak256("MINTING_POLICY");
+    bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
 
     ProtocolRegistry public immutable protocolRegistry;
 
@@ -52,6 +54,14 @@ contract QCMinter is AccessControl {
     {
         if (qc == address(0)) revert InvalidQCAddress();
         if (amount == 0) revert InvalidAmount();
+
+        // Check if QC is emergency paused
+        SystemState systemState = SystemState(
+            protocolRegistry.getService(SYSTEM_STATE_KEY)
+        );
+        if (systemState.isQCEmergencyPaused(qc)) {
+            revert SystemState.QCIsEmergencyPaused(qc);
+        }
 
         // Get active minting policy from registry
         IMintingPolicy policy = IMintingPolicy(
