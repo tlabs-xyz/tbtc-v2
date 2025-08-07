@@ -333,12 +333,45 @@ The system separates concerns into:
 
 **Purpose**: Unified multi-attester oracle and reserve data storage
 
+**Architecture Design**: Oracle + Slim Ledger Architecture
+
+The QCReserveLedger implements a two-component architecture:
+1. **ReserveOracle**: Handles multi-attester consensus (internal logic)
+2. **QCReserveLedger**: Stores consensus results and maintains history (external interface)
+
+```
+┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│   Attester 1        │     │   Attester 2        │     │   Attester 3-N      │
+└──────────┬──────────┘     └──────────┬──────────┘     └──────────┬──────────┘
+           │                           │                           │
+           │ submitAttestation()       │                           │
+           ▼                           ▼                           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            ReserveOracle (Internal)                          │
+│  - Receives multiple attestations                                           │
+│  - Calculates consensus (median)                                            │
+│  - Validates freshness                                                      │
+│  - No permanent storage                                                     │
+└─────────────────────────────────────┬───────────────────────────────────────┘
+                                      │
+                                      │ pushConsensusAttestation()
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          QCReserveLedger (External)                         │
+│  - Stores consensus values only                                             │
+│  - Maintains attestation history                                            │
+│  - Provides staleness checking                                              │
+│  - Handles invalidations                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
 **Key Features**:
 - Multi-attester consensus system for reserve balance tracking
 - Byzantine fault tolerance with median calculation from 3+ attesters
 - Staleness detection for outdated attestations
 - Historical reserve tracking and validation
 - Direct integration with WatchdogEnforcer for violation detection
+- Clear trust boundary between untrusted attestations and trusted consensus data
 
 **Core Functions**:
 ```solidity
@@ -359,6 +392,14 @@ function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) // Emergency
 - **Efficient Implementation**: Insertion sort + median for small attester sets (≤10 attesters)
 - **Threshold Protection**: Requires minimum 3 attestations before any balance update
 - **Atomic Operations**: Consensus and storage happen atomically to prevent inconsistencies
+- **Deviation Tolerance**: 5% acceptable deviation to handle minor discrepancies
+- **Consensus Window**: 6 hours for fresh attestations only
+
+**Design Principles**:
+1. **No Individual Attestations in Ledger**: Only consensus-validated values stored
+2. **Oracle as Pure Function**: Minimal state for consensus calculation
+3. **Clear Trust Boundary**: Explicit separation between proposals and facts
+4. **Separation of Concerns**: Oracle solves trust, ledger solves storage
 
 **Emergency Consensus Mechanism**:
 - **Function**: `forceConsensus(address qc)` - ARBITER_ROLE only
@@ -697,8 +738,170 @@ This comprehensive specification serves as the definitive reference for understa
 
 ---
 
+---
+
+## Architecture Decision Records (ADRs)
+
+### Overview
+
+This section records significant architectural decisions made during the development of the Account Control system for tBTC v2.
+
+### ADR-001: Watchdog System Simplification
+
+**Date**: 2025-08-06  
+**Status**: Accepted and Implemented
+
+**Context**: Alternative approaches considered included complex systems with 6+ contracts with overlapping responsibilities:
+- WatchdogAutomatedEnforcement
+- WatchdogConsensusManager  
+- WatchdogDAOEscalation
+- WatchdogThresholdActions
+- WatchdogMonitor
+- QCWatchdog
+
+Critical issue identified: **Machines cannot interpret human-readable strings** - the OptimisticWatchdogConsensus expected automated systems to understand strings like "excessive_slippage_observed".
+
+**Decision**: Migrate to a simplified 3-contract architecture focused on objective enforcement:
+1. **Oracle Problem** → `QCReserveLedger` (multi-attester consensus)
+2. **Enforcement** → `WatchdogEnforcer` (permissionless with reason codes)
+3. **Validation** → `WatchdogReasonCodes` (machine-readable violation codes)
+
+**Consequences**:
+- Positive: 50% reduction in contracts (6 → 3), machine-readable reason codes enable automation, no single points of trust, gas optimization through minimal state
+- Negative: Additional complexity to implement, documentation updates needed, retraining for operators
+
+### ADR-002: Machine-Readable Reason Codes
+
+**Date**: 2025-08-05  
+**Status**: Accepted and Implemented
+
+**Context**: Original system used human-readable strings for violations like "excessive_slippage_observed", "suspicious_minting_pattern". Machines cannot interpret semantic meaning from strings.
+
+**Decision**: Replace strings with standardized bytes32 reason codes:
+```solidity
+bytes32 constant INSUFFICIENT_RESERVES = keccak256("INSUFFICIENT_RESERVES");
+bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
+```
+
+**Consequences**:
+- Positive: Enables automated validation, reduces gas costs (bytes32 vs string), prevents interpretation attacks
+- Negative: Less human-readable in logs, requires mapping for UI display
+
+### ADR-003: Oracle Consensus for Reserve Attestations
+
+**Date**: 2025-08-05  
+**Status**: Accepted and Implemented
+
+**Context**: Original design trusted a single attester for reserve balances - single point of failure. User feedback: "we don't trust single watchdogs"
+
+**Decision**: Implement multi-attester oracle consensus:
+- Minimum 3 attesters required
+- Median calculation for robustness
+- Automatic consensus when threshold met
+
+**Consequences**:
+- Positive: Eliminates single trust point, Byzantine fault tolerance, robust against manipulation
+- Negative: Higher operational complexity, requires multiple attesters, slightly higher gas costs
+
+### ADR-004: Remove proposedAction Field
+
+**Date**: 2025-08-05  
+**Status**: Accepted and Implemented
+
+**Context**: Initial design included `proposedAction` field in subjective reports. User feedback: "watchdogs should report observations, DAO should investigate and make judgment"
+
+**Decision**: Remove `proposedAction` field entirely. Watchdogs only report observations, DAO decides actions.
+
+**Consequences**:
+- Positive: Clear separation of concerns, prevents watchdog overreach, simplifies report structure
+- Negative: DAO must interpret observations, no automated remediation hints
+
+### ADR-005: No Rate Limiting for Reports
+
+**Date**: 2025-08-05  
+**Status**: Accepted and Implemented
+
+**Context**: Proposed various rate limiting mechanisms to prevent spam. User feedback: "I don't think any rate-limiting ideas you shared are actually good"
+
+**Decision**: No explicit rate limiting - rely on:
+- Gas costs as natural deterrent
+- Role-gating (WATCHDOG_ROLE required)
+- Support thresholds for importance
+
+**Consequences**:
+- Positive: Simpler implementation, no artificial constraints, emergencies not blocked
+- Negative: Potential for spam if gas is cheap, requires active DAO monitoring
+
+### ADR-006: Evidence Storage via Hashes
+
+**Date**: 2025-08-05  
+**Status**: Accepted and Implemented
+
+**Context**: Need to store evidence for subjective reports without DoS vulnerability.
+
+**Decision**: Store evidence hashes on-chain (max 20 per report), actual content via watchdog REST APIs.
+
+**Consequences**:
+- Positive: Bounded on-chain storage, no DoS vulnerability, leverages existing infrastructure
+- Negative: Requires off-chain availability, trust in watchdog REST APIs
+
+### ADR-007: Direct DAO Action Model
+
+**Date**: 2025-08-05  
+**Status**: Accepted and Implemented
+
+**Context**: Initial design included WatchdogDAOBridge as intermediary. User feedback: "why cant the dao simply observe onchain reporting, discuss it offchain and then take action?"
+
+**Decision**: Remove DAOBridge entirely. DAO monitors events directly and takes action through governance.
+
+**Consequences**:
+- Positive: Eliminates unnecessary contract, simpler architecture, direct accountability
+- Negative: Requires DAO tooling for monitoring, no automated escalation
+
+### ADR-009: Permissionless Enforcement
+
+**Date**: 2025-08-05  
+**Status**: Accepted and Implemented
+
+**Context**: Original system required specific roles to trigger enforcement actions.
+
+**Decision**: Allow anyone to call `enforceObjectiveViolation()` - validation ensures only real violations trigger.
+
+**Consequences**:
+- Positive: No dependency on specific operators, faster response to violations, increased system resilience
+- Negative: Potential for griefing attempts, higher validation gas costs
+
+### ADR-010: Support-Based Report Filtering
+
+**Date**: 2025-08-05  
+**Status**: Accepted and Implemented
+
+**Context**: Need mechanism to filter important reports without explicit severity levels.
+
+**Decision**: Use support count as natural importance indicator:
+- SECURITY_OBSERVATION: 0 supporters (immediate)
+- COMPLIANCE_QUESTION: 1 supporter
+- Others: 3 supporters for visibility
+
+**Consequences**:
+- Positive: Organic importance emergence, no artificial severity scale, community-driven prioritization
+- Negative: Requires multiple watchdogs, delayed response for non-critical
+
+### Architecture Decisions Summary
+
+The architectural decisions reflect a philosophy of:
+1. **Simplification** over feature completeness
+2. **Trust distribution** over efficiency
+3. **Clear separation** over integration
+4. **Machine readability** over human interpretation
+5. **Direct action** over intermediation
+
+These decisions resulted in a 33% reduction in contract count while improving security and clarity.
+
+---
+
 **Document History**:
-- v3.0 (2025-08-06): Final consolidated architecture specification
+- v3.0 (2025-08-06): Final consolidated architecture specification with ADRs
 - v2.0 (2025-08-04): Consolidated architecture specification
-- Combines: ARCHITECTURE.md, WATCHDOG_FINAL_ARCHITECTURE.md, and Future Enhancements
-- Covers: Complete production system + automation framework + emergency consensus
+- Combines: ARCHITECTURE.md, WATCHDOG_FINAL_ARCHITECTURE.md, Future Enhancements, ARCHITECTURE_DECISIONS.md, and ORACLE_DESIGN_DECISION.md
+- Covers: Complete production system + automation framework + emergency consensus + all architectural decisions
