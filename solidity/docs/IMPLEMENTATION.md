@@ -432,7 +432,7 @@ bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 - **PARAMETER_ADMIN_ROLE**: Can update system parameters
 - **PAUSER_ROLE**: Can pause/unpause system operations
 
-#### v1 Watchdog System Roles
+#### Watchdog System Roles
 ```solidity
 // WatchdogConsensusManager
 bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
@@ -565,9 +565,9 @@ deploy/
 ├── 95_deploy_account_control_core.ts       # Core QC management
 ├── 96_deploy_account_control_state.ts      # System state and registry
 ├── 97_deploy_account_control_policies.ts   # Minting/redemption policies
-├── 98_deploy_account_control_watchdog.ts   # v1 watchdog system  
+├── 98_deploy_account_control_watchdog.ts   # watchdog system  
 ├── 99_configure_account_control_system.ts  # Final configuration
-├── 100_deploy_automated_framework.ts       # v1 automation
+├── 100_deploy_automated_framework.ts       # automation framework
 └── 101_configure_automated_framework.ts    # Automation configuration
 ```
 
@@ -595,7 +595,7 @@ npx hardhat deploy --tags "AccountControlState" --network <network>
 npx hardhat deploy --tags "AccountControlPolicies" --network <network>
 ```
 
-#### Step 4: v1 Watchdog System
+#### Step 4: Watchdog System
 ```bash
 # Deploy watchdog consensus system
 npx hardhat deploy --tags "AccountControlWatchdog" --network <network>
@@ -675,7 +675,7 @@ contract SystemState {
 }
 ```
 
-**v1 Watchdog Configuration**:
+**Watchdog Configuration**:
 ```solidity
 // WatchdogConsensusManager configuration
 struct ConsensusParams {

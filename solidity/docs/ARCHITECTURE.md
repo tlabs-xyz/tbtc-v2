@@ -226,6 +226,73 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 
 ---
 
+## Design Rationale
+
+### Core Architectural Decisions
+
+#### Why Direct Bank Integration?
+
+**Decision**: Integrate directly with existing tBTC Bank/Vault infrastructure rather than creating abstraction layers.
+
+**Rationale**:
+- **Simplicity**: Eliminates unnecessary abstraction layers that add complexity
+- **Proven Infrastructure**: Leverages battle-tested Bank/Vault architecture with known security properties
+- **Gas Efficiency**: Direct integration reduces transaction costs by ~50% compared to layered approaches
+- **Reduced Risk**: Fewer contracts in the critical path means fewer potential failure points
+- **Perfect Fungibility**: QC-minted tBTC is indistinguishable from Bridge-minted tBTC
+
+#### Why Simplified Watchdog System?
+
+**Decision**: Focus on objective enforcement only, abandoning complex consensus mechanisms.
+
+**Rationale**:
+- **Operational Complexity vs. Theoretical Security**: Complex consensus mechanisms proved operationally burdensome with 90% of watchdog operations being routine
+- **Gas Efficiency Requirements**: Complex voting mechanisms consumed excessive gas, creating poor user experience
+- **Machine vs Human Interpretation**: Original design required machines to interpret human-readable proposals, which proved difficult to automate effectively
+- **YAGNI Principle**: Many sophisticated features designed for theoretical edge cases were never needed in practice
+
+#### Why Three-Layer Decision Framework?
+
+**Decision**: Separate deterministic enforcement (90%), threshold consensus (9%), and governance arbitration (1%).
+
+**Rationale**:
+- **Layer 1 (Deterministic)**: 90%+ automation through objective rule enforcement for measurable violations
+- **Layer 2 (Threshold)**: Human-supervised consensus only for subjective issues requiring multiple attestations
+- **Layer 3 (Governance)**: Final arbitration reserved for truly complex decisions requiring DAO intervention
+- **Efficiency Focus**: Most operations should be automated, with human intervention only when necessary
+
+#### Why Machine-Readable Evidence System?
+
+**Decision**: Use structured evidence with cryptographic verification instead of human-readable proposals.
+
+**Rationale**:
+- **Automation Enablement**: Structured data enables true machine processing and validation
+- **Evidence Hash**: Cryptographic verification ensures evidence integrity without trusting intermediaries
+- **IPFS URI Pattern**: Decentralized storage provides detailed evidence while keeping on-chain data minimal
+- **Threshold Mechanisms**: Clear quantitative triggers (3+ reports within 24 hours) remove subjective interpretation
+
+#### Why Multi-Attester Consensus for Reserves?
+
+**Decision**: Require 3+ independent attestations with median calculation for reserve balances.
+
+**Rationale**:
+- **Single Point of Trust Elimination**: No single attester can manipulate reserve data
+- **Byzantine Fault Tolerance**: System continues operating even with malicious or failed attesters
+- **Objective Facts Only**: Reserve balances are objective, measurable facts suitable for consensus
+- **Staleness Detection**: Time-based validation ensures data freshness without complex coordination
+
+### Technical Constraints
+
+**Contract Size Limits**: Ethereum contract size limits necessitate library patterns for modular functionality.
+
+**Gas Optimization**: Storage layouts and function designs prioritize gas efficiency for institutional users performing frequent operations.
+
+**SPV Complexity**: Bitcoin SPV proof validation complexity requires reusing existing infrastructure rather than reimplementation.
+
+**Testing Requirements**: Advanced mocking capabilities needed for comprehensive coverage across multiple blockchain interactions.
+
+---
+
 ## Simplified Watchdog System
 
 ### Two-Problem Framework
@@ -591,7 +658,7 @@ The tBTC v2 Account Control architecture represents a sophisticated balance of a
 - **Future-proof evolution** via policy-driven architecture
 - **Comprehensive security** through multiple validation layers
 
-The architecture's strength lies in its ability to evolve - from the current v1 production system through automation toward future crypto-economic trust-minimization - all while maintaining interface stability and operational continuity.
+The architecture's strength lies in its ability to evolve - from the current production system through automation toward future crypto-economic trust-minimization - all while maintaining interface stability and operational continuity.
 
 ## Complete System Overview
 
@@ -633,5 +700,5 @@ This comprehensive specification serves as the definitive reference for understa
 **Document History**:
 - v3.0 (2025-08-06): Final consolidated architecture specification
 - v2.0 (2025-08-04): Consolidated architecture specification
-- Combines: ARCHITECTURE.md, WATCHDOG_FINAL_ARCHITECTURE.md, v1 specification, and Future Enhancements
-- Covers: Complete v1 production + automation framework + emergency consensus
+- Combines: ARCHITECTURE.md, WATCHDOG_FINAL_ARCHITECTURE.md, and Future Enhancements
+- Covers: Complete production system + automation framework + emergency consensus

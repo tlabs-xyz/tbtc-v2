@@ -2,7 +2,7 @@
 
 **Document Version**: 2.0  
 **Date**: 2025-08-06  
-**Architecture**: Simplified Watchdog System (Post-Migration)  
+**Architecture**: Simplified Watchdog System  
 **Status**: Production Ready
 
 ---
@@ -27,7 +27,6 @@ Welcome to the Account Control system documentation. This feature extends tBTC v
 | **[../docs/CURRENT_SYSTEM_STATE.md](../docs/CURRENT_SYSTEM_STATE.md)** | Current system state (truth source) | All stakeholders |
 | **[../docs/WATCHDOG_FINAL_ARCHITECTURE.md](../docs/WATCHDOG_FINAL_ARCHITECTURE.md)** | Watchdog system architecture | Technical teams |
 | **[../docs/future-enhancements/FUTURE_ENHANCEMENTS.md](../docs/future-enhancements/FUTURE_ENHANCEMENTS.md)**           | V2 roadmap and enhancements  | Product, architects     |
-| **[RESEARCH.md](RESEARCH.md)**                                 | Background research findings | Researchers, architects |
 | **[../DOCUMENTATION_MAP.md](../DOCUMENTATION_MAP.md)** | Complete documentation navigation | All stakeholders |
 
 ---
@@ -40,7 +39,7 @@ Account Control enables **Qualified Custodians** (regulated institutional entiti
 
 ### Key Innovation: Direct Bank Integration
 
-Unlike abstraction-layer approaches, Account Control integrates directly with the existing tBTC Bank/Vault architecture:
+Account Control integrates directly with the existing tBTC Bank/Vault architecture:
 
 ```
 User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
@@ -159,17 +158,9 @@ The system deploys as an **independent contract suite** without modifying existi
 - **Gas Efficiency**: Direct integration reduces transaction costs
 - **Reduced Risk**: Fewer contracts in the critical path
 
-### Watchdog System Migration (v2.0)
+### Watchdog System Design
 
-#### The Problem with v1.x
-The original watchdog system had fundamental issues:
-- **Machine Interpretation Problem**: Contracts expected machines to interpret human-readable strings
-- **Single Point of Trust**: One attester for critical reserve attestations
-- **Over-Complexity**: 6+ overlapping contracts with unclear responsibilities
-- **State Machine Overhead**: Complex voting and escalation for objective facts
-
-#### The Solution: Focused Objective Enforcement
-We simplified to address only objective, measurable violations:
+The watchdog system focuses on objective, measurable violations through three key solutions:
 
 1. **Oracle Problem** (Objective Facts)
    - Solution: Multi-attester consensus via `QCReserveLedger`
@@ -183,8 +174,8 @@ We simplified to address only objective, measurable violations:
    - Solution: Direct DAO action for any non-automated decisions
    - DAO monitors enforcement events and can override if needed
 
-#### Migration Benefits
-- **50% Fewer Contracts**: 6 old contracts → 3 new contracts
+#### System Benefits
+- **Minimal Contracts**: 3-contract architecture for clarity and efficiency
 - **Machine-Readable**: Reason codes enable automated validation
 - **Trust Distribution**: No single points of failure
 - **Permissionless Enforcement**: Anyone can trigger objective violations
@@ -193,7 +184,7 @@ We simplified to address only objective, measurable violations:
 ### Why Policy-Driven Architecture?
 
 - **Upgradeability**: Business logic can evolve without core contract changes
-- **Future-Proofing**: Clear path from attestation-based V1 to crypto-economic V2
+- **Future-Proofing**: Clear upgrade path to future crypto-economic enhancements
 - **Interface Stability**: Core contracts maintain stable interfaces
 - **Risk Management**: Isolated upgrade risks to policy contracts only
 
@@ -220,7 +211,7 @@ We simplified to address only objective, measurable violations:
 | ------- | ---------- | ------------------------------------------ |
 | 1.0     | 2025-07-11 | Initial consolidated documentation release |
 | 1.1     | 2025-08-04 | Dual-path watchdog + automated framework  |
-| 2.0     | 2025-08-06 | Simplified watchdog migration complete    |
+| 2.0     | 2025-08-06 | Simplified watchdog system finalized     |
 
 ---
 
