@@ -26,7 +26,6 @@
 ### Analysis & Reports
 - **ROLE_MATRIX.md** - Complete role structure
 - **GAS_ANALYSIS_REPORT.md** - Gas optimization analysis
-- **DEPLOYMENT_SCRIPT_AUDIT.md** - Deployment review
 - **SLITHER_ANALYSIS_REPORT.md** - Security analysis
 - **CODE_REVIEW_CHECKLIST.md** - Review guidelines
 
