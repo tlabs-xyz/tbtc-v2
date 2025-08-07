@@ -81,8 +81,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 | Component                       | Purpose                      | Key Features                                      |
 | ------------------------------- | ---------------------------- | ------------------------------------------------- |
 | **WatchdogReasonCodes**         | Machine-readable violations  | Standardized codes for automated validation       |
-| **ReserveOracle**               | Multi-attester consensus     | Median calculation, eliminates single trust point |
-| **WatchdogReporting** | Transparent reporting        | Simple event emission for DAO monitoring          |
+| **QCReserveLedger**             | Multi-attester consensus     | Median calculation, eliminates single trust point |
 | **WatchdogEnforcer**            | Permissionless enforcement   | Anyone can trigger objective violations           |
 
 ### Integration with Existing tBTC v2
@@ -169,23 +168,23 @@ The original watchdog system had fundamental issues:
 - **Over-Complexity**: 6+ overlapping contracts with unclear responsibilities
 - **State Machine Overhead**: Complex voting and escalation for objective facts
 
-#### The Solution: Three-Problem Framework
-We identified three distinct problems requiring different solutions:
+#### The Solution: Focused Objective Enforcement
+We simplified to address only objective, measurable violations:
 
 1. **Oracle Problem** (Objective Facts)
-   - Solution: Multi-attester consensus via `ReserveOracle`
+   - Solution: Multi-attester consensus via `QCReserveLedger`
    - Multiple attesters submit reserve balances, median calculation prevents manipulation
 
-2. **Observation Problem** (Subjective Concerns)  
-   - Solution: Simple transparent reporting via `WatchdogReporting`
-   - Watchdogs report observations, DAO monitors events and investigates
+2. **Enforcement Problem** (Objective Violations)
+   - Solution: Permissionless enforcement via `WatchdogEnforcer`
+   - Anyone can trigger enforcement for verifiable violations
 
 3. **Decision Problem** (Governance Actions)
-   - Solution: Direct DAO action without intermediary contracts
-   - DAO observes reports, discusses off-chain, takes action directly
+   - Solution: Direct DAO action for any non-automated decisions
+   - DAO monitors enforcement events and can override if needed
 
 #### Migration Benefits
-- **33% Fewer Contracts**: 6 old contracts → 4 new contracts
+- **50% Fewer Contracts**: 6 old contracts → 3 new contracts
 - **Machine-Readable**: Reason codes enable automated validation
 - **Trust Distribution**: No single points of failure
 - **Permissionless Enforcement**: Anyone can trigger objective violations

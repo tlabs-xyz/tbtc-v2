@@ -24,14 +24,6 @@ const func: DeployFunction = async function DeployQCReserveLedger(
   })
   log(`✅ QCReserveLedger deployed at ${reserveLedger.address}`)
 
-  // Deploy WatchdogReporting
-  log("Deploying WatchdogReporting...")
-  const watchdogReporting = await deploy("WatchdogReporting", {
-    from: deployer,
-    log: true,
-  })
-  log(`✅ WatchdogReporting deployed at ${watchdogReporting.address}`)
-
   // Deploy WatchdogEnforcer (reason codes now inlined, no library needed)
   log("Deploying WatchdogEnforcer...")
   const watchdogEnforcer = await deploy("WatchdogEnforcer", {
@@ -46,11 +38,10 @@ const func: DeployFunction = async function DeployQCReserveLedger(
   })
   log(`✅ WatchdogEnforcer deployed at ${watchdogEnforcer.address}`)
 
-  log("✨ QCReserveLedger System deployment complete!")
+  log("✨ Watchdog System deployment complete!")
   log("")
   log("Deployed contracts:")
   log(`  - QCReserveLedger: ${reserveLedger.address}`)
-  log(`  - WatchdogReporting: ${watchdogReporting.address}`)
   log(`  - WatchdogEnforcer: ${watchdogEnforcer.address}`)
   log("  - Note: WatchdogReasonCodes library removed - reason codes now inlined")
   log("")
