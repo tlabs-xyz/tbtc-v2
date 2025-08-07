@@ -177,24 +177,22 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 ### 3.4 Reserve Management
 
 #### 3.4.1 Simplified Watchdog Architecture (REQ-FUNC-RES-001)
-**Requirement**: The system MUST implement a simplified watchdog architecture based on the Three-Problem Framework
+**Requirement**: The system MUST implement a simplified watchdog architecture focused on objective enforcement
 
 **Current Design (v2.0)**:
-- **Oracle Problem**: ReserveOracle provides multi-attester consensus for reserve balances
-- **Observation Problem**: WatchdogReporting enables transparent reporting via events
-- **Decision Problem**: Direct DAO action without intermediary contracts
+- **Oracle Problem**: QCReserveLedger provides multi-attester consensus for reserve balances
 - **Enforcement**: WatchdogEnforcer allows permissionless triggering of objective violations
+- **Decision Problem**: Direct DAO action for any governance decisions
 
 **Key Components**:
 - **WatchdogReasonCodes**: Machine-readable violation codes for automated validation
-- **ReserveOracle**: Median consensus from 3+ attesters, eliminates single trust point
-- **WatchdogReporting**: Simple event emission for DAO monitoring
+- **QCReserveLedger**: Median consensus from 3+ attesters, eliminates single trust point
 - **WatchdogEnforcer**: Anyone can trigger enforcement with valid reason codes
 
 **Acceptance Criteria**:
 - Multiple attesters submit reserve balances, oracle calculates median
 - Machine-readable reason codes enable automated validation
-- Subjective reports emit events for DAO monitoring
+- Enforcement events provide transparency for DAO monitoring
 - Permissionless enforcement of objective violations (INSUFFICIENT_RESERVES, STALE_ATTESTATIONS)
 - All operations protected by ReentrancyGuard and comprehensive access control
 - V1.2 framework achieves 90%+ automation for measurable violations

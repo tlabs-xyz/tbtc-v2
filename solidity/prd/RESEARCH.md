@@ -120,7 +120,7 @@ The research revealed that Account Control could be implemented as an independen
 
 **Research Findings**: The initial OptimisticWatchdogConsensus design was abandoned during development. After further analysis, the dual-path architecture was also replaced with an even simpler Three-Problem Framework in v2.0.
 
-**Note**: This research is preserved for historical context. The current system uses ReserveOracle for multi-attester consensus and WatchdogReporting for transparent observation reporting.
+**Note**: This research is preserved for historical context. The current system uses QCReserveLedger for multi-attester consensus and WatchdogEnforcer for objective violation enforcement.
 
 #### Key Insights from Implementation
 
