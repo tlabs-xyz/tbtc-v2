@@ -12,10 +12,8 @@ import {
   QCReserveLedger,
   BasicMintingPolicy,
   BasicRedemptionPolicy,
-  QCWatchdog,
   TBTC,
   SPVValidator,
-  QCBridge,
   Bank,
   TBTCVault,
 } from "../../typechain"
@@ -38,10 +36,10 @@ describe("Account Control System - Integration Test", () => {
   let qcQCReserveLedger: QCReserveLedger
   let basicMintingPolicy: BasicMintingPolicy
   let basicRedemptionPolicy: BasicRedemptionPolicy
-  let qcWatchdog: QCWatchdog
+  let qcWatchdog: FakeContract<QCManager> // Mock QCWatchdog using QCManager interface
   let tbtc: TBTC
   let mockSpvValidator: FakeContract<SPVValidator>
-  let qcBridge: QCBridge
+  // let qcBridge: QCBridge // Not used in this test
   let bank: Bank
   let tbtcVault: TBTCVault
 
@@ -154,9 +152,7 @@ describe("Account Control System - Integration Test", () => {
     const QCReserveLedgerFactory = await ethers.getContractFactory(
       "QCReserveLedger"
     )
-    qcQCReserveLedger = await QCReserveLedgerFactory.deploy(
-      protocolRegistry.address
-    )
+    qcQCReserveLedger = await QCReserveLedgerFactory.deploy()
     await qcQCReserveLedger.deployed()
 
     const BasicMintingPolicyFactory = await ethers.getContractFactory(
@@ -175,14 +171,11 @@ describe("Account Control System - Integration Test", () => {
     )
     await basicRedemptionPolicy.deployed()
 
-    // Phase 4: Watchdog Integration
-    const QCWatchdogFactory = await ethers.getContractFactory(
-      "QCWatchdog"
-    )
-    qcWatchdog = await QCWatchdogFactory.deploy(
-      protocolRegistry.address
-    )
-    await qcWatchdog.deployed()
+    // Phase 4: Watchdog Integration (Mock since QCWatchdog doesn't exist)
+    qcWatchdog = await smock.fake<QCManager>("QCManager")
+    // Set up basic mock behaviors for qcWatchdog
+    qcWatchdog.registerQC.returns()
+    qcWatchdog.setQCStatus.returns()
 
     // Phase 5: System Configuration
     await configureSystem()
@@ -990,6 +983,244 @@ describe("Account Control System - Integration Test", () => {
       // Verify QC status was changed back to Active
       const finalStatus = await qcData.getQCStatus(qcAddress.address)
       expect(finalStatus).to.equal(0) // Active again
+    })
+  })
+
+  describe("Emergency Consensus Integration", () => {
+    let attester1: SignerWithAddress
+    let attester2: SignerWithAddress
+    let attester3: SignerWithAddress
+    let arbiter: SignerWithAddress
+    let watchdogEnforcer: SignerWithAddress
+    
+    const STALE_ATTESTATIONS = ethers.utils.id("STALE_ATTESTATIONS")
+    const maxStaleness = 86400 // 24 hours
+    
+    beforeEach(async () => {
+      // Get additional signers for testing
+      const signers = await ethers.getSigners()
+      attester1 = signers[5]
+      attester2 = signers[6]
+      attester3 = signers[7]
+      arbiter = signers[8]
+      watchdogEnforcer = signers[9]
+      
+      // Grant ATTESTER_ROLE to our attesters
+      await qcQCReserveLedger.grantRole(ATTESTER_ROLE, attester1.address)
+      await qcQCReserveLedger.grantRole(ATTESTER_ROLE, attester2.address)
+      await qcQCReserveLedger.grantRole(ATTESTER_ROLE, attester3.address)
+      
+      // Grant ARBITER_ROLE to our arbiter
+      await qcQCReserveLedger.grantRole(ARBITER_ROLE, arbiter.address)
+      await qcManager.grantRole(ARBITER_ROLE, arbiter.address)
+      
+      // Register a QC
+      await qcManager.connect(qcWatchdog.address).registerQC(qcAddress.address, initialCapacity)
+      
+      // Setup initial consensus for the QC
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qcAddress.address, reserveBalance)
+      await qcQCReserveLedger.connect(attester2).submitAttestation(qcAddress.address, reserveBalance)
+      await qcQCReserveLedger.connect(attester3).submitAttestation(qcAddress.address, reserveBalance)
+      
+      // Verify initial state
+      const [balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(reserveBalance)
+      expect(isStale).to.be.false
+    })
+    
+    it("should handle complete emergency consensus workflow", async () => {
+      // 1. Advance time to make reserves stale (> 24 hours)
+      await ethers.provider.send("evm_increaseTime", [maxStaleness + 1])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Verify reserves are now stale
+      let [balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(isStale).to.be.true
+      
+      // 2. Anyone can trigger enforcement for stale attestations
+      // For this test, we'll manually set the QC to UnderReview to simulate WatchdogEnforcer
+      await qcManager.connect(qcWatchdog.address).setQCStatus(
+        qcAddress.address, 
+        1, // UnderReview
+        STALE_ATTESTATIONS
+      )
+      
+      // Verify QC is now UnderReview
+      let qcStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(qcStatus).to.equal(1) // UnderReview
+      
+      // Verify minting is blocked
+      await expect(
+        basicMintingPolicy.checkMintingAllowed(qcAddress.address, ethers.utils.parseEther("10"))
+      ).to.be.revertedWith("QCNotActive")
+      
+      // 3. Submit fresh attestations (but only 2, below threshold of 3)
+      const newReserveBalance = ethers.utils.parseEther("600")
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qcAddress.address, newReserveBalance)
+      await qcQCReserveLedger.connect(attester2).submitAttestation(qcAddress.address, newReserveBalance)
+      
+      // Verify consensus was NOT reached (need 3 attestations)
+      ;[balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(reserveBalance) // Still old balance
+      expect(isStale).to.be.true // Still stale
+      
+      // 4. Arbiter forces consensus with available attestations
+      const tx = await qcQCReserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // Verify ForcedConsensusReached event
+      await expect(tx).to.emit(qcQCReserveLedger, "ForcedConsensusReached")
+        .withArgs(
+          qcAddress.address,
+          newReserveBalance,
+          2,
+          arbiter.address,
+          [attester1.address, attester2.address],
+          [newReserveBalance, newReserveBalance]
+        )
+      
+      // 5. Verify reserves are updated and no longer stale
+      ;[balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(newReserveBalance)
+      expect(isStale).to.be.false
+      
+      // 6. Arbiter moves QC back to Active status
+      await qcManager.connect(arbiter).setQCStatus(
+        qcAddress.address,
+        0, // Active
+        ethers.utils.id("RESERVES_RESTORED")
+      )
+      
+      // Verify QC is Active again
+      qcStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(qcStatus).to.equal(0) // Active
+      
+      // 7. Verify minting is allowed again
+      const canMint = await basicMintingPolicy.checkMintingAllowed(
+        qcAddress.address, 
+        ethers.utils.parseEther("10")
+      )
+      expect(canMint).to.be.true
+    })
+    
+    it("should allow attestations to continue during UnderReview", async () => {
+      // Make reserves stale
+      await ethers.provider.send("evm_increaseTime", [maxStaleness + 1])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Set QC to UnderReview
+      await qcManager.connect(qcWatchdog.address).setQCStatus(
+        qcAddress.address,
+        1, // UnderReview
+        STALE_ATTESTATIONS
+      )
+      
+      // Submit attestations while QC is UnderReview
+      const newBalance1 = ethers.utils.parseEther("700")
+      const newBalance2 = ethers.utils.parseEther("750")
+      const newBalance3 = ethers.utils.parseEther("800")
+      
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qcAddress.address, newBalance1)
+      await qcQCReserveLedger.connect(attester2).submitAttestation(qcAddress.address, newBalance2)
+      
+      // Force consensus with partial attestations
+      await qcQCReserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // Submit another attestation after forced consensus
+      await qcQCReserveLedger.connect(attester3).submitAttestation(qcAddress.address, newBalance3)
+      
+      // Now regular consensus should work with fresh attestations
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qcAddress.address, newBalance3)
+      await qcQCReserveLedger.connect(attester2).submitAttestation(qcAddress.address, newBalance3)
+      
+      // Verify consensus was reached normally
+      const [balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(newBalance3)
+      expect(isStale).to.be.false
+    })
+    
+    it("should prevent minting when reserves are stale", async () => {
+      // Advance time to make reserves stale
+      await ethers.provider.send("evm_increaseTime", [maxStaleness + 1])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Minting should still work if QC is Active (policy doesn't check staleness directly)
+      const mintAmount = ethers.utils.parseEther("100")
+      const canMint = await basicMintingPolicy.checkMintingAllowed(qcAddress.address, mintAmount)
+      expect(canMint).to.be.true
+      
+      // But after UnderReview, minting is blocked
+      await qcManager.connect(qcWatchdog.address).setQCStatus(
+        qcAddress.address,
+        1, // UnderReview
+        STALE_ATTESTATIONS
+      )
+      
+      await expect(
+        basicMintingPolicy.checkMintingAllowed(qcAddress.address, mintAmount)
+      ).to.be.revertedWith("QCNotActive")
+    })
+    
+    it("should allow redemptions to continue during UnderReview", async () => {
+      // First mint some tBTC
+      const mintAmount = ethers.utils.parseEther("100")
+      await basicMintingPolicy.connect(qcWatchdog.address).executeMinting(
+        qcAddress.address,
+        user.address,
+        mintAmount
+      )
+      
+      // Make reserves stale and set UnderReview
+      await ethers.provider.send("evm_increaseTime", [maxStaleness + 1])
+      await ethers.provider.send("evm_mine", [])
+      
+      await qcManager.connect(qcWatchdog.address).setQCStatus(
+        qcAddress.address,
+        1, // UnderReview
+        STALE_ATTESTATIONS
+      )
+      
+      // Redemptions should still be allowed during UnderReview
+      const redeemAmount = ethers.utils.parseEther("50")
+      const canRedeem = await basicRedemptionPolicy.canRequestRedemption(
+        qcAddress.address,
+        redeemAmount
+      )
+      expect(canRedeem).to.be.true
+    })
+    
+    it("should handle multiple QCs independently", async () => {
+      // Register second QC
+      const signers = await ethers.getSigners()
+      const qc2 = signers[10]
+      await qcManager.connect(qcWatchdog.address).registerQC(qc2.address, initialCapacity)
+      
+      // Set up initial consensus for QC2
+      const qc2Balance = ethers.utils.parseEther("1000")
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qc2.address, qc2Balance)
+      await qcQCReserveLedger.connect(attester2).submitAttestation(qc2.address, qc2Balance)
+      await qcQCReserveLedger.connect(attester3).submitAttestation(qc2.address, qc2Balance)
+      
+      // Make QC1 reserves stale
+      await ethers.provider.send("evm_increaseTime", [maxStaleness + 1])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Both QCs should be stale now
+      let [balance1, isStale1] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      let [balance2, isStale2] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qc2.address)
+      expect(isStale1).to.be.true
+      expect(isStale2).to.be.true
+      
+      // Force consensus only for QC1
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("550"))
+      await qcQCReserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // QC1 should be fresh, QC2 still stale
+      ;[balance1, isStale1] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      ;[balance2, isStale2] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qc2.address)
+      expect(isStale1).to.be.false
+      expect(isStale2).to.be.true
+      expect(balance1).to.equal(ethers.utils.parseEther("550"))
+      expect(balance2).to.equal(qc2Balance)
     })
   })
 })

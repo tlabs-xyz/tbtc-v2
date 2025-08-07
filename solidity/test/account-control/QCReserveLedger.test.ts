@@ -454,7 +454,14 @@ describe("QCReserveLedger", () => {
       // Force consensus
       const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
       await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
-        .withArgs(qcAddress.address, balance, 1, arbiter.address)
+        .withArgs(
+          qcAddress.address, 
+          balance, 
+          1, 
+          arbiter.address,
+          [attester1.address],
+          [balance]
+        )
       await expect(tx).to.emit(reserveLedger, "ReserveUpdated")
       
       // Verify reserve was updated
@@ -465,12 +472,22 @@ describe("QCReserveLedger", () => {
     
     it("should allow arbiter to force consensus with two attestations", async () => {
       // Submit two different attestations (below threshold)
-      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("90"))
-      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("110"))
+      const balance1 = ethers.utils.parseEther("90")
+      const balance2 = ethers.utils.parseEther("110")
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance1)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, balance2)
       
       // Force consensus
       const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
       await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
+        .withArgs(
+          qcAddress.address,
+          ethers.utils.parseEther("100"), // median of 90 and 110
+          2,
+          arbiter.address,
+          [attester1.address, attester2.address],
+          [balance1, balance2]
+        )
       
       // Verify median was calculated (median of 90, 110 is 100)
       const [reserveBalance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
@@ -503,15 +520,23 @@ describe("QCReserveLedger", () => {
       await ethers.provider.send("evm_mine", [])
       
       // Submit fresh attestation
-      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      const freshBalance = ethers.utils.parseEther("100")
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, freshBalance)
       
       // Force consensus should only use the fresh attestation
       const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
       await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
-        .withArgs(qcAddress.address, ethers.utils.parseEther("100"), 1, arbiter.address)
+        .withArgs(
+          qcAddress.address, 
+          freshBalance, 
+          1, 
+          arbiter.address,
+          [attester2.address], // Only attester2's attestation is valid
+          [freshBalance]
+        )
       
       const [reserveBalance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
-      expect(reserveBalance).to.equal(ethers.utils.parseEther("100"))
+      expect(reserveBalance).to.equal(freshBalance)
     })
     
     it("should clear pending attestations after forced consensus", async () => {
@@ -552,6 +577,32 @@ describe("QCReserveLedger", () => {
       ;[balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
       expect(balance).to.equal(ethers.utils.parseEther("150"))
       expect(isStale).to.be.false
+    })
+    
+    it("should emit correct attester arrays with multiple attestations", async () => {
+      // Submit multiple attestations with different values
+      const balance1 = ethers.utils.parseEther("80")
+      const balance2 = ethers.utils.parseEther("90")
+      const balance3 = ethers.utils.parseEther("100")
+      
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance1)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, balance2)
+      
+      // Note: attesters are processed in the order they appear in pendingAttesters array
+      // which is the order they first submitted attestations
+      
+      const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // Verify event includes all attesters and their balances
+      await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
+        .withArgs(
+          qcAddress.address,
+          ethers.utils.parseEther("85"), // median of 80 and 90
+          2,
+          arbiter.address,
+          [attester1.address, attester2.address],
+          [balance1, balance2]
+        )
     })
   })
 })
