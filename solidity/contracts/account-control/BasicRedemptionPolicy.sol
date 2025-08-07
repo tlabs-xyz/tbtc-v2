@@ -120,6 +120,9 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         if (systemState.isRedemptionPaused()) {
             return false;
         }
+        if (systemState.isQCEmergencyPaused(qc)) {
+            return false;
+        }
 
         // Check if amount is within bounds
         if (amount < systemState.minMintAmount()) {
