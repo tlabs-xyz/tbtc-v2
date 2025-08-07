@@ -275,7 +275,11 @@ contract QCManager is AccessControl, ReentrancyGuard {
     
     /// @notice Request status change from WatchdogEnforcer (WATCHDOG_ENFORCER_ROLE only)
     /// @dev WATCHDOG_ENFORCER_ROLE has LIMITED authority - can ONLY set QCs to UnderReview.
-    ///      This is used when objective violations are detected (insufficient reserves, etc.)
+    ///      This design provides automated detection with human oversight:
+    ///      - Watchdog detects objective violations (insufficient reserves, stale attestations)
+    ///      - Sets QC to UnderReview (temporary suspension) to prevent further minting
+    ///      - Human governance (ARBITER_ROLE) reviews and decides final outcome
+    ///      This prevents false positives from permanently damaging QCs while ensuring rapid response.
     ///      SECURITY: nonReentrant protects against reentrancy via QCData external calls
     /// @param qc The address of the QC
     /// @param newStatus The new status (must be UnderReview for watchdog enforcer)

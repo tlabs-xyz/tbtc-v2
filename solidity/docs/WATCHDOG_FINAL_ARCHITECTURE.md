@@ -193,6 +193,20 @@ Community/Systems (Fallback) → WatchdogEnforcer → Validation → QCManager S
 
 ---
 
+## Authority Limitations & Design Rationale
+
+### WatchdogEnforcer Authority Model
+The WatchdogEnforcer has **intentionally limited authority** - it can ONLY set QCs to `UnderReview` status. This design choice provides:
+
+1. **Automated Detection**: Watchdog rapidly identifies objective violations (insufficient reserves, stale attestations)
+2. **Human Oversight**: ARBITER_ROLE makes final decisions (restore to Active or permanently Revoke)
+3. **Safety First**: Prevents false positives from permanently damaging legitimate QCs
+4. **Rapid Response**: Immediate suspension of minting while preserving existing redemptions
+
+**Key Principle**: "Automated detection, human resolution" - ensuring system safety without sacrificing legitimate QC operations.
+
+---
+
 ## Security Considerations
 
 ### Trust Model

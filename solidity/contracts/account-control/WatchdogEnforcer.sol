@@ -12,6 +12,13 @@ import "./SystemState.sol";
 /// @notice Automated enforcement of objective violations without requiring consensus
 /// @dev Anyone can trigger enforcement for objective violations, making the system permissionless.
 ///      
+///      AUTHORITY MODEL:
+///      This contract has LIMITED authority - it can ONLY set QCs to UnderReview status.
+///      This design provides automated detection with human oversight:
+///      - Automated: Rapidly detects and responds to objective violations
+///      - Human Oversight: ARBITER_ROLE makes final decisions (Active/Revoked)
+///      - Safety: Prevents false positives from permanently damaging legitimate QCs
+///      
 ///      EXPECTED USAGE PATTERN:
 ///      - Primary callers: Watchdogs who continuously monitor QC compliance
 ///      - Secondary callers: Automated monitoring systems, community members, or other participants
