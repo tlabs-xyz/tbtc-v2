@@ -99,7 +99,7 @@ describe("Security Integration Tests", () => {
     tbtc = fixture.tbtc
     mockSpvValidator = fixture.mockSpvValidator
 
-    // Deploy V1.1 watchdog system
+    // Deploy v1 watchdog system
     const WatchdogConsensusManagerFactory = await ethers.getContractFactory(
       "WatchdogConsensusManager"
     )

@@ -99,7 +99,7 @@
 *Purpose: Preserved for historical context*
 
 #### Subdirectories
-- `v1.1-v1.2/` - Old dual-path watchdog documentation
+- `v1/` - Watchdog system documentation
 - `watchdog-migration/` - Migration process documentation
 - `audit-phases/` - Phase 1-4 audit summaries
 

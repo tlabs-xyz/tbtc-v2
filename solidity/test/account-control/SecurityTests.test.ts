@@ -9,7 +9,7 @@ const { loadFixture } = waffle
 
 // Security tests for WatchdogConsensusManager/WatchdogMonitor architecture
 // Tests M-of-N consensus, access control, reentrancy protection, and Byzantine fault tolerance
-describe("V1.1 Security Tests", () => {
+describe("v1 Security Tests", () => {
   let deployer: SignerWithAddress
   let governance: SignerWithAddress
   let watchdog1: SignerWithAddress

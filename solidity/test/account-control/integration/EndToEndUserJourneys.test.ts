@@ -101,7 +101,7 @@ describe("End-to-End User Journeys", () => {
     systemState = fixture.systemState
     tbtc = fixture.tbtc
 
-    // Deploy V1.1 consensus contracts
+    // Deploy v1 consensus contracts
     const WatchdogConsensusManagerFactory = await ethers.getContractFactory(
       "WatchdogConsensusManager"
     )
