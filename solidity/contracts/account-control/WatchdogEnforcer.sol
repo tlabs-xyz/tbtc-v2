@@ -34,8 +34,15 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
     // Reason codes for objective violations
     bytes32 public constant INSUFFICIENT_RESERVES = keccak256("INSUFFICIENT_RESERVES");
     bytes32 public constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
+    bytes32 public constant SUSTAINED_RESERVE_VIOLATION = keccak256("SUSTAINED_RESERVE_VIOLATION");
     
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    
+    // Escalation parameters
+    uint256 public constant ESCALATION_DELAY = 45 minutes;
+    
+    // Escalation state tracking
+    mapping(address => uint256) public criticalViolationTimestamps;
     
     // External contracts
     QCReserveLedger public immutable reserveLedger;
@@ -57,6 +64,27 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         address indexed enforcer,
         bool success,
         string reason
+    );
+    
+    event CriticalViolationDetected(
+        address indexed qc,
+        bytes32 indexed reasonCode,
+        address indexed enforcer,
+        uint256 timestamp,
+        uint256 escalationDeadline
+    );
+    
+    event ViolationEscalated(
+        address indexed qc,
+        bytes32 indexed reasonCode,
+        address indexed escalator,
+        uint256 timestamp
+    );
+    
+    event EscalationTimerCleared(
+        address indexed qc,
+        address indexed clearedBy,
+        uint256 timestamp
     );
     
     // Custom errors
@@ -149,6 +177,13 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
     function _executeEnforcement(address qc, bytes32 reasonCode) internal {
         // All objective violations trigger UnderReview status through QCManager
         qcManager.requestStatusChange(qc, QCData.QCStatus.UnderReview, reasonCode);
+        
+        // Start escalation timer for INSUFFICIENT_RESERVES violations
+        if (reasonCode == INSUFFICIENT_RESERVES) {
+            criticalViolationTimestamps[qc] = block.timestamp;
+            uint256 escalationDeadline = block.timestamp + ESCALATION_DELAY;
+            emit CriticalViolationDetected(qc, reasonCode, msg.sender, block.timestamp, escalationDeadline);
+        }
     }
     
     /// @notice Check if a violation exists without enforcing (read-only)
@@ -205,6 +240,52 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         violatedQCs = new address[](count);
         for (uint256 i = 0; i < count; i++) {
             violatedQCs[i] = temp[i];
+        }
+    }
+    
+    /// @notice Check and escalate sustained violations to emergency pause
+    /// @dev Anyone can call this function to escalate violations that have persisted
+    ///      beyond the ESCALATION_DELAY. This provides automated safety net for
+    ///      sustained violations while respecting the 45-minute grace period.
+    /// @param qc The QC address to check for escalation
+    function checkEscalation(address qc) external nonReentrant {
+        uint256 violationTimestamp = criticalViolationTimestamps[qc];
+        
+        // Must have an active escalation timer
+        if (violationTimestamp == 0) {
+            revert ViolationNotFound();
+        }
+        
+        // Must have exceeded the escalation delay
+        if (block.timestamp < violationTimestamp + ESCALATION_DELAY) {
+            revert("Escalation delay not yet reached");
+        }
+        
+        // QC must still be in UnderReview status (not resolved)
+        if (qcData.getQCStatus(qc) != QCData.QCStatus.UnderReview) {
+            // QC status changed - clear the timer
+            delete criticalViolationTimestamps[qc];
+            emit EscalationTimerCleared(qc, msg.sender, block.timestamp);
+            return;
+        }
+        
+        // Escalate to emergency pause
+        systemState.emergencyPauseQC(qc, SUSTAINED_RESERVE_VIOLATION);
+        emit ViolationEscalated(qc, SUSTAINED_RESERVE_VIOLATION, msg.sender, block.timestamp);
+        
+        // Clear the escalation timer after escalation
+        delete criticalViolationTimestamps[qc];
+    }
+    
+    /// @notice Clear escalation timer when QC returns to Active status
+    /// @dev This function allows cleanup of escalation timers when QCs resolve
+    ///      their violations and return to Active status. Can be called by anyone.
+    /// @param qc The QC address to clear the timer for
+    function clearEscalationTimer(address qc) external {
+        // Only clear if QC is back to Active status
+        if (qcData.getQCStatus(qc) == QCData.QCStatus.Active && criticalViolationTimestamps[qc] != 0) {
+            delete criticalViolationTimestamps[qc];
+            emit EscalationTimerCleared(qc, msg.sender, block.timestamp);
         }
     }
     
