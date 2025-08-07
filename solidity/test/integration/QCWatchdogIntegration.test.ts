@@ -19,7 +19,7 @@ const HOUR = 3600
 const DAY = 86400
 const WEEK = 604800
 
-describe("V1.1 System Integration Tests", () => {
+describe("QCWatchdog Integration Tests", () => {
   let deployer: SignerWithAddress
   let governance: SignerWithAddress
   let watchdog1: SignerWithAddress
