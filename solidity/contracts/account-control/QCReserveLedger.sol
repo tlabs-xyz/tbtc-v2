@@ -65,7 +65,9 @@ contract QCReserveLedger is AccessControl {
         address indexed qc,
         uint256 consensusBalance,
         uint256 attestationCount,
-        address indexed arbiter
+        address indexed arbiter,
+        address[] attestersUsed,
+        uint256[] balancesUsed
     );
     
     event ConsensusThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
@@ -153,6 +155,7 @@ contract QCReserveLedger is AccessControl {
         address[] memory attesters = pendingAttesters[qc];
         uint256 validCount = 0;
         uint256[] memory validBalances = new uint256[](attesters.length);
+        address[] memory validAttesters = new address[](attesters.length);
         
         // Collect valid attestations within timeout window (same logic as _attemptConsensus)
         for (uint256 i = 0; i < attesters.length; i++) {
@@ -161,12 +164,21 @@ contract QCReserveLedger is AccessControl {
             // Check if attestation is still valid (not expired)
             if (block.timestamp <= attestation.timestamp + attestationTimeout) {
                 validBalances[validCount] = attestation.balance;
+                validAttesters[validCount] = attesters[i];
                 validCount++;
             }
         }
         
         // SAFETY: Require at least ONE valid attestation to prevent arbitrary balance setting
         require(validCount > 0, "No valid attestations to force consensus");
+        
+        // Create properly sized arrays for the event
+        address[] memory usedAttesters = new address[](validCount);
+        uint256[] memory usedBalances = new uint256[](validCount);
+        for (uint256 i = 0; i < validCount; i++) {
+            usedAttesters[i] = validAttesters[i];
+            usedBalances[i] = validBalances[i];
+        }
         
         // Calculate median of available valid balances
         uint256 consensusBalance = _calculateMedian(validBalances, validCount);
@@ -182,7 +194,7 @@ contract QCReserveLedger is AccessControl {
         _clearPendingAttestations(qc);
         
         // Emit both forced consensus and regular reserve update events
-        emit ForcedConsensusReached(qc, consensusBalance, validCount, msg.sender);
+        emit ForcedConsensusReached(qc, consensusBalance, validCount, msg.sender, usedAttesters, usedBalances);
         emit ReserveUpdated(qc, oldBalance, consensusBalance, block.timestamp);
     }
     
