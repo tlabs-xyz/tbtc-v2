@@ -32,7 +32,6 @@ The tBTC v2 Account Control system enables **Qualified Custodians** (regulated i
 4. [Protocol Integration](#protocol-integration)
 5. [Security Model](#security-model)
 6. [Deployment Architecture](#deployment-architecture)
-7. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -394,72 +393,6 @@ Watchdog Count    Recommended M    Reasoning
 - Geographic distribution across regions
 - Organizational independence (different legal entities)
 - No shared infrastructure dependencies
-
----
-
-## Future Enhancements
-
-### Architecture Evolution Path
-
-The modular architecture enables seamless evolution through policy upgrades:
-
-**Current → V2 Migration Path**:
-```
-v1 System (Production)
-    ↓
-v1 Framework  
-    ↓
-V2.0 Crypto-Economic (Trust-minimized)
-    ↓
-V3.0 Fully Autonomous (AI-driven)
-```
-
-### Key Enhancement Categories
-
-#### 1. Protocol Registry Enhancements
-- **Service Versioning**: Blue-green policy deployments
-- **Health Checking**: Automated monitoring integration
-- **Performance Metrics**: Real-time service health monitoring
-
-#### 2. Advanced Minting Strategies
-- **Strategy Enum**: Replace boolean with flexible options
-- **Batch Operations**: Gas optimization for high-volume QCs
-- **Conditional Minting**: Smart execution based on market conditions
-
-#### 3. Advanced Security Features
-- **Cryptographic Proof-of-Reserves**: Replace trust-based attestations
-- **Granular Emergency Controls**: Fine-grained pause mechanisms
-- **Multi-signature Integration**: Advanced institutional controls
-
-#### 4. DeFi Integration
-- **Liquidity Provision**: QC reserves as DeFi collateral
-- **Flash Loan Support**: Capital efficiency improvements
-- **Structured Products**: Derivatives and yield instruments
-
-#### 5. Cross-Chain Expansion
-- **L2 Integration**: Direct minting on Layer 2 solutions
-- **Cross-Chain Messaging**: Multi-network QC operations
-- **Interoperability Protocols**: Standardized cross-chain interfaces
-
-### Implementation Priority
-
-**High Priority** (6-12 months):
-- Service versioning support
-- Cryptographic proof-of-reserves
-- Batch operations support
-- Advanced emergency controls
-
-**Medium Priority** (12-18 months):
-- Advanced minting strategies
-- DeFi protocol integrations
-- Cross-chain expansion
-- Performance optimizations
-
-**Future Research** (18+ months):
-- Fully autonomous operations
-- AI-driven risk management
-- Novel consensus mechanisms
-- Quantum-resistant cryptography
 
 ---
 
