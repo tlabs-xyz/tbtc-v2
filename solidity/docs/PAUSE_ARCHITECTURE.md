@@ -237,40 +237,61 @@ The two-tier design addresses fundamentally different threat models:
 
 ## Implementation Status
 
-### Currently Implemented
+### Phase 1: Emergency Pause Integration ✅ Complete
 
 ✅ **Global Pause Infrastructure**
 - All pause/unpause functions in SystemState.sol
 - Integration in BasicMintingPolicy and BasicRedemptionPolicy
 - Comprehensive test coverage
 
-✅ **QC Emergency Pause Infrastructure**
-- Functions and modifiers in SystemState.sol
-- Event emissions and reason tracking
-- Query functions for pause status
+✅ **QC Emergency Pause Integration**
+- QCMinter and QCRedeemer check emergency pause status
+- BasicMintingPolicy and BasicRedemptionPolicy enforce pause state
+- All operations respect QC-specific emergency pauses
+- Complete integration test suite
 
-### Pending Integration
+### Phase 2: Time-Based Escalation ✅ Complete
 
-⏳ **QC Emergency Pause Usage**
-- qcNotEmergencyPaused modifier not yet applied
-- Future QCMinter/QCRedeemer contracts will integrate
-- WatchdogEnforcer currently uses status changes instead
+✅ **Automated Escalation Infrastructure**
+- 45-minute escalation timer in WatchdogEnforcer
+- INSUFFICIENT_RESERVES violations trigger escalation countdown
+- Automated emergency pause after sustained violations
+- PAUSER_ROLE granted to WatchdogEnforcer for escalation
 
-### Design Choice: Status vs Emergency Pause
+✅ **Monitoring Integration**
+- Comprehensive event structure for off-chain monitoring
+- CriticalViolationDetected, ViolationEscalated, EscalationTimerCleared events
+- Timer cleanup and management functions
+- Integration documentation and examples
 
-The system maintains **two parallel QC disable mechanisms**:
+### Coordinated Dual System Architecture
 
-1. **Status-Based** (Active → UnderReview → Revoked)
-   - Currently used by QCManager
-   - More nuanced state transitions
-   - Integrated with watchdog enforcement
+The system now implements **coordinated dual QC disable mechanisms**:
 
-2. **Emergency Pause**
-   - Infrastructure ready for future use
-   - More severe/immediate response mechanism
-   - Direct integration with operations
+1. **Status-Based System** (Active → UnderReview → Revoked)
+   - Used for policy violations and graduated enforcement
+   - Provides human oversight and nuanced state transitions
+   - Integrated with QCManager and watchdog enforcement
 
-This dual approach provides flexibility for different severity levels and future evolution.
+2. **Emergency Pause System** (Manual + Automated Escalation)
+   - Manual emergency pauses for security incidents (Emergency Council)
+   - Automated escalation for sustained critical violations (45-min delay)
+   - Immediate operational halt with auto-expiry safety net
+
+**Graduated Response Flow**:
+```
+INSUFFICIENT_RESERVES Detected
+         ↓
+QC → UnderReview Status (45-minute grace period)
+         ↓ (if violation persists)
+Automatic Emergency Pause (blocks all operations)
+```
+
+This coordinated approach provides:
+- **Legal compliance** through human oversight windows
+- **Automated safety** for sustained critical violations  
+- **Proportional response** matching intervention to threat severity
+- **Multiple independent safety mechanisms** for defense in depth
 
 ---
 
@@ -426,6 +447,151 @@ Security Incident Detected
    - Log all emergency actions
    - Document reason codes
    - Maintain pause/unpause history
+
+---
+
+## Off-Chain Monitoring Integration
+
+### Escalation Event Monitoring
+
+The time-based escalation system (Phase 2) emits specific events designed for off-chain monitoring integration:
+
+#### CriticalViolationDetected Event
+```solidity
+event CriticalViolationDetected(
+    address indexed qc,
+    bytes32 indexed reasonCode,
+    address indexed enforcer,
+    uint256 timestamp,
+    uint256 escalationDeadline
+);
+```
+
+**Event Type**: *Warning system event*  
+**Purpose**: Indicates a QC has triggered a critical violation (insufficient reserves) that starts a 45-minute escalation timer  
+**Action Required**: Monitor QC for resolution within escalation window
+
+**Off-Chain Integration Requirements**:
+- Set up alerts for approaching escalation deadlines
+- Monitor QC status changes during the escalation window  
+- Prepare automated `checkEscalation()` calls after the 45-minute delay
+- Track QC compliance metrics and resolution rates
+
+#### ViolationEscalated Event
+```solidity
+event ViolationEscalated(
+    address indexed qc,
+    bytes32 indexed reasonCode,
+    address indexed escalator,
+    uint256 timestamp
+);
+```
+
+**Event Type**: *Critical system event*  
+**Purpose**: Indicates a QC's critical violation persisted beyond the 45-minute window and triggered automatic emergency pause  
+**Action Required**: Immediate team response to investigate sustained violation
+
+**Response Procedures**:
+- Investigate root cause of sustained violation
+- Coordinate with QC to resolve underlying issue
+- Manually unpause via emergency council once verified safe
+- Review automated escalation thresholds if false positive
+- Update incident response documentation
+
+#### EscalationTimerCleared Event
+```solidity
+event EscalationTimerCleared(
+    address indexed qc,
+    address indexed clearedBy,
+    uint256 timestamp
+);
+```
+
+**Event Type**: *Informational system event*  
+**Purpose**: Indicates escalation timer cleared due to QC returning to Active status or manual intervention  
+**Action Required**: Log resolution for compliance tracking
+
+### Monitoring System Architecture
+
+#### Event Routing Strategy
+```
+CriticalViolationDetected → Sentry Hub → PagerDuty + Discord #qc-alerts
+ViolationEscalated → Sentry Hub → Immediate PagerDuty escalation
+EscalationTimerCleared → Discord #qc-notifications (informational)
+```
+
+#### Automated Monitoring Tasks
+
+**Timer Management**:
+- Track escalation deadlines for all active critical violations
+- Automated `checkEscalation()` calls after 45-minute delays
+- Grace period handling for block timing variations
+
+**Metrics Collection**:
+- QC violation frequency and resolution times
+- Escalation trigger rates and false positive analysis
+- Emergency pause duration and recovery metrics
+- System availability impact during emergency responses
+
+**Alert Thresholds**:
+- Critical: Violation escalated to emergency pause
+- Warning: Critical violation detected (45-min countdown)
+- Info: Escalation timer cleared (violation resolved)
+
+#### Integration with Existing Infrastructure
+
+The QC escalation events integrate with the existing tBTC v2 monitoring system architecture:
+
+- **Sentry Hub**: Receives critical and warning events for team action
+- **Discord Integration**: Informational events sent directly to notification channels  
+- **PagerDuty Escalation**: Critical events trigger immediate team response
+- **Monitoring Dashboard**: Real-time visibility into QC status and escalation timers
+
+#### Configuration Requirements
+
+**Event Listeners**:
+```javascript
+// Example monitoring integration
+const watchdogEnforcer = new ethers.Contract(address, abi, provider);
+
+// Critical violation detection
+watchdogEnforcer.on("CriticalViolationDetected", 
+  (qc, reasonCode, enforcer, timestamp, escalationDeadline) => {
+    scheduleEscalationCheck(qc, escalationDeadline);
+    alertTeam("warning", `QC ${qc} critical violation - 45min timer started`);
+  }
+);
+
+// Automatic escalation to emergency pause
+watchdogEnforcer.on("ViolationEscalated", 
+  (qc, reasonCode, escalator, timestamp) => {
+    alertTeam("critical", `QC ${qc} emergency paused - immediate action required`);
+    updateDashboard(qc, "EMERGENCY_PAUSED");
+  }
+);
+
+// Resolution tracking
+watchdogEnforcer.on("EscalationTimerCleared", 
+  (qc, clearedBy, timestamp) => {
+    logResolution(qc, timestamp);
+    updateDashboard(qc, "RESOLVED");
+  }
+);
+```
+
+**Automated Response Functions**:
+```javascript
+async function checkEscalationDue(qc, deadline) {
+  if (Date.now() >= deadline * 1000) {
+    try {
+      const tx = await watchdogEnforcer.checkEscalation(qc);
+      console.log(`Escalation triggered for QC ${qc}: ${tx.hash}`);
+    } catch (error) {
+      console.log(`Escalation check for QC ${qc} failed: ${error.message}`);
+    }
+  }
+}
+```
 
 ---
 
