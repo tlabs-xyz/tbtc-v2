@@ -27,7 +27,6 @@
 | [`README.md`](prd/README.md) | Product overview and entry point | All stakeholders |
 | [`REQUIREMENTS.md`](prd/REQUIREMENTS.md) | Complete requirements specification | Product, architects |
 | [`FLOWS.md`](prd/FLOWS.md) | User journeys and flow diagrams | Product, QA, developers |
-| [`RESEARCH.md`](prd/RESEARCH.md) | Historical research and decisions | Architects, researchers |
 
 ### `/docs` - Technical Documentation
 *Purpose: Implementation details, architecture, and technical guides*
