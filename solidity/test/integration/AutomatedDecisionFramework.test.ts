@@ -16,7 +16,7 @@ const HOUR = 3600
 const DAY = 86400
 const WEEK = 604800
 
-describe("V1.2 Automated Decision Framework Integration Tests", () => {
+describe("Automated Decision Framework Integration Tests", () => {
   let deployer: SignerWithAddress
   let governance: SignerWithAddress
   let dao: SignerWithAddress
