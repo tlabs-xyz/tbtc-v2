@@ -50,7 +50,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 
 - **🏦 Direct Bank Integration**: Seamless integration with proven Bank/Vault infrastructure
 - **🔧 Modular Architecture**: Policy-driven contracts enable future upgrades without disruption
-- **👁️ Dual-Path Watchdog**: Individual QCWatchdog instances + M-of-N consensus for critical operations
+- **👁️ Simplified Watchdog**: Multi-attester consensus + permissionless enforcement
 - **🛡️ Segregated Reserves**: Individual QC reserves prevent systemic gridlock
 - **⚡ Simple State Machine**: Clean 3-state QC model (Active, UnderReview, Revoked)
 

@@ -291,11 +291,6 @@ WatchdogEnforcer:
 ├── ARBITER_ROLE in QCManager (for status changes)
 ├── Permissionless enforcement (anyone can call)
 └── Uses machine-readable reason codes
-
-WatchdogReporting:
-├── WATCHDOG_ROLE for submitting reports
-├── Emits events for DAO monitoring
-└── No direct contract interactions
 ```
 
 ### ProtocolRegistry Usage
@@ -482,13 +477,6 @@ uint256 public attestationWindow = 1 hours;    // Collection window
 uint256 public minCollateralRatio = 100;       // 100% minimum
 uint256 public staleThreshold = 7 days;        // Attestation staleness
 uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
-
-// WatchdogReporting
-uint256 public constant MAX_EVIDENCE_PER_REPORT = 20; // Evidence hashes
-mapping(ObservationType => uint256) supportThresholds:
-  SECURITY_OBSERVATION => 0    // Immediate
-  COMPLIANCE_QUESTION => 1     // 1 supporter
-  Others => 3                  // 3 supporters
 ```
 
 ### Environment-Specific Tuning
