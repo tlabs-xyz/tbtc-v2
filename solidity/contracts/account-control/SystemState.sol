@@ -547,7 +547,7 @@ contract SystemState is AccessControl {
     /// @notice Deprecated function - use emergencyPauseQC instead
     /// @param qc The QC address to pause
     function emergencyPause(address qc) external onlyRole(PAUSER_ROLE) {
-        emergencyPauseQC(qc, "GENERIC_EMERGENCY_PAUSE");
+        this.emergencyPauseQC(qc, keccak256("GENERIC_EMERGENCY_PAUSE"));
     }
 
     /// @dev Emergency action events

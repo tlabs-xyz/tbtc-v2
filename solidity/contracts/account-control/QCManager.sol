@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./ProtocolRegistry.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
@@ -21,7 +22,7 @@ import "./interfaces/ISPVValidator.sol";
 /// - REGISTRAR_ROLE: Can register/deregister wallets with SPV verification
 /// - ARBITER_ROLE: Can pause QCs, change status, verify solvency (emergency response)
 /// - QC_GOVERNANCE_ROLE: Can register QCs and manage minting capacity (instant actions)
-contract QCManager is AccessControl {
+contract QCManager is AccessControl, ReentrancyGuard {
     bytes32 public constant QC_ADMIN_ROLE = keccak256("QC_ADMIN_ROLE");
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
@@ -189,11 +190,13 @@ contract QCManager is AccessControl {
     // =================== INSTANT GOVERNANCE FUNCTIONS ===================
 
     /// @notice Register a new Qualified Custodian (instant action)
+    /// @dev SECURITY: nonReentrant protects against reentrancy via QCData external calls
     /// @param qc QC address to register
     /// @param maxMintingCap Maximum minting capacity for the QC
     function registerQC(address qc, uint256 maxMintingCap)
         external
         onlyRole(QC_GOVERNANCE_ROLE)
+        nonReentrant
     {
         if (qc == address(0)) {
             revert InvalidQCAddress();
@@ -215,11 +218,13 @@ contract QCManager is AccessControl {
     }
 
     /// @notice Increase minting capacity for existing QC (instant action)
+    /// @dev SECURITY: nonReentrant protects against reentrancy via QCData external calls
     /// @param qc QC address
     /// @param newCap New minting capacity (must be higher than current)
     function increaseMintingCapacity(address qc, uint256 newCap)
         external
         onlyRole(QC_GOVERNANCE_ROLE)
+        nonReentrant
     {
         if (qc == address(0)) {
             revert InvalidQCAddress();
@@ -256,6 +261,7 @@ contract QCManager is AccessControl {
     /// @notice Change QC status with full authority (ARBITER_ROLE only)
     /// @dev ARBITER_ROLE has full authority to make any valid status transition.
     ///      This is typically used by governance or emergency response.
+    ///      SECURITY: nonReentrant protects against reentrancy via QCData external calls
     /// @param qc The address of the QC
     /// @param newStatus The new status for the QC
     /// @param reason The reason for the status change
@@ -263,13 +269,14 @@ contract QCManager is AccessControl {
         address qc,
         QCData.QCStatus newStatus,
         bytes32 reason
-    ) external onlyRole(ARBITER_ROLE) onlyWhenNotPaused("registry") {
+    ) external onlyRole(ARBITER_ROLE) onlyWhenNotPaused("registry") nonReentrant {
         _executeStatusChange(qc, newStatus, reason, "ARBITER");
     }
     
     /// @notice Request status change from WatchdogEnforcer (WATCHDOG_ENFORCER_ROLE only)
     /// @dev WATCHDOG_ENFORCER_ROLE has LIMITED authority - can ONLY set QCs to UnderReview.
     ///      This is used when objective violations are detected (insufficient reserves, etc.)
+    ///      SECURITY: nonReentrant protects against reentrancy via QCData external calls
     /// @param qc The address of the QC
     /// @param newStatus The new status (must be UnderReview for watchdog enforcer)
     /// @param reason The reason code for the status change
@@ -277,7 +284,7 @@ contract QCManager is AccessControl {
         address qc,
         QCData.QCStatus newStatus,
         bytes32 reason
-    ) external onlyRole(WATCHDOG_ENFORCER_ROLE) onlyWhenNotPaused("registry") {
+    ) external onlyRole(WATCHDOG_ENFORCER_ROLE) onlyWhenNotPaused("registry") nonReentrant {
         // AUTHORITY VALIDATION: WatchdogEnforcer can only set QCs to UnderReview
         require(newStatus == QCData.QCStatus.UnderReview, "WatchdogEnforcer can only set UnderReview status");
         
@@ -329,6 +336,7 @@ contract QCManager is AccessControl {
     }
 
     /// @notice Register a wallet for a QC (REGISTRAR_ROLE)
+    /// @dev SECURITY: nonReentrant protects against reentrancy via SPVValidator and QCData external calls
     /// @param qc The address of the QC
     /// @param btcAddress The Bitcoin address to register
     /// @param challenge The challenge bytes that should be in OP_RETURN
@@ -344,6 +352,7 @@ contract QCManager is AccessControl {
         external
         onlyRole(REGISTRAR_ROLE)
         onlyWhenNotPaused("wallet_registration")
+        nonReentrant
     {
         if (bytes(btcAddress).length == 0) {
             emit WalletRegistrationFailed(qc, btcAddress, "INVALID_WALLET_ADDRESS", msg.sender);
@@ -378,10 +387,12 @@ contract QCManager is AccessControl {
     }
 
     /// @notice Request wallet deregistration
+    /// @dev SECURITY: nonReentrant protects against reentrancy via QCData external calls
     /// @param btcAddress The Bitcoin address to deregister
     function requestWalletDeRegistration(string calldata btcAddress)
         external
         onlyWhenNotPaused("wallet_registration")
+        nonReentrant
     {
         // Cache QCData service to avoid redundant SLOAD operations
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
@@ -401,6 +412,7 @@ contract QCManager is AccessControl {
     }
 
     /// @notice Finalize wallet deregistration with solvency check
+    /// @dev SECURITY: nonReentrant protects against reentrancy via QCData and QCReserveLedger external calls
     /// @param btcAddress The Bitcoin address to finalize deregistration
     /// @param newReserveBalance The new reserve balance after wallet removal
     function finalizeWalletDeRegistration(
@@ -410,6 +422,7 @@ contract QCManager is AccessControl {
         external
         onlyRole(REGISTRAR_ROLE)
         onlyWhenNotPaused("wallet_registration")
+        nonReentrant
     {
         // Cache QCData service to avoid redundant SLOAD operations
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
@@ -483,7 +496,8 @@ contract QCManager is AccessControl {
     ///      This means a QC with stale reserves can still be marked as solvent if their last known
     ///      balance covers minted amount. This is intentional to avoid false insolvency triggers
     ///      due to temporary communication issues, but creates potential for manipulation.
-    function verifyQCSolvency(address qc) external returns (bool solvent) {
+    ///      SECURITY: nonReentrant protects against reentrancy during status updates and external reads
+    function verifyQCSolvency(address qc) external nonReentrant returns (bool solvent) {
         if (!hasRole(ARBITER_ROLE, msg.sender)) {
             revert NotAuthorizedForSolvency(msg.sender);
         }
@@ -526,11 +540,13 @@ contract QCManager is AccessControl {
     }
 
     /// @notice Update QC minted amount (for use by minting system)
+    /// @dev SECURITY: nonReentrant protects against reentrancy via QCData external calls
     /// @param qc The address of the QC
     /// @param newAmount The new total minted amount
     function updateQCMintedAmount(address qc, uint256 newAmount)
         external
         onlyRole(QC_ADMIN_ROLE)
+        nonReentrant
     {
         QCData qcData = QCData(protocolRegistry.getService(QC_DATA_KEY));
         if (!qcData.isQCRegistered(qc)) {
