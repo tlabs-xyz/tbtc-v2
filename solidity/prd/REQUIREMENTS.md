@@ -2,7 +2,7 @@
 
 **Document Version**: 4.0  
 **Date**: 2025-08-06  
-**Architecture**: Simplified Watchdog System (Post-Migration)  
+**Architecture**: Simplified Watchdog System  
 **Purpose**: Complete requirements specification (source of truth)  
 **Related Documents**: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION.md](IMPLEMENTATION.md), [FLOWS.md](FLOWS.md)
 
@@ -195,7 +195,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - Enforcement events provide transparency for DAO monitoring
 - Permissionless enforcement of objective violations (INSUFFICIENT_RESERVES, STALE_ATTESTATIONS)
 - All operations protected by ReentrancyGuard and comprehensive access control
-- v1 framework achieves 90%+ automation for measurable violations
+- The system achieves 90%+ automation for measurable violations
 
 #### 3.4.2 Proof-of-Reserves Process (REQ-FUNC-POR-001)
 
@@ -937,7 +937,7 @@ The success of this implementation depends on careful execution of these require
 **Document Control**
 
 - **Version**: 3.0 (Consolidated Source of Truth)
-- **Replaces**: account-control-requirements.md
+- **Purpose**: Consolidated requirements specification
 - **Approval Required From**: tBTC DAO, Technical Team, Security Team
 - **Next Review Date**: 2025-08-11
 - **Distribution**: All project stakeholders, development team, governance council

@@ -9,7 +9,7 @@
 
 ## Overview
 
-This document records significant architectural decisions made during the development of the Account Control system for tBTC v2, particularly focusing on the watchdog system migration.
+This document records significant architectural decisions made during the development of the Account Control system for tBTC v2.
 
 ---
 
@@ -22,7 +22,7 @@ This document records significant architectural decisions made during the develo
 Accepted and Implemented
 
 ### Context
-The initial watchdog system (v1.x) contained 6+ contracts with overlapping responsibilities:
+Alternative approaches considered included complex systems with 6+ contracts with overlapping responsibilities:
 - WatchdogAutomatedEnforcement
 - WatchdogConsensusManager  
 - WatchdogDAOEscalation
@@ -48,7 +48,7 @@ Migrate to a simplified 3-contract architecture focused on objective enforcement
 - Clear separation of concerns
 
 **Negative:**
-- Migration effort required
+- Additional complexity to implement
 - Documentation updates needed
 - Retraining for operators
 
@@ -242,36 +242,6 @@ Remove DAOBridge entirely. DAO monitors events directly and takes action through
 
 ---
 
-## ADR-008: Full Migration vs Parallel Systems
-
-### Date
-2025-08-06
-
-### Status
-Accepted and Implemented
-
-### Context
-Choice between:
-- Option A: Keep both old and new systems
-- Option B: Full migration to new system
-
-User decision: "we want to fully migrate to new contracts"
-
-### Decision
-Complete migration - remove all old watchdog contracts, deploy only new simplified system.
-
-### Consequences
-**Positive:**
-- No confusion from dual systems
-- Clean architecture
-- Lower maintenance burden
-
-**Negative:**
-- No gradual transition
-- Higher migration risk
-- Breaking change
-
----
 
 ## ADR-009: Permissionless Enforcement
 
