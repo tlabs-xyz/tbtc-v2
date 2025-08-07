@@ -33,16 +33,15 @@ The initial watchdog system (v1.x) contained 6+ contracts with overlapping respo
 Critical issue identified: **Machines cannot interpret human-readable strings** - the OptimisticWatchdogConsensus expected automated systems to understand strings like "excessive_slippage_observed".
 
 ### Decision
-Migrate to a simplified 4-contract architecture based on the **Three-Problem Framework**:
+Migrate to a simplified 3-contract architecture focused on objective enforcement:
 
-1. **Oracle Problem** → `ReserveOracle` (multi-attester consensus)
-2. **Observation Problem** → `WatchdogReporting` (transparent reporting)
-3. **Decision Problem** → Direct DAO action (no intermediary)
-4. **Enforcement** → `WatchdogEnforcer` (permissionless with reason codes)
+1. **Oracle Problem** → `QCReserveLedger` (multi-attester consensus)
+2. **Enforcement** → `WatchdogEnforcer` (permissionless with reason codes)
+3. **Validation** → `WatchdogReasonCodes` (machine-readable violation codes)
 
 ### Consequences
 **Positive:**
-- 33% reduction in contracts (6 → 4)
+- 50% reduction in contracts (6 → 3)
 - Machine-readable reason codes enable automation
 - No single points of trust
 - Gas optimization through minimal state

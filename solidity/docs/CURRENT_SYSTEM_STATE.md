@@ -41,27 +41,27 @@ The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tB
 | Component | Purpose | Status |
 |-----------|---------|--------|
 | **WatchdogReasonCodes** | Machine-readable violation codes | ✅ Implemented |
-| **WatchdogReporting** | Transparent event-based reporting | ✅ Implemented |
+| **QCReserveLedger** | Multi-attester consensus oracle | ✅ Implemented |
 | **WatchdogEnforcer** | Permissionless violation enforcement | ✅ Implemented |
 
 ### Removed in Migration
 
 The following contracts were removed during the watchdog simplification:
 - ~~WatchdogAutomatedEnforcement~~ → Replaced by WatchdogEnforcer
-- ~~WatchdogConsensusManager~~ → Replaced by ReserveOracle
+- ~~WatchdogConsensusManager~~ → Replaced by QCReserveLedger
 - ~~WatchdogDAOEscalation~~ → Direct DAO action model
-- ~~WatchdogThresholdActions~~ → Simplified reporting
+- ~~WatchdogThresholdActions~~ → Simplified to permissionless enforcement
 - ~~WatchdogMonitor~~ → No longer needed
 - ~~QCWatchdog~~ → Functionality distributed
+- ~~WatchdogReporting~~ → Removed (subjective observations handled off-chain)
 
 ---
 
 ## Key Design Principles
 
-### 1. Three-Problem Framework
-- **Oracle Problem**: Multi-attester consensus for objective facts
-- **Observation Problem**: Transparent reporting for subjective concerns
-- **Decision Problem**: Direct DAO governance without intermediaries
+### 1. Two-Problem Framework
+- **Oracle Problem**: Multi-attester consensus for objective facts (solved by QCReserveLedger)
+- **Enforcement Problem**: Permissionless enforcement of objective violations (solved by WatchdogEnforcer)
 
 ### 2. Direct Integration
 - Uses existing Bank/Vault infrastructure
@@ -93,23 +93,17 @@ attestationWindow: 1 hour       // Oracle collection window
 redemptionTimeout: 48 hours     // QC must fulfill within
 minMintAmount: 0.01 tBTC        // Minimum minting amount
 maxMintAmount: 100 tBTC         // Maximum per transaction
-
-// Reporting
-maxEvidencePerReport: 20        // Hash array limit
-supportThresholds: {
-  SECURITY_OBSERVATION: 0,      // Immediate escalation
-  COMPLIANCE_QUESTION: 1,       // 1 supporter needed
-  Others: 3                     // 3 supporters needed
-}
 ```
 
 ### Role Structure
 - **DEFAULT_ADMIN_ROLE**: DAO governance
 - **ATTESTER_ROLE**: Oracle attesters (multiple entities)
-- **WATCHDOG_ROLE**: Subjective reporters
-- **ARBITER_ROLE**: WatchdogEnforcer contract
+- **ARBITER_ROLE**: Update QC status
+- **WATCHDOG_ENFORCER_ROLE**: WatchdogEnforcer contract
 - **MINTER_ROLE**: QCMinter contract
 - **PAUSER_ROLE**: Emergency council
+- **QC_ADMIN_ROLE**: QC administration
+- **QC_GOVERNANCE_ROLE**: QC registration and capacity
 
 ### Operational Expectations
 
@@ -162,7 +156,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → TBTC Tokens
 ## Recent Changes (Migration v2.0)
 
 ### What Changed
-1. **Watchdog System**: 6 contracts → 4 contracts (33% reduction)
+1. **Watchdog System**: 6 contracts → 3 contracts (50% reduction)
 2. **Trust Model**: Single watchdog → Multi-attester consensus
 3. **Enforcement**: Role-gated → Permissionless with validation
 4. **Reporting**: Complex state machines → Simple event emission

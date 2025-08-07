@@ -9,11 +9,10 @@
 
 ## Executive Summary
 
-The tBTC v2 Account Control system enables **Qualified Custodians** (regulated institutional entities) to mint tBTC tokens against their Bitcoin reserves through **direct Bank integration**. The system implements a simplified watchdog architecture based on the Three-Problem Framework:
+The tBTC v2 Account Control system enables **Qualified Custodians** (regulated institutional entities) to mint tBTC tokens against their Bitcoin reserves through **direct Bank integration**. The system implements a simplified watchdog architecture focusing on objective enforcement:
 
-- **Oracle Problem**: Multi-attester consensus for objective facts (reserve balances)
-- **Observation Problem**: Transparent reporting of subjective concerns via events
-- **Decision Problem**: Direct DAO governance without intermediary contracts
+- **Oracle Problem**: Multi-attester consensus for objective facts (reserve balances) - solved by QCReserveLedger
+- **Enforcement Problem**: Permissionless enforcement of objective violations - solved by WatchdogEnforcer
 
 ### Core Architectural Principles
 
@@ -179,14 +178,13 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 
 ## Simplified Watchdog System
 
-### Three-Problem Framework
+### Two-Problem Framework
 
-**Core Principle**: Different problems require different solutions - oracle consensus for facts, transparent reporting for observations, direct DAO action for decisions.
+**Core Principle**: Focus on objective enforcement - oracle consensus for facts, permissionless enforcement for violations.
 
 The system separates concerns into:
-- **Oracle Problem**: Multi-attester consensus for objective facts
-- **Observation Problem**: Individual transparent reporting for subjective concerns
-- **Decision Problem**: Direct DAO governance without intermediaries
+- **Oracle Problem**: Multi-attester consensus for objective facts (reserve balances)
+- **Enforcement Problem**: Permissionless enforcement of objective violations
 
 ### Architecture Components
 
@@ -247,33 +245,7 @@ bytes32 constant ZERO_RESERVES = keccak256("ZERO_RESERVES");
 bytes32 constant REDEMPTION_TIMEOUT = keccak256("REDEMPTION_TIMEOUT");
 ```
 
-### 3. WatchdogReporting.sol
-
-**Purpose**: Transparent reporting of subjective observations
-
-**Report Structure**:
-```solidity
-struct Report {
-    uint256 id;
-    address watchdog;
-    address target;
-    ObservationType obsType;
-    string description;
-    bytes32[] evidenceHashes;  // Max 20 hashes
-    uint256 timestamp;
-    uint256 supportCount;
-}
-```
-
-**Key Features**:
-- Simple event emission for DAO monitoring
-- Support mechanism for validation
-- Evidence stored as hashes (actual content via REST API)
-- No complex state machines or escalation
-
----
-
-### 4. WatchdogReasonCodes.sol
+### 3. WatchdogReasonCodes.sol
 
 **Purpose**: Machine-readable violation codes
 
