@@ -65,7 +65,6 @@ contract QCReserveLedger is AccessControl {
     event MaxStalenessUpdated(uint256 oldStaleness, uint256 newStaleness);
     
     // Errors
-    error InvalidBalance();
     error InvalidThreshold();
     error InvalidTimeout();
     error NoConsensusYet();
@@ -79,8 +78,6 @@ contract QCReserveLedger is AccessControl {
     /// @param qc The QC address
     /// @param balance The attested reserve balance
     function submitAttestation(address qc, uint256 balance) external onlyRole(ATTESTER_ROLE) {
-        if (balance == 0) revert InvalidBalance();
-        
         // Store attestation
         pendingAttestations[qc][msg.sender] = PendingAttestation({
             balance: balance,
