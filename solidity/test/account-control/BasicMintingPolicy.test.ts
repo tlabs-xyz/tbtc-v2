@@ -345,7 +345,6 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
       )
 
       const receipt = await tx.wait()
-      console.log("Direct integration gas used:", receipt.gasUsed.toString())
 
       // Direct integration should use less gas than going through QCBridge
       // Typical savings: ~50,000-70,000 gas by removing extra contract call

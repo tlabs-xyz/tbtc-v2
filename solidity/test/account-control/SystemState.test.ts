@@ -25,9 +25,12 @@ describe("SystemState", () => {
   const testStaleThreshold = 3600 // 1 hour
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, governance, pauserAccount, adminAccount, thirdParty] =
-      await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    governance = signers[1]
+    pauserAccount = signers[2]
+    adminAccount = signers[3]
+    thirdParty = signers[4]
 
     // Generate role hashes
     PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")

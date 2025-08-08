@@ -308,8 +308,6 @@ describe("Cross-Contract Real Integration - Advanced Scenarios", () => {
     })
 
     it("should measure gas costs for complete mint-to-redemption cycle", async () => {
-      console.log("Analyzing gas costs for complete cycle...")
-      
       const gasResults: { [key: string]: number } = {}
       
       // === MINT PHASE ===
