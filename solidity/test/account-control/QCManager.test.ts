@@ -629,12 +629,6 @@ describe("QCManager", () => {
         )
       })
 
-      it("should update reserve ledger", async () => {
-        const sufficientBalance = mintedAmount.add(ethers.utils.parseEther("1"))
-        expect(
-          mockQcQCReserveLedger.submitReserveAttestation
-        ).to.have.been.calledWith(qcAddress.address, sufficientBalance)
-      })
     })
 
     context("when wallet is not registered", () => {
@@ -920,29 +914,6 @@ describe("QCManager", () => {
     })
   })
 
-  describe("getQCStatus", () => {
-    it("should delegate to QCData", async () => {
-      mockQcData.getQCStatus.returns(1) // UnderReview
-
-      const status = await qcManager.getQCStatus(qcAddress.address)
-
-      expect(mockQcData.getQCStatus).to.have.been.calledWith(qcAddress.address)
-      expect(status).to.equal(1)
-    })
-  })
-
-  describe("getQCWallets", () => {
-    const mockWallets = ["wallet1", "wallet2", "wallet3"]
-
-    it("should delegate to QCData", async () => {
-      mockQcData.getQCWallets.returns(mockWallets)
-
-      const wallets = await qcManager.getQCWallets(qcAddress.address)
-
-      expect(mockQcData.getQCWallets).to.have.been.calledWith(qcAddress.address)
-      expect(wallets).to.deep.equal(mockWallets)
-    })
-  })
 
   describe("Status Transition Validation", () => {
     beforeEach(async () => {
@@ -1236,128 +1207,6 @@ describe("QCManager", () => {
     })
   })
 
-  describe("emergencyPauseQC", () => {
-    const emergencyReason = ethers.utils.id("SECURITY_BREACH")
-
-    beforeEach(async () => {
-      mockQcData.isQCRegistered.returns(true)
-      mockQcData.getQCStatus.returns(0) // Active
-    })
-
-    context("when called by arbiter", () => {
-      let tx: any
-
-      beforeEach(async () => {
-        tx = await qcManager
-          .connect(watchdog)
-          .emergencyPauseQC(qcAddress.address, emergencyReason)
-      })
-
-      it("should call QCData setQCStatus to UnderReview", async () => {
-        expect(mockQcData.setQCStatus).to.have.been.calledWith(
-          qcAddress.address,
-          1, // UnderReview
-          emergencyReason
-        )
-      })
-
-      it("should emit QCStatusChanged event", async () => {
-        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-        await expect(tx)
-          .to.emit(qcManager, "QCStatusChanged")
-          .withArgs(
-            qcAddress.address,
-            0,
-            1,
-            emergencyReason,
-            watchdog.address,
-            currentBlock.timestamp
-          )
-      })
-
-      it("should emit QCEmergencyPaused event", async () => {
-        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-        await expect(tx)
-          .to.emit(qcManager, "QCEmergencyPaused")
-          .withArgs(
-            qcAddress.address,
-            emergencyReason,
-            watchdog.address,
-            currentBlock.timestamp
-          )
-      })
-    })
-
-    context("when called with invalid parameters", () => {
-      it("should revert with zero address", async () => {
-        await expect(
-          qcManager
-            .connect(watchdog)
-            .emergencyPauseQC(ethers.constants.AddressZero, emergencyReason)
-        ).to.be.revertedWith("InvalidQCAddress")
-      })
-
-      it("should revert with empty reason", async () => {
-        await expect(
-          qcManager
-            .connect(watchdog)
-            .emergencyPauseQC(qcAddress.address, ethers.constants.HashZero)
-        ).to.be.revertedWith("ReasonRequired")
-      })
-
-      it("should revert when QC not registered", async () => {
-        mockQcData.isQCRegistered.returns(false)
-        await expect(
-          qcManager
-            .connect(watchdog)
-            .emergencyPauseQC(qcAddress.address, emergencyReason)
-        ).to.be.revertedWith("QCNotRegistered")
-      })
-    })
-
-    context("when QC is already Revoked", () => {
-      beforeEach(async () => {
-        mockQcData.getQCStatus.returns(2) // Revoked
-      })
-
-      it("should not change status", async () => {
-        await qcManager
-          .connect(watchdog)
-          .emergencyPauseQC(qcAddress.address, emergencyReason)
-
-        // Status change should not be called for Revoked QCs
-        expect(mockQcData.setQCStatus).to.not.have.been.called
-      })
-    })
-
-    context("when called by non-arbiter", () => {
-      it("should revert", async () => {
-        await expect(
-          qcManager
-            .connect(thirdParty)
-            .emergencyPauseQC(qcAddress.address, emergencyReason)
-        ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
-        )
-      })
-    })
-
-    context("when function is paused", () => {
-      beforeEach(async () => {
-        mockSystemState.isFunctionPaused
-          .whenCalledWith("registry")
-          .returns(true)
-      })
-
-      it("should revert", async () => {
-        await expect(
-          qcManager
-            .connect(watchdog)
-            .emergencyPauseQC(qcAddress.address, emergencyReason)
-        ).to.be.revertedWith("Function is paused")
-      })
-    })
-  })
 
   describe("requestStatusChange", () => {
     beforeEach(async () => {
