@@ -332,9 +332,7 @@ library Fraud {
         // Send the ether deposited by the challenger to the treasury
         /* solhint-disable avoid-low-level-calls */
         // slither-disable-next-line low-level-calls,unchecked-lowlevel,arbitrary-send
-        (bool success, ) = self.treasury.call{gas: 100000, value: challenge.depositAmount}("");
-        // Treasury transfer failure is not critical, we continue execution
-        success; // Suppress unused variable warning
+        self.treasury.call{gas: 100000, value: challenge.depositAmount}("");
         /* solhint-enable avoid-low-level-calls */
 
         bytes memory compressedWalletPublicKey = EcdsaLib.compressPublicKey(
@@ -415,12 +413,25 @@ library Fraud {
         // Return the ether deposited by the challenger
         /* solhint-disable avoid-low-level-calls */
         // slither-disable-next-line low-level-calls,unchecked-lowlevel
-        (bool success, ) = challenge.challenger.call{gas: 100000, value: challenge.depositAmount}("");
-        // Challenger refund failure is not critical, we continue execution
-        success; // Suppress unused variable warning
+        challenge.challenger.call{gas: 100000, value: challenge.depositAmount}(
+            ""
+        );
         /* solhint-enable avoid-low-level-calls */
 
-        _finalizeDefeatTimeout(self, walletPublicKey, walletMembersIDs, challenge.challenger, sighash);
+        bytes memory compressedWalletPublicKey = EcdsaLib.compressPublicKey(
+            walletPublicKey.slice32(0),
+            walletPublicKey.slice32(32)
+        );
+        bytes20 walletPubKeyHash = compressedWalletPublicKey.hash160View();
+
+        self.notifyWalletFraudChallengeDefeatTimeout(
+            walletPubKeyHash,
+            walletMembersIDs,
+            challenge.challenger
+        );
+
+        // slither-disable-next-line reentrancy-events
+        emit FraudChallengeDefeatTimedOut(walletPubKeyHash, sighash);
     }
 
     /// @notice Extracts the UTXO keys from the given preimage used during
@@ -565,30 +576,5 @@ library Fraud {
         bytes4 sighashTypeBytes = preimage.slice4(preimage.length - 4);
         uint32 sighashTypeLE = uint32(sighashTypeBytes);
         return sighashTypeLE.reverseUint32();
-    }
-
-    /// @notice Internal helper to finalize fraud challenge defeat timeout
-    /// @dev Extracted to reduce stack depth in main function
-    function _finalizeDefeatTimeout(
-        BridgeState.Storage storage self,
-        bytes calldata walletPublicKey,
-        uint32[] calldata walletMembersIDs,
-        address challenger,
-        bytes32 sighash
-    ) internal {
-        bytes memory compressedWalletPublicKey = EcdsaLib.compressPublicKey(
-            walletPublicKey.slice32(0),
-            walletPublicKey.slice32(32)
-        );
-        bytes20 walletPubKeyHash = compressedWalletPublicKey.hash160View();
-
-        self.notifyWalletFraudChallengeDefeatTimeout(
-            walletPubKeyHash,
-            walletMembersIDs,
-            challenger
-        );
-
-        // slither-disable-next-line reentrancy-events
-        emit FraudChallengeDefeatTimedOut(walletPubKeyHash, sighash);
     }
 }
