@@ -97,7 +97,9 @@ describe("Race Condition Tests", () => {
         // Final state should be consistent
         const finalStatus = await qcData.getQCStatus(qcAddress.address)
         const [finalReserves] =
-          await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+          await qcQCReserveLedger.getReserveBalanceAndStaleness(
+            qcAddress.address
+          )
 
         // Due to race condition, the solvency check might have read old reserves
         // Run another solvency check to ensure final state consistency
@@ -144,7 +146,9 @@ describe("Race Condition Tests", () => {
         await qcManager.connect(watchdog).verifyQCSolvency(qcAddress.address)
 
         const [finalReserves] =
-          await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+          await qcQCReserveLedger.getReserveBalanceAndStaleness(
+            qcAddress.address
+          )
         const finalStatus = await qcData.getQCStatus(qcAddress.address)
 
         // Status should match the final reserve state

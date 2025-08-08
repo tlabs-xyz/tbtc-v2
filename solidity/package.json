@@ -36,6 +36,7 @@
     "@keep-network/ecdsa": "development",
     "@keep-network/random-beacon": "development",
     "@keep-network/tbtc": "development",
+    "@nomicfoundation/hardhat-network-helpers": "^1.1.0",
     "@openzeppelin/contracts": "^4.8.1",
     "@openzeppelin/contracts-upgradeable": "^4.8.1",
     "@thesis/solidity-contracts": "github:thesis/solidity-contracts#4985bcf"

@@ -210,7 +210,7 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 1. **User Initiates Redemption**
 
    - User calls `QCRedeemer.initiateRedemption(qc, amount, userBtcAddress)`
-   - QCRedeemer burns user's tBTC tokens immediately 
+   - QCRedeemer burns user's tBTC tokens immediately
    - Creates redemption record with `Pending` status
    - Generates unique collision-resistant redemption ID
    - Event: `RedemptionRequested`

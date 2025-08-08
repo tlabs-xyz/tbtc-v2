@@ -5,7 +5,7 @@
   "reporter": "spec",
   "spec": [
     "test/account-control/integration/SystemIntegration.test.ts",
-    "test/account-control/integration/EndToEndUserJourneys.test.ts", 
+    "test/account-control/integration/EndToEndUserJourneys.test.ts",
     "test/account-control/integration/SecurityIntegration.test.ts"
   ]
 }

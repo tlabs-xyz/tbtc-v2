@@ -33,13 +33,27 @@ describe("v1 Security Tests", () => {
 
   // Role constants
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-  const WATCHDOG_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("WATCHDOG_ROLE"))
-  const MANAGER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MANAGER_ROLE"))
-  const WATCHDOG_OPERATOR_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("WATCHDOG_OPERATOR_ROLE"))
+  const WATCHDOG_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("WATCHDOG_ROLE")
+  )
+  const MANAGER_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("MANAGER_ROLE")
+  )
+  const WATCHDOG_OPERATOR_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("WATCHDOG_OPERATOR_ROLE")
+  )
 
   async function fixture() {
-    ;[deployer, governance, watchdog1, watchdog2, watchdog3, watchdog4, watchdog5, attacker] = 
-      await ethers.getSigners()
+    ;[
+      deployer,
+      governance,
+      watchdog1,
+      watchdog2,
+      watchdog3,
+      watchdog4,
+      watchdog5,
+      attacker,
+    ] = await ethers.getSigners()
 
     // Deploy mock QC contracts for WatchdogConsensusManager
     qcManager = await smock.fake("QCManager")
@@ -47,7 +61,9 @@ describe("v1 Security Tests", () => {
     qcData = await smock.fake("QCData")
 
     // Deploy WatchdogConsensusManager
-    const WatchdogConsensusManager = await ethers.getContractFactory("WatchdogConsensusManager")
+    const WatchdogConsensusManager = await ethers.getContractFactory(
+      "WatchdogConsensusManager"
+    )
     consensusManager = await WatchdogConsensusManager.deploy(
       qcManager.address,
       qcRedeemer.address,
@@ -57,22 +73,41 @@ describe("v1 Security Tests", () => {
 
     // Deploy WatchdogMonitor
     const WatchdogMonitor = await ethers.getContractFactory("WatchdogMonitor")
-    watchdogMonitor = await WatchdogMonitor.deploy(consensusManager.address, qcData.address)
+    watchdogMonitor = await WatchdogMonitor.deploy(
+      consensusManager.address,
+      qcData.address
+    )
     await watchdogMonitor.deployed()
 
     // Setup consensus manager roles
     await consensusManager.grantRole(MANAGER_ROLE, governance.address)
-    await consensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog1.address)
-    await consensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog2.address)
-    await consensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog3.address)
-    await consensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog4.address)
-    await consensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog5.address)
+    await consensusManager
+      .connect(governance)
+      .grantRole(WATCHDOG_ROLE, watchdog1.address)
+    await consensusManager
+      .connect(governance)
+      .grantRole(WATCHDOG_ROLE, watchdog2.address)
+    await consensusManager
+      .connect(governance)
+      .grantRole(WATCHDOG_ROLE, watchdog3.address)
+    await consensusManager
+      .connect(governance)
+      .grantRole(WATCHDOG_ROLE, watchdog4.address)
+    await consensusManager
+      .connect(governance)
+      .grantRole(WATCHDOG_ROLE, watchdog5.address)
 
     // Setup monitor roles
     await watchdogMonitor.grantRole(MANAGER_ROLE, governance.address)
-    await watchdogMonitor.connect(governance).grantRole(WATCHDOG_OPERATOR_ROLE, watchdog1.address)
-    await watchdogMonitor.connect(governance).grantRole(WATCHDOG_OPERATOR_ROLE, watchdog2.address)
-    await watchdogMonitor.connect(governance).grantRole(WATCHDOG_OPERATOR_ROLE, watchdog3.address)
+    await watchdogMonitor
+      .connect(governance)
+      .grantRole(WATCHDOG_OPERATOR_ROLE, watchdog1.address)
+    await watchdogMonitor
+      .connect(governance)
+      .grantRole(WATCHDOG_OPERATOR_ROLE, watchdog2.address)
+    await watchdogMonitor
+      .connect(governance)
+      .grantRole(WATCHDOG_OPERATOR_ROLE, watchdog3.address)
 
     return {
       consensusManager,
@@ -105,7 +140,7 @@ describe("v1 Security Tests", () => {
       watchdog3,
       watchdog4,
       watchdog5,
-      attacker
+      attacker,
     } = await loadFixture(fixture))
   })
 
@@ -115,14 +150,14 @@ describe("v1 Security Tests", () => {
       const qcAddress = ethers.Wallet.createRandom().address
       const newStatus = 1 // UnderReview
       const reason = "Suspicious activity detected"
-      
-      const tx = await consensusManager.connect(watchdog1).proposeStatusChange(
-        qcAddress,
-        newStatus,
-        reason
-      )
+
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress, newStatus, reason)
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Should not execute with only 1 vote (need 2 by default)
       const proposal = await consensusManager.getProposal(proposalId)
@@ -135,14 +170,14 @@ describe("v1 Security Tests", () => {
       const qcAddress = ethers.Wallet.createRandom().address
       const newStatus = 1 // UnderReview
       const reason = "Consensus reached"
-      
-      const tx = await consensusManager.connect(watchdog1).proposeStatusChange(
-        qcAddress,
-        newStatus,
-        reason
-      )
+
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress, newStatus, reason)
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Second watchdog votes - should trigger auto-execution
       await expect(consensusManager.connect(watchdog2).vote(proposalId))
@@ -160,14 +195,14 @@ describe("v1 Security Tests", () => {
       const qcAddress = ethers.Wallet.createRandom().address
       const newStatus = 1
       const reason = "Test proposal"
-      
-      const tx = await consensusManager.connect(watchdog1).proposeStatusChange(
-        qcAddress,
-        newStatus,
-        reason
-      )
+
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress, newStatus, reason)
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Try to vote again - should fail
       await expect(
@@ -181,9 +216,11 @@ describe("v1 Security Tests", () => {
       const qcAddress = ethers.Wallet.createRandom().address
       const newStatus = 1
       const reason = "Unauthorized attempt"
-      
+
       await expect(
-        consensusManager.connect(attacker).proposeStatusChange(qcAddress, newStatus, reason)
+        consensusManager
+          .connect(attacker)
+          .proposeStatusChange(qcAddress, newStatus, reason)
       ).to.be.reverted // Should fail due to missing WATCHDOG_ROLE
     })
 
@@ -192,19 +229,18 @@ describe("v1 Security Tests", () => {
       const qcAddress = ethers.Wallet.createRandom().address
       const newStatus = 1
       const reason = "Test proposal"
-      
-      const tx = await consensusManager.connect(watchdog1).proposeStatusChange(
-        qcAddress,
-        newStatus,
-        reason
-      )
+
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress, newStatus, reason)
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Attacker tries to vote
-      await expect(
-        consensusManager.connect(attacker).vote(proposalId)
-      ).to.be.reverted // Should fail due to missing WATCHDOG_ROLE
+      await expect(consensusManager.connect(attacker).vote(proposalId)).to.be
+        .reverted // Should fail due to missing WATCHDOG_ROLE
     })
 
     it("should prevent execution of non-approved proposals", async () => {
@@ -212,14 +248,14 @@ describe("v1 Security Tests", () => {
       const qcAddress = ethers.Wallet.createRandom().address
       const newStatus = 1
       const reason = "Insufficient votes"
-      
-      const tx = await consensusManager.connect(watchdog1).proposeStatusChange(
-        qcAddress,
-        newStatus,
-        reason
-      )
+
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress, newStatus, reason)
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Try to execute manually without enough votes
       await expect(
@@ -245,14 +281,14 @@ describe("v1 Security Tests", () => {
       const qcAddress = ethers.Wallet.createRandom().address
       const newStatus = 1
       const reason = "Reentrancy test"
-      
-      const tx = await consensusManager.connect(watchdog1).proposeStatusChange(
-        qcAddress,
-        newStatus,
-        reason
-      )
+
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress, newStatus, reason)
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Get second vote to reach threshold
       await consensusManager.connect(watchdog2).vote(proposalId)
@@ -271,24 +307,36 @@ describe("v1 Security Tests", () => {
   describe("Byzantine Fault Tolerance Tests", () => {
     it("should handle diverse proposal types", async () => {
       const qcAddress = ethers.Wallet.createRandom().address
-      
+
       // Test different proposal types
-      const statusTx = await consensusManager.connect(watchdog1).proposeStatusChange(
-        qcAddress, 1, "Status change test"
-      )
+      const statusTx = await consensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress, 1, "Status change test")
       const statusReceipt = await statusTx.wait()
-      const statusProposalId = statusReceipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
-      
-      const walletTx = await consensusManager.connect(watchdog2).proposeWalletDeregistration(
-        qcAddress, "bc1qwalletaddress", "Wallet deregistration test"
-      )
+      const statusProposalId = statusReceipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
+
+      const walletTx = await consensusManager
+        .connect(watchdog2)
+        .proposeWalletDeregistration(
+          qcAddress,
+          "bc1qwalletaddress",
+          "Wallet deregistration test"
+        )
       const walletReceipt = await walletTx.wait()
-      const walletProposalId = walletReceipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const walletProposalId = walletReceipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Verify both proposals exist
-      const statusProposal = await consensusManager.getProposal(statusProposalId)
-      const walletProposal = await consensusManager.getProposal(walletProposalId)
-      
+      const statusProposal = await consensusManager.getProposal(
+        statusProposalId
+      )
+      const walletProposal = await consensusManager.getProposal(
+        walletProposalId
+      )
+
       expect(statusProposal.proposalType).to.equal(STATUS_CHANGE)
       expect(walletProposal.proposalType).to.equal(WALLET_DEREGISTRATION)
     })
@@ -296,26 +344,34 @@ describe("v1 Security Tests", () => {
     it("should handle concurrent proposals correctly", async () => {
       const qc1 = ethers.Wallet.createRandom().address
       const qc2 = ethers.Wallet.createRandom().address
-      
+
       // Create multiple proposals concurrently
-      const tx1 = await consensusManager.connect(watchdog1).proposeStatusChange(qc1, 1, "Proposal 1")
-      const tx2 = await consensusManager.connect(watchdog2).proposeStatusChange(qc2, 1, "Proposal 2")
-      
+      const tx1 = await consensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qc1, 1, "Proposal 1")
+      const tx2 = await consensusManager
+        .connect(watchdog2)
+        .proposeStatusChange(qc2, 1, "Proposal 2")
+
       const receipt1 = await tx1.wait()
       const receipt2 = await tx2.wait()
-      
-      const proposalId1 = receipt1.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
-      const proposalId2 = receipt2.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
-      
+
+      const proposalId1 = receipt1.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
+      const proposalId2 = receipt2.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
+
       expect(proposalId1).to.not.equal(proposalId2)
-      
+
       // Both should be able to reach consensus
       await consensusManager.connect(watchdog3).vote(proposalId1)
       await consensusManager.connect(watchdog4).vote(proposalId2)
-      
+
       const proposal1 = await consensusManager.getProposal(proposalId1)
       const proposal2 = await consensusManager.getProposal(proposalId2)
-      
+
       expect(proposal1.executed).to.equal(true)
       expect(proposal2.executed).to.equal(true)
     })
@@ -327,14 +383,14 @@ describe("v1 Security Tests", () => {
       const qcAddress = ethers.Wallet.createRandom().address
       const newStatus = 1
       const reason = "Expiration test"
-      
-      const tx = await consensusManager.connect(watchdog1).proposeStatusChange(
-        qcAddress,
-        newStatus,
-        reason
-      )
+
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress, newStatus, reason)
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Fast forward past voting period
       await helpers.time.increase(2 * 60 * 60 + 1) // 2 hours + 1 second
@@ -350,23 +406,22 @@ describe("v1 Security Tests", () => {
       const qcAddress = ethers.Wallet.createRandom().address
       const newStatus = 1
       const reason = "Cleanup test"
-      
-      const tx = await consensusManager.connect(watchdog1).proposeStatusChange(
-        qcAddress,
-        newStatus,
-        reason
-      )
+
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress, newStatus, reason)
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Fast forward past voting period
       await helpers.time.increase(2 * 60 * 60 + 1)
 
       // Should be able to clean up expired proposal
-      await expect(
-        consensusManager.cleanupExpired([proposalId])
-      ).to.emit(consensusManager, "ProposalExpired")
-      .withArgs(proposalId)
+      await expect(consensusManager.cleanupExpired([proposalId]))
+        .to.emit(consensusManager, "ProposalExpired")
+        .withArgs(proposalId)
     })
 
     it("should handle parameter bounds correctly", async () => {
@@ -375,7 +430,7 @@ describe("v1 Security Tests", () => {
         consensusManager.connect(governance).updateConsensusParams(1, 5) // Below minimum
       ).to.be.revertedWithCustomError(consensusManager, "InvalidParameters")
 
-      // Test maximum bounds  
+      // Test maximum bounds
       await expect(
         consensusManager.connect(governance).updateConsensusParams(8, 10) // Above maximum
       ).to.be.revertedWithCustomError(consensusManager, "InvalidParameters")

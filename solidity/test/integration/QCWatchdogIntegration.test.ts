@@ -52,19 +52,32 @@ describe("QCWatchdog Integration Tests", () => {
   beforeEach(async () => {
     await deployments.fixture(["AccountControl"])
     ;({ deployer, governance } = await helpers.signers.getNamedSigners())
-    ;[watchdog1, watchdog2, watchdog3, watchdog4, watchdog5, qc1, qc2, user, arbiter] = 
-      await helpers.signers.getUnnamedSigners()
+    ;[
+      watchdog1,
+      watchdog2,
+      watchdog3,
+      watchdog4,
+      watchdog5,
+      qc1,
+      qc2,
+      user,
+      arbiter,
+    ] = await helpers.signers.getUnnamedSigners()
 
     // Get deployed contracts
     qcManager = await helpers.contracts.getContract("QCManager")
-    qcQCReserveLedger = await helpers.contracts.getContract("QCReserveLedger") 
+    qcQCReserveLedger = await helpers.contracts.getContract("QCReserveLedger")
     qcRedeemer = await helpers.contracts.getContract("QCRedeemer")
     watchdogMonitor = await helpers.contracts.getContract("WatchdogMonitor")
-    watchdogConsensusManager = await helpers.contracts.getContract("WatchdogConsensusManager")
+    watchdogConsensusManager = await helpers.contracts.getContract(
+      "WatchdogConsensusManager"
+    )
     systemState = await helpers.contracts.getContract("SystemState")
     bank = await helpers.contracts.getContract("Bank")
     mintingPolicy = await helpers.contracts.getContract("BasicMintingPolicy")
-    redemptionPolicy = await helpers.contracts.getContract("BasicRedemptionPolicy")
+    redemptionPolicy = await helpers.contracts.getContract(
+      "BasicRedemptionPolicy"
+    )
 
     // Deploy individual watchdog instances
     const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
@@ -88,45 +101,48 @@ describe("QCWatchdog Integration Tests", () => {
     )
 
     // Grant roles
-    await qcWatchdog1.connect(deployer).grantRole(
-      await qcWatchdog1.WATCHDOG_OPERATOR_ROLE(),
-      watchdog1.address
-    )
-    await qcWatchdog2.connect(deployer).grantRole(
-      await qcWatchdog2.WATCHDOG_OPERATOR_ROLE(),
-      watchdog2.address
-    )
-    await qcWatchdog3.connect(deployer).grantRole(
-      await qcWatchdog3.WATCHDOG_OPERATOR_ROLE(),
-      watchdog3.address
-    )
+    await qcWatchdog1
+      .connect(deployer)
+      .grantRole(await qcWatchdog1.WATCHDOG_OPERATOR_ROLE(), watchdog1.address)
+    await qcWatchdog2
+      .connect(deployer)
+      .grantRole(await qcWatchdog2.WATCHDOG_OPERATOR_ROLE(), watchdog2.address)
+    await qcWatchdog3
+      .connect(deployer)
+      .grantRole(await qcWatchdog3.WATCHDOG_OPERATOR_ROLE(), watchdog3.address)
 
     // Register watchdogs with monitor
-    await watchdogMonitor.connect(governance).registerWatchdog(
-      qcWatchdog1.address,
-      "Watchdog 1"
-    )
-    await watchdogMonitor.connect(governance).registerWatchdog(
-      qcWatchdog2.address,
-      "Watchdog 2"
-    )
-    await watchdogMonitor.connect(governance).registerWatchdog(
-      qcWatchdog3.address,
-      "Watchdog 3"
-    )
+    await watchdogMonitor
+      .connect(governance)
+      .registerWatchdog(qcWatchdog1.address, "Watchdog 1")
+    await watchdogMonitor
+      .connect(governance)
+      .registerWatchdog(qcWatchdog2.address, "Watchdog 2")
+    await watchdogMonitor
+      .connect(governance)
+      .registerWatchdog(qcWatchdog3.address, "Watchdog 3")
 
     // Register watchdogs with consensus manager
-    await watchdogConsensusManager.connect(governance).addWatchdog(watchdog1.address)
-    await watchdogConsensusManager.connect(governance).addWatchdog(watchdog2.address)
-    await watchdogConsensusManager.connect(governance).addWatchdog(watchdog3.address)
-    await watchdogConsensusManager.connect(governance).addWatchdog(watchdog4.address)
-    await watchdogConsensusManager.connect(governance).addWatchdog(watchdog5.address)
+    await watchdogConsensusManager
+      .connect(governance)
+      .addWatchdog(watchdog1.address)
+    await watchdogConsensusManager
+      .connect(governance)
+      .addWatchdog(watchdog2.address)
+    await watchdogConsensusManager
+      .connect(governance)
+      .addWatchdog(watchdog3.address)
+    await watchdogConsensusManager
+      .connect(governance)
+      .addWatchdog(watchdog4.address)
+    await watchdogConsensusManager
+      .connect(governance)
+      .addWatchdog(watchdog5.address)
 
     // Grant arbiter role
-    await qcRedeemer.connect(governance).grantRole(
-      await qcRedeemer.ARBITER_ROLE(),
-      arbiter.address
-    )
+    await qcRedeemer
+      .connect(governance)
+      .grantRole(await qcRedeemer.ARBITER_ROLE(), arbiter.address)
 
     // Register QCs
     await qcManager.connect(governance).registerQC(qc1.address, "QC1")
@@ -144,18 +160,18 @@ describe("QCWatchdog Integration Tests", () => {
 
       // Register wallet through watchdog
       await expect(
-        qcWatchdog1.connect(watchdog1).registerQCWallet(
-          qc1.address,
-          walletPubKey,
-          btcAddress,
-          proofData
-        )
+        qcWatchdog1
+          .connect(watchdog1)
+          .registerQCWallet(qc1.address, walletPubKey, btcAddress, proofData)
       )
         .to.emit(qcManager, "WalletRegistered")
         .withArgs(qc1.address, walletPubKey, btcAddress)
 
       // Verify wallet is registered
-      const isRegistered = await qcManager.isWalletRegistered(qc1.address, walletPubKey)
+      const isRegistered = await qcManager.isWalletRegistered(
+        qc1.address,
+        walletPubKey
+      )
       expect(isRegistered).to.be.true
 
       // Verify wallet details
@@ -176,30 +192,34 @@ describe("QCWatchdog Integration Tests", () => {
 
       // Attempt registration while paused
       await expect(
-        qcWatchdog1.connect(watchdog1).registerQCWallet(
-          qc1.address,
-          walletPubKey,
-          validLegacyBtc,
-          proofData
-        )
+        qcWatchdog1
+          .connect(watchdog1)
+          .registerQCWallet(
+            qc1.address,
+            walletPubKey,
+            validLegacyBtc,
+            proofData
+          )
       ).to.be.revertedWith("System paused")
 
       // Unpause and retry
       await systemState.connect(governance).unpauseRegistrations()
-      
+
       await expect(
-        qcWatchdog1.connect(watchdog1).registerQCWallet(
-          qc1.address,
-          walletPubKey,
-          validLegacyBtc,
-          proofData
-        )
+        qcWatchdog1
+          .connect(watchdog1)
+          .registerQCWallet(
+            qc1.address,
+            walletPubKey,
+            validLegacyBtc,
+            proofData
+          )
       ).to.emit(qcManager, "WalletRegistered")
     })
 
     it("should handle reserve attestation with staleness checks", async () => {
       const reserves = ethers.utils.parseEther("100")
-      
+
       // First attestation
       await expect(
         qcWatchdog1.connect(watchdog1).attestReserves(qc1.address, reserves)
@@ -208,7 +228,9 @@ describe("QCWatchdog Integration Tests", () => {
         .withArgs(qc1.address, reserves)
 
       // Check current reserves
-      const currentReserves = await qcQCReserveLedger.getCurrentReserves(qc1.address)
+      const currentReserves = await qcQCReserveLedger.getCurrentReserves(
+        qc1.address
+      )
       expect(currentReserves).to.equal(reserves)
 
       // Fast forward past staleness period
@@ -221,10 +243,14 @@ describe("QCWatchdog Integration Tests", () => {
 
       // Fresh attestation
       const newReserves = ethers.utils.parseEther("150")
-      await qcWatchdog2.connect(watchdog2).attestReserves(qc1.address, newReserves)
+      await qcWatchdog2
+        .connect(watchdog2)
+        .attestReserves(qc1.address, newReserves)
 
       // Should work again
-      const updatedReserves = await qcQCReserveLedger.getCurrentReserves(qc1.address)
+      const updatedReserves = await qcQCReserveLedger.getCurrentReserves(
+        qc1.address
+      )
       expect(updatedReserves).to.equal(newReserves)
     })
   })
@@ -240,23 +266,18 @@ describe("QCWatchdog Integration Tests", () => {
         [ethers.utils.keccak256("0x1234"), 100, "0x", "0x", 0]
       )
 
-      await qcWatchdog1.connect(watchdog1).registerQCWallet(
-        qc1.address,
-        walletPubKey,
-        validLegacyBtc,
-        proofData
-      )
+      await qcWatchdog1
+        .connect(watchdog1)
+        .registerQCWallet(qc1.address, walletPubKey, validLegacyBtc, proofData)
 
-      await qcWatchdog1.connect(watchdog1).attestReserves(
-        qc1.address,
-        ethers.utils.parseEther("1000")
-      )
+      await qcWatchdog1
+        .connect(watchdog1)
+        .attestReserves(qc1.address, ethers.utils.parseEther("1000"))
 
       // Give bank some balance
-      await bank.connect(deployer).increaseBalance(
-        qc1.address,
-        ethers.utils.parseEther("100")
-      )
+      await bank
+        .connect(deployer)
+        .increaseBalance(qc1.address, ethers.utils.parseEther("100"))
     })
 
     it("should handle complete redemption lifecycle", async () => {
@@ -264,22 +285,21 @@ describe("QCWatchdog Integration Tests", () => {
       const btcAddress = validBech32Btc
 
       // Initiate redemption
-      const tx = await qcRedeemer.connect(qc1).initiateRedemption(
-        amount,
-        btcAddress,
-        btcAddress
-      )
+      const tx = await qcRedeemer
+        .connect(qc1)
+        .initiateRedemption(amount, btcAddress, btcAddress)
       const receipt = await tx.wait()
-      const event = receipt.events?.find(e => e.event === "RedemptionInitiated")
+      const event = receipt.events?.find(
+        (e) => e.event === "RedemptionInitiated"
+      )
       redemptionId = event?.args?.redemptionId
 
       // Fulfill redemption through watchdog
       const btcTxHash = "0x" + "dd".repeat(32)
       await expect(
-        qcWatchdog1.connect(watchdog1).fulfillRedemption(
-          redemptionId,
-          btcTxHash
-        )
+        qcWatchdog1
+          .connect(watchdog1)
+          .fulfillRedemption(redemptionId, btcTxHash)
       )
         .to.emit(qcRedeemer, "RedemptionFulfilled")
         .withArgs(redemptionId, btcTxHash)
@@ -293,22 +313,20 @@ describe("QCWatchdog Integration Tests", () => {
       const amount = ethers.utils.parseEther("10")
 
       // Initiate redemption
-      const tx = await qcRedeemer.connect(qc1).initiateRedemption(
-        amount,
-        validLegacyBtc,
-        validLegacyBtc
-      )
+      const tx = await qcRedeemer
+        .connect(qc1)
+        .initiateRedemption(amount, validLegacyBtc, validLegacyBtc)
       const receipt = await tx.wait()
-      const event = receipt.events?.find(e => e.event === "RedemptionInitiated")
+      const event = receipt.events?.find(
+        (e) => e.event === "RedemptionInitiated"
+      )
       redemptionId = event?.args?.redemptionId
 
       // Fast forward past timeout
       await helpers.time.increaseTime(2 * DAY + 1)
 
       // Should be defaultable
-      await expect(
-        qcRedeemer.connect(arbiter).defaultRedemption(redemptionId)
-      )
+      await expect(qcRedeemer.connect(arbiter).defaultRedemption(redemptionId))
         .to.emit(qcRedeemer, "RedemptionDefaulted")
         .withArgs(redemptionId)
 
@@ -321,7 +339,7 @@ describe("QCWatchdog Integration Tests", () => {
   describe("Cross-Contract State Consistency", () => {
     it("should maintain consistent state across QCManager and QCReserveLedger", async () => {
       // Register QC in manager
-      const qc3 = await helpers.signers.getUnnamedSigners().then(s => s[10])
+      const qc3 = await helpers.signers.getUnnamedSigners().then((s) => s[10])
       await qcManager.connect(governance).registerQC(qc3.address, "QC3")
 
       // Verify QC is active in manager
@@ -333,22 +351,25 @@ describe("QCWatchdog Integration Tests", () => {
       await qcWatchdog1.connect(watchdog1).attestReserves(qc3.address, reserves)
 
       // Verify reserves in ledger
-      const currentReserves = await qcQCReserveLedger.getCurrentReserves(qc3.address)
+      const currentReserves = await qcQCReserveLedger.getCurrentReserves(
+        qc3.address
+      )
       expect(currentReserves).to.equal(reserves)
 
       // Deactivate QC
       await qcManager.connect(governance).deactivateQC(qc3.address)
 
       // Should still be able to read reserves (but QC is inactive)
-      const reservesAfter = await qcQCReserveLedger.getCurrentReserves(qc3.address)
+      const reservesAfter = await qcQCReserveLedger.getCurrentReserves(
+        qc3.address
+      )
       expect(reservesAfter).to.equal(reserves)
 
       // But new operations should fail
       await expect(
-        qcWatchdog1.connect(watchdog1).attestReserves(
-          qc3.address,
-          ethers.utils.parseEther("600")
-        )
+        qcWatchdog1
+          .connect(watchdog1)
+          .attestReserves(qc3.address, ethers.utils.parseEther("600"))
       ).to.be.revertedWith("QC not active")
     })
 
@@ -360,25 +381,21 @@ describe("QCWatchdog Integration Tests", () => {
         [ethers.utils.keccak256("0x1234"), 100, "0x", "0x", 0]
       )
 
-      await qcWatchdog1.connect(watchdog1).registerQCWallet(
-        qc1.address,
-        walletPubKey,
-        validLegacyBtc,
-        proofData
-      )
+      await qcWatchdog1
+        .connect(watchdog1)
+        .registerQCWallet(qc1.address, walletPubKey, validLegacyBtc, proofData)
 
       const reserves = ethers.utils.parseEther("1000")
       await qcWatchdog1.connect(watchdog1).attestReserves(qc1.address, reserves)
 
       // Grant minter role to policy
-      await bank.connect(governance).grantRole(
-        await bank.MINTER_ROLE(),
-        mintingPolicy.address
-      )
+      await bank
+        .connect(governance)
+        .grantRole(await bank.MINTER_ROLE(), mintingPolicy.address)
 
       // Mint through policy (simulating the flow)
       const mintAmount = ethers.utils.parseEther("100")
-      
+
       // Policy would check reserves and call bank.increaseBalanceAndCall
       // For testing, we'll verify the policy can interact correctly
       const canMint = await mintingPolicy.canMint(qc1.address, mintAmount)
@@ -398,15 +415,23 @@ describe("QCWatchdog Integration Tests", () => {
       const reserves3 = ethers.utils.parseEther("200")
 
       // All watchdogs attest different values
-      const tx1 = qcWatchdog1.connect(watchdog1).attestReserves(qc1.address, reserves1)
-      const tx2 = qcWatchdog2.connect(watchdog2).attestReserves(qc1.address, reserves2)
-      const tx3 = qcWatchdog3.connect(watchdog3).attestReserves(qc1.address, reserves3)
+      const tx1 = qcWatchdog1
+        .connect(watchdog1)
+        .attestReserves(qc1.address, reserves1)
+      const tx2 = qcWatchdog2
+        .connect(watchdog2)
+        .attestReserves(qc1.address, reserves2)
+      const tx3 = qcWatchdog3
+        .connect(watchdog3)
+        .attestReserves(qc1.address, reserves3)
 
       // Wait for all transactions
       await Promise.all([tx1, tx2, tx3])
 
       // The last successful attestation should be the current value
-      const currentReserves = await qcQCReserveLedger.getCurrentReserves(qc1.address)
+      const currentReserves = await qcQCReserveLedger.getCurrentReserves(
+        qc1.address
+      )
       expect([reserves1, reserves2, reserves3]).to.include(currentReserves)
     })
 
@@ -418,64 +443,65 @@ describe("QCWatchdog Integration Tests", () => {
       )
 
       // Two watchdogs try to register the same wallet
-      const tx1 = qcWatchdog1.connect(watchdog1).registerQCWallet(
-        qc1.address,
-        walletPubKey,
-        validLegacyBtc,
-        proofData
-      )
-      const tx2 = qcWatchdog2.connect(watchdog2).registerQCWallet(
-        qc1.address,
-        walletPubKey,
-        validLegacyBtc,
-        proofData
-      )
+      const tx1 = qcWatchdog1
+        .connect(watchdog1)
+        .registerQCWallet(qc1.address, walletPubKey, validLegacyBtc, proofData)
+      const tx2 = qcWatchdog2
+        .connect(watchdog2)
+        .registerQCWallet(qc1.address, walletPubKey, validLegacyBtc, proofData)
 
       // One should succeed, one should fail
       const results = await Promise.allSettled([tx1, tx2])
-      const successes = results.filter(r => r.status === "fulfilled").length
-      const failures = results.filter(r => r.status === "rejected").length
+      const successes = results.filter((r) => r.status === "fulfilled").length
+      const failures = results.filter((r) => r.status === "rejected").length
 
       expect(successes).to.equal(1)
       expect(failures).to.equal(1)
 
       // Wallet should be registered exactly once
-      const isRegistered = await qcManager.isWalletRegistered(qc1.address, walletPubKey)
+      const isRegistered = await qcManager.isWalletRegistered(
+        qc1.address,
+        walletPubKey
+      )
       expect(isRegistered).to.be.true
     })
   })
 
   describe("Role-Based Access Control", () => {
     it("should enforce watchdog operator permissions", async () => {
-      const unauthorizedSigner = await helpers.signers.getUnnamedSigners().then(s => s[11])
+      const unauthorizedSigner = await helpers.signers
+        .getUnnamedSigners()
+        .then((s) => s[11])
 
       // Attempt operations without role
       await expect(
-        qcWatchdog1.connect(unauthorizedSigner).attestReserves(
-          qc1.address,
-          ethers.utils.parseEther("100")
-        )
+        qcWatchdog1
+          .connect(unauthorizedSigner)
+          .attestReserves(qc1.address, ethers.utils.parseEther("100"))
       ).to.be.revertedWith("AccessControl: account")
 
       await expect(
-        qcWatchdog1.connect(unauthorizedSigner).registerQCWallet(
-          qc1.address,
-          "0x" + "ff".repeat(20),
-          validLegacyBtc,
-          "0x"
-        )
+        qcWatchdog1
+          .connect(unauthorizedSigner)
+          .registerQCWallet(
+            qc1.address,
+            "0x" + "ff".repeat(20),
+            validLegacyBtc,
+            "0x"
+          )
       ).to.be.revertedWith("AccessControl: account")
     })
 
     it("should enforce governance permissions on critical operations", async () => {
-      const unauthorizedSigner = await helpers.signers.getUnnamedSigners().then(s => s[12])
+      const unauthorizedSigner = await helpers.signers
+        .getUnnamedSigners()
+        .then((s) => s[12])
 
       // Attempt QC registration without governance role
       await expect(
-        qcManager.connect(unauthorizedSigner).registerQC(
-          unauthorizedSigner.address,
-          "Unauthorized QC"
-        )
+        qcManager
+          .connect(unauthorizedSigner)
+          .registerQC(unauthorizedSigner.address, "Unauthorized QC")
       ).to.be.revertedWith("AccessControl: account")
 
       // Attempt to pause system without role
@@ -492,12 +518,14 @@ describe("QCWatchdog Integration Tests", () => {
       const proofData = "0x"
 
       await expect(
-        qcWatchdog1.connect(watchdog1).registerQCWallet(
-          qc1.address,
-          walletPubKey,
-          invalidBtcAddress,
-          proofData
-        )
+        qcWatchdog1
+          .connect(watchdog1)
+          .registerQCWallet(
+            qc1.address,
+            walletPubKey,
+            invalidBtcAddress,
+            proofData
+          )
       ).to.be.revertedWith("Invalid Bitcoin address format")
     })
 
@@ -509,18 +537,19 @@ describe("QCWatchdog Integration Tests", () => {
 
     it("should handle redemptions exceeding bank balance", async () => {
       // Give QC small balance
-      await bank.connect(deployer).increaseBalance(
-        qc1.address,
-        ethers.utils.parseEther("1")
-      )
+      await bank
+        .connect(deployer)
+        .increaseBalance(qc1.address, ethers.utils.parseEther("1"))
 
       // Try to redeem more than balance
       await expect(
-        qcRedeemer.connect(qc1).initiateRedemption(
-          ethers.utils.parseEther("10"),
-          validLegacyBtc,
-          validLegacyBtc
-        )
+        qcRedeemer
+          .connect(qc1)
+          .initiateRedemption(
+            ethers.utils.parseEther("10"),
+            validLegacyBtc,
+            validLegacyBtc
+          )
       ).to.be.revertedWith("Insufficient balance")
     })
   })

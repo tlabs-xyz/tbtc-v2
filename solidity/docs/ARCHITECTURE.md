@@ -17,7 +17,7 @@ The tBTC v2 Account Control system enables **Qualified Custodians** (regulated i
 ### Core Architectural Principles
 
 1. **Direct Integration**: Leverage existing Bank/Vault infrastructure without abstraction layers
-2. **Modular Design**: Policy-driven contracts enable evolution without breaking core interfaces  
+2. **Modular Design**: Policy-driven contracts enable evolution without breaking core interfaces
 3. **Data/Logic Separation**: Clear separation between storage (QCData) and business logic (QCManager)
 4. **Simplified Watchdog**: Machine-readable codes, distributed trust, permissionless enforcement
 5. **Future-Proof Interfaces**: Stable core contracts with upgradeable policy implementations
@@ -68,6 +68,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 ```
 
 **Key Integration Points**:
+
 - **Bank Authorization**: BasicMintingPolicy authorized via `authorizedBalanceIncreasers`
 - **Shared Infrastructure**: Uses same Bank/Vault/Token contracts as regular Bridge
 - **Perfect Fungibility**: QC-minted tBTC indistinguishable from Bridge-minted tBTC
@@ -118,6 +119,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 **Purpose**: The cornerstone of QC integration, acting as the direct interface between Account Control and existing tBTC Bank/Vault architecture.
 
 **Key Features**:
+
 - Directly calls `Bank.increaseBalanceAndCall()` for seamless integration
 - Auto-minting capability through TBTCVault integration
 - Capacity validation and authorization checks
@@ -125,14 +127,16 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 - Policy-driven evolution (upgradeable via ProtocolRegistry)
 
 **Critical Methods**:
+
 ```solidity
 function creditQCBackedDeposit(
-    address user,
-    uint256 amount,
-    address qc,
-    bytes32 mintId,
-    bool autoMint
+  address user,
+  uint256 amount,
+  address qc,
+  bytes32 mintId,
+  bool autoMint
 ) external onlyRole(MINTER_ROLE);
+
 ```
 
 ### 2. ProtocolRegistry.sol (Service Locator)
@@ -140,12 +144,14 @@ function creditQCBackedDeposit(
 **Purpose**: Central registry enabling modular architecture and seamless upgrades.
 
 **Key Features**:
+
 - Service registration and discovery
-- Hot-swappable policy contracts  
+- Hot-swappable policy contracts
 - Gas-optimized service resolution
 - Version management capabilities
 
 **Usage Pattern**:
+
 ```solidity
 // Policy lookup
 IBasicMintingPolicy policy = IBasicMintingPolicy(
@@ -159,6 +165,7 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 ### 3. QC Management Contracts
 
 #### QCManager.sol (Business Logic)
+
 - **Stateless business logic** for QC operations
 - QC status management (Active, UnderReview, Revoked)
 - Capacity calculations and validations
@@ -166,18 +173,21 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 - Integration with watchdog consensus
 
 #### QCData.sol (Storage Layer)
+
 - **Pure storage contract** for QC state
 - Gas-optimized data structures
 - Audit-friendly data access patterns
 - Separation of concerns from business logic
 
 #### QCMinter.sol & QCRedeemer.sol (Stable Interfaces)
+
 - **Entry points** for minting and redemption operations
 - Policy delegation to maintain interface stability
 - Emergency pause capabilities
 - Role-based access control
 
 #### QCReserveLedger.sol (Reserve Tracking)
+
 - Bitcoin reserve attestation storage
 - Staleness detection and validation
 - Multi-watchdog attestation support
@@ -186,28 +196,34 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 ### 4. Supporting Contracts
 
 #### SPVValidator.sol (Bitcoin Transaction Validation)
+
 **Purpose**: Provides Bitcoin SPV proof validation capabilities for Account Control operations
 
 **Key Features**:
+
 - Replicates Bridge's proven SPV validation logic without modifying production Bridge
 - Account Control-tailored interface for Bitcoin transaction verification
 - Maintains identical security guarantees as production Bridge
 - Supports wallet control verification and redemption fulfillment validation
 
 #### BitcoinAddressUtils.sol (Address Handling)
+
 **Purpose**: Utility library for Bitcoin address format handling
 
 **Supported Formats**:
+
 - P2PKH (Pay-to-Public-Key-Hash) addresses
-- P2SH (Pay-to-Script-Hash) addresses  
+- P2SH (Pay-to-Script-Hash) addresses
 - P2WPKH (Pay-to-Witness-Public-Key-Hash) addresses
 - P2WSH (Pay-to-Witness-Script-Hash) addresses
 - Bridges gap between human-readable addresses and script representations
 
 #### SystemState.sol (Emergency Controls)
+
 **Purpose**: Global emergency controls and system parameters
 
 **Key Features**:
+
 - Function-specific pauses (minting, redemption, registry, wallet registration)
 - QC-specific emergency controls with reason code tracking
 - Time-limited emergency pauses (default 7 days) with automatic expiry
@@ -216,11 +232,13 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 ### 5. Interface Contracts
 
 #### IMintingPolicy.sol & IRedemptionPolicy.sol
+
 - Define standard interfaces for upgradeable policy contracts
 - Enable minting and redemption rule upgrades without changing core contracts
 - Support pluggable business logic architecture
 
 #### ISPVValidator.sol
+
 - Interface for Bitcoin SPV proof validation operations
 - Standardizes validation requirements across different use cases
 
@@ -235,6 +253,7 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 **Decision**: Integrate directly with existing tBTC Bank/Vault infrastructure rather than creating abstraction layers.
 
 **Rationale**:
+
 - **Simplicity**: Eliminates unnecessary abstraction layers that add complexity
 - **Proven Infrastructure**: Leverages battle-tested Bank/Vault architecture with known security properties
 - **Gas Efficiency**: Direct integration reduces transaction costs by ~50% compared to layered approaches
@@ -246,6 +265,7 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 **Decision**: Focus on objective enforcement only, abandoning complex consensus mechanisms.
 
 **Rationale**:
+
 - **Operational Complexity vs. Theoretical Security**: Complex consensus mechanisms proved operationally burdensome with 90% of watchdog operations being routine
 - **Gas Efficiency Requirements**: Complex voting mechanisms consumed excessive gas, creating poor user experience
 - **Machine vs Human Interpretation**: Original design required machines to interpret human-readable proposals, which proved difficult to automate effectively
@@ -256,6 +276,7 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 **Decision**: Separate deterministic enforcement (90%), threshold consensus (9%), and governance arbitration (1%).
 
 **Rationale**:
+
 - **Layer 1 (Deterministic)**: 90%+ automation through objective rule enforcement for measurable violations
 - **Layer 2 (Threshold)**: Human-supervised consensus only for subjective issues requiring multiple attestations
 - **Layer 3 (Governance)**: Final arbitration reserved for truly complex decisions requiring DAO intervention
@@ -266,6 +287,7 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 **Decision**: Use structured evidence with cryptographic verification instead of human-readable proposals.
 
 **Rationale**:
+
 - **Automation Enablement**: Structured data enables true machine processing and validation
 - **Evidence Hash**: Cryptographic verification ensures evidence integrity without trusting intermediaries
 - **IPFS URI Pattern**: Decentralized storage provides detailed evidence while keeping on-chain data minimal
@@ -276,6 +298,7 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 **Decision**: Require 3+ independent attestations with median calculation for reserve balances.
 
 **Rationale**:
+
 - **Single Point of Trust Elimination**: No single attester can manipulate reserve data
 - **Byzantine Fault Tolerance**: System continues operating even with malicious or failed attesters
 - **Objective Facts Only**: Reserve balances are objective, measurable facts suitable for consensus
@@ -300,6 +323,7 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 **Core Principle**: Focus on objective enforcement - oracle consensus for facts, permissionless enforcement for violations.
 
 The system separates concerns into:
+
 - **Oracle Problem**: Multi-attester consensus for objective facts (reserve balances)
 - **Enforcement Problem**: Permissionless enforcement of objective violations
 
@@ -336,6 +360,7 @@ The system separates concerns into:
 **Architecture Design**: Oracle + Slim Ledger Architecture
 
 The QCReserveLedger implements a two-component architecture:
+
 1. **ReserveOracle**: Handles multi-attester consensus (internal logic)
 2. **QCReserveLedger**: Stores consensus results and maintains history (external interface)
 
@@ -366,6 +391,7 @@ The QCReserveLedger implements a two-component architecture:
 ```
 
 **Key Features**:
+
 - Multi-attester consensus system for reserve balance tracking
 - Byzantine fault tolerance with median calculation from 3+ attesters
 - Staleness detection for outdated attestations
@@ -374,6 +400,7 @@ The QCReserveLedger implements a two-component architecture:
 - Clear trust boundary between untrusted attestations and trusted consensus data
 
 **Core Functions**:
+
 ```solidity
 function submitAttestation(address qc, uint256 balance) external onlyRole(ATTESTER_ROLE)
 function getReserveBalanceAndStaleness(address qc) external view returns (uint256, bool)
@@ -383,11 +410,13 @@ function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) // Emergency
 ```
 
 **Consensus Parameters**:
+
 - `consensusThreshold`: 3 attestations required (configurable)
-- `attestationTimeout`: 6 hours window for valid attestations  
+- `attestationTimeout`: 6 hours window for valid attestations
 - `maxStaleness`: 24 hours before data considered stale
 
 **Consensus Algorithm**:
+
 - **Byzantine Fault Tolerance**: Median calculation protects against up to 50% malicious attesters
 - **Efficient Implementation**: Insertion sort + median for small attester sets (≤10 attesters)
 - **Threshold Protection**: Requires minimum 3 attestations before any balance update
@@ -396,22 +425,25 @@ function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) // Emergency
 - **Consensus Window**: 6 hours for fresh attestations only
 
 **Design Principles**:
+
 1. **No Individual Attestations in Ledger**: Only consensus-validated values stored
 2. **Oracle as Pure Function**: Minimal state for consensus calculation
 3. **Clear Trust Boundary**: Explicit separation between proposals and facts
 4. **Separation of Concerns**: Oracle solves trust, ledger solves storage
 
 **Emergency Consensus Mechanism**:
+
 - **Function**: `forceConsensus(address qc)` - ARBITER_ROLE only
-- **Purpose**: Break consensus deadlocks when insufficient attestations prevent normal consensus  
+- **Purpose**: Break consensus deadlocks when insufficient attestations prevent normal consensus
 - **Safety**: Requires at least 1 valid attestation to prevent arbitrary balance setting
 - **Use Case**: After QC enters UnderReview due to stale attestations, ARBITER can force consensus with available fresh attestations
 
 **Emergency Consensus Workflow**:
+
 1. Normal consensus fails (< 3 attestations)
 2. Reserves become stale after 24 hours
 3. Anyone calls `enforceObjectiveViolation()` for STALE_ATTESTATIONS
-4. QC enters UnderReview status  
+4. QC enters UnderReview status
 5. Attesters continue submitting fresh attestations
 6. ARBITER calls `forceConsensus()` using available attestations
 7. Reserve balance updated, QC can be restored to Active
@@ -421,6 +453,7 @@ function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) // Emergency
 **Purpose**: Automated enforcement of objective violations with time-based escalation
 
 **Key Features**:
+
 - **Permissionless Design**: Anyone can trigger enforcement for violations
 - **Limited Authority**: Can only set QCs to UnderReview status (human oversight for final decisions)
 - **Objective Only**: Monitors only machine-verifiable conditions
@@ -428,6 +461,7 @@ function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) // Emergency
 - **Byzantine Fault Tolerance**: Works with QCReserveLedger consensus data
 
 **Core Functions**:
+
 ```solidity
 function enforceObjectiveViolation(address qc, bytes32 reasonCode) external
 function checkViolation(address qc, bytes32 reasonCode) external view returns (bool violated, string memory reason)
@@ -437,18 +471,24 @@ function clearEscalationTimer(address qc) external // Timer cleanup
 ```
 
 **Supported Violations**:
+
 ```solidity
 bytes32 constant INSUFFICIENT_RESERVES = keccak256("INSUFFICIENT_RESERVES");
 bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
-bytes32 constant SUSTAINED_RESERVE_VIOLATION = keccak256("SUSTAINED_RESERVE_VIOLATION");
+bytes32 constant SUSTAINED_RESERVE_VIOLATION = keccak256(
+  "SUSTAINED_RESERVE_VIOLATION"
+);
+
 ```
 
 **Expected Usage Pattern**:
+
 - **Primary callers**: Watchdogs who continuously monitor QC compliance
 - **Secondary callers**: Automated monitoring systems, community members, other participants
 - **Resilience design**: Permissionless nature ensures system integrity even if watchdogs fail to act
 
 **Escalation Flow**:
+
 1. Violation detected → QC set to UnderReview (immediate human oversight)
 2. 45-minute grace period for resolution (legal compliance)
 3. If unresolved → automatic emergency pause (safety net)
@@ -457,14 +497,15 @@ bytes32 constant SUSTAINED_RESERVE_VIOLATION = keccak256("SUSTAINED_RESERVE_VIOL
 
 The watchdog system implements a clear role hierarchy for security and operational separation:
 
-| Role | Purpose | Contracts | Authority |
-|------|---------|-----------|-----------|
-| **ATTESTER_ROLE** | Submit reserve attestations | QCReserveLedger | Submit balance observations |
-| **ARBITER_ROLE** | Emergency consensus & enforcement | QCReserveLedger, WatchdogEnforcer | Force consensus, QC status changes |
-| **PAUSER_ROLE** | Emergency pause controls | SystemState | Emergency pause/unpause QCs |
-| **DEFAULT_ADMIN_ROLE** | System administration | All contracts | Grant/revoke roles |
+| Role                   | Purpose                           | Contracts                         | Authority                          |
+| ---------------------- | --------------------------------- | --------------------------------- | ---------------------------------- |
+| **ATTESTER_ROLE**      | Submit reserve attestations       | QCReserveLedger                   | Submit balance observations        |
+| **ARBITER_ROLE**       | Emergency consensus & enforcement | QCReserveLedger, WatchdogEnforcer | Force consensus, QC status changes |
+| **PAUSER_ROLE**        | Emergency pause controls          | SystemState                       | Emergency pause/unpause QCs        |
+| **DEFAULT_ADMIN_ROLE** | System administration             | All contracts                     | Grant/revoke roles                 |
 
 **Role Design Principles**:
+
 - **No overlapping definitions** - Each role has distinct, non-overlapping permissions
 - **Clear separation of concerns** - Roles map to specific operational functions
 - **Standardized across contracts** - Consistent role naming and usage patterns
@@ -479,6 +520,7 @@ The watchdog system implements a clear role hierarchy for security and operation
 The system achieves efficiency through direct integration with existing tBTC contracts:
 
 **Integration Flow**:
+
 ```
 QC Request → QCMinter → BasicMintingPolicy
     ↓
@@ -488,6 +530,7 @@ TBTCVault.receiveBalanceIncrease() → Auto-mint tBTC
 ```
 
 **Benefits**:
+
 - **50% Gas Reduction**: Direct calls eliminate intermediate contracts
 - **Proven Infrastructure**: Leverages battle-tested Bank/Vault architecture
 - **Perfect Fungibility**: QC tBTC identical to Bridge tBTC
@@ -496,6 +539,7 @@ TBTCVault.receiveBalanceIncrease() → Auto-mint tBTC
 ### Role Integration
 
 **System Role Hierarchy**:
+
 ```
 ReserveOracle:
 ├── Multiple ATTESTER_ROLE holders submit attestations
@@ -511,11 +555,13 @@ WatchdogEnforcer:
 ### ProtocolRegistry Usage
 
 **Direct Integration**:
+
 - Bank contract - Core balance management
 - TBTCVault contract - Token minting/burning
 - TBTC token contract - ERC-20 operations
 
 **Registry Integration** (Flexible):
+
 - BasicMintingPolicy (upgradeable)
 - BasicRedemptionPolicy (upgradeable)
 - QC management contracts
@@ -528,6 +574,7 @@ WatchdogEnforcer:
 ### Threat Model
 
 **Protected Against**:
+
 - Single malicious watchdog (M-of-N consensus)
 - Coordination failures (independent operations)
 - Emergency scenarios (automatic responses)
@@ -535,6 +582,7 @@ WatchdogEnforcer:
 - Front-running attacks (idempotent operations)
 
 **Trust Assumptions**:
+
 - Majority of watchdogs honest (standard assumption)
 - Watchdogs are KYC'd legal entities (not anonymous)
 - DAO governance acts in system interest
@@ -542,6 +590,7 @@ WatchdogEnforcer:
 ### Access Control Architecture
 
 **Multi-layered Security**:
+
 1. **Role-based Access Control**: OpenZeppelin AccessControl throughout
 2. **Time-locked Governance**: 7-day delays for critical parameter changes
 3. **Emergency Pause Mechanisms**: Granular pause controls per operation type
@@ -550,18 +599,21 @@ WatchdogEnforcer:
 ### Security Features by Component
 
 **QC Management**:
+
 - SPV proof validation for all Bitcoin operations
 - Reserve attestation staleness detection
 - Capacity enforcement and validation
 - Status change authorization controls
 
 **Watchdog System**:
+
 - M-of-N consensus for authority decisions
 - Independent verification for data operations
 - Emergency circuit breaker with automatic triggers
 - Cooldown periods prevent spam attacks
 
 **Protocol Integration**:
+
 - Direct integration reduces attack surface
 - Existing Bank/Vault security model maintained
 - Perfect fungibility prevents protocol discrimination
@@ -576,33 +628,36 @@ WatchdogEnforcer:
 The system deploys through numbered scripts ensuring proper dependency resolution:
 
 **Core Infrastructure (Scripts 95-99)**:
+
 1. `95_deploy_account_control_core.ts` - Core entry points (QCMinter, QCRedeemer, ProtocolRegistry)
 2. `96_deploy_account_control_state.ts` - State management (QCData, SystemState, QCManager)
 3. `97_deploy_account_control_policies.ts` - Policy contracts (BasicMintingPolicy, BasicRedemptionPolicy)
 4. `98_deploy_reserve_ledger.ts` - Reserve tracking and watchdog system (QCReserveLedger, WatchdogEnforcer)
 5. `99_configure_account_control_system.ts` - Role assignments and final configuration
 
-**Supporting Infrastructure**:
-6. `30_deploy_spv_validator.ts` - Bitcoin transaction validation (SPVValidator)
+**Supporting Infrastructure**: 6. `30_deploy_spv_validator.ts` - Bitcoin transaction validation (SPVValidator)
 
 ### Production Deployment Strategy
 
 **Multi-Environment Approach**:
+
 1. **Development**: Single attester for QCReserveLedger, fast parameters for testing
 2. **Staging**: Multiple attesters, realistic timing parameters for validation
 3. **Production**: Minimum 3 attesters for Byzantine fault tolerance, secure parameters
 
 **Reserve Attestation Scaling**:
+
 ```
 Environment    Min Attesters    Consensus Method    Timing
 Development    1               Direct submission    Fast (minutes)
-Staging        2-3             Median calculation   Medium (hours)  
+Staging        2-3             Median calculation   Medium (hours)
 Production     3+              Byzantine tolerant   Secure (hours)
 ```
 
 ### Geographic Distribution
 
 **Operational Security Requirements**:
+
 - Independent deployment by different operators
 - Geographic distribution across regions
 - Organizational independence (different legal entities)
@@ -615,6 +670,7 @@ Production     3+              Byzantine tolerant   Secure (hours)
 ### System-Wide Defaults
 
 **Simplified Watchdog System**:
+
 ```solidity
 // ReserveOracle
 uint256 public constant MIN_ATTESTERS = 3;     // Minimum for consensus
@@ -629,16 +685,19 @@ uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
 ### Environment-Specific Tuning
 
 **Development**:
+
 - Single approval for testing
 - Faster iteration cycles
 - Relaxed validation rules
 
 **Staging**:
+
 - Majority consensus validation
 - Realistic timing parameters
 - Full feature testing
 
 **Production**:
+
 - Secure majority requirements
 - Conservative timing windows
 - Maximum security validation
@@ -650,18 +709,21 @@ uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
 ### Key Performance Indicators
 
 **System Health**:
+
 - Active watchdog count and distribution
 - Consensus participation rates
 - Emergency response times
 - Automated enforcement accuracy
 
 **Operational Metrics**:
+
 - QC onboarding and status changes
 - Minting/redemption volumes and success rates
 - Reserve attestation frequency and staleness
 - Policy upgrade deployment frequency
 
 **Security Metrics**:
+
 - Failed authorization attempts
 - Emergency pause triggers
 - Consensus disputes and resolutions
@@ -670,18 +732,21 @@ uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
 ### Alerting Framework
 
 **Critical Alerts**:
+
 - Emergency pause triggered
 - Watchdog consensus failure
 - Automated enforcement errors
 - Security policy violations
 
 **Warning Alerts**:
+
 - Stale reserve attestations
 - Low watchdog participation
 - Approaching capacity limits
 - Performance degradation
 
 **Informational Alerts**:
+
 - Successful policy upgrades
 - QC onboarding
 - System parameter changes
@@ -706,6 +771,7 @@ The architecture's strength lies in its ability to evolve - from the current pro
 The Account Control system consists of:
 
 ### Core Account Control Infrastructure (13 contracts)
+
 - QCManager.sol - QC lifecycle management
 - QCData.sol - QC state and data storage
 - BasicMintingPolicy.sol - Direct Bank integration for minting
@@ -721,13 +787,15 @@ The Account Control system consists of:
 - WatchdogReasonCodes.sol - Machine-readable violation codes
 
 ### Interface Contracts (3 interfaces)
+
 - IMintingPolicy.sol - Minting policy interface
-- IRedemptionPolicy.sol - Redemption policy interface  
+- IRedemptionPolicy.sol - Redemption policy interface
 - ISPVValidator.sol - SPV validation interface
 
 **Total System**: 13 contracts + 3 interfaces = **16 total files**
 
 The result is a comprehensive system that is:
+
 - **Focused**: Clear separation of concerns between components
 - **Secure**: Multiple validation layers and Byzantine fault tolerance
 - **Efficient**: Direct integration and optimized algorithms
@@ -752,8 +820,9 @@ This section records significant architectural decisions made during the develop
 **Status**: Accepted and Implemented
 
 **Context**: Alternative approaches considered included complex systems with 6+ contracts with overlapping responsibilities:
+
 - WatchdogAutomatedEnforcement
-- WatchdogConsensusManager  
+- WatchdogConsensusManager
 - WatchdogDAOEscalation
 - WatchdogThresholdActions
 - WatchdogMonitor
@@ -762,11 +831,13 @@ This section records significant architectural decisions made during the develop
 Critical issue identified: **Machines cannot interpret human-readable strings** - the OptimisticWatchdogConsensus expected automated systems to understand strings like "excessive_slippage_observed".
 
 **Decision**: Migrate to a simplified 3-contract architecture focused on objective enforcement:
+
 1. **Oracle Problem** → `QCReserveLedger` (multi-attester consensus)
 2. **Enforcement** → `WatchdogEnforcer` (permissionless with reason codes)
 3. **Validation** → `WatchdogReasonCodes` (machine-readable violation codes)
 
 **Consequences**:
+
 - Positive: 50% reduction in contracts (6 → 3), machine-readable reason codes enable automation, no single points of trust, gas optimization through minimal state
 - Negative: Additional complexity to implement, documentation updates needed, retraining for operators
 
@@ -778,12 +849,15 @@ Critical issue identified: **Machines cannot interpret human-readable strings** 
 **Context**: Original system used human-readable strings for violations like "excessive_slippage_observed", "suspicious_minting_pattern". Machines cannot interpret semantic meaning from strings.
 
 **Decision**: Replace strings with standardized bytes32 reason codes:
+
 ```solidity
 bytes32 constant INSUFFICIENT_RESERVES = keccak256("INSUFFICIENT_RESERVES");
 bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
+
 ```
 
 **Consequences**:
+
 - Positive: Enables automated validation, reduces gas costs (bytes32 vs string), prevents interpretation attacks
 - Negative: Less human-readable in logs, requires mapping for UI display
 
@@ -795,11 +869,13 @@ bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
 **Context**: Original design trusted a single attester for reserve balances - single point of failure. User feedback: "we don't trust single watchdogs"
 
 **Decision**: Implement multi-attester oracle consensus:
+
 - Minimum 3 attesters required
 - Median calculation for robustness
 - Automatic consensus when threshold met
 
 **Consequences**:
+
 - Positive: Eliminates single trust point, Byzantine fault tolerance, robust against manipulation
 - Negative: Higher operational complexity, requires multiple attesters, slightly higher gas costs
 
@@ -813,6 +889,7 @@ bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
 **Decision**: Remove `proposedAction` field entirely. Watchdogs only report observations, DAO decides actions.
 
 **Consequences**:
+
 - Positive: Clear separation of concerns, prevents watchdog overreach, simplifies report structure
 - Negative: DAO must interpret observations, no automated remediation hints
 
@@ -824,11 +901,13 @@ bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
 **Context**: Proposed various rate limiting mechanisms to prevent spam. User feedback: "I don't think any rate-limiting ideas you shared are actually good"
 
 **Decision**: No explicit rate limiting - rely on:
+
 - Gas costs as natural deterrent
 - Role-gating (WATCHDOG_ROLE required)
 - Support thresholds for importance
 
 **Consequences**:
+
 - Positive: Simpler implementation, no artificial constraints, emergencies not blocked
 - Negative: Potential for spam if gas is cheap, requires active DAO monitoring
 
@@ -842,6 +921,7 @@ bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
 **Decision**: Store evidence hashes on-chain (max 20 per report), actual content via watchdog REST APIs.
 
 **Consequences**:
+
 - Positive: Bounded on-chain storage, no DoS vulnerability, leverages existing infrastructure
 - Negative: Requires off-chain availability, trust in watchdog REST APIs
 
@@ -855,6 +935,7 @@ bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
 **Decision**: Remove DAOBridge entirely. DAO monitors events directly and takes action through governance.
 
 **Consequences**:
+
 - Positive: Eliminates unnecessary contract, simpler architecture, direct accountability
 - Negative: Requires DAO tooling for monitoring, no automated escalation
 
@@ -868,6 +949,7 @@ bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
 **Decision**: Allow anyone to call `enforceObjectiveViolation()` - validation ensures only real violations trigger.
 
 **Consequences**:
+
 - Positive: No dependency on specific operators, faster response to violations, increased system resilience
 - Negative: Potential for griefing attempts, higher validation gas costs
 
@@ -879,17 +961,20 @@ bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
 **Context**: Need mechanism to filter important reports without explicit severity levels.
 
 **Decision**: Use support count as natural importance indicator:
+
 - SECURITY_OBSERVATION: 0 supporters (immediate)
 - COMPLIANCE_QUESTION: 1 supporter
 - Others: 3 supporters for visibility
 
 **Consequences**:
+
 - Positive: Organic importance emergence, no artificial severity scale, community-driven prioritization
 - Negative: Requires multiple watchdogs, delayed response for non-critical
 
 ### Architecture Decisions Summary
 
 The architectural decisions reflect a philosophy of:
+
 1. **Simplification** over feature completeness
 2. **Trust distribution** over efficiency
 3. **Clear separation** over integration
@@ -901,6 +986,7 @@ These decisions resulted in a 33% reduction in contract count while improving se
 ---
 
 **Document History**:
+
 - v3.0 (2025-08-06): Final consolidated architecture specification with ADRs
 - v2.0 (2025-08-04): Consolidated architecture specification
 - Combines: ARCHITECTURE.md, WATCHDOG_FINAL_ARCHITECTURE.md, Future Enhancements, ARCHITECTURE_DECISIONS.md, and ORACLE_DESIGN_DECISION.md

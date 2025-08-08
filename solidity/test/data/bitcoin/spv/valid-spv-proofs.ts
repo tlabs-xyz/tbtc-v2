@@ -74,8 +74,7 @@ export const ValidMainnetProof: SPVProofTestData = {
       "0d0000000000000000001d3799aa3eb8d18916f46bf2cf807cb89a9b1b4c5" +
       "6c3f2693711bf1064d9a32435429c5ba1192817752e49ae",
     coinbasePreimage:
-      "0x77b98a5e6643973bba49dda18a75140306d2d8694b66f2dcb3561ad5aff" +
-      "0b0c7",
+      "0x77b98a5e6643973bba49dda18a75140306d2d8694b66f2dcb3561ad5aff" + "0b0c7",
     coinbaseProof:
       "0xdc20dadef477faab2852f2f8ae0c826aa7e05c4de0d36f0e63630429554" +
       "884c371da5974b6f34fa2c3536738f031b49f34e0c9d084d7280f26212e39" +
@@ -225,7 +224,7 @@ export const InvalidMerkleProofData = {
         "f8e67e0e85f2f5894bc63d00c2ed9d64",
     },
   },
-  
+
   // Insufficient merkle proof depth
   shortMerkleProof: {
     ...ValidMainnetProof,

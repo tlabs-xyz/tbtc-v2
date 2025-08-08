@@ -4,7 +4,8 @@ import fs from "fs"
 
 // Role definitions
 const ROLES = {
-  DEFAULT_ADMIN_ROLE: "0x0000000000000000000000000000000000000000000000000000000000000000",
+  DEFAULT_ADMIN_ROLE:
+    "0x0000000000000000000000000000000000000000000000000000000000000000",
   PARAMETER_ADMIN_ROLE: ethers.utils.id("PARAMETER_ADMIN_ROLE"),
   PAUSER_ROLE: ethers.utils.id("PAUSER_ROLE"),
   MANAGER_ROLE: ethers.utils.id("MANAGER_ROLE"),
@@ -32,66 +33,237 @@ interface RoleAssignment {
 // Contract role requirements
 const EXPECTED_ROLES: RoleAssignment[] = [
   // SystemState
-  { contract: "SystemState", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "SystemState", role: "PARAMETER_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "SystemState", role: "PAUSER_ROLE", expectedHolders: ["governance"], critical: true },
+  {
+    contract: "SystemState",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "SystemState",
+    role: "PARAMETER_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "SystemState",
+    role: "PAUSER_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
 
   // QCManager
-  { contract: "QCManager", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "QCManager", role: "QC_ADMIN_ROLE", expectedHolders: ["BasicMintingPolicy"], critical: true },
-  { contract: "QCManager", role: "REGISTRAR_ROLE", expectedHolders: ["QCWatchdog"], critical: false }, // Individual instances
-  { contract: "QCManager", role: "ARBITER_ROLE", expectedHolders: ["WatchdogConsensusManager", "WatchdogAutomatedEnforcement"], critical: true },
+  {
+    contract: "QCManager",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "QCManager",
+    role: "QC_ADMIN_ROLE",
+    expectedHolders: ["BasicMintingPolicy"],
+    critical: true,
+  },
+  {
+    contract: "QCManager",
+    role: "REGISTRAR_ROLE",
+    expectedHolders: ["QCWatchdog"],
+    critical: false,
+  }, // Individual instances
+  {
+    contract: "QCManager",
+    role: "ARBITER_ROLE",
+    expectedHolders: [
+      "WatchdogConsensusManager",
+      "WatchdogAutomatedEnforcement",
+    ],
+    critical: true,
+  },
 
   // QCData
-  { contract: "QCData", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "QCData", role: "QC_MANAGER_ROLE", expectedHolders: ["QCManager"], critical: true },
+  {
+    contract: "QCData",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "QCData",
+    role: "QC_MANAGER_ROLE",
+    expectedHolders: ["QCManager"],
+    critical: true,
+  },
 
   // QCMinter
-  { contract: "QCMinter", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "QCMinter", role: "MINTER_ROLE", expectedHolders: ["BasicMintingPolicy"], critical: false }, // QCMinter has this on BasicMintingPolicy
+  {
+    contract: "QCMinter",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "QCMinter",
+    role: "MINTER_ROLE",
+    expectedHolders: ["BasicMintingPolicy"],
+    critical: false,
+  }, // QCMinter has this on BasicMintingPolicy
 
   // QCRedeemer
-  { contract: "QCRedeemer", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "QCRedeemer", role: "ARBITER_ROLE", expectedHolders: ["WatchdogConsensusManager", "WatchdogAutomatedEnforcement"], critical: true },
+  {
+    contract: "QCRedeemer",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "QCRedeemer",
+    role: "ARBITER_ROLE",
+    expectedHolders: [
+      "WatchdogConsensusManager",
+      "WatchdogAutomatedEnforcement",
+    ],
+    critical: true,
+  },
 
   // QCReserveLedger
-  { contract: "QCReserveLedger", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "QCReserveLedger", role: "ATTESTER_ROLE", expectedHolders: ["QCWatchdog"], critical: false }, // Individual instances
+  {
+    contract: "QCReserveLedger",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "QCReserveLedger",
+    role: "ATTESTER_ROLE",
+    expectedHolders: ["QCWatchdog"],
+    critical: false,
+  }, // Individual instances
 
   // BasicMintingPolicy
-  { contract: "BasicMintingPolicy", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "BasicMintingPolicy", role: "MINTER_ROLE", expectedHolders: ["QCMinter"], critical: true },
+  {
+    contract: "BasicMintingPolicy",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "BasicMintingPolicy",
+    role: "MINTER_ROLE",
+    expectedHolders: ["QCMinter"],
+    critical: true,
+  },
 
   // BasicRedemptionPolicy
-  { contract: "BasicRedemptionPolicy", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "BasicRedemptionPolicy", role: "REDEEMER_ROLE", expectedHolders: ["QCRedeemer"], critical: true },
+  {
+    contract: "BasicRedemptionPolicy",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "BasicRedemptionPolicy",
+    role: "REDEEMER_ROLE",
+    expectedHolders: ["QCRedeemer"],
+    critical: true,
+  },
 
   // WatchdogConsensusManager
-  { contract: "WatchdogConsensusManager", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "WatchdogConsensusManager", role: "MANAGER_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "WatchdogConsensusManager", role: "WATCHDOG_ROLE", expectedHolders: [], critical: false }, // Added by operators
+  {
+    contract: "WatchdogConsensusManager",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "WatchdogConsensusManager",
+    role: "MANAGER_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "WatchdogConsensusManager",
+    role: "WATCHDOG_ROLE",
+    expectedHolders: [],
+    critical: false,
+  }, // Added by operators
 
   // WatchdogMonitor
-  { contract: "WatchdogMonitor", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "WatchdogMonitor", role: "MANAGER_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "WatchdogMonitor", role: "WATCHDOG_OPERATOR_ROLE", expectedHolders: [], critical: false }, // Added by operators
+  {
+    contract: "WatchdogMonitor",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "WatchdogMonitor",
+    role: "MANAGER_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "WatchdogMonitor",
+    role: "WATCHDOG_OPERATOR_ROLE",
+    expectedHolders: [],
+    critical: false,
+  }, // Added by operators
 
   // ProtocolRegistry
-  { contract: "ProtocolRegistry", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-]
+  {
+    contract: "ProtocolRegistry",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
 
   // WatchdogAutomatedEnforcement
-  { contract: "WatchdogAutomatedEnforcement", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "WatchdogAutomatedEnforcement", role: "MANAGER_ROLE", expectedHolders: ["governance"], critical: true },
+  {
+    contract: "WatchdogAutomatedEnforcement",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "WatchdogAutomatedEnforcement",
+    role: "MANAGER_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
 
   // WatchdogThresholdActions
-  { contract: "WatchdogThresholdActions", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "WatchdogThresholdActions", role: "MANAGER_ROLE", expectedHolders: ["governance"], critical: true },
+  {
+    contract: "WatchdogThresholdActions",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "WatchdogThresholdActions",
+    role: "MANAGER_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
 
   // WatchdogDAOEscalation
-  { contract: "WatchdogDAOEscalation", role: "DEFAULT_ADMIN_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "WatchdogDAOEscalation", role: "MANAGER_ROLE", expectedHolders: ["governance"], critical: true },
-  { contract: "WatchdogDAOEscalation", role: "ESCALATOR_ROLE", expectedHolders: ["WatchdogThresholdActions"], critical: true },
+  {
+    contract: "WatchdogDAOEscalation",
+    role: "DEFAULT_ADMIN_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "WatchdogDAOEscalation",
+    role: "MANAGER_ROLE",
+    expectedHolders: ["governance"],
+    critical: true,
+  },
+  {
+    contract: "WatchdogDAOEscalation",
+    role: "ESCALATOR_ROLE",
+    expectedHolders: ["WatchdogThresholdActions"],
+    critical: true,
+  },
+]
 
 interface VerificationResult {
   contract: string
@@ -112,9 +284,13 @@ async function getContractAddress(name: string): Promise<string | null> {
   }
 }
 
-async function resolveExpectedHolders(holders: string[], deployer: string, governance: string): Promise<string[]> {
+async function resolveExpectedHolders(
+  holders: string[],
+  deployer: string,
+  governance: string
+): Promise<string[]> {
   const resolved: string[] = []
-  
+
   for (const holder of holders) {
     if (holder === "deployer") {
       resolved.push(deployer)
@@ -128,19 +304,22 @@ async function resolveExpectedHolders(holders: string[], deployer: string, gover
       }
     }
   }
-  
+
   return resolved
 }
 
-async function getRoleHolders(contract: Contract, role: string): Promise<string[]> {
+async function getRoleHolders(
+  contract: Contract,
+  role: string
+): Promise<string[]> {
   const holders: string[] = []
-  
+
   try {
     // Get role member count if available
     const memberCount = contract.getRoleMemberCount
       ? await contract.getRoleMemberCount(role)
       : 0
-      
+
     if (memberCount > 0) {
       // Use getRoleMember to enumerate
       for (let i = 0; i < memberCount; i++) {
@@ -151,19 +330,25 @@ async function getRoleHolders(contract: Contract, role: string): Promise<string[
       // Fallback: check known addresses
       const [deployer, governance] = await ethers.getSigners()
       const addresses = [deployer.address, governance.address]
-      
+
       // Check common contract addresses
       const contractsToCheck = [
-        "QCManager", "QCMinter", "QCRedeemer", "BasicMintingPolicy",
-        "BasicRedemptionPolicy", "WatchdogConsensusManager", "WatchdogMonitor",
-        "WatchdogAutomatedEnforcement", "WatchdogThresholdActions"
+        "QCManager",
+        "QCMinter",
+        "QCRedeemer",
+        "BasicMintingPolicy",
+        "BasicRedemptionPolicy",
+        "WatchdogConsensusManager",
+        "WatchdogMonitor",
+        "WatchdogAutomatedEnforcement",
+        "WatchdogThresholdActions",
       ]
-      
+
       for (const contractName of contractsToCheck) {
         const addr = await getContractAddress(contractName)
         if (addr) addresses.push(addr)
       }
-      
+
       // Check each address
       for (const addr of addresses) {
         try {
@@ -178,7 +363,7 @@ async function getRoleHolders(contract: Contract, role: string): Promise<string[
   } catch (error) {
     console.error(`Error getting role holders: ${error.message}`)
   }
-  
+
   return holders
 }
 
@@ -211,8 +396,14 @@ async function verifyRoles(): Promise<void> {
       continue
     }
 
-    const contractInstance = await ethers.getContractAt(assignment.contract, contract)
-    const actualHolders = await getRoleHolders(contractInstance, ROLES[assignment.role])
+    const contractInstance = await ethers.getContractAt(
+      assignment.contract,
+      contract
+    )
+    const actualHolders = await getRoleHolders(
+      contractInstance,
+      ROLES[assignment.role]
+    )
     const expectedHolders = await resolveExpectedHolders(
       assignment.expectedHolders,
       deployer.address,
@@ -220,26 +411,39 @@ async function verifyRoles(): Promise<void> {
     )
 
     // Check if deployer still has admin roles
-    if (assignment.role === "DEFAULT_ADMIN_ROLE" && actualHolders.includes(deployer.address)) {
-      deployerPrivileges.push(`${assignment.contract} still has deployer as admin`)
+    if (
+      assignment.role === "DEFAULT_ADMIN_ROLE" &&
+      actualHolders.includes(deployer.address)
+    ) {
+      deployerPrivileges.push(
+        `${assignment.contract} still has deployer as admin`
+      )
     }
 
     // Analyze results
     let status: "✅ OK" | "⚠️ WARNING" | "❌ ERROR" = "✅ OK"
     let message = ""
 
-    const missingHolders = expectedHolders.filter(e => !actualHolders.includes(e))
-    const unexpectedHolders = actualHolders.filter(a => !expectedHolders.includes(a) && a !== deployer.address)
+    const missingHolders = expectedHolders.filter(
+      (e) => !actualHolders.includes(e)
+    )
+    const unexpectedHolders = actualHolders.filter(
+      (a) => !expectedHolders.includes(a) && a !== deployer.address
+    )
 
     if (missingHolders.length > 0) {
       if (assignment.critical) {
         status = "❌ ERROR"
         message = `Missing critical role holders: ${missingHolders.join(", ")}`
-        criticalErrors.push(`${assignment.contract}.${getRoleName(assignment.role)}: ${message}`)
+        criticalErrors.push(
+          `${assignment.contract}.${getRoleName(assignment.role)}: ${message}`
+        )
       } else {
         status = "⚠️ WARNING"
         message = `Missing optional role holders: ${missingHolders.join(", ")}`
-        warnings.push(`${assignment.contract}.${getRoleName(assignment.role)}: ${message}`)
+        warnings.push(
+          `${assignment.contract}.${getRoleName(assignment.role)}: ${message}`
+        )
       }
     }
 
@@ -247,7 +451,11 @@ async function verifyRoles(): Promise<void> {
       status = status === "✅ OK" ? "⚠️ WARNING" : status
       message += message ? "; " : ""
       message += `Unexpected holders: ${unexpectedHolders.join(", ")}`
-      warnings.push(`${assignment.contract}.${getRoleName(assignment.role)}: Unexpected holders`)
+      warnings.push(
+        `${assignment.contract}.${getRoleName(
+          assignment.role
+        )}: Unexpected holders`
+      )
     }
 
     results.push({
@@ -257,19 +465,18 @@ async function verifyRoles(): Promise<void> {
       expected: expectedHolders,
       actual: actualHolders,
       status,
-      message: message || "All expected holders present"
+      message: message || "All expected holders present",
     })
   }
-
 
   // Generate report
   console.log("\n📊 VERIFICATION REPORT")
   console.log("====================\n")
 
   // Summary
-  const okCount = results.filter(r => r.status === "✅ OK").length
-  const warningCount = results.filter(r => r.status === "⚠️ WARNING").length
-  const errorCount = results.filter(r => r.status === "❌ ERROR").length
+  const okCount = results.filter((r) => r.status === "✅ OK").length
+  const warningCount = results.filter((r) => r.status === "⚠️ WARNING").length
+  const errorCount = results.filter((r) => r.status === "❌ ERROR").length
 
   console.log("Summary:")
   console.log(`✅ OK: ${okCount}`)
@@ -280,21 +487,21 @@ async function verifyRoles(): Promise<void> {
   // Critical errors
   if (criticalErrors.length > 0) {
     console.log("❌ CRITICAL ERRORS:")
-    criticalErrors.forEach(error => console.log(`  - ${error}`))
+    criticalErrors.forEach((error) => console.log(`  - ${error}`))
     console.log("")
   }
 
   // Warnings
   if (warnings.length > 0) {
     console.log("⚠️  WARNINGS:")
-    warnings.forEach(warning => console.log(`  - ${warning}`))
+    warnings.forEach((warning) => console.log(`  - ${warning}`))
     console.log("")
   }
 
   // Deployer privileges
   if (deployerPrivileges.length > 0) {
     console.log("🚨 DEPLOYER STILL HAS ADMIN ROLES:")
-    deployerPrivileges.forEach(priv => console.log(`  - ${priv}`))
+    deployerPrivileges.forEach((priv) => console.log(`  - ${priv}`))
     console.log("")
   }
 
@@ -304,8 +511,16 @@ async function verifyRoles(): Promise<void> {
 
   for (const result of results) {
     console.log(`${result.status} ${result.contract}.${result.roleName}`)
-    console.log(`   Expected: ${result.expected.length > 0 ? result.expected.join(", ") : "None"}`)
-    console.log(`   Actual: ${result.actual.length > 0 ? result.actual.join(", ") : "None"}`)
+    console.log(
+      `   Expected: ${
+        result.expected.length > 0 ? result.expected.join(", ") : "None"
+      }`
+    )
+    console.log(
+      `   Actual: ${
+        result.actual.length > 0 ? result.actual.join(", ") : "None"
+      }`
+    )
     if (result.message !== "All expected holders present") {
       console.log(`   Note: ${result.message}`)
     }
@@ -321,12 +536,12 @@ async function verifyRoles(): Promise<void> {
       ok: okCount,
       warnings: warningCount,
       errors: errorCount,
-      deployerPrivileges: deployerPrivileges.length
+      deployerPrivileges: deployerPrivileges.length,
     },
     criticalErrors,
     warnings,
     deployerPrivileges,
-    results
+    results,
   }
 
   const reportPath = `./role-verification-report-${Date.now()}.json`

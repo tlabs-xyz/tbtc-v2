@@ -40,12 +40,25 @@ describe("Automated Decision Framework Integration Tests", () => {
   beforeEach(async () => {
     await deployments.fixture(["AccountControl", "AutomatedDecisionFramework"])
     ;({ deployer, governance } = await helpers.signers.getNamedSigners())
-    ;[dao, watchdog1, watchdog2, watchdog3, watchdog4, watchdog5, qc1, qc2, user] = 
-      await helpers.signers.getUnnamedSigners()
+    ;[
+      dao,
+      watchdog1,
+      watchdog2,
+      watchdog3,
+      watchdog4,
+      watchdog5,
+      qc1,
+      qc2,
+      user,
+    ] = await helpers.signers.getUnnamedSigners()
 
     // Get deployed contracts
-    automatedEnforcement = await helpers.contracts.getContract("WatchdogAutomatedEnforcement")
-    thresholdActions = await helpers.contracts.getContract("WatchdogThresholdActions")
+    automatedEnforcement = await helpers.contracts.getContract(
+      "WatchdogAutomatedEnforcement"
+    )
+    thresholdActions = await helpers.contracts.getContract(
+      "WatchdogThresholdActions"
+    )
     daoEscalation = await helpers.contracts.getContract("WatchdogDAOEscalation")
     watchdogMonitor = await helpers.contracts.getContract("WatchdogMonitor")
     qcManager = await helpers.contracts.getContract("QCManager")
@@ -53,10 +66,9 @@ describe("Automated Decision Framework Integration Tests", () => {
     systemState = await helpers.contracts.getContract("SystemState")
 
     // Grant DAO role
-    await daoEscalation.connect(governance).grantRole(
-      await daoEscalation.DAO_ROLE(),
-      dao.address
-    )
+    await daoEscalation
+      .connect(governance)
+      .grantRole(await daoEscalation.DAO_ROLE(), dao.address)
 
     // Register QCs
     await qcManager.connect(governance).registerQC(qc1.address, "QC1")
@@ -80,7 +92,7 @@ describe("Automated Decision Framework Integration Tests", () => {
         qcAddress: qc1.address,
         currentRatio: 90, // Below 95%
         requiredRatio: 95,
-        timestamp: await helpers.time.latest()
+        timestamp: await helpers.time.latest(),
       }
 
       // Trigger automated check
@@ -106,27 +118,24 @@ describe("Automated Decision Framework Integration Tests", () => {
       await automatedEnforcement.connect(governance).configureRule(
         1, // RuleType.RedemptionTimeout
         true,
-        ethers.utils.defaultAbiCoder.encode(
-          ["uint256"],
-          [48 * HOUR]
-        )
+        ethers.utils.defaultAbiCoder.encode(["uint256"], [48 * HOUR])
       )
 
       // Create a redemption
-      await qcRedeemer.connect(qc1).initiateRedemption(
-        ethers.utils.parseEther("10"),
-        "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
-        "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
-      )
+      await qcRedeemer
+        .connect(qc1)
+        .initiateRedemption(
+          ethers.utils.parseEther("10"),
+          "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+          "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
+        )
       const redemptionId = await qcRedeemer.currentRedemptionId()
 
       // Fast forward past timeout
       await helpers.time.increaseTime(49 * HOUR)
 
       // Trigger automated check
-      await expect(
-        automatedEnforcement.checkRedemptionTimeout(redemptionId)
-      )
+      await expect(automatedEnforcement.checkRedemptionTimeout(redemptionId))
         .to.emit(automatedEnforcement, "RuleTriggered")
         .withArgs(1, qc1.address, "Redemption timeout exceeded")
         .and.to.emit(qcRedeemer, "RedemptionDefaulted")
@@ -142,15 +151,12 @@ describe("Automated Decision Framework Integration Tests", () => {
       await automatedEnforcement.connect(governance).configureRule(
         2, // RuleType.AttestationStaleness
         true,
-        ethers.utils.defaultAbiCoder.encode(
-          ["uint256"],
-          [7 * DAY]
-        )
+        ethers.utils.defaultAbiCoder.encode(["uint256"], [7 * DAY])
       )
 
       // Simulate stale attestation check
-      const lastAttestation = await helpers.time.latest() - (8 * DAY)
-      
+      const lastAttestation = (await helpers.time.latest()) - 8 * DAY
+
       await expect(
         automatedEnforcement.checkAttestationStaleness(
           qc1.address,
@@ -170,7 +176,7 @@ describe("Automated Decision Framework Integration Tests", () => {
         true,
         ethers.utils.defaultAbiCoder.encode(["uint256", "uint256"], [95, 100])
       )
-      
+
       await automatedEnforcement.connect(governance).configureRule(
         2, // Attestation staleness
         true,
@@ -178,8 +184,10 @@ describe("Automated Decision Framework Integration Tests", () => {
       )
 
       // Batch check multiple conditions
-      const violations = await automatedEnforcement.batchCheckCompliance(qc1.address)
-      
+      const violations = await automatedEnforcement.batchCheckCompliance(
+        qc1.address
+      )
+
       // Process violations
       for (const violation of violations) {
         if (violation.violated) {
@@ -198,7 +206,7 @@ describe("Automated Decision Framework Integration Tests", () => {
   describe("Layer 2: Threshold Actions (3+ reports → action)", () => {
     it("should trigger action after threshold reports", async () => {
       const issueType = "WALLET_COMPROMISE"
-      
+
       // Configure threshold for wallet compromise
       await thresholdActions.connect(governance).configureThreshold(
         issueType,
@@ -209,29 +217,35 @@ describe("Automated Decision Framework Integration Tests", () => {
 
       // First report
       await expect(
-        thresholdActions.connect(watchdog1).reportIssue(
-          qc1.address,
-          issueType,
-          "Suspicious wallet activity detected"
-        )
+        thresholdActions
+          .connect(watchdog1)
+          .reportIssue(
+            qc1.address,
+            issueType,
+            "Suspicious wallet activity detected"
+          )
       )
         .to.emit(thresholdActions, "IssueReported")
         .withArgs(qc1.address, issueType, watchdog1.address)
 
       // Second report
-      await thresholdActions.connect(watchdog2).reportIssue(
-        qc1.address,
-        issueType,
-        "Confirmed unauthorized transaction"
-      )
+      await thresholdActions
+        .connect(watchdog2)
+        .reportIssue(
+          qc1.address,
+          issueType,
+          "Confirmed unauthorized transaction"
+        )
 
       // Third report triggers action
       await expect(
-        thresholdActions.connect(watchdog3).reportIssue(
-          qc1.address,
-          issueType,
-          "Multiple unauthorized transfers"
-        )
+        thresholdActions
+          .connect(watchdog3)
+          .reportIssue(
+            qc1.address,
+            issueType,
+            "Multiple unauthorized transfers"
+          )
       )
         .to.emit(thresholdActions, "ThresholdReached")
         .withArgs(qc1.address, issueType, 3)
@@ -245,7 +259,7 @@ describe("Automated Decision Framework Integration Tests", () => {
 
     it("should respect time windows for threshold counting", async () => {
       const issueType = "PERFORMANCE_DEGRADATION"
-      
+
       await thresholdActions.connect(governance).configureThreshold(
         issueType,
         2,
@@ -254,38 +268,34 @@ describe("Automated Decision Framework Integration Tests", () => {
       )
 
       // First report
-      await thresholdActions.connect(watchdog1).reportIssue(
-        qc2.address,
-        issueType,
-        "Slow response times"
-      )
+      await thresholdActions
+        .connect(watchdog1)
+        .reportIssue(qc2.address, issueType, "Slow response times")
 
       // Fast forward past window
       await helpers.time.increaseTime(31 * MINUTE)
 
       // Second report - should not trigger as first is outside window
       await expect(
-        thresholdActions.connect(watchdog2).reportIssue(
-          qc2.address,
-          issueType,
-          "Still slow"
-        )
+        thresholdActions
+          .connect(watchdog2)
+          .reportIssue(qc2.address, issueType, "Still slow")
       ).to.not.emit(thresholdActions, "ThresholdReached")
 
       // Third report within new window
-      await thresholdActions.connect(watchdog3).reportIssue(
-        qc2.address,
-        issueType,
-        "Performance issues continue"
-      )
+      await thresholdActions
+        .connect(watchdog3)
+        .reportIssue(qc2.address, issueType, "Performance issues continue")
 
       // Now threshold should be reached
       await expect(
-        thresholdActions.connect(watchdog4).reportIssue(
-          qc2.address,
-          issueType,
-          "Critical performance degradation"
-        )
+        thresholdActions
+          .connect(watchdog4)
+          .reportIssue(
+            qc2.address,
+            issueType,
+            "Critical performance degradation"
+          )
       )
         .to.emit(thresholdActions, "ThresholdReached")
         .withArgs(qc2.address, issueType, 2)
@@ -293,40 +303,28 @@ describe("Automated Decision Framework Integration Tests", () => {
 
     it("should handle different issue types independently", async () => {
       // Configure different thresholds
-      await thresholdActions.connect(governance).configureThreshold(
-        "SECURITY_BREACH",
-        2,
-        1 * HOUR,
-        0
-      )
-      
-      await thresholdActions.connect(governance).configureThreshold(
-        "COMPLIANCE_VIOLATION",
-        3,
-        2 * HOUR,
-        1
-      )
+      await thresholdActions
+        .connect(governance)
+        .configureThreshold("SECURITY_BREACH", 2, 1 * HOUR, 0)
+
+      await thresholdActions
+        .connect(governance)
+        .configureThreshold("COMPLIANCE_VIOLATION", 3, 2 * HOUR, 1)
 
       // Mix reports of different types
-      await thresholdActions.connect(watchdog1).reportIssue(
-        qc1.address,
-        "SECURITY_BREACH",
-        "Potential breach"
-      )
-      
-      await thresholdActions.connect(watchdog2).reportIssue(
-        qc1.address,
-        "COMPLIANCE_VIOLATION",
-        "KYC issue"
-      )
-      
+      await thresholdActions
+        .connect(watchdog1)
+        .reportIssue(qc1.address, "SECURITY_BREACH", "Potential breach")
+
+      await thresholdActions
+        .connect(watchdog2)
+        .reportIssue(qc1.address, "COMPLIANCE_VIOLATION", "KYC issue")
+
       // Security breach reaches threshold first
       await expect(
-        thresholdActions.connect(watchdog3).reportIssue(
-          qc1.address,
-          "SECURITY_BREACH",
-          "Confirmed breach"
-        )
+        thresholdActions
+          .connect(watchdog3)
+          .reportIssue(qc1.address, "SECURITY_BREACH", "Confirmed breach")
       )
         .to.emit(thresholdActions, "ThresholdReached")
         .withArgs(qc1.address, "SECURITY_BREACH", 2)
@@ -346,18 +344,22 @@ describe("Automated Decision Framework Integration Tests", () => {
         issueType: "QC_INSOLVENCY_RISK",
         severity: 9, // High severity
         description: "QC showing signs of potential insolvency",
-        evidence: ethers.utils.keccak256(ethers.utils.toUtf8Bytes("evidence_hash"))
+        evidence: ethers.utils.keccak256(
+          ethers.utils.toUtf8Bytes("evidence_hash")
+        ),
       }
 
       // Escalate to DAO
       await expect(
-        daoEscalation.connect(watchdog1).escalateToDAO(
-          qc1.address,
-          complexIssue.issueType,
-          complexIssue.severity,
-          complexIssue.description,
-          complexIssue.evidence
-        )
+        daoEscalation
+          .connect(watchdog1)
+          .escalateToDAO(
+            qc1.address,
+            complexIssue.issueType,
+            complexIssue.severity,
+            complexIssue.description,
+            complexIssue.evidence
+          )
       )
         .to.emit(daoEscalation, "IssueEscalated")
         .withArgs(
@@ -376,13 +378,15 @@ describe("Automated Decision Framework Integration Tests", () => {
 
     it("should allow DAO to resolve escalated issues", async () => {
       // Create escalation
-      await daoEscalation.connect(watchdog1).escalateToDAO(
-        qc2.address,
-        "REGULATORY_CONCERN",
-        7,
-        "Potential regulatory compliance issue",
-        ethers.utils.formatBytes32String("evidence1")
-      )
+      await daoEscalation
+        .connect(watchdog1)
+        .escalateToDAO(
+          qc2.address,
+          "REGULATORY_CONCERN",
+          7,
+          "Potential regulatory compliance issue",
+          ethers.utils.formatBytes32String("evidence1")
+        )
 
       const escalationId = 1 // First escalation
 
@@ -393,23 +397,21 @@ describe("Automated Decision Framework Integration Tests", () => {
         conditions: ethers.utils.defaultAbiCoder.encode(
           ["string[]"],
           [["Provide audit report", "Update compliance procedures"]]
-        )
+        ),
       }
 
       await expect(
-        daoEscalation.connect(dao).resolveEscalation(
-          escalationId,
-          resolution.action,
-          resolution.reasoning,
-          resolution.conditions
-        )
+        daoEscalation
+          .connect(dao)
+          .resolveEscalation(
+            escalationId,
+            resolution.action,
+            resolution.reasoning,
+            resolution.conditions
+          )
       )
         .to.emit(daoEscalation, "EscalationResolved")
-        .withArgs(
-          escalationId,
-          resolution.action,
-          resolution.reasoning
-        )
+        .withArgs(escalationId, resolution.action, resolution.reasoning)
 
       // Verify resolution is recorded
       const escalation = await daoEscalation.escalations(escalationId)
@@ -419,13 +421,15 @@ describe("Automated Decision Framework Integration Tests", () => {
 
     it("should enforce DAO decisions through automated systems", async () => {
       // Escalate issue
-      await daoEscalation.connect(watchdog1).escalateToDAO(
-        qc1.address,
-        "SEVERE_VIOLATION",
-        10,
-        "Critical security and compliance violations",
-        ethers.utils.formatBytes32String("evidence2")
-      )
+      await daoEscalation
+        .connect(watchdog1)
+        .escalateToDAO(
+          qc1.address,
+          "SEVERE_VIOLATION",
+          10,
+          "Critical security and compliance violations",
+          ethers.utils.formatBytes32String("evidence2")
+        )
 
       const escalationId = 1
 
@@ -449,29 +453,17 @@ describe("Automated Decision Framework Integration Tests", () => {
 
     it("should track escalation history for governance review", async () => {
       // Create multiple escalations
-      await daoEscalation.connect(watchdog1).escalateToDAO(
-        qc1.address,
-        "ISSUE_1",
-        5,
-        "First issue",
-        "0x01"
-      )
+      await daoEscalation
+        .connect(watchdog1)
+        .escalateToDAO(qc1.address, "ISSUE_1", 5, "First issue", "0x01")
 
-      await daoEscalation.connect(watchdog2).escalateToDAO(
-        qc1.address,
-        "ISSUE_2",
-        8,
-        "Second issue",
-        "0x02"
-      )
+      await daoEscalation
+        .connect(watchdog2)
+        .escalateToDAO(qc1.address, "ISSUE_2", 8, "Second issue", "0x02")
 
-      await daoEscalation.connect(watchdog3).escalateToDAO(
-        qc2.address,
-        "ISSUE_3",
-        6,
-        "Third issue",
-        "0x03"
-      )
+      await daoEscalation
+        .connect(watchdog3)
+        .escalateToDAO(qc2.address, "ISSUE_3", 6, "Third issue", "0x03")
 
       // Get QC-specific escalations
       const qc1Escalations = await daoEscalation.getQCEscalations(qc1.address)
@@ -519,11 +511,13 @@ describe("Automated Decision Framework Integration Tests", () => {
         .withArgs(qc1.address, "Layer2", "Anomaly requires human review")
 
       // Layer 2 picks up the escalation
-      await thresholdActions.connect(watchdog1).reportIssue(
-        qc1.address,
-        "ANOMALY_ESCALATION",
-        "Automated system flagged unusual pattern"
-      )
+      await thresholdActions
+        .connect(watchdog1)
+        .reportIssue(
+          qc1.address,
+          "ANOMALY_ESCALATION",
+          "Automated system flagged unusual pattern"
+        )
     })
 
     it("should escalate from Layer 2 to Layer 3 for unresolvable issues", async () => {
@@ -536,22 +530,26 @@ describe("Automated Decision Framework Integration Tests", () => {
       )
 
       // Reports trigger threshold
-      await thresholdActions.connect(watchdog1).reportIssue(
-        qc2.address,
-        "CRITICAL_ISSUE",
-        "Major problem detected"
-      )
+      await thresholdActions
+        .connect(watchdog1)
+        .reportIssue(qc2.address, "CRITICAL_ISSUE", "Major problem detected")
 
       // Second report triggers DAO escalation
       await expect(
-        thresholdActions.connect(watchdog2).reportIssue(
-          qc2.address,
-          "CRITICAL_ISSUE",
-          "Confirmed critical issue"
-        )
+        thresholdActions
+          .connect(watchdog2)
+          .reportIssue(
+            qc2.address,
+            "CRITICAL_ISSUE",
+            "Confirmed critical issue"
+          )
       )
         .to.emit(thresholdActions, "DAOEscalationRequired")
-        .withArgs(qc2.address, "CRITICAL_ISSUE", "Threshold action requires DAO")
+        .withArgs(
+          qc2.address,
+          "CRITICAL_ISSUE",
+          "Threshold action requires DAO"
+        )
 
       // Verify escalation created in Layer 3
       const escalations = await daoEscalation.getActiveEscalations()
@@ -563,25 +561,33 @@ describe("Automated Decision Framework Integration Tests", () => {
       await automatedEnforcement.checkReserveRatio(qc1.address, 90, 95)
 
       // Layer 2 reports
-      await thresholdActions.connect(watchdog1).reportIssue(
-        qc1.address,
-        "FOLLOW_UP",
-        "Monitoring after automated action"
-      )
+      await thresholdActions
+        .connect(watchdog1)
+        .reportIssue(
+          qc1.address,
+          "FOLLOW_UP",
+          "Monitoring after automated action"
+        )
 
       // Layer 3 escalation
-      await daoEscalation.connect(watchdog2).escalateToDAO(
-        qc1.address,
-        "COMPREHENSIVE_REVIEW",
-        8,
-        "Full review needed after multiple issues",
-        "0x"
-      )
+      await daoEscalation
+        .connect(watchdog2)
+        .escalateToDAO(
+          qc1.address,
+          "COMPREHENSIVE_REVIEW",
+          8,
+          "Full review needed after multiple issues",
+          "0x"
+        )
 
       // Each layer maintains its own logs
       // Integration layer could aggregate these for comprehensive view
-      const automatedLogs = await automatedEnforcement.getActionHistory(qc1.address)
-      const thresholdReports = await thresholdActions.getReportHistory(qc1.address)
+      const automatedLogs = await automatedEnforcement.getActionHistory(
+        qc1.address
+      )
+      const thresholdReports = await thresholdActions.getReportHistory(
+        qc1.address
+      )
       const daoEscalations = await daoEscalation.getQCEscalations(qc1.address)
 
       // All should have entries for qc1

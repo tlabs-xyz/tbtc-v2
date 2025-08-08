@@ -49,6 +49,7 @@ This document provides a comprehensive guide for implementing audit trails acros
 **Entry Point**: `QCManager.registerQC(address qc, uint256 maxMintingCap)`
 
 **Key Events**:
+
 ```solidity
 // From QCManager.sol
 event QCRegistrationInitiated(
@@ -74,6 +75,7 @@ event QCRegistered(
 ```
 
 **Audit Data Points**:
+
 - QC address
 - Initial minting capacity
 - Registration timestamp
@@ -81,8 +83,9 @@ event QCRegistered(
 - Transaction details (gas, block number)
 
 **Reconstruction Query**:
+
 ```sql
-SELECT * FROM events 
+SELECT * FROM events
 WHERE event_name IN ('QCRegistrationInitiated', 'QCOnboarded', 'QCRegistered')
 AND qc_address = ?
 ORDER BY timestamp ASC;
@@ -95,6 +98,7 @@ ORDER BY timestamp ASC;
 **Entry Point**: `QCManager.increaseMintingCapacity(address qc, uint256 newCap)`
 
 **Key Events**:
+
 ```solidity
 event MintingCapIncreased(
     address indexed qc,
@@ -114,6 +118,7 @@ event QCMaxMintingCapacityUpdated(
 ```
 
 **Audit Data Points**:
+
 - Previous capacity vs new capacity
 - Capacity change percentage
 - Authority verification
@@ -126,6 +131,7 @@ event QCMaxMintingCapacityUpdated(
 **Entry Point**: `QCManager.setQCStatus(address qc, QCStatus newStatus, bytes32 reason)`
 
 **Key Events**:
+
 ```solidity
 event QCStatusChanged(
     address indexed qc,
@@ -147,6 +153,7 @@ event WatchdogQCStatusChange(
 ```
 
 **Audit Data Points**:
+
 - Status transition validation
 - Reason codes and descriptions
 - Authority (ARBITER_ROLE required)
@@ -161,10 +168,12 @@ event WatchdogQCStatusChange(
 **Purpose**: Register Bitcoin addresses under QC control with SPV verification
 
 **Entry Points**:
+
 - `QCManager.registerWallet(address qc, string btcAddress, bytes32 challenge, BitcoinTx.Info txInfo, BitcoinTx.Proof proof)`
 - `QCWatchdog.registerWalletWithProof(address qc, string btcAddress, bytes spvProof, bytes32 challengeHash)`
 
 **Key Events**:
+
 ```solidity
 // Success path
 event WalletRegistrationRequested(
@@ -205,6 +214,7 @@ event WalletRegistrationFailed(
 ```
 
 **Audit Data Points**:
+
 - Bitcoin address format validation
 - SPV proof components (transaction, merkle proof, block header)
 - Challenge-response verification
@@ -212,6 +222,7 @@ event WalletRegistrationFailed(
 - Complete proof data for re-verification
 
 **Reconstruction Pattern**:
+
 1. Find `WalletRegistrationRequested` event
 2. Match with `WalletControlVerified` using qc + btcAddress
 3. Retrieve `SPVProofStored` using operationId = keccak256(qc, btcAddress)
@@ -222,10 +233,12 @@ event WalletRegistrationFailed(
 **Purpose**: Remove Bitcoin addresses from QC control with solvency verification
 
 **Entry Points**:
+
 - Request: `QCManager.requestWalletDeRegistration(string btcAddress)`
 - Finalize: `QCManager.finalizeWalletDeRegistration(string btcAddress, uint256 newReserveBalance)`
 
 **Key Events**:
+
 ```solidity
 event WalletDeRegistrationRequested(
     address indexed qc,
@@ -259,6 +272,7 @@ event ReserveBalanceUpdated(
 ```
 
 **Audit Data Points**:
+
 - Two-step process tracking
 - Reserve balance before/after
 - Solvency check results
@@ -275,6 +289,7 @@ event ReserveBalanceUpdated(
 **Entry Point**: `QCReserveLedger.submitReserveAttestation(address qc, uint256 balance)`
 
 **Key Events**:
+
 ```solidity
 event ReserveAttestationSubmitted(
     address indexed attester,
@@ -302,6 +317,7 @@ event WatchdogReserveAttestation(
 ```
 
 **Audit Data Points**:
+
 - Balance change magnitude and direction
 - Attestation frequency
 - Attester authorization (ATTESTER_ROLE)
@@ -314,6 +330,7 @@ event WatchdogReserveAttestation(
 **Entry Point**: `QCReserveLedger.submitSPVVerifiedAttestation(address qc, uint256 balance, bytes proofData)`
 
 **Key Events**:
+
 ```solidity
 event SPVVerifiedAttestationSubmitted(
     address indexed attester,
@@ -331,6 +348,7 @@ event SPVVerifiedAttestationSubmitted(
 **Entry Point**: `QCManager.verifyQCSolvency(address qc)`
 
 **Key Events**:
+
 ```solidity
 event SolvencyCheckPerformed(
     address indexed qc,
@@ -361,10 +379,12 @@ event QCStatusChanged(
 **Purpose**: Create tBTC tokens backed by QC reserves
 
 **Entry Points**:
+
 - User: `QCMinter.requestQCMint(uint256 amount)`
 - Policy: `BasicMintingPolicy.requestMint(address qc, address user, uint256 amount)`
 
 **Key Events**:
+
 ```solidity
 // From QCMinter
 event QCMintRequested(
@@ -423,6 +443,7 @@ event QCMintedAmountUpdated(
 ```
 
 **Audit Data Points**:
+
 - Unique mintId for tracking
 - tBTC amount vs satoshi conversion
 - Available capacity before mint
@@ -434,6 +455,7 @@ event QCMintedAmountUpdated(
 **Purpose**: Track rejected minting attempts
 
 **Key Events**:
+
 ```solidity
 event MintRejected(
     address indexed qc,
@@ -446,6 +468,7 @@ event MintRejected(
 ```
 
 **Failure Reasons**:
+
 - "Minting paused"
 - "Amount outside allowed range"
 - "QC not active"
@@ -462,6 +485,7 @@ event MintRejected(
 **Entry Point**: `QCRedeemer.initiateRedemption(address qc, uint256 amount, string userBtcAddress)`
 
 **Key Events**:
+
 ```solidity
 // Success path
 event RedemptionRequested(
@@ -498,6 +522,7 @@ event RedemptionRequestFailed(
 **Entry Point**: `QCRedeemer.recordRedemptionFulfillment(bytes32 redemptionId, string userBtcAddress, uint64 expectedAmount, BitcoinTx.Info txInfo, BitcoinTx.Proof proof)`
 
 **Key Events**:
+
 ```solidity
 event RedemptionFulfilled(
     bytes32 indexed redemptionId,
@@ -537,6 +562,7 @@ event WatchdogRedemptionAction(
 **Entry Point**: `QCRedeemer.flagDefaultedRedemption(bytes32 redemptionId, bytes32 reason)`
 
 **Key Events**:
+
 ```solidity
 event RedemptionDefaulted(
     bytes32 indexed redemptionId,
@@ -578,6 +604,7 @@ event QCStatusChanged(
 **Entry Point**: `WatchdogConsensusManager.createProposal(ProposalType proposalType, bytes data, string reason)`
 
 **Key Events**:
+
 ```solidity
 event ProposalCreated(
     bytes32 indexed proposalId,
@@ -604,6 +631,7 @@ event ProposalExpired(
 ```
 
 **Proposal Types**:
+
 - STATUS_CHANGE
 - WALLET_DEREGISTRATION
 - REDEMPTION_DEFAULT
@@ -616,6 +644,7 @@ event ProposalExpired(
 **Entry Point**: `WatchdogMonitor.submitCriticalReport(address qc, string reason)`
 
 **Key Events**:
+
 ```solidity
 event CriticalReportSubmitted(
     address indexed qc,
@@ -647,6 +676,7 @@ event EmergencyPauseCleared(
 **Entry Points**: Various `grantRole` and `revokeRole` functions
 
 **Key Events**:
+
 ```solidity
 // Standard OpenZeppelin events
 event RoleGranted(
@@ -682,6 +712,7 @@ event AttesterRoleGranted(
 **Entry Points**: Various setter functions in SystemState
 
 **Key Events**:
+
 ```solidity
 event MinMintAmountUpdated(
     uint256 indexed oldAmount,
@@ -712,6 +743,7 @@ event StaleThresholdUpdated(
 **Entry Points**: `SystemState.pauseMinting()`, `pauseRedemption()`, etc.
 
 **Key Events**:
+
 ```solidity
 event MintingPaused(
     address indexed triggeredBy,
@@ -736,43 +768,50 @@ event RedemptionPaused(
 ### 9.1 Cross-Contract Event Linking
 
 **Minting Flow Correlation**:
+
 ```javascript
 // Link minting events across contracts
 const correlatedMintFlow = {
-    mintId: "0x123...",
-    events: [
-        { contract: "QCMinter", event: "QCMintRequested", timestamp: 1000 },
-        { contract: "BasicMintingPolicy", event: "QCBankBalanceCreated", timestamp: 1001 },
-        { contract: "Bank", event: "BalanceIncreased", timestamp: 1002 },
-        { contract: "TBTCVault", event: "Minted", timestamp: 1003 },
-        { contract: "BasicMintingPolicy", event: "MintCompleted", timestamp: 1004 }
-    ]
-};
+  mintId: "0x123...",
+  events: [
+    { contract: "QCMinter", event: "QCMintRequested", timestamp: 1000 },
+    {
+      contract: "BasicMintingPolicy",
+      event: "QCBankBalanceCreated",
+      timestamp: 1001,
+    },
+    { contract: "Bank", event: "BalanceIncreased", timestamp: 1002 },
+    { contract: "TBTCVault", event: "Minted", timestamp: 1003 },
+    { contract: "BasicMintingPolicy", event: "MintCompleted", timestamp: 1004 },
+  ],
+}
 ```
 
 **Redemption Lifecycle Correlation**:
+
 ```javascript
 const redemptionLifecycle = {
-    redemptionId: "0x456...",
-    phases: {
-        request: { event: "RedemptionRequested", timestamp: 2000 },
-        burn: { event: "Transfer", amount: "1000000000000000000" },
-        fulfillment: { 
-            event: "RedemptionFulfilled", 
-            proof: { event: "SPVProofStored", txHash: "0x789..." }
-        }
-    }
-};
+  redemptionId: "0x456...",
+  phases: {
+    request: { event: "RedemptionRequested", timestamp: 2000 },
+    burn: { event: "Transfer", amount: "1000000000000000000" },
+    fulfillment: {
+      event: "RedemptionFulfilled",
+      proof: { event: "SPVProofStored", txHash: "0x789..." },
+    },
+  },
+}
 ```
 
 ### 9.2 Actor Analysis Patterns
 
 **Role-Based Activity Tracking**:
+
 ```sql
 -- Find all actions by a specific watchdog
 SELECT event_name, qc_address, timestamp
 FROM events
-WHERE actor_address = ? 
+WHERE actor_address = ?
 AND actor_role IN ('WATCHDOG_OPERATOR_ROLE', 'ARBITER_ROLE')
 ORDER BY timestamp DESC;
 ```
@@ -780,10 +819,11 @@ ORDER BY timestamp DESC;
 ### 9.3 State Reconstruction Queries
 
 **QC State at Point in Time**:
+
 ```sql
 -- Reconstruct QC state at specific timestamp
 WITH qc_history AS (
-    SELECT 
+    SELECT
         qc_address,
         event_name,
         event_data,
@@ -803,6 +843,7 @@ SELECT * FROM qc_history WHERE rn = 1;
 ### 10.1 Core Metrics
 
 **System Health Dashboard**:
+
 - Active QCs count
 - Total minted vs total reserves
 - Pending redemptions count
@@ -810,6 +851,7 @@ SELECT * FROM qc_history WHERE rn = 1;
 - Average processing times
 
 **QC Detail View**:
+
 - Current status and history
 - Minting capacity utilization
 - Wallet addresses (active/inactive)
@@ -819,6 +861,7 @@ SELECT * FROM qc_history WHERE rn = 1;
 ### 10.2 Compliance Reports
 
 **Daily Operations Report**:
+
 ```javascript
 {
     date: "2025-01-08",
@@ -839,6 +882,7 @@ SELECT * FROM qc_history WHERE rn = 1;
 ### 10.3 Anomaly Detection
 
 **Patterns to Monitor**:
+
 1. **Unusual Minting Patterns**: Sudden spikes or drops
 2. **Attestation Irregularities**: Missed attestations, large balance changes
 3. **Redemption Delays**: Approaching timeout thresholds
@@ -848,6 +892,7 @@ SELECT * FROM qc_history WHERE rn = 1;
 ### 10.4 Real-Time Alerts
 
 **Critical Alerts**:
+
 - QC status changed to UnderReview or Revoked
 - Redemption default detected
 - Emergency pause activated
@@ -855,6 +900,7 @@ SELECT * FROM qc_history WHERE rn = 1;
 - Consensus proposal requiring attention
 
 **Warning Alerts**:
+
 - Attestation approaching staleness
 - High capacity utilization (>90%)
 - Increased failure rate
@@ -863,6 +909,7 @@ SELECT * FROM qc_history WHERE rn = 1;
 ### 10.5 Data Retention Policy
 
 **Retention Requirements**:
+
 - Transaction data: Permanent
 - Event logs: Permanent
 - Derived metrics: 2 years

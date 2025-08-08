@@ -12,8 +12,9 @@
 The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tBTC against their Bitcoin reserves through direct Bank integration. The system uses a simplified watchdog architecture based on the Three-Problem Framework.
 
 **Key Statistics**:
+
 - **Core Contracts**: 10 (QC management) + 3 (watchdog)
-- **Trust Model**: Multi-attester consensus (no single points of failure) 
+- **Trust Model**: Multi-attester consensus (no single points of failure)
 - **Architecture**: Direct Bank integration with modular policies
 - **Gas Savings**: ~50% vs abstraction layer approach
 
@@ -23,24 +24,24 @@ The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tB
 
 ### Core Account Control System
 
-| Component | Purpose | Status |
-|-----------|---------|--------|
-| **ProtocolRegistry** | Service discovery and upgrades | ✅ Deployed |
-| **QCManager** | QC lifecycle and business logic | ✅ Deployed |
-| **QCData** | Isolated storage layer | ✅ Deployed |
-| **QCMinter** | Minting entry point | ✅ Deployed |
-| **QCRedeemer** | Redemption management | ✅ Deployed |
-| **QCReserveLedger** | Unified reserve attestation and consensus | ✅ Deployed |
-| **BasicMintingPolicy** | Direct Bank integration | ✅ Deployed |
-| **BasicRedemptionPolicy** | Redemption policy logic | ✅ Deployed |
-| **SystemState** | Global parameters and pausing | ✅ Deployed |
-| **SPVValidator** | Bitcoin SPV proof validation | ✅ Deployed |
+| Component                 | Purpose                                   | Status      |
+| ------------------------- | ----------------------------------------- | ----------- |
+| **ProtocolRegistry**      | Service discovery and upgrades            | ✅ Deployed |
+| **QCManager**             | QC lifecycle and business logic           | ✅ Deployed |
+| **QCData**                | Isolated storage layer                    | ✅ Deployed |
+| **QCMinter**              | Minting entry point                       | ✅ Deployed |
+| **QCRedeemer**            | Redemption management                     | ✅ Deployed |
+| **QCReserveLedger**       | Unified reserve attestation and consensus | ✅ Deployed |
+| **BasicMintingPolicy**    | Direct Bank integration                   | ✅ Deployed |
+| **BasicRedemptionPolicy** | Redemption policy logic                   | ✅ Deployed |
+| **SystemState**           | Global parameters and pausing             | ✅ Deployed |
+| **SPVValidator**          | Bitcoin SPV proof validation              | ✅ Deployed |
 
 ### Simplified Watchdog System (v2.0)
 
-| Component | Purpose | Status |
-|-----------|---------|--------|
-| **QCReserveLedger** | Multi-attester consensus oracle | ✅ Implemented |
+| Component            | Purpose                                                      | Status         |
+| -------------------- | ------------------------------------------------------------ | -------------- |
+| **QCReserveLedger**  | Multi-attester consensus oracle                              | ✅ Implemented |
 | **WatchdogEnforcer** | Permissionless violation enforcement (includes reason codes) | ✅ Implemented |
 
 ---
@@ -48,20 +49,24 @@ The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tB
 ## Key Design Principles
 
 ### 1. Two-Problem Framework
+
 - **Oracle Problem**: Multi-attester consensus for objective facts (solved by QCReserveLedger)
 - **Enforcement Problem**: Permissionless enforcement of objective violations (solved by WatchdogEnforcer with embedded reason codes)
 
 ### 2. Direct Integration
+
 - Uses existing Bank/Vault infrastructure
 - No abstraction layers
 - ~50% gas savings vs proxy approaches
 
 ### 3. Trust Distribution
+
 - No single points of failure
 - Minimum 3 attesters for reserve consensus
 - Permissionless enforcement of violations
 
 ### 4. Machine Readability
+
 - Standardized bytes32 reason codes (INSUFFICIENT_RESERVES, STALE_ATTESTATIONS, SUSTAINED_RESERVE_VIOLATION)
 - Automated validation without human interpretation
 - Clear objective vs subjective separation
@@ -71,10 +76,11 @@ The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tB
 ## Current Configuration
 
 ### System Parameters
+
 ```solidity
 // Reserve Management
 minCollateralRatio: 100%        // Minimum reserves vs minted
-staleThreshold: 24 hours        // Max age for reserve attestations  
+staleThreshold: 24 hours        // Max age for reserve attestations
 attestationTimeout: 6 hours     // Oracle collection window
 
 // Operations
@@ -84,6 +90,7 @@ maxMintAmount: 1000 tBTC        // Maximum per transaction
 ```
 
 ### Role Structure
+
 - **DEFAULT_ADMIN_ROLE**: DAO governance
 - **ATTESTER_ROLE**: Oracle attesters (multiple entities)
 - **ARBITER_ROLE**: Update QC status
@@ -96,6 +103,7 @@ maxMintAmount: 1000 tBTC        // Maximum per transaction
 ### Operational Expectations
 
 **WatchdogEnforcer Usage Pattern**:
+
 - **Primary Operation**: Watchdogs continuously monitor QCs and call enforcement functions
 - **Fallback Mechanism**: Permissionless design allows anyone to enforce violations if watchdogs fail
 - **Monitoring Flow**: Watchdogs use `checkViolation()` and `batchCheckViolations()` for efficient scanning
@@ -103,6 +111,7 @@ maxMintAmount: 1000 tBTC        // Maximum per transaction
 - **Transparency**: All enforcement attempts logged via events for DAO monitoring
 
 **Expected Actors**:
+
 - **Primary**: Watchdogs with WATCHDOG_ROLE who monitor system health
 - **Secondary**: Automated monitoring systems, community members, other participants
 - **Resilience**: System integrity maintained even if primary actors are inactive
@@ -112,11 +121,13 @@ maxMintAmount: 1000 tBTC        // Maximum per transaction
 ## Integration Points
 
 ### With tBTC Core
+
 - **Bank Contract**: BasicMintingPolicy authorized as balance increaser
 - **TBTCVault**: Receives balance increases for auto-minting
 - **TBTC Token**: QCMinter has MINTER_ROLE, QCRedeemer has BURNER_ROLE
 
 ### Data Flow
+
 ```
 User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → TBTC Tokens
          ↓
@@ -130,11 +141,13 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → TBTC Tokens
 ## Operational Status
 
 ### QC States
+
 - **Active**: Can mint and fulfill redemptions
 - **UnderReview**: Minting paused, under investigation
 - **Revoked**: Permanently disabled
 
 ### Redemption States
+
 - **Pending**: Awaiting Bitcoin transaction
 - **Fulfilled**: Completed with SPV proof
 - **Defaulted**: Failed to fulfill within timeout
@@ -144,12 +157,14 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → TBTC Tokens
 ## System Design Rationale
 
 ### Core Architecture Decisions
+
 1. **Watchdog System**: 3-contract architecture for clarity and efficiency
 2. **Trust Model**: Multi-attester consensus eliminates single points of failure
 3. **Enforcement**: Permissionless validation enables objective enforcement
 4. **Reporting**: Simple event emission with machine-readable reason codes
 
 ### Design Principles
+
 - **Machine-Readable**: System uses structured data instead of human strings
 - **Trust Distribution**: Multiple attesters provide consensus on objective facts
 - **Simplification**: Minimal contracts reduce complexity and gas costs
@@ -160,16 +175,19 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → TBTC Tokens
 ## Documentation References
 
 ### Technical Documentation
+
 - **Architecture**: docs/ARCHITECTURE.md
 - **Implementation**: docs/IMPLEMENTATION.md
 - **Deployment**: deploy/README.md
 
 ### Business Documentation
+
 - **Requirements**: prd/REQUIREMENTS.md
 - **User Flows**: prd/FLOWS.md
 - **Product Overview**: prd/README.md
 
 ### Watchdog Specific
+
 - **Final Architecture**: docs/WATCHDOG_FINAL_ARCHITECTURE.md
 - **Architecture Decisions**: docs/ARCHITECTURE_DECISIONS.md
 
@@ -178,20 +196,23 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → TBTC Tokens
 ## Next Steps
 
 ### Immediate
+
 1. Complete integration testing on testnet
 2. Security audit of simplified watchdog system
 3. Grant roles to initial attesters and reporters
 
 ### Near Term
+
 1. Onboard first Qualified Custodians
 2. Establish oracle attester network
 3. Configure DAO monitoring tools
 
 ### Long Term
+
 1. Expand QC network
 2. Optimize gas costs further
 3. Consider graduated documentation (Phase 3)
 
 ---
 
-*This document is the authoritative source for current system state. All other state descriptions should reference this document.*
+_This document is the authoritative source for current system state. All other state descriptions should reference this document._

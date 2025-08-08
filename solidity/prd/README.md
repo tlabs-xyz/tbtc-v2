@@ -13,21 +13,21 @@ Welcome to the Account Control system documentation. This feature extends tBTC v
 
 ### 📋 Essential Documents
 
-| Document                                   | Purpose                             | Audience                 |
-| ------------------------------------------ | ----------------------------------- | ------------------------ |
-| **[REQUIREMENTS.md](REQUIREMENTS.md)**     | Complete requirements specification | All stakeholders         |
+| Document                                                   | Purpose                             | Audience                 |
+| ---------------------------------------------------------- | ----------------------------------- | ------------------------ |
+| **[REQUIREMENTS.md](REQUIREMENTS.md)**                     | Complete requirements specification | All stakeholders         |
 | **[../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)**     | Detailed technical architecture     | Architects, developers   |
 | **[../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md)** | Code patterns and deployment        | Developers, DevOps       |
-| **[FLOWS.md](FLOWS.md)**                   | User journeys and sequences         | Product, QA, integrators |
+| **[FLOWS.md](FLOWS.md)**                                   | User journeys and sequences         | Product, QA, integrators |
 
 ### 📚 Reference Documents
 
-| Document                                                       | Purpose                      | Audience                |
-| -------------------------------------------------------------- | ---------------------------- | ----------------------- |
-| **[../docs/CURRENT_SYSTEM_STATE.md](../docs/CURRENT_SYSTEM_STATE.md)** | Current system state (truth source) | All stakeholders |
-| **[../docs/WATCHDOG_FINAL_ARCHITECTURE.md](../docs/WATCHDOG_FINAL_ARCHITECTURE.md)** | Watchdog system architecture | Technical teams |
-| **[../docs/future-enhancements/FUTURE_ENHANCEMENTS.md](../docs/future-enhancements/FUTURE_ENHANCEMENTS.md)**           | V2 roadmap and enhancements  | Product, architects     |
-| **[../DOCUMENTATION_MAP.md](../DOCUMENTATION_MAP.md)** | Complete documentation navigation | All stakeholders |
+| Document                                                                                                     | Purpose                             | Audience            |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------- | ------------------- |
+| **[../docs/CURRENT_SYSTEM_STATE.md](../docs/CURRENT_SYSTEM_STATE.md)**                                       | Current system state (truth source) | All stakeholders    |
+| **[../docs/WATCHDOG_FINAL_ARCHITECTURE.md](../docs/WATCHDOG_FINAL_ARCHITECTURE.md)**                         | Watchdog system architecture        | Technical teams     |
+| **[../docs/future-enhancements/FUTURE_ENHANCEMENTS.md](../docs/future-enhancements/FUTURE_ENHANCEMENTS.md)** | V2 roadmap and enhancements         | Product, architects |
+| **[../DOCUMENTATION_MAP.md](../DOCUMENTATION_MAP.md)**                                                       | Complete documentation navigation   | All stakeholders    |
 
 ---
 
@@ -67,21 +67,23 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 ### System Components
 
 #### Core Account Control
-| Component                       | Purpose                      | Key Features                                      |
-| ------------------------------- | ---------------------------- | ------------------------------------------------- |
-| **BasicMintingPolicy**          | Direct Bank integration      | Auto-minting, capacity validation, error handling |
-| **ProtocolRegistry**            | Central service registry     | Component upgrades, dependency management         |
-| **QCManager**                   | Business logic               | Stateless QC management, capacity calculations    |
-| **QCData**                      | Storage layer                | Pure storage, gas-optimized, audit-friendly       |
-| **QCMinter**                    | Stable entry point           | Policy delegation, emergency pause                |
-| **QCRedeemer**                  | Redemption engine            | Lifecycle management, default handling            |
+
+| Component              | Purpose                  | Key Features                                      |
+| ---------------------- | ------------------------ | ------------------------------------------------- |
+| **BasicMintingPolicy** | Direct Bank integration  | Auto-minting, capacity validation, error handling |
+| **ProtocolRegistry**   | Central service registry | Component upgrades, dependency management         |
+| **QCManager**          | Business logic           | Stateless QC management, capacity calculations    |
+| **QCData**             | Storage layer            | Pure storage, gas-optimized, audit-friendly       |
+| **QCMinter**           | Stable entry point       | Policy delegation, emergency pause                |
+| **QCRedeemer**         | Redemption engine        | Lifecycle management, default handling            |
 
 #### Simplified Watchdog System (v2.0)
-| Component                       | Purpose                      | Key Features                                      |
-| ------------------------------- | ---------------------------- | ------------------------------------------------- |
-| **WatchdogReasonCodes**         | Machine-readable violations  | Standardized codes for automated validation       |
-| **QCReserveLedger**             | Multi-attester consensus     | Median calculation, eliminates single trust point |
-| **WatchdogEnforcer**            | Permissionless enforcement   | Anyone can trigger objective violations           |
+
+| Component               | Purpose                     | Key Features                                      |
+| ----------------------- | --------------------------- | ------------------------------------------------- |
+| **WatchdogReasonCodes** | Machine-readable violations | Standardized codes for automated validation       |
+| **QCReserveLedger**     | Multi-attester consensus    | Median calculation, eliminates single trust point |
+| **WatchdogEnforcer**    | Permissionless enforcement  | Anyone can trigger objective violations           |
 
 ### Integration with Existing tBTC v2
 
@@ -163,10 +165,12 @@ The system deploys as an **independent contract suite** without modifying existi
 The watchdog system focuses on objective, measurable violations through three key solutions:
 
 1. **Oracle Problem** (Objective Facts)
+
    - Solution: Multi-attester consensus via `QCReserveLedger`
    - Multiple attesters submit reserve balances, median calculation prevents manipulation
 
 2. **Enforcement Problem** (Objective Violations)
+
    - Solution: Permissionless enforcement via `WatchdogEnforcer`
    - Anyone can trigger enforcement for verifiable violations
 
@@ -175,6 +179,7 @@ The watchdog system focuses on objective, measurable violations through three ke
    - DAO monitors enforcement events and can override if needed
 
 #### System Benefits
+
 - **Minimal Contracts**: 3-contract architecture for clarity and efficiency
 - **Machine-Readable**: Reason codes enable automated validation
 - **Trust Distribution**: No single points of failure
@@ -210,8 +215,8 @@ The watchdog system focuses on objective, measurable violations through three ke
 | Version | Date       | Changes                                    |
 | ------- | ---------- | ------------------------------------------ |
 | 1.0     | 2025-07-11 | Initial consolidated documentation release |
-| 1.1     | 2025-08-04 | Dual-path watchdog + automated framework  |
-| 2.0     | 2025-08-06 | Simplified watchdog system finalized     |
+| 1.1     | 2025-08-04 | Dual-path watchdog + automated framework   |
+| 2.0     | 2025-08-06 | Simplified watchdog system finalized       |
 
 ---
 

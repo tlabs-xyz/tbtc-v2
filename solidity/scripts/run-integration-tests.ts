@@ -33,7 +33,7 @@ class IntegrationTestRunner {
     this.printSummary()
   }
 
-  private async runTest(testFile: string): Promise<void> {
+  public async runTest(testFile: string): Promise<void> {
     const testName = testFile.replace(".test.ts", "")
     const testPath = `test/integration/account-control/${testFile}`
 

@@ -8,7 +8,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const Bank = await deployments.get("Bank")
   const TBTC = await deployments.get("TBTC")
-  const Bridge = await deployments.get("Bridge")
+
+  // Handle both Bridge and BridgeStub deployments (for testing)
+  let Bridge
+  try {
+    Bridge = await deployments.get("Bridge")
+  } catch (error) {
+    // Fallback to BridgeStub for test environments
+    Bridge = await deployments.get("BridgeStub")
+  }
 
   const tbtcVault = await deploy("TBTCVault", {
     contract: "TBTCVault",
@@ -33,4 +41,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 export default func
 
 func.tags = ["TBTCVault"]
-func.dependencies = ["Bank", "TBTC"]
+func.dependencies = ["Bank", "TBTC", "Bridge"]

@@ -946,11 +946,12 @@ describe("QCData", () => {
     describe("grantQCManagerRole", () => {
       it("should grant QC_MANAGER_ROLE to valid address", async () => {
         const newManager = thirdParty
-        
+
         const tx = await qcData.grantQCManagerRole(newManager.address)
-        
-        expect(await qcData.hasRole(QC_MANAGER_ROLE, newManager.address)).to.be.true
-        
+
+        expect(await qcData.hasRole(QC_MANAGER_ROLE, newManager.address)).to.be
+          .true
+
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
         await expect(tx)
           .to.emit(qcData, "RoleGranted")
@@ -966,12 +967,14 @@ describe("QCData", () => {
       it("should allow multiple managers", async () => {
         const manager1 = thirdParty
         const manager2 = governance
-        
+
         await qcData.grantQCManagerRole(manager1.address)
         await qcData.grantQCManagerRole(manager2.address)
-        
-        expect(await qcData.hasRole(QC_MANAGER_ROLE, manager1.address)).to.be.true
-        expect(await qcData.hasRole(QC_MANAGER_ROLE, manager2.address)).to.be.true
+
+        expect(await qcData.hasRole(QC_MANAGER_ROLE, manager1.address)).to.be
+          .true
+        expect(await qcData.hasRole(QC_MANAGER_ROLE, manager2.address)).to.be
+          .true
       })
 
       it("should only be callable by admin", async () => {
@@ -989,9 +992,10 @@ describe("QCData", () => {
 
       it("should revoke QC_MANAGER_ROLE from address", async () => {
         const tx = await qcData.revokeQCManagerRole(thirdParty.address)
-        
-        expect(await qcData.hasRole(QC_MANAGER_ROLE, thirdParty.address)).to.be.false
-        
+
+        expect(await qcData.hasRole(QC_MANAGER_ROLE, thirdParty.address)).to.be
+          .false
+
         await expect(tx)
           .to.emit(qcData, "RoleRevoked")
           .withArgs(QC_MANAGER_ROLE, thirdParty.address, deployer.address)
@@ -1022,7 +1026,7 @@ describe("QCData", () => {
     const updatedCapacity = ethers.utils.parseEther("2000")
 
     beforeEach(async () => {
-      // Register a QC first  
+      // Register a QC first
       await qcData.connect(qcManager).registerQC(qcAddress.address)
     })
 
@@ -1031,30 +1035,44 @@ describe("QCData", () => {
         const tx = await qcData
           .connect(qcManager)
           .updateMaxMintingCapacity(qcAddress.address, testCapacity)
-        
-        expect(await qcData.getMaxMintingCapacity(qcAddress.address)).to.equal(testCapacity)
-        
+
+        expect(await qcData.getMaxMintingCapacity(qcAddress.address)).to.equal(
+          testCapacity
+        )
+
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
         await expect(tx)
           .to.emit(qcData, "MaxMintingCapacityUpdated")
-          .withArgs(qcAddress.address, testCapacity, qcManager.address, currentBlock.timestamp)
+          .withArgs(
+            qcAddress.address,
+            testCapacity,
+            qcManager.address,
+            currentBlock.timestamp
+          )
       })
 
       it("should allow updating capacity multiple times", async () => {
         await qcData
           .connect(qcManager)
           .updateMaxMintingCapacity(qcAddress.address, testCapacity)
-        
+
         const tx = await qcData
           .connect(qcManager)
           .updateMaxMintingCapacity(qcAddress.address, updatedCapacity)
-        
-        expect(await qcData.getMaxMintingCapacity(qcAddress.address)).to.equal(updatedCapacity)
-        
+
+        expect(await qcData.getMaxMintingCapacity(qcAddress.address)).to.equal(
+          updatedCapacity
+        )
+
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
         await expect(tx)
           .to.emit(qcData, "MaxMintingCapacityUpdated")
-          .withArgs(qcAddress.address, updatedCapacity, qcManager.address, currentBlock.timestamp)
+          .withArgs(
+            qcAddress.address,
+            updatedCapacity,
+            qcManager.address,
+            currentBlock.timestamp
+          )
       })
 
       it("should revert with zero capacity", async () => {
@@ -1067,7 +1085,7 @@ describe("QCData", () => {
 
       it("should revert if QC not registered", async () => {
         const unregisteredQC = governance.address
-        
+
         await expect(
           qcData
             .connect(qcManager)
@@ -1089,7 +1107,7 @@ describe("QCData", () => {
         await qcData
           .connect(qcManager)
           .updateMaxMintingCapacity(qcAddress.address, testCapacity)
-        
+
         const capacity = await qcData.getMaxMintingCapacity(qcAddress.address)
         expect(capacity).to.equal(testCapacity)
       })
@@ -1109,8 +1127,10 @@ describe("QCData", () => {
         await qcData
           .connect(qcManager)
           .updateMaxMintingCapacity(qcAddress.address, testCapacity)
-        
-        const gasEstimate = await qcData.estimateGas.getMaxMintingCapacity(qcAddress.address)
+
+        const gasEstimate = await qcData.estimateGas.getMaxMintingCapacity(
+          qcAddress.address
+        )
         expect(gasEstimate).to.be.lt(30000) // Should be very cheap
       })
     })
