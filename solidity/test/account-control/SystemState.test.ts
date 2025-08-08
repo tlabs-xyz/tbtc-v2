@@ -25,9 +25,12 @@ describe("SystemState", () => {
   const testStaleThreshold = 3600 // 1 hour
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, governance, pauserAccount, adminAccount, thirdParty] =
-      await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    governance = signers[1]
+    pauserAccount = signers[2]
+    adminAccount = signers[3]
+    thirdParty = signers[4]
 
     // Generate role hashes
     PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")
@@ -882,6 +885,539 @@ describe("SystemState", () => {
         await expect(
           systemState.connect(deployer).setEmergencyCouncil(thirdParty.address)
         ).to.emit(systemState, "EmergencyCouncilUpdated")
+      })
+    })
+  })
+
+  describe("Emergency QC Functions", () => {
+    let testQC: string
+    let testReason: string
+    let invalidQC: string
+
+    beforeEach(async () => {
+      testQC = governance.address // Use governance address as test QC
+      testReason = ethers.utils.id("INSUFFICIENT_COLLATERAL")
+      invalidQC = ethers.constants.AddressZero
+    })
+
+    describe("emergencyPauseQC", () => {
+      context("when called by pauser", () => {
+        it("should pause QC successfully with correct reason", async () => {
+          const tx = await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
+
+          // Verify state changes
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+          expect(await systemState.getQCPauseTimestamp(testQC)).to.equal(
+            currentBlock.timestamp
+          )
+
+          // Verify events
+          await expect(tx)
+            .to.emit(systemState, "QCEmergencyPaused")
+            .withArgs(testQC, pauserAccount.address, currentBlock.timestamp, testReason)
+
+          await expect(tx)
+            .to.emit(systemState, "EmergencyActionTaken")
+            .withArgs(testQC, ethers.utils.formatBytes32String("QC_EMERGENCY_PAUSE"), pauserAccount.address, currentBlock.timestamp)
+        })
+
+        it("should handle different reason codes", async () => {
+          const reasons = [
+            ethers.utils.id("INSUFFICIENT_COLLATERAL"),
+            ethers.utils.id("STALE_ATTESTATION"),
+            ethers.utils.id("COMPLIANCE_VIOLATION"),
+            ethers.utils.id("SECURITY_INCIDENT"),
+            ethers.utils.id("TECHNICAL_FAILURE")
+          ]
+
+          for (const reason of reasons) {
+            const qc = ethers.Wallet.createRandom().address
+            
+            const tx = await systemState.connect(pauserAccount).emergencyPauseQC(qc, reason)
+            const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
+            
+            await expect(tx)
+              .to.emit(systemState, "QCEmergencyPaused")
+              .withArgs(qc, pauserAccount.address, currentBlock.timestamp, reason)
+
+            expect(await systemState.isQCEmergencyPaused(qc)).to.be.true
+          }
+        })
+
+        it("should allow multiple QCs to be paused independently", async () => {
+          const qc1 = ethers.Wallet.createRandom().address
+          const qc2 = ethers.Wallet.createRandom().address
+          const qc3 = ethers.Wallet.createRandom().address
+
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(qc1, ethers.utils.id("REASON_1"))
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(qc2, ethers.utils.id("REASON_2"))
+
+          expect(await systemState.isQCEmergencyPaused(qc1)).to.be.true
+          expect(await systemState.isQCEmergencyPaused(qc2)).to.be.true
+          expect(await systemState.isQCEmergencyPaused(qc3)).to.be.false
+        })
+
+        it("should revert when QC is already paused", async () => {
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+
+          await expect(
+            systemState
+              .connect(pauserAccount)
+              .emergencyPauseQC(testQC, testReason)
+          ).to.be.revertedWith("QCIsEmergencyPaused")
+        })
+
+        it("should revert with zero address", async () => {
+          await expect(
+            systemState
+              .connect(pauserAccount)
+              .emergencyPauseQC(invalidQC, testReason)
+          ).to.be.revertedWith("InvalidCouncilAddress")
+        })
+      })
+
+      context("when called by non-pauser", () => {
+        it("should revert with access control error", async () => {
+          await expect(
+            systemState.connect(thirdParty).emergencyPauseQC(testQC, testReason)
+          ).to.be.revertedWith("AccessControl: account")
+        })
+      })
+
+      context("when called by admin", () => {
+        it("should work if admin also has pauser role", async () => {
+          await systemState.grantRole(PAUSER_ROLE, adminAccount.address)
+
+          await expect(
+            systemState
+              .connect(adminAccount)
+              .emergencyPauseQC(testQC, testReason)
+          ).to.not.be.reverted
+        })
+      })
+    })
+
+    describe("emergencyUnpauseQC", () => {
+      beforeEach(async () => {
+        // Pause the QC first
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(testQC, testReason)
+      })
+
+      context("when called by pauser", () => {
+        it("should unpause QC successfully", async () => {
+          const tx = await systemState
+            .connect(pauserAccount)
+            .emergencyUnpauseQC(testQC)
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
+
+          // Verify state changes
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
+          expect(await systemState.getQCPauseTimestamp(testQC)).to.equal(0)
+
+          // Verify events
+          await expect(tx)
+            .to.emit(systemState, "QCEmergencyUnpaused")
+            .withArgs(testQC, pauserAccount.address, currentBlock.timestamp)
+
+          await expect(tx)
+            .to.emit(systemState, "EmergencyActionTaken")
+            .withArgs(testQC, ethers.utils.formatBytes32String("QC_EMERGENCY_UNPAUSE"), pauserAccount.address, currentBlock.timestamp)
+        })
+
+        it("should allow QC to be paused and unpaused multiple times", async () => {
+          // Unpause
+          await systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
+
+          // Pause again
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+
+          // Unpause again
+          await systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
+        })
+
+        it("should revert when QC is not paused", async () => {
+          const unPausedQC = ethers.Wallet.createRandom().address
+
+          await expect(
+            systemState.connect(pauserAccount).emergencyUnpauseQC(unPausedQC)
+          ).to.be.revertedWith("QCNotEmergencyPaused")
+        })
+
+        it("should revert when trying to unpause already unpaused QC", async () => {
+          await systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
+
+          await expect(
+            systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
+          ).to.be.revertedWith("QCNotEmergencyPaused")
+        })
+      })
+
+      context("when called by non-pauser", () => {
+        it("should revert with access control error", async () => {
+          await expect(
+            systemState.connect(thirdParty).emergencyUnpauseQC(testQC)
+          ).to.be.revertedWith("AccessControl: account")
+        })
+      })
+    })
+
+    describe("Emergency Pause View Functions", () => {
+      describe("isQCEmergencyPaused", () => {
+        it("should return false for non-paused QC", async () => {
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
+        })
+
+        it("should return true for paused QC", async () => {
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+        })
+
+        it("should return false after unpause", async () => {
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+          await systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
+        })
+      })
+
+      describe("isQCEmergencyPauseExpired", () => {
+        it("should return false for non-paused QC", async () => {
+          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.false
+        })
+
+        it("should return false for recently paused QC", async () => {
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.false
+        })
+
+        it("should return true after emergency pause duration", async () => {
+          // Set a short emergency pause duration for testing
+          await systemState
+            .connect(adminAccount)
+            .setEmergencyPauseDuration(1) // 1 second
+
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+
+          // Fast forward time
+          await helpers.time.increaseTime(3)
+
+          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.true
+        })
+      })
+
+      describe("getQCPauseTimestamp", () => {
+        it("should return 0 for non-paused QC", async () => {
+          expect(await systemState.getQCPauseTimestamp(testQC)).to.equal(0)
+        })
+
+        it("should return timestamp for paused QC", async () => {
+          const tx = await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+          const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
+
+          expect(await systemState.getQCPauseTimestamp(testQC)).to.equal(
+            currentBlock.timestamp
+          )
+        })
+
+        it("should return 0 after unpause", async () => {
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+          await systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
+
+          expect(await systemState.getQCPauseTimestamp(testQC)).to.equal(0)
+        })
+      })
+    })
+
+    describe("Emergency Pause Integration", () => {
+      describe("qcNotEmergencyPaused modifier", () => {
+        let testContract: any
+
+        beforeEach(async () => {
+          // Deploy a test contract that uses the modifier
+          const TestContract = await ethers.getContractFactory("TestEmergencyIntegration")
+          testContract = await TestContract.deploy(systemState.address)
+          await testContract.deployed()
+        })
+
+        it("should allow function execution when QC is not paused", async () => {
+          await expect(testContract.testFunction(testQC)).to.not.be.reverted
+        })
+
+        it("should revert function execution when QC is paused", async () => {
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+
+          await expect(testContract.testFunction(testQC))
+            .to.be.revertedWith("QCIsEmergencyPaused")
+        })
+
+        it("should allow function execution after QC is unpaused", async () => {
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+          await systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
+
+          await expect(testContract.testFunction(testQC)).to.not.be.reverted
+        })
+      })
+    })
+
+    describe("Emergency System Attack Scenarios", () => {
+      describe("Unauthorized Pause Attempts", () => {
+        it("should prevent non-authorized accounts from pausing", async () => {
+          const attacker = thirdParty
+          
+          await expect(
+            systemState.connect(attacker).emergencyPauseQC(testQC, testReason)
+          ).to.be.revertedWith("AccessControl: account")
+        })
+
+        it("should prevent parameter admin from pausing without pauser role", async () => {
+          await expect(
+            systemState.connect(adminAccount).emergencyPauseQC(testQC, testReason)
+          ).to.be.revertedWith("AccessControl: account")
+        })
+
+        it("should allow emergency council to pause if granted pauser role", async () => {
+          const emergencyCouncil = thirdParty
+          await systemState.setEmergencyCouncil(emergencyCouncil.address)
+          await systemState.grantRole(PAUSER_ROLE, emergencyCouncil.address)
+
+          await expect(
+            systemState.connect(emergencyCouncil).emergencyPauseQC(testQC, testReason)
+          ).to.not.be.reverted
+        })
+      })
+
+      describe("Pause Bypass Attempts", () => {
+        beforeEach(async () => {
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+        })
+
+        it("should prevent double-pausing for same QC", async () => {
+          await expect(
+            systemState
+              .connect(pauserAccount)
+              .emergencyPauseQC(testQC, testReason)
+          ).to.be.revertedWith("QCIsEmergencyPaused")
+        })
+
+        it("should prevent unauthorized unpause", async () => {
+          await expect(
+            systemState.connect(thirdParty).emergencyUnpauseQC(testQC)
+          ).to.be.revertedWith("AccessControl: account")
+        })
+      })
+
+      describe("State Manipulation Attempts", () => {
+        it("should maintain pause state consistency", async () => {
+          // Pause QC
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+          
+          const pauseTimestamp1 = await systemState.getQCPauseTimestamp(testQC)
+          expect(pauseTimestamp1).to.be.gt(0)
+          
+          // Try to pause again (should fail)
+          await expect(
+            systemState
+              .connect(pauserAccount)
+              .emergencyPauseQC(testQC, testReason)
+          ).to.be.revertedWith("QCIsEmergencyPaused")
+          
+          // Verify timestamp didn't change
+          const pauseTimestamp2 = await systemState.getQCPauseTimestamp(testQC)
+          expect(pauseTimestamp2).to.equal(pauseTimestamp1)
+        })
+
+        it("should properly clean up state on unpause", async () => {
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+          
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+          expect(await systemState.getQCPauseTimestamp(testQC)).to.be.gt(0)
+          
+          await systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
+          
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
+          expect(await systemState.getQCPauseTimestamp(testQC)).to.equal(0)
+        })
+      })
+
+      describe("Timing Attack Scenarios", () => {
+        it("should handle rapid pause/unpause sequences", async () => {
+          for (let i = 0; i < 5; i++) {
+            await systemState
+              .connect(pauserAccount)
+              .emergencyPauseQC(testQC, testReason)
+            expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+            
+            await systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
+            expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
+          }
+        })
+
+        it("should handle pause expiry edge cases", async () => {
+          // Set very short pause duration
+          await systemState
+            .connect(adminAccount)
+            .setEmergencyPauseDuration(2)
+
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+
+          // Check not expired initially
+          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.false
+
+          // Fast forward to exactly expiry time (should still not be expired)
+          await helpers.time.increaseTime(2)
+          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.false
+
+          // Fast forward past expiry time (should be expired)
+          await helpers.time.increaseTime(1)
+          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.true
+
+          // QC should still be marked as paused even if expired
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+        })
+      })
+    })
+
+    describe("Emergency System Recovery", () => {
+      describe("Mass QC Recovery", () => {
+        let qcs: string[]
+
+        beforeEach(async () => {
+          qcs = [
+            ethers.Wallet.createRandom().address,
+            ethers.Wallet.createRandom().address,
+            ethers.Wallet.createRandom().address
+          ]
+
+          // Pause all QCs
+          for (const qc of qcs) {
+            await systemState
+              .connect(pauserAccount)
+              .emergencyPauseQC(qc, testReason)
+          }
+        })
+
+        it("should support selective recovery", async () => {
+          // Unpause only first QC
+          await systemState.connect(pauserAccount).emergencyUnpauseQC(qcs[0])
+
+          expect(await systemState.isQCEmergencyPaused(qcs[0])).to.be.false
+          expect(await systemState.isQCEmergencyPaused(qcs[1])).to.be.true
+          expect(await systemState.isQCEmergencyPaused(qcs[2])).to.be.true
+        })
+
+        it("should support full recovery", async () => {
+          // Unpause all QCs
+          for (const qc of qcs) {
+            await systemState.connect(pauserAccount).emergencyUnpauseQC(qc)
+            expect(await systemState.isQCEmergencyPaused(qc)).to.be.false
+          }
+        })
+      })
+
+      describe("Emergency Council Transition", () => {
+        it("should maintain pause state during council changes", async () => {
+          const newCouncil = ethers.Wallet.createRandom()
+
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+
+          // Change emergency council
+          await systemState.setEmergencyCouncil(newCouncil.address)
+
+          // QC should remain paused
+          expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+        })
+
+        it("should allow new pauser to unpause", async () => {
+          const [newPauser] = await ethers.getSigners()
+
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(testQC, testReason)
+
+          // Grant pauser role to new account  
+          await systemState.grantRole(PAUSER_ROLE, newPauser.address)
+
+          // New pauser should be able to unpause
+          await expect(
+            systemState.connect(newPauser).emergencyUnpauseQC(testQC)
+          ).to.not.be.reverted
+        })
+      })
+    })
+
+    describe("Gas Optimization", () => {
+      it("should have reasonable gas costs for emergency operations", async () => {
+        // Measure gas for pause operation
+        const pauseTx = await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(testQC, testReason)
+        const pauseReceipt = await pauseTx.wait()
+
+        // Measure gas for unpause operation
+        const unpauseTx = await systemState
+          .connect(pauserAccount)
+          .emergencyUnpauseQC(testQC)
+        const unPauseReceipt = await unpauseTx.wait()
+
+        // Emergency operations should be gas-efficient (under 100k gas)
+        expect(pauseReceipt.gasUsed).to.be.lt(100000)
+        expect(unPauseReceipt.gasUsed).to.be.lt(100000)
+      })
+
+      it("should have minimal gas cost for view functions", async () => {
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(testQC, testReason)
+
+        // View functions should be very cheap
+        const gasUsed1 = await systemState.estimateGas.isQCEmergencyPaused(testQC)
+        const gasUsed2 = await systemState.estimateGas.getQCPauseTimestamp(testQC)
+        const gasUsed3 = await systemState.estimateGas.isQCEmergencyPauseExpired(testQC)
+
+        expect(gasUsed1).to.be.lt(30000)
+        expect(gasUsed2).to.be.lt(30000)
+        expect(gasUsed3).to.be.lt(30000)
       })
     })
   })

@@ -55,7 +55,7 @@ class ReserveAttestationIntegration extends BaseAccountControlIntegration {
     // Step 3: Watchdog submits attestation
     console.log("Step 3: Submitting reserve attestation...")
 
-    const attestationTx = await this.qcReserveLedger
+    const attestationTx = await this.qcQCReserveLedger
       .connect(this.watchdog)
       .submitAttestation(this.qc.address, totalReserves, currentTimestamp)
 
@@ -96,11 +96,11 @@ class ReserveAttestationIntegration extends BaseAccountControlIntegration {
     console.log("Step 6: Verifying attestation storage...")
 
     const lastAttestationTime =
-      await this.qcReserveLedger.getLastAttestationTime(this.qc.address)
+      await this.qcQCReserveLedger.getLastAttestationTime(this.qc.address)
     expect(lastAttestationTime).to.equal(currentTimestamp)
 
     const lastAttestationAmount =
-      await this.qcReserveLedger.getLastAttestationAmount(this.qc.address)
+      await this.qcQCReserveLedger.getLastAttestationAmount(this.qc.address)
     expect(lastAttestationAmount).to.equal(totalReserves)
 
     console.log("✅ Attestation data stored correctly")
@@ -139,7 +139,7 @@ class ReserveAttestationIntegration extends BaseAccountControlIntegration {
     const insufficientReserves = ethers.utils.parseEther("40") // Less than minted amount
     const currentTimestamp = await this.getBlockTimestamp()
 
-    const attestationTx = await this.qcReserveLedger
+    const attestationTx = await this.qcQCReserveLedger
       .connect(this.watchdog)
       .submitAttestation(
         this.qc.address,
@@ -183,7 +183,7 @@ class ReserveAttestationIntegration extends BaseAccountControlIntegration {
     const totalReserves = ethers.utils.parseEther("100")
     const oldTimestamp = await this.getBlockTimestamp()
 
-    await this.qcReserveLedger
+    await this.qcQCReserveLedger
       .connect(this.watchdog)
       .submitAttestation(this.qc.address, totalReserves, oldTimestamp)
 
@@ -212,7 +212,7 @@ class ReserveAttestationIntegration extends BaseAccountControlIntegration {
 
     // Submit fresh attestation
     const freshTimestamp = await this.getBlockTimestamp()
-    await this.qcReserveLedger
+    await this.qcQCReserveLedger
       .connect(this.watchdog)
       .submitAttestation(this.qc.address, totalReserves, freshTimestamp)
 
@@ -233,7 +233,7 @@ class ReserveAttestationIntegration extends BaseAccountControlIntegration {
     const currentTimestamp = await this.getBlockTimestamp()
 
     await expect(
-      this.qcReserveLedger
+      this.qcQCReserveLedger
         .connect(this.user)
         .submitAttestation(this.qc.address, totalReserves, currentTimestamp)
     ).to.be.revertedWith("Only attester can submit attestation")
@@ -242,7 +242,7 @@ class ReserveAttestationIntegration extends BaseAccountControlIntegration {
 
     // Test 2: Attestation for non-existent QC
     await expect(
-      this.qcReserveLedger
+      this.qcQCReserveLedger
         .connect(this.watchdog)
         .submitAttestation(this.user.address, totalReserves, currentTimestamp)
     ).to.be.revertedWith("QC does not exist")
@@ -253,7 +253,7 @@ class ReserveAttestationIntegration extends BaseAccountControlIntegration {
     const futureTimestamp = currentTimestamp + 3600
 
     await expect(
-      this.qcReserveLedger
+      this.qcQCReserveLedger
         .connect(this.watchdog)
         .submitAttestation(this.qc.address, totalReserves, futureTimestamp)
     ).to.be.revertedWith("Future timestamp not allowed")
@@ -264,7 +264,7 @@ class ReserveAttestationIntegration extends BaseAccountControlIntegration {
     const veryOldTimestamp = currentTimestamp - 30 * 24 * 60 * 60 // 30 days ago
 
     await expect(
-      this.qcReserveLedger
+      this.qcQCReserveLedger
         .connect(this.watchdog)
         .submitAttestation(this.qc.address, totalReserves, veryOldTimestamp)
     ).to.be.revertedWith("Attestation too old")

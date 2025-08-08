@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/IMintingPolicy.sol";
 import "./ProtocolRegistry.sol";
 import "./QCManager.sol";
@@ -21,8 +22,7 @@ import "../token/TBTC.sol";
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - MINTER_ROLE: Can request minting of tBTC tokens (typically granted to QCMinter contract)
-contract BasicMintingPolicy is IMintingPolicy, AccessControl {
-    // Custom errors for gas-efficient reverts
+contract BasicMintingPolicy is IMintingPolicy, AccessControl, ReentrancyGuard {
     error InvalidQCAddress();
     error InvalidUserAddress();
     error InvalidAmount();
@@ -33,19 +33,23 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     error NotAuthorizedInBank();
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    uint256 public constant SATOSHI_MULTIPLIER = 1e10;
 
-    // Service keys for ProtocolRegistry
+    // Service keys for remaining registry-based lookups
     bytes32 public constant QC_MANAGER_KEY = keccak256("QC_MANAGER");
     bytes32 public constant QC_DATA_KEY = keccak256("QC_DATA");
     bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
-    bytes32 public constant QC_RESERVE_LEDGER_KEY =
-        keccak256("QC_RESERVE_LEDGER");
-    bytes32 public constant BANK_KEY = keccak256("BANK");
-    bytes32 public constant TBTC_VAULT_KEY = keccak256("TBTC_VAULT");
 
-    /// @notice Satoshi multiplier for converting tBTC to satoshis
-    uint256 public constant SATOSHI_MULTIPLIER = 1e10;
+    // =================== DIRECT INTEGRATION ===================
+    // Core protocol contracts - immutable, high-frequency access, no registry overhead
+    
+    Bank public immutable bank;            // Direct Bank integration saves ~5k gas per mint
+    TBTCVault public immutable tbtcVault;  // Direct Vault integration for minting
+    TBTC public immutable tbtc;            // Direct token contract access
 
+    // =================== REGISTRY INTEGRATION ===================
+    // Business logic contracts - upgradeable, lower frequency access
+    
     ProtocolRegistry public immutable protocolRegistry;
 
     /// @dev Mapping to track mint requests
@@ -93,15 +97,37 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         uint256 timestamp
     );
 
-    constructor(address _protocolRegistry) {
-        if (_protocolRegistry == address(0)) revert InvalidQCAddress();
+    /// @notice Emitted when QC-backed balance is created in Bank
+    event QCBankBalanceCreated(
+        address indexed qc,
+        address indexed user,
+        uint256 satoshis,
+        bytes32 indexed mintId
+    );
+
+    constructor(
+        address _bank,
+        address _tbtcVault,
+        address _tbtc,
+        address _protocolRegistry
+    ) {
+        require(_bank != address(0), "Invalid bank address");
+        require(_tbtcVault != address(0), "Invalid vault address");
+        require(_tbtc != address(0), "Invalid token address");
+        require(_protocolRegistry != address(0), "Invalid registry address");
+
+        bank = Bank(_bank);
+        tbtcVault = TBTCVault(_tbtcVault);
+        tbtc = TBTC(_tbtc);
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
     }
 
     /// @notice Request minting with direct Bank integration for seamless user experience
     /// @dev Validates QC capacity, directly creates Bank balance, and triggers TBTCVault minting
+    ///      SECURITY: nonReentrant protects against reentrancy via Bank.increaseBalanceAndCall
     /// @param qc The address of the Qualified Custodian
     /// @param user The address receiving the tBTC tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
@@ -110,7 +136,7 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         address qc,
         address user,
         uint256 amount
-    ) external override onlyRole(MINTER_ROLE) returns (bytes32 mintId) {
+    ) external override onlyRole(MINTER_ROLE) nonReentrant returns (bytes32 mintId) {
         // Validate inputs
         if (qc == address(0)) revert InvalidQCAddress();
         if (user == address(0)) revert InvalidUserAddress();
@@ -130,6 +156,17 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
                 block.timestamp
             );
             revert MintingPaused();
+        }
+        if (systemState.isQCEmergencyPaused(qc)) {
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "QC emergency paused",
+                msg.sender,
+                block.timestamp
+            );
+            revert SystemState.QCIsEmergencyPaused(qc);
         }
         if (
             amount < systemState.minMintAmount() ||
@@ -186,13 +223,7 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
             completed: false
         });
 
-        // Get Bank and Vault references
-        Bank bank = Bank(protocolRegistry.getService(BANK_KEY));
-        TBTCVault tbtcVault = TBTCVault(
-            protocolRegistry.getService(TBTC_VAULT_KEY)
-        );
-
-        // Verify this contract is authorized in Bank
+        // Verify this contract is authorized in Bank - direct integration
         if (!bank.authorizedBalanceIncreasers(address(this))) {
             revert NotAuthorizedInBank();
         }
@@ -206,6 +237,9 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         uint256[] memory amounts = new uint256[](1);
         depositors[0] = user;
         amounts[0] = satoshis;
+
+        // Emit event before Bank interaction for QC attribution
+        emit QCBankBalanceCreated(qc, user, satoshis, mintId);
 
         // This will create Bank balance and automatically trigger TBTCVault minting
         bank.increaseBalanceAndCall(address(tbtcVault), depositors, amounts);
@@ -309,4 +343,5 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
         uint256 currentMinted = qcDataContract.getQCMintedAmount(qc);
         qcManager.updateQCMintedAmount(qc, currentMinted + amount);
     }
+
 }

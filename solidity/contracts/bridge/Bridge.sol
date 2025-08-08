@@ -1534,11 +1534,11 @@ contract Bridge is
     }
 
     /// @notice Updates treasury address. The treasury receives the system fees.
-    /// @param treasury New value of the treasury address.
+    /// @param _treasury New value of the treasury address.
     /// @dev The treasury address must not be 0x0.
     // slither-disable-next-line shadowing-local
-    function updateTreasury(address treasury) external onlyGovernance {
-        self.updateTreasury(treasury);
+    function updateTreasury(address _treasury) external onlyGovernance {
+        self.updateTreasury(_treasury);
     }
 
     /// @notice Collection of all revealed deposits indexed by
