@@ -85,7 +85,7 @@ describe("Security Integration Tests", () => {
 
     // Deploy security test fixture with mocks
     fixture = await deploySecurityTestFixture()
-    
+
     protocolRegistry = fixture.protocolRegistry
     qcManager = fixture.qcManager
     qcData = fixture.qcData
@@ -128,7 +128,7 @@ describe("Security Integration Tests", () => {
       await watchdogConsensusManager.MANAGER_ROLE(),
       governance.address
     )
-    
+
     const allWatchdogs = [watchdog1, watchdog2, watchdog3, compromisedWatchdog]
     for (const watchdog of allWatchdogs) {
       await watchdogConsensusManager
@@ -154,7 +154,7 @@ describe("Security Integration Tests", () => {
           allWatchdogs[i].address,
           `Watchdog${i + 1}`
         )
-      
+
       await watchdogMonitor
         .connect(governance)
         .grantRole(
@@ -165,17 +165,26 @@ describe("Security Integration Tests", () => {
 
     // Register test QC
     await qcData.registerQC(qcAddress.address, ethers.utils.parseEther("10000"))
-    
+
     // Register wallet
     const { challenge, txInfo, proof } = createMockSpvData()
     await qcManager
       .connect(fixture.watchdog)
-      .registerWallet(qcAddress.address, TEST_DATA.BTC_ADDRESSES.TEST, challenge, txInfo, proof)
-    
+      .registerWallet(
+        qcAddress.address,
+        TEST_DATA.BTC_ADDRESSES.TEST,
+        challenge,
+        txInfo,
+        proof
+      )
+
     // Submit reserves
     await qcQCReserveLedger
       .connect(fixture.watchdog)
-      .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("5000"))
+      .submitReserveAttestation(
+        qcAddress.address,
+        ethers.utils.parseEther("5000")
+      )
 
     // Setup mocks for minting
     tbtc.mint.returns()
@@ -228,8 +237,9 @@ describe("Security Integration Tests", () => {
       let callbackExecuted = false
 
       // Simulate callback during reserve attestation
-      const originalSubmitAttestation = qcQCReserveLedger.submitReserveAttestation
-      
+      const originalSubmitAttestation =
+        qcQCReserveLedger.submitReserveAttestation
+
       // Mock to simulate malicious callback
       const mockSubmitAttestation = async (...args: any[]) => {
         if (!callbackExecuted) {
@@ -238,7 +248,10 @@ describe("Security Integration Tests", () => {
           await expect(
             qcQCReserveLedger
               .connect(fixture.watchdog)
-              .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("6000"))
+              .submitReserveAttestation(
+                qcAddress.address,
+                ethers.utils.parseEther("6000")
+              )
           ).to.not.be.reverted // Second call should succeed (not reentrant)
         }
         return originalSubmitAttestation.apply(qcQCReserveLedger, args)
@@ -247,7 +260,10 @@ describe("Security Integration Tests", () => {
       // Execute attestation
       await qcQCReserveLedger
         .connect(fixture.watchdog)
-        .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("5500"))
+        .submitReserveAttestation(
+          qcAddress.address,
+          ethers.utils.parseEther("5500")
+        )
 
       expect(callbackExecuted).to.be.true
     })
@@ -257,23 +273,33 @@ describe("Security Integration Tests", () => {
     it("should prevent privilege escalation through role manipulation", async () => {
       // Attacker tries to grant themselves admin role
       await expect(
-        qcManager.connect(attacker).grantRole(ROLES.DEFAULT_ADMIN_ROLE, attacker.address)
+        qcManager
+          .connect(attacker)
+          .grantRole(ROLES.DEFAULT_ADMIN_ROLE, attacker.address)
       ).to.be.revertedWith("AccessControl")
 
       // Attacker tries to grant themselves QC admin role
       await expect(
-        qcManager.connect(attacker).grantRole(ROLES.QC_ADMIN_ROLE, attacker.address)
+        qcManager
+          .connect(attacker)
+          .grantRole(ROLES.QC_ADMIN_ROLE, attacker.address)
       ).to.be.revertedWith("AccessControl")
 
       // Attacker tries to grant themselves registrar role
       await expect(
-        qcManager.connect(attacker).grantRole(ROLES.REGISTRAR_ROLE, attacker.address)
+        qcManager
+          .connect(attacker)
+          .grantRole(ROLES.REGISTRAR_ROLE, attacker.address)
       ).to.be.revertedWith("AccessControl")
 
       // Verify attacker has no elevated privileges
-      expect(await qcManager.hasRole(ROLES.DEFAULT_ADMIN_ROLE, attacker.address)).to.be.false
-      expect(await qcManager.hasRole(ROLES.QC_ADMIN_ROLE, attacker.address)).to.be.false
-      expect(await qcManager.hasRole(ROLES.REGISTRAR_ROLE, attacker.address)).to.be.false
+      expect(
+        await qcManager.hasRole(ROLES.DEFAULT_ADMIN_ROLE, attacker.address)
+      ).to.be.false
+      expect(await qcManager.hasRole(ROLES.QC_ADMIN_ROLE, attacker.address)).to
+        .be.false
+      expect(await qcManager.hasRole(ROLES.REGISTRAR_ROLE, attacker.address)).to
+        .be.false
     })
 
     it("should prevent unauthorized contract interactions", async () => {
@@ -283,18 +309,25 @@ describe("Security Integration Tests", () => {
       ).to.be.revertedWith("AccessControl")
 
       await expect(
-        qcData.connect(attacker).setQCStatus(qcAddress.address, QCStatus.Revoked)
+        qcData
+          .connect(attacker)
+          .setQCStatus(qcAddress.address, QCStatus.Revoked)
       ).to.be.revertedWith("AccessControl")
 
       await expect(
-        qcData.connect(attacker).updateQCMintedAmount(qcAddress.address, LARGE_AMOUNT)
+        qcData
+          .connect(attacker)
+          .updateQCMintedAmount(qcAddress.address, LARGE_AMOUNT)
       ).to.be.revertedWith("AccessControl")
 
       // Attacker tries to manipulate reserve ledger
       await expect(
         qcQCReserveLedger
           .connect(attacker)
-          .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("99999"))
+          .submitReserveAttestation(
+            qcAddress.address,
+            ethers.utils.parseEther("99999")
+          )
       ).to.be.revertedWith("AccessControl")
     })
 
@@ -320,13 +353,17 @@ describe("Security Integration Tests", () => {
       const proposalId = event?.args?.proposalId
 
       // Compromised watchdog votes
-      await watchdogConsensusManager.connect(compromisedWatchdog).vote(proposalId)
+      await watchdogConsensusManager
+        .connect(compromisedWatchdog)
+        .vote(proposalId)
 
       // Honest watchdogs don't vote - proposal fails
       await helpers.time.increase(7200 + 1) // Past voting period
 
       await expect(
-        watchdogConsensusManager.connect(compromisedWatchdog).executeProposal(proposalId)
+        watchdogConsensusManager
+          .connect(compromisedWatchdog)
+          .executeProposal(proposalId)
       ).to.be.revertedWith("ProposalNotApproved")
     })
   })
@@ -334,7 +371,9 @@ describe("Security Integration Tests", () => {
   describe("Economic Attack Scenarios", () => {
     beforeEach(async () => {
       // Setup successful minting for legitimate user
-      tbtc.balanceOf.whenCalledWith(legitimateUser.address).returns(MEDIUM_AMOUNT)
+      tbtc.balanceOf
+        .whenCalledWith(legitimateUser.address)
+        .returns(MEDIUM_AMOUNT)
       await basicMintingPolicy.executeMint(
         legitimateUser.address,
         qcAddress.address,
@@ -352,7 +391,9 @@ describe("Security Integration Tests", () => {
         .initiateRedemption(qcAddress.address, SMALL_AMOUNT, userBtcAddress)
 
       // Check balance after redemption
-      tbtc.balanceOf.whenCalledWith(legitimateUser.address).returns(MEDIUM_AMOUNT.sub(SMALL_AMOUNT))
+      tbtc.balanceOf
+        .whenCalledWith(legitimateUser.address)
+        .returns(MEDIUM_AMOUNT.sub(SMALL_AMOUNT))
 
       // Attacker tries to redeem more than remaining balance
       await expect(
@@ -363,7 +404,7 @@ describe("Security Integration Tests", () => {
 
       // Attacker tries to manipulate balance check
       tbtc.balanceOf.whenCalledWith(attacker.address).returns(LARGE_AMOUNT)
-      
+
       await expect(
         qcRedeemer
           .connect(attacker)
@@ -393,7 +434,9 @@ describe("Security Integration Tests", () => {
 
       // Attacker tries to manipulate capacity through direct contract calls
       await expect(
-        qcData.connect(attacker).updateQCCapacity(qcAddress.address, LARGE_AMOUNT.mul(10))
+        qcData
+          .connect(attacker)
+          .updateQCCapacity(qcAddress.address, LARGE_AMOUNT.mul(10))
       ).to.be.revertedWith("AccessControl")
     })
 
@@ -402,26 +445,34 @@ describe("Security Integration Tests", () => {
       await expect(
         qcQCReserveLedger
           .connect(attacker)
-          .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("99999"))
+          .submitReserveAttestation(
+            qcAddress.address,
+            ethers.utils.parseEther("99999")
+          )
       ).to.be.revertedWith("AccessControl")
 
       // Even with accomplice who has attester role
       await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, accomplice.address)
-      
+
       // Accomplice submits inflated reserves
       await qcQCReserveLedger
         .connect(accomplice)
-        .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("50000"))
+        .submitReserveAttestation(
+          qcAddress.address,
+          ethers.utils.parseEther("50000")
+        )
 
       // But other attesters can contradict with real values
       await qcQCReserveLedger
         .connect(fixture.watchdog)
-        .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("5000"))
+        .submitReserveAttestation(
+          qcAddress.address,
+          ethers.utils.parseEther("5000")
+        )
 
       // System should use most recent or consensus value
-      const [currentReserves] = await qcQCReserveLedger.getReserveBalanceAndStaleness(
-        qcAddress.address
-      )
+      const [currentReserves] =
+        await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
       expect(currentReserves).to.equal(ethers.utils.parseEther("5000"))
     })
   })
@@ -497,16 +548,26 @@ describe("Security Integration Tests", () => {
         .createProposal(0, legitimateProposalData, "Legitimate concern")
 
       const legitimateReceipt = await legitimateTx.wait()
-      const legitimateEvent = legitimateReceipt.events?.find((e) => e.event === "ProposalCreated")
+      const legitimateEvent = legitimateReceipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )
       const legitimateProposalId = legitimateEvent?.args?.proposalId
 
       // Honest watchdogs vote on legitimate proposal
-      await watchdogConsensusManager.connect(watchdog1).vote(legitimateProposalId)
-      await watchdogConsensusManager.connect(watchdog2).vote(legitimateProposalId)
-      await watchdogConsensusManager.connect(watchdog1).executeProposal(legitimateProposalId)
+      await watchdogConsensusManager
+        .connect(watchdog1)
+        .vote(legitimateProposalId)
+      await watchdogConsensusManager
+        .connect(watchdog2)
+        .vote(legitimateProposalId)
+      await watchdogConsensusManager
+        .connect(watchdog1)
+        .executeProposal(legitimateProposalId)
 
       // Legitimate proposal succeeds while spam fails
-      expect(await qcData.getQCStatus(qcAddress.address)).to.equal(QCStatus.UnderReview)
+      expect(await qcData.getQCStatus(qcAddress.address)).to.equal(
+        QCStatus.UnderReview
+      )
     })
 
     it("should prevent vote timing manipulation attacks", async () => {
@@ -529,7 +590,9 @@ describe("Security Integration Tests", () => {
       await helpers.time.increase(votingPeriod.sub(10)) // 10 seconds before deadline
 
       // Vote at last second
-      await watchdogConsensusManager.connect(compromisedWatchdog).vote(proposalId)
+      await watchdogConsensusManager
+        .connect(compromisedWatchdog)
+        .vote(proposalId)
 
       // Advance past deadline
       await helpers.time.increase(20)
@@ -541,7 +604,9 @@ describe("Security Integration Tests", () => {
 
       // Try to execute with insufficient votes
       await expect(
-        watchdogConsensusManager.connect(compromisedWatchdog).executeProposal(proposalId)
+        watchdogConsensusManager
+          .connect(compromisedWatchdog)
+          .executeProposal(proposalId)
       ).to.be.revertedWith("ProposalNotApproved")
     })
   })
@@ -584,7 +649,10 @@ describe("Security Integration Tests", () => {
       })
 
       // If somehow the malicious contract was installed
-      await protocolRegistry.setService(SERVICE_KEYS.QC_DATA, maliciousQcData.address)
+      await protocolRegistry.setService(
+        SERVICE_KEYS.QC_DATA,
+        maliciousQcData.address
+      )
 
       // Operations should still be protected against reentrancy
       await basicMintingPolicy.canMint(
@@ -612,7 +680,8 @@ describe("Security Integration Tests", () => {
         .submitCriticalReport(qcAddress.address, "Fake critical issue 1")
 
       // Only 1 report - no emergency triggered
-      expect(await watchdogMonitor.isEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await watchdogMonitor.isEmergencyPaused(qcAddress.address)).to.be
+        .false
 
       // Honest watchdogs don't submit false reports
       // System remains operational
@@ -626,29 +695,31 @@ describe("Security Integration Tests", () => {
 
     it("should prevent emergency system lockdown attacks", async () => {
       // Even if attacker triggers emergency, governance can clear it
-      
+
       // Simulate compromised watchdogs submitting false reports
       await watchdogMonitor
         .connect(compromisedWatchdog)
         .submitCriticalReport(qcAddress.address, "False critical 1")
-      
+
       await watchdogMonitor
         .connect(watchdog1)
         .submitCriticalReport(qcAddress.address, "False critical 2")
-      
+
       await watchdogMonitor
         .connect(watchdog2)
         .submitCriticalReport(qcAddress.address, "False critical 3")
 
       // Emergency triggered
-      expect(await watchdogMonitor.isEmergencyPaused(qcAddress.address)).to.be.true
+      expect(await watchdogMonitor.isEmergencyPaused(qcAddress.address)).to.be
+        .true
 
       // Governance can clear false emergency
       await watchdogMonitor
         .connect(governance)
         .clearEmergencyPause(qcAddress.address)
 
-      expect(await watchdogMonitor.isEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await watchdogMonitor.isEmergencyPaused(qcAddress.address)).to.be
+        .false
 
       // Operations resume
       const canMint = await basicMintingPolicy.canMint(
@@ -668,7 +739,9 @@ describe("Security Integration Tests", () => {
       ).to.be.revertedWith("AccessControl")
 
       await expect(
-        qcData.connect(attacker).setQCStatus(qcAddress.address, QCStatus.Revoked)
+        qcData
+          .connect(attacker)
+          .setQCStatus(qcAddress.address, QCStatus.Revoked)
       ).to.be.revertedWith("AccessControl")
 
       // Attacker tries to corrupt reserve data
@@ -679,7 +752,9 @@ describe("Security Integration Tests", () => {
       ).to.be.revertedWith("AccessControl")
 
       // Verify system state remains intact
-      expect(await qcData.getQCStatus(qcAddress.address)).to.equal(QCStatus.Active)
+      expect(await qcData.getQCStatus(qcAddress.address)).to.equal(
+        QCStatus.Active
+      )
       expect(await qcData.isQCRegistered(qcAddress.address)).to.be.true
     })
 
@@ -690,7 +765,10 @@ describe("Security Integration Tests", () => {
       // Submit attestation
       await qcQCReserveLedger
         .connect(fixture.watchdog)
-        .submitReserveAttestation(qcAddress.address, ethers.utils.parseEther("5100"))
+        .submitReserveAttestation(
+          qcAddress.address,
+          ethers.utils.parseEther("5100")
+        )
 
       // Advance time to make attestation stale
       await helpers.time.increase(86400 + 1) // 24 hours + 1 second
@@ -745,19 +823,24 @@ describe("Security Integration Tests", () => {
       ).to.be.reverted // Should fail
 
       // DEFENSE: Honest actors prevent attack success
-      
+
       // Honest watchdogs don't vote on malicious proposal
       await helpers.time.increase(7200 + 1) // Past voting period
-      
+
       await expect(
-        watchdogConsensusManager.connect(compromisedWatchdog).executeProposal(proposalId)
+        watchdogConsensusManager
+          .connect(compromisedWatchdog)
+          .executeProposal(proposalId)
       ).to.be.revertedWith("ProposalNotApproved")
 
       // Only 1 false report - no emergency
-      expect(await watchdogMonitor.isEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await watchdogMonitor.isEmergencyPaused(qcAddress.address)).to.be
+        .false
 
       // Economic attack failed
-      expect(await qcData.getQCStatus(qcAddress.address)).to.equal(QCStatus.Active)
+      expect(await qcData.getQCStatus(qcAddress.address)).to.equal(
+        QCStatus.Active
+      )
 
       // System remains operational for legitimate users
       const canMint = await basicMintingPolicy.canMint(
@@ -770,11 +853,13 @@ describe("Security Integration Tests", () => {
 
     it("should maintain security under degraded conditions", async () => {
       // SCENARIO: Multiple attack vectors with partial success
-      
+
       // 1. One watchdog compromised (already set up)
       // 2. System under stress with multiple users
-      
-      tbtc.balanceOf.whenCalledWith(legitimateUser.address).returns(MEDIUM_AMOUNT)
+
+      tbtc.balanceOf
+        .whenCalledWith(legitimateUser.address)
+        .returns(MEDIUM_AMOUNT)
       await basicMintingPolicy.executeMint(
         legitimateUser.address,
         qcAddress.address,
@@ -785,13 +870,14 @@ describe("Security Integration Tests", () => {
       await watchdogMonitor
         .connect(compromisedWatchdog)
         .submitCriticalReport(qcAddress.address, "Compromised report 1")
-      
+
       await watchdogMonitor
         .connect(watchdog1)
         .submitCriticalReport(qcAddress.address, "Legitimate concern")
 
       // 4. System degraded but still functional
-      expect(await watchdogMonitor.isEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await watchdogMonitor.isEmergencyPaused(qcAddress.address)).to.be
+        .false
 
       // 5. Legitimate operations continue to work
       await qcRedeemer
@@ -811,7 +897,9 @@ describe("Security Integration Tests", () => {
       expect(canMintLarge).to.be.false // Even if they had legitimate access
 
       // 7. Governance can intervene if needed
-      if (await watchdogMonitor.getRecentReportCount(qcAddress.address) >= 2) {
+      if (
+        (await watchdogMonitor.getRecentReportCount(qcAddress.address)) >= 2
+      ) {
         // High alert mode - governance review recommended
         expect(true).to.be.true // System properly flags high-risk conditions
       }

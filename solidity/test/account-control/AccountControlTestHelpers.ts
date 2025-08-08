@@ -40,7 +40,9 @@ export const SERVICE_KEYS = {
   TBTC_TOKEN: ethers.utils.id("TBTC_TOKEN"),
   SPV_VALIDATOR: ethers.utils.id("SPV_VALIDATOR"),
   // Automated Decision Framework services
-  WATCHDOG_AUTOMATED_ENFORCEMENT: ethers.utils.id("WATCHDOG_AUTOMATED_ENFORCEMENT"),
+  WATCHDOG_AUTOMATED_ENFORCEMENT: ethers.utils.id(
+    "WATCHDOG_AUTOMATED_ENFORCEMENT"
+  ),
   WATCHDOG_THRESHOLD_ACTIONS: ethers.utils.id("WATCHDOG_THRESHOLD_ACTIONS"),
   WATCHDOG_DAO_ESCALATION: ethers.utils.id("WATCHDOG_DAO_ESCALATION"),
 }
@@ -224,18 +226,18 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   )
   await qcWatchdog.deployed()
 
-
   // Deploy Automated Decision Framework contracts
   const WatchdogAutomatedEnforcementFactory = await ethers.getContractFactory(
     "WatchdogAutomatedEnforcement"
   )
-  const watchdogAutomatedEnforcement = await WatchdogAutomatedEnforcementFactory.deploy(
-    qcManager.address,
-    qcRedeemer.address,
-    qcData.address,
-    systemState.address,
-    qcReserveLedger.address
-  )
+  const watchdogAutomatedEnforcement =
+    await WatchdogAutomatedEnforcementFactory.deploy(
+      qcManager.address,
+      qcRedeemer.address,
+      qcData.address,
+      systemState.address,
+      qcReserveLedger.address
+    )
   await watchdogAutomatedEnforcement.deployed()
 
   const WatchdogThresholdActionsFactory = await ethers.getContractFactory(
@@ -293,7 +295,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     qcWatchdog.address
   )
   await protocolRegistry.setService(SERVICE_KEYS.TBTC_TOKEN, tbtc.address)
-  
+
   // Register Automated Decision Framework services
   await protocolRegistry.setService(
     SERVICE_KEYS.WATCHDOG_AUTOMATED_ENFORCEMENT,
@@ -318,16 +320,31 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
 
   // Grant roles for Automated Decision Framework
   await reserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
-  await watchdogThresholdActions.grantRole(ROLES.WATCHDOG_ROLE, watchdog.address)
-  await watchdogDAOEscalation.grantRole(ROLES.ESCALATOR_ROLE, watchdogThresholdActions.address)
-  await systemState.grantRole(ROLES.PAUSER_ROLE, watchdogThresholdActions.address)
-  
+  await watchdogThresholdActions.grantRole(
+    ROLES.WATCHDOG_ROLE,
+    watchdog.address
+  )
+  await watchdogDAOEscalation.grantRole(
+    ROLES.ESCALATOR_ROLE,
+    watchdogThresholdActions.address
+  )
+  await systemState.grantRole(
+    ROLES.PAUSER_ROLE,
+    watchdogThresholdActions.address
+  )
+
   // Connect ThresholdActions to DAO Escalation
   await watchdogThresholdActions.setDAOEscalation(watchdogDAOEscalation.address)
-  
+
   // Grant automated enforcement permissions
-  await qcManager.grantRole(ROLES.ARBITER_ROLE, watchdogAutomatedEnforcement.address)
-  await qcRedeemer.grantRole(ROLES.ARBITER_ROLE, watchdogAutomatedEnforcement.address)
+  await qcManager.grantRole(
+    ROLES.ARBITER_ROLE,
+    watchdogAutomatedEnforcement.address
+  )
+  await qcRedeemer.grantRole(
+    ROLES.ARBITER_ROLE,
+    watchdogAutomatedEnforcement.address
+  )
 
   // Transfer ownership of TBTC to the BasicMintingPolicy for minting
   await tbtc.transferOwnership(basicMintingPolicy.address)
@@ -436,7 +453,9 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
   await tbtc.deployed()
 
   // Deploy mock SPV validator for security tests
-  const MockSPVValidatorFactory = await ethers.getContractFactory("MockSPVValidator")
+  const MockSPVValidatorFactory = await ethers.getContractFactory(
+    "MockSPVValidator"
+  )
   const mockSpvValidator = await MockSPVValidatorFactory.deploy()
   await mockSpvValidator.deployed()
 

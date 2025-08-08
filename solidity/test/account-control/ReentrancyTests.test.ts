@@ -225,7 +225,13 @@ describe("Advanced Reentrancy Tests", () => {
       })
 
       it("should prevent reentrancy during service lookups", async () => {
-        const { qcMinter, qcAddress, basicMintingPolicy, qcReserveLedger, qcData } = fixture
+        const {
+          qcMinter,
+          qcAddress,
+          basicMintingPolicy,
+          qcReserveLedger,
+          qcData,
+        } = fixture
 
         // QC is already registered via setupQCWithWallets in beforeEach
 
@@ -240,7 +246,7 @@ describe("Advanced Reentrancy Tests", () => {
         // Ensure QC has sufficient reserves for minting capacity
         const ATTESTER_ROLE = await qcReserveLedger.ATTESTER_ROLE()
         await qcReserveLedger.grantRole(ATTESTER_ROLE, fixture.deployer.address)
-        
+
         await qcReserveLedger.submitAttestation(
           qcAddress.address,
           TEST_DATA.AMOUNTS.RESERVE_BALANCE
@@ -314,8 +320,7 @@ describe("Advanced Reentrancy Tests", () => {
         const reserveBalance = TEST_DATA.AMOUNTS.RESERVE_BALANCE
 
         // Grant WATCHDOG_OPERATOR_ROLE to watchdog
-        const WATCHDOG_OPERATOR_ROLE =
-          await qcWatchdog.WATCHDOG_OPERATOR_ROLE()
+        const WATCHDOG_OPERATOR_ROLE = await qcWatchdog.WATCHDOG_OPERATOR_ROLE()
         await qcWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
         // Attestation should not allow reentrancy to other watchdog functions
@@ -337,8 +342,7 @@ describe("Advanced Reentrancy Tests", () => {
         const testReason = ethers.utils.id("TEST_REASON")
 
         // Grant WATCHDOG_OPERATOR_ROLE to watchdog
-        const WATCHDOG_OPERATOR_ROLE =
-          await qcWatchdog.WATCHDOG_OPERATOR_ROLE()
+        const WATCHDOG_OPERATOR_ROLE = await qcWatchdog.WATCHDOG_OPERATOR_ROLE()
         await qcWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
         // Different watchdog roles should not allow reentrancy between each other
@@ -408,7 +412,13 @@ describe("Advanced Reentrancy Tests", () => {
         // multiple malicious contracts creating reentrancy chains
 
         // For now, verify that basic operations don't allow reentrancy
-        const { qcMinter, qcAddress, basicMintingPolicy, qcReserveLedger, qcData } = fixture
+        const {
+          qcMinter,
+          qcAddress,
+          basicMintingPolicy,
+          qcReserveLedger,
+          qcData,
+        } = fixture
 
         // QC is already registered via setupQCWithWallets in beforeEach
 
@@ -423,7 +433,7 @@ describe("Advanced Reentrancy Tests", () => {
         // Ensure QC has sufficient reserves
         const ATTESTER_ROLE = await qcReserveLedger.ATTESTER_ROLE()
         await qcReserveLedger.grantRole(ATTESTER_ROLE, fixture.deployer.address)
-        
+
         await qcReserveLedger.submitAttestation(
           qcAddress.address,
           TEST_DATA.AMOUNTS.RESERVE_BALANCE
@@ -528,8 +538,11 @@ describe("Advanced Reentrancy Tests", () => {
           )
         const receipt = await tx.wait()
         // Find the RedemptionRequested event
-        const event = receipt.events?.find(e => e.event === 'RedemptionRequested')
-        const redemptionId = event?.args?.redemptionId || ethers.utils.id("test_redemption_2")
+        const event = receipt.events?.find(
+          (e) => e.event === "RedemptionRequested"
+        )
+        const redemptionId =
+          event?.args?.redemptionId || ethers.utils.id("test_redemption_2")
 
         // Grant ARBITER_ROLE to attacker
         const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
@@ -549,13 +562,19 @@ describe("Advanced Reentrancy Tests", () => {
           mockSpvData.txInfo,
           mockSpvData.proof
         )
-        
+
         // Verify attack was attempted
         expect(await maliciousPolicy.attackCount()).to.be.gt(0)
       })
 
       it("should prevent reentrancy in BasicRedemptionPolicy.recordFulfillment", async () => {
-        const { basicRedemptionPolicy, qcAddress, tbtc, qcData, qcReserveLedger } = fixture
+        const {
+          basicRedemptionPolicy,
+          qcAddress,
+          tbtc,
+          qcData,
+          qcReserveLedger,
+        } = fixture
 
         // Deploy reentrancy attacker
         const ReentrancyAttacker = await ethers.getContractFactory(
@@ -616,7 +635,13 @@ describe("Advanced Reentrancy Tests", () => {
 
       it("should test gas limit based reentrancy protection", async () => {
         // Test that functions consume enough gas to prevent certain reentrancy attacks
-        const { basicMintingPolicy, qcMinter, qcAddress, qcReserveLedger, qcData } = fixture
+        const {
+          basicMintingPolicy,
+          qcMinter,
+          qcAddress,
+          qcReserveLedger,
+          qcData,
+        } = fixture
 
         // QC is already registered via setupQCWithWallets in beforeEach
 
@@ -631,7 +656,7 @@ describe("Advanced Reentrancy Tests", () => {
         // Ensure QC has sufficient reserves
         const ATTESTER_ROLE = await qcReserveLedger.ATTESTER_ROLE()
         await qcReserveLedger.grantRole(ATTESTER_ROLE, fixture.deployer.address)
-        
+
         // Submit a fresh attestation to ensure it's not stale
         await qcReserveLedger.submitAttestation(
           qcAddress.address,

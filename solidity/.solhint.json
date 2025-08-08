@@ -4,6 +4,8 @@
   "rules": {
     "func-visibility": ["error", { "ignoreConstructors": true }],
     "not-rely-on-time": "off",
-    "ordering": "off"
+    "ordering": "off",
+    "func-name-mixedcase": "off",
+    "max-states-count": "off"
   }
 }

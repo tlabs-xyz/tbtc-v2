@@ -40,7 +40,7 @@ export interface IntegrationTestContext {
   watchdog1: SignerWithAddress
   watchdog2: SignerWithAddress
   watchdog3: SignerWithAddress
-  
+
   // Core contracts
   protocolRegistry: ProtocolRegistry
   qcManager: QCManager
@@ -54,11 +54,11 @@ export interface IntegrationTestContext {
   systemState: SystemState
   tbtc: TBTC
   mockSpvValidator: FakeContract<SPVValidator>
-  
+
   // V1 contracts
   watchdogMonitor: WatchdogMonitor
   watchdogConsensusManager: WatchdogConsensusManager
-  
+
   // V2 contracts (optional)
   bank?: Bank
   vault?: TBTCVault
@@ -82,7 +82,7 @@ export async function setupIntegrationTest(
 
   // Deploy base fixture
   const fixture = await deployAccountControlFixture()
-  
+
   // Deploy V1 consensus contracts
   const WatchdogConsensusManagerFactory = await ethers.getContractFactory(
     "WatchdogConsensusManager"
@@ -107,7 +107,7 @@ export async function setupIntegrationTest(
   const mockSpvValidator = await smock.fake<SPVValidator>("SPVValidator")
   mockSpvValidator.verifyWalletControl.returns(true)
   mockSpvValidator.verifyRedemptionFulfillment.returns(true)
-  
+
   await fixture.protocolRegistry.setService(
     SERVICE_KEYS.SPV_VALIDATOR,
     mockSpvValidator.address
@@ -171,7 +171,7 @@ async function setupWatchdogRoles(
     await watchdogConsensusManager.MANAGER_ROLE(),
     governance.address
   )
-  
+
   for (const watchdog of watchdogs) {
     await watchdogConsensusManager
       .connect(governance)
@@ -196,7 +196,7 @@ async function setupWatchdogRoles(
         watchdogs[i].address,
         `Watchdog${i + 1}`
       )
-    
+
     await watchdogMonitor
       .connect(governance)
       .grantRole(
@@ -232,8 +232,11 @@ export async function setupQCForTesting(
   reserveBalance: string
 ) {
   // Register QC
-  await context.qcData.registerQC(qcAddress, ethers.utils.parseEther(initialCapacity))
-  
+  await context.qcData.registerQC(
+    qcAddress,
+    ethers.utils.parseEther(initialCapacity)
+  )
+
   // Register wallet with SPV proof
   const { challenge, txInfo, proof } = createMockSpvData()
   const encodedProof = ethers.utils.defaultAbiCoder.encode(
@@ -256,7 +259,10 @@ export async function setupQCForTesting(
   // Submit reserve attestation
   await context.qcReserveLedger
     .connect(context.watchdog1)
-    .submitReserveAttestation(qcAddress, ethers.utils.parseEther(reserveBalance))
+    .submitReserveAttestation(
+      qcAddress,
+      ethers.utils.parseEther(reserveBalance)
+    )
 }
 
 export async function createAndExecuteProposal(
@@ -280,7 +286,9 @@ export async function createAndExecuteProposal(
   }
 
   // Execute proposal
-  await context.watchdogConsensusManager.connect(voters[0]).executeProposal(proposalId)
+  await context.watchdogConsensusManager
+    .connect(voters[0])
+    .executeProposal(proposalId)
 
   return proposalId
 }

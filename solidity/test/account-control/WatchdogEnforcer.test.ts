@@ -96,9 +96,7 @@ describe("WatchdogEnforcer", () => {
       expect(await watchdogEnforcer.reserveLedger()).to.equal(
         mockQcReserveLedger.address
       )
-      expect(await watchdogEnforcer.qcManager()).to.equal(
-        mockQcManager.address
-      )
+      expect(await watchdogEnforcer.qcManager()).to.equal(mockQcManager.address)
       expect(await watchdogEnforcer.qcData()).to.equal(mockQcData.address)
       expect(await watchdogEnforcer.systemState()).to.equal(
         mockSystemState.address
@@ -333,7 +331,7 @@ describe("WatchdogEnforcer", () => {
         // The WatchdogEnforcer uses nonReentrant modifier
         // This test verifies the modifier is present by checking that
         // the function executes successfully when called normally
-        
+
         // Setup violation
         mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
           reserveBalance,
@@ -347,7 +345,7 @@ describe("WatchdogEnforcer", () => {
             STALE_ATTESTATIONS
           )
         ).to.not.be.reverted
-        
+
         // Verify requestStatusChange was called once
         expect(mockQcManager.requestStatusChange).to.have.been.calledOnce
       })
@@ -400,7 +398,9 @@ describe("WatchdogEnforcer", () => {
         )
 
         expect(violated).to.be.false
-        expect(reason).to.equal("Reserves are stale, cannot determine violation")
+        expect(reason).to.equal(
+          "Reserves are stale, cannot determine violation"
+        )
       })
     })
 

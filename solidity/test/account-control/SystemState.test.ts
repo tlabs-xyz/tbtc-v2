@@ -917,11 +917,21 @@ describe("SystemState", () => {
           // Verify events
           await expect(tx)
             .to.emit(systemState, "QCEmergencyPaused")
-            .withArgs(testQC, pauserAccount.address, currentBlock.timestamp, testReason)
+            .withArgs(
+              testQC,
+              pauserAccount.address,
+              currentBlock.timestamp,
+              testReason
+            )
 
           await expect(tx)
             .to.emit(systemState, "EmergencyActionTaken")
-            .withArgs(testQC, ethers.utils.formatBytes32String("QC_EMERGENCY_PAUSE"), pauserAccount.address, currentBlock.timestamp)
+            .withArgs(
+              testQC,
+              ethers.utils.formatBytes32String("QC_EMERGENCY_PAUSE"),
+              pauserAccount.address,
+              currentBlock.timestamp
+            )
         })
 
         it("should handle different reason codes", async () => {
@@ -930,18 +940,25 @@ describe("SystemState", () => {
             ethers.utils.id("STALE_ATTESTATION"),
             ethers.utils.id("COMPLIANCE_VIOLATION"),
             ethers.utils.id("SECURITY_INCIDENT"),
-            ethers.utils.id("TECHNICAL_FAILURE")
+            ethers.utils.id("TECHNICAL_FAILURE"),
           ]
 
           for (const reason of reasons) {
             const qc = ethers.Wallet.createRandom().address
-            
-            const tx = await systemState.connect(pauserAccount).emergencyPauseQC(qc, reason)
+
+            const tx = await systemState
+              .connect(pauserAccount)
+              .emergencyPauseQC(qc, reason)
             const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
-            
+
             await expect(tx)
               .to.emit(systemState, "QCEmergencyPaused")
-              .withArgs(qc, pauserAccount.address, currentBlock.timestamp, reason)
+              .withArgs(
+                qc,
+                pauserAccount.address,
+                currentBlock.timestamp,
+                reason
+              )
 
             expect(await systemState.isQCEmergencyPaused(qc)).to.be.true
           }
@@ -1032,7 +1049,12 @@ describe("SystemState", () => {
 
           await expect(tx)
             .to.emit(systemState, "EmergencyActionTaken")
-            .withArgs(testQC, ethers.utils.formatBytes32String("QC_EMERGENCY_UNPAUSE"), pauserAccount.address, currentBlock.timestamp)
+            .withArgs(
+              testQC,
+              ethers.utils.formatBytes32String("QC_EMERGENCY_UNPAUSE"),
+              pauserAccount.address,
+              currentBlock.timestamp
+            )
         })
 
         it("should allow QC to be paused and unpaused multiple times", async () => {
@@ -1101,21 +1123,21 @@ describe("SystemState", () => {
 
       describe("isQCEmergencyPauseExpired", () => {
         it("should return false for non-paused QC", async () => {
-          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.false
+          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be
+            .false
         })
 
         it("should return false for recently paused QC", async () => {
           await systemState
             .connect(pauserAccount)
             .emergencyPauseQC(testQC, testReason)
-          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.false
+          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be
+            .false
         })
 
         it("should return true after emergency pause duration", async () => {
           // Set a short emergency pause duration for testing
-          await systemState
-            .connect(adminAccount)
-            .setEmergencyPauseDuration(1) // 1 second
+          await systemState.connect(adminAccount).setEmergencyPauseDuration(1) // 1 second
 
           await systemState
             .connect(pauserAccount)
@@ -1161,7 +1183,9 @@ describe("SystemState", () => {
 
         beforeEach(async () => {
           // Deploy a test contract that uses the modifier
-          const TestContract = await ethers.getContractFactory("TestEmergencyIntegration")
+          const TestContract = await ethers.getContractFactory(
+            "TestEmergencyIntegration"
+          )
           testContract = await TestContract.deploy(systemState.address)
           await testContract.deployed()
         })
@@ -1175,8 +1199,9 @@ describe("SystemState", () => {
             .connect(pauserAccount)
             .emergencyPauseQC(testQC, testReason)
 
-          await expect(testContract.testFunction(testQC))
-            .to.be.revertedWith("QCIsEmergencyPaused")
+          await expect(testContract.testFunction(testQC)).to.be.revertedWith(
+            "QCIsEmergencyPaused"
+          )
         })
 
         it("should allow function execution after QC is unpaused", async () => {
@@ -1194,7 +1219,7 @@ describe("SystemState", () => {
       describe("Unauthorized Pause Attempts", () => {
         it("should prevent non-authorized accounts from pausing", async () => {
           const attacker = thirdParty
-          
+
           await expect(
             systemState.connect(attacker).emergencyPauseQC(testQC, testReason)
           ).to.be.revertedWith("AccessControl: account")
@@ -1202,7 +1227,9 @@ describe("SystemState", () => {
 
         it("should prevent parameter admin from pausing without pauser role", async () => {
           await expect(
-            systemState.connect(adminAccount).emergencyPauseQC(testQC, testReason)
+            systemState
+              .connect(adminAccount)
+              .emergencyPauseQC(testQC, testReason)
           ).to.be.revertedWith("AccessControl: account")
         })
 
@@ -1212,7 +1239,9 @@ describe("SystemState", () => {
           await systemState.grantRole(PAUSER_ROLE, emergencyCouncil.address)
 
           await expect(
-            systemState.connect(emergencyCouncil).emergencyPauseQC(testQC, testReason)
+            systemState
+              .connect(emergencyCouncil)
+              .emergencyPauseQC(testQC, testReason)
           ).to.not.be.reverted
         })
       })
@@ -1245,17 +1274,17 @@ describe("SystemState", () => {
           await systemState
             .connect(pauserAccount)
             .emergencyPauseQC(testQC, testReason)
-          
+
           const pauseTimestamp1 = await systemState.getQCPauseTimestamp(testQC)
           expect(pauseTimestamp1).to.be.gt(0)
-          
+
           // Try to pause again (should fail)
           await expect(
             systemState
               .connect(pauserAccount)
               .emergencyPauseQC(testQC, testReason)
           ).to.be.revertedWith("QCIsEmergencyPaused")
-          
+
           // Verify timestamp didn't change
           const pauseTimestamp2 = await systemState.getQCPauseTimestamp(testQC)
           expect(pauseTimestamp2).to.equal(pauseTimestamp1)
@@ -1265,12 +1294,12 @@ describe("SystemState", () => {
           await systemState
             .connect(pauserAccount)
             .emergencyPauseQC(testQC, testReason)
-          
+
           expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
           expect(await systemState.getQCPauseTimestamp(testQC)).to.be.gt(0)
-          
+
           await systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
-          
+
           expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
           expect(await systemState.getQCPauseTimestamp(testQC)).to.equal(0)
         })
@@ -1283,7 +1312,7 @@ describe("SystemState", () => {
               .connect(pauserAccount)
               .emergencyPauseQC(testQC, testReason)
             expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
-            
+
             await systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
             expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
           }
@@ -1291,20 +1320,20 @@ describe("SystemState", () => {
 
         it("should handle pause expiry edge cases", async () => {
           // Set very short pause duration
-          await systemState
-            .connect(adminAccount)
-            .setEmergencyPauseDuration(2)
+          await systemState.connect(adminAccount).setEmergencyPauseDuration(2)
 
           await systemState
             .connect(pauserAccount)
             .emergencyPauseQC(testQC, testReason)
 
           // Check not expired initially
-          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.false
+          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be
+            .false
 
           // Fast forward to exactly expiry time (should still not be expired)
           await helpers.time.increaseTime(2)
-          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.false
+          expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be
+            .false
 
           // Fast forward past expiry time (should be expired)
           await helpers.time.increaseTime(1)
@@ -1324,7 +1353,7 @@ describe("SystemState", () => {
           qcs = [
             ethers.Wallet.createRandom().address,
             ethers.Wallet.createRandom().address,
-            ethers.Wallet.createRandom().address
+            ethers.Wallet.createRandom().address,
           ]
 
           // Pause all QCs
@@ -1375,7 +1404,7 @@ describe("SystemState", () => {
             .connect(pauserAccount)
             .emergencyPauseQC(testQC, testReason)
 
-          // Grant pauser role to new account  
+          // Grant pauser role to new account
           await systemState.grantRole(PAUSER_ROLE, newPauser.address)
 
           // New pauser should be able to unpause
@@ -1411,9 +1440,14 @@ describe("SystemState", () => {
           .emergencyPauseQC(testQC, testReason)
 
         // View functions should be very cheap
-        const gasUsed1 = await systemState.estimateGas.isQCEmergencyPaused(testQC)
-        const gasUsed2 = await systemState.estimateGas.getQCPauseTimestamp(testQC)
-        const gasUsed3 = await systemState.estimateGas.isQCEmergencyPauseExpired(testQC)
+        const gasUsed1 = await systemState.estimateGas.isQCEmergencyPaused(
+          testQC
+        )
+        const gasUsed2 = await systemState.estimateGas.getQCPauseTimestamp(
+          testQC
+        )
+        const gasUsed3 =
+          await systemState.estimateGas.isQCEmergencyPauseExpired(testQC)
 
         expect(gasUsed1).to.be.lt(30000)
         expect(gasUsed2).to.be.lt(30000)

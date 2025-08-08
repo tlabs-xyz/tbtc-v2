@@ -45,17 +45,20 @@ The tBTC v2 Account Control system implements a comprehensive security architect
 The system implements 17 distinct roles across 4 categories:
 
 #### 1. Administrative Roles
+
 - **DEFAULT_ADMIN_ROLE (0x00)**: Ultimate admin authority in all contracts
 - **PARAMETER_ADMIN_ROLE**: System parameter management
 - **MANAGER_ROLE**: Operational management and configuration
 
 #### 2. Operational Roles
+
 - **PAUSER_ROLE**: Emergency pause capabilities
 - **MINTER_ROLE**: Authorization to mint tBTC
 - **REDEEMER_ROLE**: Process redemption requests
 - **ARBITER_ROLE**: Handle disputes and full status changes
 
 #### 3. Watchdog Roles
+
 - **WATCHDOG_ROLE**: Participate in consensus voting
 - **WATCHDOG_OPERATOR_ROLE**: Individual watchdog operations
 - **WATCHDOG_ENFORCER_ROLE**: Limited enforcement (UnderReview only)
@@ -63,6 +66,7 @@ The system implements 17 distinct roles across 4 categories:
 - **REGISTRAR_ROLE**: Register Bitcoin wallets
 
 #### 4. QC Management Roles
+
 - **QC_ADMIN_ROLE**: QC administrative operations
 - **QC_MANAGER_ROLE**: Modify QC data
 - **QC_GOVERNANCE_ROLE**: QC governance decisions
@@ -71,25 +75,31 @@ The system implements 17 distinct roles across 4 categories:
 ### Critical Role Definitions
 
 #### ARBITER_ROLE
+
 **Purpose**: Authority for disputes and full status changes  
 **Capabilities**:
+
 - Change QC status (any valid transition)
 - Flag defaulted redemptions
 - Handle dispute resolution
 - Force consensus when needed
 
-**Holders**: 
+**Holders**:
+
 - Governance multisig
 - Emergency responders
 
 #### WATCHDOG_ENFORCER_ROLE
+
 **Purpose**: Limited enforcement authority for objective violations  
 **Capabilities**:
+
 - ONLY set QCs to UnderReview status
 - Cannot set Active or Revoked status
 - Used for automated enforcement
 
-**Holders**: 
+**Holders**:
+
 - WatchdogEnforcer contract (not individuals)
 
 ### Contract-Role Mapping
@@ -122,6 +132,7 @@ SystemState:
 **QCManager is the ONLY contract that can change QC status.**
 
 This centralized approach ensures:
+
 - Proper validation of state transitions
 - Consistent event emission
 - Authority checking
@@ -133,7 +144,7 @@ This centralized approach ensures:
 // FULL Authority - Can make any valid transition
 ARBITER_ROLE → setQCStatus(qc, newStatus, reason)
 
-// LIMITED Authority - Can only set to UnderReview  
+// LIMITED Authority - Can only set to UnderReview
 WATCHDOG_ENFORCER_ROLE → requestStatusChange(qc, UnderReview, reason)
 
 // INTERNAL Authority - Solvency checks
@@ -151,11 +162,12 @@ _executeStatusChange(qc, UnderReview, reason, "SOLVENCY_CHECK")
 ```
 
 #### Valid Transitions
+
 - **Active → UnderReview**: Temporary suspension (any authority)
 - **Active → Revoked**: Permanent termination (ARBITER only)
 - **UnderReview → Active**: Issues resolved (ARBITER only)
 - **UnderReview → Revoked**: Permanent termination (ARBITER only)
-- **Revoked → ***: No transitions (terminal state)
+- **Revoked → \***: No transitions (terminal state)
 
 ### Implementation Pattern
 
@@ -170,12 +182,12 @@ contract QCManager {
     ) private {
         // Centralized validation
         if (!qcData.isQCRegistered(qc)) revert QCNotRegistered(qc);
-        if (!_isValidStatusTransition(oldStatus, newStatus)) 
+        if (!_isValidStatusTransition(oldStatus, newStatus))
             revert InvalidStatusTransition(...);
-        
+
         // State change
         qcData.setQCStatus(qc, newStatus, reason);
-        
+
         // Event emission
         emit QCStatusChanged(...);
     }
@@ -193,6 +205,7 @@ The system implements automated enforcement for objective (machine-verifiable) v
 #### Current Violations
 
 1. **INSUFFICIENT_RESERVES**: QC reserves below 100% collateral ratio
+
    - Data Source: QCReserveLedger consensus + QCData minted amount
    - Validation: `reserves < (mintedAmount * minCollateralRatio()) / 100`
 
@@ -204,20 +217,20 @@ The system implements automated enforcement for objective (machine-verifiable) v
 
 ```solidity
 function enforceObjectiveViolation(address qc, bytes32 reasonCode) external {
-    // Validate objective violation
-    if (reasonCode != INSUFFICIENT_RESERVES && 
-        reasonCode != STALE_ATTESTATIONS) {
-        revert NotObjectiveViolation();
-    }
-    
-    // Check violation
-    (bool violated, string memory reason) = checkViolation(qc, reasonCode);
-    
-    // Execute enforcement
-    if (violated) {
-        qcManager.requestStatusChange(qc, UnderReview, reasonCode);
-    }
+  // Validate objective violation
+  if (reasonCode != INSUFFICIENT_RESERVES && reasonCode != STALE_ATTESTATIONS) {
+    revert NotObjectiveViolation();
+  }
+
+  // Check violation
+  (bool violated, string memory reason) = checkViolation(qc, reasonCode);
+
+  // Execute enforcement
+  if (violated) {
+    qcManager.requestStatusChange(qc, UnderReview, reasonCode);
+  }
 }
+
 ```
 
 ### Future Violation Expansion
@@ -225,10 +238,12 @@ function enforceObjectiveViolation(address qc, bytes32 reasonCode) external {
 The architecture supports 3-8 total objective violations:
 
 #### High Priority Additions
+
 - **ZERO_RESERVES_WITH_MINTED_TOKENS**: Critical safety check
 - **EMERGENCY_PAUSE_EXPIRED**: Automated cleanup of expired pauses
 
 #### Medium Priority Additions
+
 - **REDEMPTION_TIMEOUT_EXCEEDED**: Unfulfilled redemptions
 - **ATTESTATION_CONSENSUS_FAILURE**: Systemic attestation problems
 
@@ -238,13 +253,15 @@ The QCReserveLedger includes emergency consensus for deadlock situations:
 
 ```solidity
 function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) {
-    // Requires at least 1 valid attestation
-    // Uses median calculation
-    // Maintains Byzantine fault tolerance
+  // Requires at least 1 valid attestation
+  // Uses median calculation
+  // Maintains Byzantine fault tolerance
 }
+
 ```
 
 **Workflow**:
+
 1. Normal consensus fails (< 3 attestations)
 2. Reserves become stale after 24 hours
 3. Anyone triggers STALE_ATTESTATIONS violation
@@ -259,14 +276,17 @@ function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) {
 ### Critical Permission Dependencies
 
 1. **WatchdogEnforcer → QCManager**
+
    - Requires: WATCHDOG_ENFORCER_ROLE
    - Purpose: Set QCs to UnderReview
 
 2. **BasicMintingPolicy → Bank**
+
    - Requires: Authorization in `authorizedBalanceIncreasers`
    - Purpose: Mint tBTC tokens
 
 3. **QCManager → QCData**
+
    - Requires: QC_MANAGER_ROLE
    - Purpose: Modify QC storage
 
@@ -291,18 +311,20 @@ Attestations           Business Logic           Token Operations
 ### Development Guidelines
 
 1. **Checks-Effects-Interactions Pattern**
+
    ```solidity
    // 1. Checks
    require(valid, "Invalid");
-   
+
    // 2. Effects
    state = newState;
-   
+
    // 3. Interactions
    external.call();
    ```
 
 2. **Access Control Modifiers**
+
    ```solidity
    modifier onlyRole(bytes32 role) {
        require(hasRole(role, msg.sender), "Missing role");
@@ -317,11 +339,13 @@ Attestations           Business Logic           Token Operations
 ### Operational Security
 
 1. **Role Management**
+
    - Two-step role transfers
    - Regular role audits
    - Time-locked admin changes
 
 2. **Emergency Response**
+
    - Multiple PAUSER_ROLE holders
    - Clear pause procedures
    - Maximum pause durations (7 days)
@@ -334,12 +358,14 @@ Attestations           Business Logic           Token Operations
 ### Common Pitfalls to Avoid
 
 #### ❌ Direct State Modification
+
 ```solidity
 // DON'T: Bypass validation
 qcData.setQCStatus(qc, newStatus, reason);
 ```
 
 #### ❌ Multiple Authority Paths
+
 ```solidity
 // DON'T: Inconsistent validation
 if (hasRole(ROLE_A)) {
@@ -350,6 +376,7 @@ if (hasRole(ROLE_A)) {
 ```
 
 #### ❌ Missing Validation
+
 ```solidity
 // DON'T: No transition validation
 function setStatus(...) external {
@@ -364,16 +391,19 @@ function setStatus(...) external {
 ### Response Levels
 
 1. **Level 1: Automated Response**
+
    - Objective violations trigger UnderReview
    - No human intervention required
    - Example: Insufficient reserves
 
 2. **Level 2: Arbiter Intervention**
+
    - Human review of UnderReview QCs
    - Decision to restore or revoke
    - Example: Resolved collateral issues
 
 3. **Level 3: Emergency Pause**
+
    - System-wide or QC-specific pause
    - Maximum 7-day duration
    - Example: Critical vulnerability
@@ -395,11 +425,13 @@ Detection → Assessment → Response → Recovery
 ### Post-Incident Actions
 
 1. **Documentation**
+
    - Incident timeline
    - Actions taken
    - Lessons learned
 
 2. **System Updates**
+
    - Parameter adjustments
    - Role modifications
    - Process improvements
@@ -414,18 +446,21 @@ Detection → Assessment → Response → Recovery
 ## Security Audit Checklist
 
 ### Pre-Deployment
+
 - [ ] All roles properly configured
 - [ ] Cross-contract permissions verified
 - [ ] Emergency procedures documented
 - [ ] Monitoring systems operational
 
 ### Post-Deployment
+
 - [ ] Governance has all admin roles
 - [ ] Deployer privileges revoked
 - [ ] Event logs match expected state
 - [ ] Emergency contacts established
 
 ### Operational
+
 - [ ] Regular role audits performed
 - [ ] Violation monitoring active
 - [ ] Incident response tested

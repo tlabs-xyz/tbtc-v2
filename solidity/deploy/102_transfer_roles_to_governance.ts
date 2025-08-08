@@ -14,21 +14,28 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   // Check if governance is configured
   if (!governance || governance === deployer) {
     log("ERROR: No separate governance account configured!")
-    log("Please configure a governance account in hardhat config before running this script.")
+    log(
+      "Please configure a governance account in hardhat config before running this script."
+    )
     return
   }
 
-  log(`Transferring roles from deployer (${deployer}) to governance (${governance})...`)
+  log(
+    `Transferring roles from deployer (${deployer}) to governance (${governance})...`
+  )
   log("")
 
   // Step 1: Transfer QC_GOVERNANCE_ROLE in QCManager
   log("Step 1: Transferring QC_GOVERNANCE_ROLE in QCManager...")
   const QC_GOVERNANCE_ROLE = ethers.utils.id("QC_GOVERNANCE_ROLE")
-  
+
   // First check if governance already has the role
   const qcManager = await ethers.getContract("QCManager")
-  const governanceHasRole = await qcManager.hasRole(QC_GOVERNANCE_ROLE, governance)
-  
+  const governanceHasRole = await qcManager.hasRole(
+    QC_GOVERNANCE_ROLE,
+    governance
+  )
+
   if (!governanceHasRole) {
     await execute(
       "QCManager",
@@ -59,27 +66,29 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   // Step 2: Transfer DEFAULT_ADMIN_ROLE in all contracts
   log("")
   log("Step 2: Transferring DEFAULT_ADMIN_ROLE in all contracts...")
-  
+
   const contracts = [
     "QCManager",
     "QCData",
     "QCReserveLedger",
     "QCRedeemer",
     "SystemState",
-    "BasicMintingPolicy",
-    "BasicRedemptionPolicy",
-    "WatchdogConsensus",
+    "WatchdogEnforcer",
     "ProtocolRegistry",
-    "QCMinter"
+    "QCMinter",
   ]
 
-  const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000"
+  const DEFAULT_ADMIN_ROLE =
+    "0x0000000000000000000000000000000000000000000000000000000000000000"
 
   for (const contractName of contracts) {
     try {
       const contract = await ethers.getContract(contractName)
-      const governanceIsAdmin = await contract.hasRole(DEFAULT_ADMIN_ROLE, governance)
-      
+      const governanceIsAdmin = await contract.hasRole(
+        DEFAULT_ADMIN_ROLE,
+        governance
+      )
+
       if (!governanceIsAdmin) {
         log(`Granting DEFAULT_ADMIN_ROLE to governance in ${contractName}...`)
         await execute(
@@ -103,8 +112,11 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   log("Step 3: Transferring PAUSER_ROLE in SystemState...")
   const PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")
   const systemState = await ethers.getContract("SystemState")
-  const governanceHasPauserRole = await systemState.hasRole(PAUSER_ROLE, governance)
-  
+  const governanceHasPauserRole = await systemState.hasRole(
+    PAUSER_ROLE,
+    governance
+  )
+
   if (!governanceHasPauserRole) {
     await execute(
       "SystemState",
@@ -156,13 +168,15 @@ func.skip = async (hre: HardhatRuntimeEnvironment) => {
   // Skip this in test/development environments
   const { getNamedAccounts } = hre
   const { governance, deployer } = await getNamedAccounts()
-  
+
   // Skip if no separate governance account
   if (!governance || governance === deployer) {
-    console.log("Skipping role transfer: No separate governance account configured")
+    console.log(
+      "Skipping role transfer: No separate governance account configured"
+    )
     return true
   }
-  
+
   // Only run this script manually in production
   return process.env.TRANSFER_ROLES_TO_GOVERNANCE !== "true"
 }

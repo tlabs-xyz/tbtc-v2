@@ -88,7 +88,10 @@ describe("Consensus Failure Modes", () => {
     await watchdogMonitor.deployed()
 
     // Setup roles
-    await consensusManager.grantRole(ROLES.DEFAULT_ADMIN_ROLE, governance.address)
+    await consensusManager.grantRole(
+      ROLES.DEFAULT_ADMIN_ROLE,
+      governance.address
+    )
     await consensusManager
       .connect(governance)
       .grantRole(await consensusManager.MANAGER_ROLE(), governance.address)
@@ -114,9 +117,7 @@ describe("Consensus Failure Modes", () => {
     it("should handle (N-1)/3 Byzantine watchdogs", async () => {
       // With 5 watchdogs, can tolerate 1 Byzantine (5-1)/3 = 1.33 -> 1
       // Set required votes to 3 (majority)
-      await consensusManager
-        .connect(governance)
-        .updateConsensusParameters(3, 5)
+      await consensusManager.connect(governance).updateConsensusParameters(3, 5)
 
       // Create proposal
       const proposalData = ethers.utils.defaultAbiCoder.encode(
@@ -160,9 +161,7 @@ describe("Consensus Failure Modes", () => {
 
     it("should fail with too many Byzantine watchdogs", async () => {
       // With 5 watchdogs and required = 3, if 3 are Byzantine, consensus fails
-      await consensusManager
-        .connect(governance)
-        .updateConsensusParameters(3, 5)
+      await consensusManager.connect(governance).updateConsensusParameters(3, 5)
 
       // Create proposal
       const proposalData = ethers.utils.defaultAbiCoder.encode(
@@ -252,7 +251,9 @@ describe("Consensus Failure Modes", () => {
       await consensusManager.connect(watchdog2).vote(proposalId)
 
       // Should be executable with exactly 2 votes
-      await expect(consensusManager.connect(watchdog1).executeProposal(proposalId))
+      await expect(
+        consensusManager.connect(watchdog1).executeProposal(proposalId)
+      )
         .to.emit(consensusManager, "ProposalExecuted")
         .withArgs(proposalId, ProposalType.STATUS_CHANGE, watchdog1.address)
     })
@@ -266,7 +267,7 @@ describe("Consensus Failure Modes", () => {
 
     it("should prevent execution of non-existent proposal", async () => {
       const fakeProposalId = ethers.utils.id("fake-proposal")
-      
+
       await expect(
         consensusManager.connect(watchdog1).executeProposal(fakeProposalId)
       ).to.be.revertedWith("ProposalNotFound")
@@ -395,17 +396,13 @@ describe("Consensus Failure Modes", () => {
     it("should enforce required <= total watchdogs", async () => {
       // Try to set required > total
       await expect(
-        consensusManager
-          .connect(governance)
-          .updateConsensusParameters(6, 5)
+        consensusManager.connect(governance).updateConsensusParameters(6, 5)
       ).to.be.revertedWith("InvalidParameters")
     })
 
     it("should handle voting period boundaries", async () => {
       // Set to minimum period
-      await consensusManager
-        .connect(governance)
-        .updateVotingPeriod(3600) // 1 hour minimum
+      await consensusManager.connect(governance).updateVotingPeriod(3600) // 1 hour minimum
 
       expect(await consensusManager.votingPeriod()).to.equal(3600)
 
@@ -415,9 +412,7 @@ describe("Consensus Failure Modes", () => {
       ).to.be.revertedWith("InvalidParameters")
 
       // Set to maximum period
-      await consensusManager
-        .connect(governance)
-        .updateVotingPeriod(86400) // 24 hours maximum
+      await consensusManager.connect(governance).updateVotingPeriod(86400) // 24 hours maximum
 
       expect(await consensusManager.votingPeriod()).to.equal(86400)
 
@@ -431,9 +426,7 @@ describe("Consensus Failure Modes", () => {
   describe("Coordination Deadlock Scenarios", () => {
     it("should handle split vote deadlock", async () => {
       // Set 4-of-5 requirement
-      await consensusManager
-        .connect(governance)
-        .updateConsensusParameters(4, 5)
+      await consensusManager.connect(governance).updateConsensusParameters(4, 5)
 
       // Create two competing proposals
       const proposal1Data = ethers.utils.defaultAbiCoder.encode(
@@ -464,11 +457,11 @@ describe("Consensus Failure Modes", () => {
 
       const receipt1 = await tx1.wait()
       const receipt2 = await tx2.wait()
-      
+
       const proposalId1 = receipt1.events?.find(
         (e) => e.event === "ProposalCreated"
       )?.args?.proposalId
-      
+
       const proposalId2 = receipt2.events?.find(
         (e) => e.event === "ProposalCreated"
       )?.args?.proposalId
@@ -495,9 +488,7 @@ describe("Consensus Failure Modes", () => {
 
     it("should handle offline watchdog scenario", async () => {
       // Set 3-of-5 requirement
-      await consensusManager
-        .connect(governance)
-        .updateConsensusParameters(3, 5)
+      await consensusManager.connect(governance).updateConsensusParameters(3, 5)
 
       // Create critical proposal
       const proposalData = ethers.utils.defaultAbiCoder.encode(
@@ -534,9 +525,7 @@ describe("Consensus Failure Modes", () => {
   describe("Consensus Recovery Mechanisms", () => {
     it("should allow parameter adjustment for recovery", async () => {
       // Initial: 4-of-5 requirement
-      await consensusManager
-        .connect(governance)
-        .updateConsensusParameters(4, 5)
+      await consensusManager.connect(governance).updateConsensusParameters(4, 5)
 
       // Create proposal that gets stuck
       const proposalData = ethers.utils.defaultAbiCoder.encode(
@@ -558,9 +547,7 @@ describe("Consensus Failure Modes", () => {
       await consensusManager.connect(watchdog3).vote(proposalId)
 
       // Governance reduces requirement to 3-of-5
-      await consensusManager
-        .connect(governance)
-        .updateConsensusParameters(3, 5)
+      await consensusManager.connect(governance).updateConsensusParameters(3, 5)
 
       // Old proposal still requires original 4 votes
       // This prevents gaming the system by changing params mid-vote
@@ -590,7 +577,7 @@ describe("Consensus Failure Modes", () => {
     it("should handle emergency bypass scenarios", async () => {
       // In extreme cases, system might need emergency bypass
       // This would require governance action outside consensus system
-      
+
       // For now, verify that consensus can't be bypassed by watchdogs alone
       const proposalData = ethers.utils.defaultAbiCoder.encode(
         ["address", "uint8", "bytes32"],
@@ -599,7 +586,7 @@ describe("Consensus Failure Modes", () => {
 
       // Try to execute without creating/voting
       const fakeProposalId = ethers.utils.id("emergency-bypass")
-      
+
       await expect(
         consensusManager.connect(watchdog1).executeProposal(fakeProposalId)
       ).to.be.revertedWith("ProposalNotFound")
@@ -612,7 +599,7 @@ describe("Consensus Failure Modes", () => {
   describe("Complex Failure Scenarios", () => {
     it("should handle cascading proposal failures", async () => {
       // Multiple related proposals that depend on each other
-      
+
       // Proposal 1: Change status to UnderReview
       const proposal1Data = ethers.utils.defaultAbiCoder.encode(
         ["address", "uint8", "bytes32"],
@@ -636,11 +623,11 @@ describe("Consensus Failure Modes", () => {
 
       const receipt1 = await tx1.wait()
       const receipt2 = await tx2.wait()
-      
+
       const proposalId1 = receipt1.events?.find(
         (e) => e.event === "ProposalCreated"
       )?.args?.proposalId
-      
+
       const proposalId2 = receipt2.events?.find(
         (e) => e.event === "ProposalCreated"
       )?.args?.proposalId
@@ -663,7 +650,7 @@ describe("Consensus Failure Modes", () => {
 
     it("should handle consensus during network congestion", async () => {
       // Simulate high gas prices affecting voting participation
-      
+
       // Create urgent proposal
       const proposalData = ethers.utils.defaultAbiCoder.encode(
         ["address", "uint8", "bytes32"],
@@ -690,10 +677,10 @@ describe("Consensus Failure Modes", () => {
 
       // More votes come in later
       await consensusManager.connect(watchdog2).vote(proposalId)
-      
+
       // Just before deadline
       await helpers.time.increase(VOTING_PERIOD / 2 - 100)
-      
+
       await consensusManager.connect(watchdog3).vote(proposalId)
 
       // Should still be able to execute if enough votes

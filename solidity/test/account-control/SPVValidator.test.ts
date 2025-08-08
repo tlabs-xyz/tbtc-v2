@@ -2,7 +2,11 @@ import { expect } from "chai"
 import { ethers, helpers } from "hardhat"
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers"
 
-import type { SPVValidator, LightRelayStub, SystemTestRelay } from "../../typechain"
+import type {
+  SPVValidator,
+  LightRelayStub,
+  SystemTestRelay,
+} from "../../typechain"
 import { SPVTestHelpers } from "./SPVTestHelpers"
 import {
   ValidMainnetProof,
@@ -18,7 +22,7 @@ describe("SPVValidator", () => {
   let deployer: HardhatEthersSigner
   let qcAddress: HardhatEthersSigner
   let thirdParty: HardhatEthersSigner
-  
+
   let spvValidator: SPVValidator
   let lightRelayStub: LightRelayStub
   let systemTestRelay: SystemTestRelay
@@ -79,7 +83,7 @@ describe("SPVValidator", () => {
   describe("validateProof - Positive Test Cases", () => {
     before(async () => {
       await createSnapshot()
-      
+
       // Deploy SPVValidator with SystemTestRelay for real proof validation
       const SPVValidator = await ethers.getContractFactory("SPVValidator")
       spvValidator = await SPVValidator.deploy(
@@ -94,34 +98,40 @@ describe("SPVValidator", () => {
     })
 
     it("should validate a valid mainnet SPV proof", async () => {
-      await SPVTestHelpers.setupRelayDifficulty(systemTestRelay, ValidMainnetProof)
-      
+      await SPVTestHelpers.setupRelayDifficulty(
+        systemTestRelay,
+        ValidMainnetProof
+      )
+
       const { tx, txHash, gasUsed } = await SPVTestHelpers.validateProofWithGas(
         spvValidator,
         ValidMainnetProof,
         { min: 100_000, max: 500_000 } // Expected gas range
       )
-      
+
       // Verify the correct transaction hash was calculated
       expect(txHash).to.equal(ValidMainnetProof.expectedTxHash)
-      
+
       // Verify event emission
       await expect(tx)
         .to.emit(spvValidator, "SPVProofValidated")
         .withArgs(
           ValidMainnetProof.expectedTxHash,
           deployer.address,
-          await ethers.provider.getBlock("latest").then(b => b!.timestamp)
+          await ethers.provider.getBlock("latest").then((b) => b!.timestamp)
         )
-      
+
       console.log(`Gas used for mainnet proof validation: ${gasUsed}`)
     })
 
     it("should validate a P2PKH transaction proof", async () => {
       // Note: This test uses mock data since we need a proper relay setup
       // In production, this would use real Bitcoin testnet data
-      await SPVTestHelpers.setupRelayDifficulty(systemTestRelay, P2PKHWalletControlProof)
-      
+      await SPVTestHelpers.setupRelayDifficulty(
+        systemTestRelay,
+        P2PKHWalletControlProof
+      )
+
       // For mock data, we expect this to revert since the proof isn't real
       // This demonstrates the structure - in production this would pass
       await expect(
@@ -134,8 +144,11 @@ describe("SPVValidator", () => {
 
     it("should validate a complex multi-input transaction", async () => {
       // Similar to above - demonstrates structure with mock data
-      await SPVTestHelpers.setupRelayDifficulty(systemTestRelay, ComplexMultiInputTx)
-      
+      await SPVTestHelpers.setupRelayDifficulty(
+        systemTestRelay,
+        ComplexMultiInputTx
+      )
+
       await expect(
         spvValidator.validateProof(
           ComplexMultiInputTx.txInfo,
@@ -149,7 +162,7 @@ describe("SPVValidator", () => {
       const outputs = SPVTestHelpers.parseOutputVector(
         ComplexMultiInputTx.txInfo.outputVector
       )
-      
+
       expect(outputs).to.have.lengthOf(4)
       expect(outputs[0].script).to.include("0014") // P2WPKH
       expect(outputs[1].script).to.include("a914") // P2SH
@@ -209,20 +222,29 @@ describe("SPVValidator", () => {
 
     it("should revert with malformed transaction versions", async () => {
       const malformedTxs = SPVTestHelpers.createMalformedTxInfo()
-      
+
       // Test invalid version
       await expect(
-        spvValidator.validateProof(malformedTxs.invalidVersion, ValidMainnetProof.proof)
+        spvValidator.validateProof(
+          malformedTxs.invalidVersion,
+          ValidMainnetProof.proof
+        )
       ).to.be.reverted
-      
+
       // Test empty inputs
       await expect(
-        spvValidator.validateProof(malformedTxs.emptyInputs, ValidMainnetProof.proof)
+        spvValidator.validateProof(
+          malformedTxs.emptyInputs,
+          ValidMainnetProof.proof
+        )
       ).to.be.revertedWith("InvalidInputVector")
-      
+
       // Test empty outputs
       await expect(
-        spvValidator.validateProof(malformedTxs.emptyOutputs, ValidMainnetProof.proof)
+        spvValidator.validateProof(
+          malformedTxs.emptyOutputs,
+          ValidMainnetProof.proof
+        )
       ).to.be.revertedWith("InvalidOutputVector")
     })
   })
@@ -230,7 +252,7 @@ describe("SPVValidator", () => {
   describe("validateProof - Security Attack Tests", () => {
     before(async () => {
       await createSnapshot()
-      
+
       // Use SystemTestRelay for security tests
       const SPVValidator = await ethers.getContractFactory("SPVValidator")
       spvValidator = await SPVValidator.deploy(
@@ -238,8 +260,11 @@ describe("SPVValidator", () => {
         DIFFICULTY_FACTOR
       )
       await spvValidator.deployed()
-      
-      await SPVTestHelpers.setupRelayDifficulty(systemTestRelay, ValidMainnetProof)
+
+      await SPVTestHelpers.setupRelayDifficulty(
+        systemTestRelay,
+        ValidMainnetProof
+      )
     })
 
     after(async () => {
@@ -248,7 +273,7 @@ describe("SPVValidator", () => {
 
     it("should reject tampered merkle proof", async () => {
       const tamperedProof = InvalidMerkleProofData.tamperedMerkleProof
-      
+
       await expect(
         spvValidator.validateProof(tamperedProof.txInfo, tamperedProof.proof)
       ).to.be.revertedWith("InvalidTxMerkleProof")
@@ -256,7 +281,7 @@ describe("SPVValidator", () => {
 
     it("should reject insufficient merkle proof depth", async () => {
       const shortProof = InvalidMerkleProofData.shortMerkleProof
-      
+
       await expect(
         spvValidator.validateProof(shortProof.txInfo, shortProof.proof)
       ).to.be.reverted // Will fail during merkle verification
@@ -277,7 +302,7 @@ describe("SPVValidator", () => {
         ValidMainnetProof.txInfo,
         ValidMainnetProof.proof
       )
-      
+
       // Attempting to validate the same proof again should still succeed
       // (SPV validation is stateless - replay prevention would be in calling contract)
       await expect(
@@ -294,7 +319,7 @@ describe("SPVValidator", () => {
         ...ValidMainnetProof.proof,
         bitcoinHeaders: "0x" + "00".repeat(640), // All zero headers
       }
-      
+
       await expect(
         spvValidator.validateProof(ValidMainnetProof.txInfo, brokenChainProof)
       ).to.be.reverted
@@ -317,7 +342,7 @@ describe("SPVValidator", () => {
         P2PKHWalletControlProof.txInfo,
         P2PKHWalletControlProof.proof
       )
-      
+
       // Note: This will revert with mock data - demonstrates structure
       await expect(
         spvValidator.verifyWalletControl(
@@ -352,7 +377,7 @@ describe("SPVValidator", () => {
         "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3", // P2WSH
         "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2", // P2PKH
       ]
-      
+
       // Each address type should be handled appropriately
       for (const btcAddress of addressTypes) {
         // Structure validation - actual verification would need real data
@@ -362,7 +387,7 @@ describe("SPVValidator", () => {
           P2PKHWalletControlProof.txInfo,
           P2PKHWalletControlProof.proof
         )
-        
+
         // Verify the call doesn't revert on address parsing
         // (will still revert on proof validation with mock data)
         await expect(
@@ -392,7 +417,7 @@ describe("SPVValidator", () => {
         ValidMainnetProof.txInfo,
         ValidMainnetProof.proof
       )
-      
+
       // Structure test - would pass with proper relay setup
       await expect(
         spvValidator.verifyRedemptionFulfillment(
@@ -410,10 +435,10 @@ describe("SPVValidator", () => {
     it("should handle various redemption amounts", async () => {
       const amounts = [
         1000000, // 0.01 BTC
-        100000000, // 1 BTC  
+        100000000, // 1 BTC
         1000000000, // 10 BTC
       ]
-      
+
       // Test structure for different redemption amounts
       for (const amount of amounts) {
         // Would create transaction with specific output amount
@@ -429,9 +454,9 @@ describe("SPVValidator", () => {
         P2PKHWalletControlProof,
         ComplexMultiInputTx,
       ]
-      
+
       console.log("\n=== SPV Validation Gas Profile ===")
-      
+
       // Note: With mock data these will revert, but structure shows gas profiling approach
       for (const testCase of testCases) {
         try {
@@ -467,25 +492,25 @@ describe("SPVValidator", () => {
 
 /**
  * IMPORTANT NOTE:
- * 
+ *
  * This test suite demonstrates the complete structure for SPV validation testing.
  * Several tests use mock data and will revert because:
- * 
+ *
  * 1. Mock merkle proofs don't form valid proof chains
  * 2. Mock headers don't have valid proof-of-work
  * 3. Mock transactions don't have valid signatures
- * 
+ *
  * In production, these tests should use:
  * - Real Bitcoin testnet transactions
  * - Valid SPV proofs from actual Bitcoin blocks
  * - Properly configured relay with real difficulty values
- * 
+ *
  * The ValidMainnetProof test shows a working example with real Bitcoin data.
  * Additional real test vectors should be added from:
  * - Bitcoin testnet
  * - Recent mainnet blocks
  * - Various transaction types (P2PKH, P2WPKH, P2SH, P2WSH)
- * 
+ *
  * Security tests with tampered data are correctly implemented and will
  * properly reject invalid proofs.
  */

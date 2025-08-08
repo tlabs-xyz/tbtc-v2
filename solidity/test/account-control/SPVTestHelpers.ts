@@ -1,9 +1,9 @@
 import { ethers } from "hardhat"
 import type { ContractTransaction } from "ethers"
-import type { 
-  SPVValidator, 
+import type {
+  SPVValidator,
   LightRelayStub,
-  SystemTestRelay
+  SystemTestRelay,
 } from "../../typechain"
 import { assertGasUsed } from "../integration/utils/gas"
 import type { SPVProofTestData } from "../data/bitcoin/spv/valid-spv-proofs"
@@ -44,14 +44,11 @@ export class SPVTestHelpers {
     txHash: string
     gasUsed: number
   }> {
-    const tx = await spvValidator.validateProof(
-      spvProof.txInfo,
-      spvProof.proof
-    )
-    
+    const tx = await spvValidator.validateProof(spvProof.txInfo, spvProof.proof)
+
     const receipt = await tx.wait()
     const gasUsed = receipt.gasUsed.toNumber()
-    
+
     // Calculate transaction hash from the transaction data
     const txHash = ethers.utils.keccak256(
       ethers.utils.solidityPack(
@@ -77,10 +74,10 @@ export class SPVTestHelpers {
    */
   static createP2PKHAddress(pubKeyHash: string): string {
     // Remove 0x prefix if present
-    const cleanHash = pubKeyHash.startsWith("0x") 
-      ? pubKeyHash.slice(2) 
+    const cleanHash = pubKeyHash.startsWith("0x")
+      ? pubKeyHash.slice(2)
       : pubKeyHash
-    
+
     // For testnet, use prefix 'tb1' for witness addresses or 'm/n' for legacy
     // For mainnet, use 'bc1' for witness or '1' for legacy
     // This is a simplified version - real implementation would use proper encoding
@@ -125,12 +122,12 @@ export class SPVTestHelpers {
   static tamperMerkleProof(originalProof: string, position: number): string {
     // Convert hex string to bytes
     const proofBytes = ethers.utils.arrayify(originalProof)
-    
+
     // Tamper with bytes at the specified position
     for (let i = 0; i < 32 && position + i < proofBytes.length; i++) {
-      proofBytes[position + i] = 0xFF
+      proofBytes[position + i] = 0xff
     }
-    
+
     return ethers.utils.hexlify(proofBytes)
   }
 
@@ -141,7 +138,7 @@ export class SPVTestHelpers {
     // Each header is 80 bytes
     const headerSize = 80 * 2 // 160 hex characters
     const totalLength = keepHeaders * headerSize
-    
+
     return headers.slice(0, totalLength)
   }
 
@@ -154,10 +151,11 @@ export class SPVTestHelpers {
       emptyInputs: {
         version: "0x02000000",
         inputVector: "0x00",
-        outputVector: "0x01" + "00e1f50500000000" + "1976a914" + "a".repeat(40) + "88ac",
+        outputVector:
+          "0x01" + "00e1f50500000000" + "1976a914" + "a".repeat(40) + "88ac",
         locktime: "0x00000000",
       },
-      
+
       // Empty output vector (invalid)
       emptyOutputs: {
         version: "0x02000000",
@@ -165,12 +163,13 @@ export class SPVTestHelpers {
         outputVector: "0x00",
         locktime: "0x00000000",
       },
-      
+
       // Invalid version
       invalidVersion: {
         version: "0x00000000", // Version 0 is invalid
         inputVector: "0x01" + "a".repeat(72) + "ffffffff",
-        outputVector: "0x01" + "00e1f50500000000" + "1976a914" + "a".repeat(40) + "88ac",
+        outputVector:
+          "0x01" + "00e1f50500000000" + "1976a914" + "a".repeat(40) + "88ac",
         locktime: "0x00000000",
       },
     }
@@ -184,30 +183,32 @@ export class SPVTestHelpers {
     script: string
   }> {
     // Remove 0x prefix
-    let data = outputVector.startsWith("0x") ? outputVector.slice(2) : outputVector
-    
+    let data = outputVector.startsWith("0x")
+      ? outputVector.slice(2)
+      : outputVector
+
     // First byte is output count
     const outputCount = parseInt(data.slice(0, 2), 16)
     data = data.slice(2)
-    
+
     const outputs = []
     for (let i = 0; i < outputCount; i++) {
       // 8 bytes for value (little-endian)
       const valueHex = data.slice(0, 16)
       const value = BigInt("0x" + valueHex.match(/../g)!.reverse().join(""))
       data = data.slice(16)
-      
+
       // 1 byte for script length
       const scriptLen = parseInt(data.slice(0, 2), 16) * 2
       data = data.slice(2)
-      
+
       // Script bytes
       const script = data.slice(0, scriptLen)
       data = data.slice(scriptLen)
-      
+
       outputs.push({ value, script })
     }
-    
+
     return outputs
   }
 
@@ -217,26 +218,28 @@ export class SPVTestHelpers {
   static async profileGasUsage(
     spvValidator: SPVValidator,
     testCases: SPVProofTestData[]
-  ): Promise<{
-    testName: string
-    gasUsed: number
-    txHash: string
-  }[]> {
+  ): Promise<
+    {
+      testName: string
+      gasUsed: number
+      txHash: string
+    }[]
+  > {
     const results = []
-    
+
     for (const testCase of testCases) {
       const { gasUsed, txHash } = await this.validateProofWithGas(
         spvValidator,
         testCase
       )
-      
+
       results.push({
         testName: testCase.name,
         gasUsed,
         txHash,
       })
     }
-    
+
     return results
   }
 }
