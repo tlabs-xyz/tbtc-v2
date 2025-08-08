@@ -400,12 +400,18 @@ describe("SPVValidator Integration Tests", () => {
       // Test that the function exists and can be called
       // With mock data, this will revert due to invalid SPV proof
       await expect(
-        spvValidator.verifyWalletControl(qcAddress, btcAddress, challenge, txInfo, proof)
+        spvValidator.verifyWalletControl(
+          qcAddress,
+          btcAddress,
+          challenge,
+          txInfo,
+          proof
+        )
       ).to.be.reverted
 
       // Verify the function signature and interface
       expect(spvValidator.verifyWalletControl).to.be.a("function")
-      
+
       // Test that the event interface exists on the contract
       const filter = spvValidator.filters.WalletControlVerified()
       expect(filter.topics).to.have.length.greaterThan(0)
@@ -424,12 +430,18 @@ describe("SPVValidator Integration Tests", () => {
       // Test that the function exists and can be called
       // With mock data, this will revert due to invalid SPV proof
       await expect(
-        spvValidator.verifyRedemptionFulfillment(redemptionId, userBtcAddress, expectedAmount, txInfo, proof)
+        spvValidator.verifyRedemptionFulfillment(
+          redemptionId,
+          userBtcAddress,
+          expectedAmount,
+          txInfo,
+          proof
+        )
       ).to.be.reverted
 
       // Verify the function signature and interface
       expect(spvValidator.verifyRedemptionFulfillment).to.be.a("function")
-      
+
       // Test that the event interface exists on the contract
       const filter = spvValidator.filters.RedemptionFulfillmentVerified()
       expect(filter.topics).to.have.length.greaterThan(0)

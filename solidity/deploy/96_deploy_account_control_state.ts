@@ -29,10 +29,14 @@ const func: DeployFunction = async function DeployAccountControlState(
     waitConfirmations: helpers.network?.confirmations || 1,
   })
 
-  // Deploy QCManager - Stateless business logic controller
+  // Get dependencies for QCManager direct injection
+  const qcReserveLedger = await get("QCReserveLedger")
+  const spvValidator = await get("SPVValidator")
+
+  // Deploy QCManager - Business logic with direct dependencies
   const qcManager = await deploy("QCManager", {
     from: deployer,
-    args: [protocolRegistry.address],
+    args: [qcData.address, systemState.address, qcReserveLedger.address, spvValidator.address],
     log: true,
     waitConfirmations: helpers.network?.confirmations || 1,
   })
@@ -45,4 +49,4 @@ const func: DeployFunction = async function DeployAccountControlState(
 
 export default func
 func.tags = ["AccountControlState", "QCData", "SystemState", "QCManager"]
-func.dependencies = ["AccountControlCore"]
+func.dependencies = ["AccountControlCore", "QCReserveLedger", "SPVValidator"]

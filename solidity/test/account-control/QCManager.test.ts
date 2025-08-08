@@ -632,7 +632,6 @@ describe("QCManager", () => {
           testBtcAddress
         )
       })
-
     })
 
     context("when wallet is not registered", () => {
@@ -917,7 +916,6 @@ describe("QCManager", () => {
       })
     })
   })
-
 
   describe("Status Transition Validation", () => {
     beforeEach(async () => {
@@ -1211,7 +1209,6 @@ describe("QCManager", () => {
     })
   })
 
-
   describe("requestStatusChange", () => {
     beforeEach(async () => {
       mockQcData.isQCRegistered.returns(true)
@@ -1271,7 +1268,9 @@ describe("QCManager", () => {
             qcManager
               .connect(watchdogEnforcer)
               .requestStatusChange(qcAddress.address, 0, testReason) // 0 = Active
-          ).to.be.revertedWith("WatchdogEnforcer can only set UnderReview status")
+          ).to.be.revertedWith(
+            "WatchdogEnforcer can only set UnderReview status"
+          )
         })
       })
 
@@ -1281,7 +1280,9 @@ describe("QCManager", () => {
             qcManager
               .connect(watchdogEnforcer)
               .requestStatusChange(qcAddress.address, 2, testReason) // 2 = Revoked
-          ).to.be.revertedWith("WatchdogEnforcer can only set UnderReview status")
+          ).to.be.revertedWith(
+            "WatchdogEnforcer can only set UnderReview status"
+          )
         })
       })
 
@@ -1629,7 +1630,7 @@ describe("QCManager", () => {
         // Setup specific values
         const specificReserve = ethers.utils.parseEther("100")
         const specificMinted = ethers.utils.parseEther("60")
-        
+
         mockQcData.getQCStatus.returns(0) // Active
         mockQcQCReserveLedger.getReserveBalanceAndStaleness.returns([
           specificReserve,
@@ -1696,7 +1697,10 @@ describe("QCManager", () => {
       it("should handle competing watchdog enforcers", async () => {
         // Grant WATCHDOG_ENFORCER_ROLE to another address
         const watchdogEnforcer2 = thirdParty
-        await qcManager.grantRole(WATCHDOG_ENFORCER_ROLE, watchdogEnforcer2.address)
+        await qcManager.grantRole(
+          WATCHDOG_ENFORCER_ROLE,
+          watchdogEnforcer2.address
+        )
 
         mockQcData.getQCStatus.returns(0) // Active
 
@@ -1766,7 +1770,10 @@ describe("QCManager", () => {
 
       it("should handle registry service unavailability gracefully", async () => {
         // Mock registry to return zero address for QC_DATA
-        await protocolRegistry.setService(QC_DATA_KEY, ethers.constants.AddressZero)
+        await protocolRegistry.setService(
+          QC_DATA_KEY,
+          ethers.constants.AddressZero
+        )
 
         // Should revert with service unavailable
         await expect(
@@ -1813,15 +1820,9 @@ describe("QCManager", () => {
 
         // Mock different states
         mockQcData.isQCRegistered.returns(true)
-        mockQcData.getQCStatus
-          .whenCalledWith(qcAddresses[0])
-          .returns(0) // Active
-        mockQcData.getQCStatus
-          .whenCalledWith(qcAddresses[1])
-          .returns(1) // UnderReview
-        mockQcData.getQCStatus
-          .whenCalledWith(qcAddresses[2])
-          .returns(2) // Revoked
+        mockQcData.getQCStatus.whenCalledWith(qcAddresses[0]).returns(0) // Active
+        mockQcData.getQCStatus.whenCalledWith(qcAddresses[1]).returns(1) // UnderReview
+        mockQcData.getQCStatus.whenCalledWith(qcAddresses[2]).returns(2) // Revoked
 
         // Check capacity for each
         const capacities = await Promise.all(
@@ -1885,7 +1886,9 @@ describe("QCManager", () => {
 
         // Check that all have zero capacity
         for (const qc of qcs) {
-          const capacity = await qcManager.getAvailableMintingCapacity(qc.address)
+          const capacity = await qcManager.getAvailableMintingCapacity(
+            qc.address
+          )
           expect(capacity).to.equal(0)
         }
       })

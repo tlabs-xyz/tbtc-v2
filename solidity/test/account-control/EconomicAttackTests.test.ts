@@ -373,7 +373,9 @@ describe("Economic Attack Tests", () => {
 
         // Use the correct function name and destructure the return values
         const [finalBalance, isStale] =
-          await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+          await qcQCReserveLedger.getReserveBalanceAndStaleness(
+            qcAddress.address
+          )
         expect(finalBalance).to.equal(reserves2) // Latest attestation should be used
         expect(isStale).to.be.false // Should not be stale immediately after submission
       })

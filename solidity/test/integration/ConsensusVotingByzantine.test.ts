@@ -41,11 +41,22 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
   beforeEach(async () => {
     await deployments.fixture(["AccountControl"])
     ;({ deployer, governance } = await helpers.signers.getNamedSigners())
-    ;[watchdog1, watchdog2, watchdog3, watchdog4, watchdog5, byzantineWatchdog, qc1, qc2, user] = 
-      await helpers.signers.getUnnamedSigners()
+    ;[
+      watchdog1,
+      watchdog2,
+      watchdog3,
+      watchdog4,
+      watchdog5,
+      byzantineWatchdog,
+      qc1,
+      qc2,
+      user,
+    ] = await helpers.signers.getUnnamedSigners()
 
     // Get deployed contracts
-    consensusManager = await helpers.contracts.getContract("WatchdogConsensusManager")
+    consensusManager = await helpers.contracts.getContract(
+      "WatchdogConsensusManager"
+    )
     qcManager = await helpers.contracts.getContract("QCManager")
     qcRedeemer = await helpers.contracts.getContract("QCRedeemer")
     systemState = await helpers.contracts.getContract("SystemState")
@@ -70,13 +81,15 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
         [qc1.address, false] // Deactivate QC1
       )
 
-      const tx = await consensusManager.connect(watchdog1).proposeAction(
-        ProposalType.StatusChange,
-        proposalData,
-        "QC1 showing suspicious behavior"
-      )
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeAction(
+          ProposalType.StatusChange,
+          proposalData,
+          "QC1 showing suspicious behavior"
+        )
       const receipt = await tx.wait()
-      const event = receipt.events?.find(e => e.event === "ProposalCreated")
+      const event = receipt.events?.find((e) => e.event === "ProposalCreated")
       const proposalId = event?.args?.proposalId
 
       // Check initial state
@@ -86,9 +99,7 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
       expect(proposal.executed).to.be.false
 
       // First additional vote (2/5 threshold reached)
-      await expect(
-        consensusManager.connect(watchdog2).vote(proposalId, true)
-      )
+      await expect(consensusManager.connect(watchdog2).vote(proposalId, true))
         .to.emit(consensusManager, "VoteCast")
         .withArgs(proposalId, watchdog2.address, true)
         .and.to.emit(consensusManager, "ProposalExecuted")
@@ -106,18 +117,19 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
 
     it("should handle 3-of-5 consensus for redemption default", async () => {
       // Setup: Create a redemption
-      await qcRedeemer.connect(qc1).initiateRedemption(
-        ethers.utils.parseEther("10"),
-        "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
-        "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
-      )
+      await qcRedeemer
+        .connect(qc1)
+        .initiateRedemption(
+          ethers.utils.parseEther("10"),
+          "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+          "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
+        )
       const redemptionId = await qcRedeemer.currentRedemptionId()
 
       // Update consensus threshold for redemption defaults
-      await consensusManager.connect(governance).updateConsensusThreshold(
-        ProposalType.RedemptionDefault,
-        3
-      )
+      await consensusManager
+        .connect(governance)
+        .updateConsensusThreshold(ProposalType.RedemptionDefault, 3)
 
       // Propose redemption default
       const proposalData = ethers.utils.defaultAbiCoder.encode(
@@ -125,13 +137,17 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
         [redemptionId]
       )
 
-      const tx = await consensusManager.connect(watchdog1).proposeAction(
-        ProposalType.RedemptionDefault,
-        proposalData,
-        "QC failed to fulfill redemption"
-      )
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeAction(
+          ProposalType.RedemptionDefault,
+          proposalData,
+          "QC failed to fulfill redemption"
+        )
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Vote from watchdog2 (2/3)
       await consensusManager.connect(watchdog2).vote(proposalId, true)
@@ -141,9 +157,7 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
       expect(proposal.executed).to.be.false
 
       // Vote from watchdog3 (3/3 threshold reached)
-      await expect(
-        consensusManager.connect(watchdog3).vote(proposalId, true)
-      )
+      await expect(consensusManager.connect(watchdog3).vote(proposalId, true))
         .to.emit(consensusManager, "ProposalExecuted")
         .withArgs(proposalId)
 
@@ -154,23 +168,26 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
 
     it("should reject proposal if threshold not met before deadline", async () => {
       // Set higher threshold temporarily
-      await consensusManager.connect(governance).updateConsensusThreshold(
-        ProposalType.StatusChange,
-        4
-      )
+      await consensusManager
+        .connect(governance)
+        .updateConsensusThreshold(ProposalType.StatusChange, 4)
 
       const proposalData = ethers.utils.defaultAbiCoder.encode(
         ["address", "bool"],
         [qc2.address, false]
       )
 
-      const tx = await consensusManager.connect(watchdog1).proposeAction(
-        ProposalType.StatusChange,
-        proposalData,
-        "Test high threshold"
-      )
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeAction(
+          ProposalType.StatusChange,
+          proposalData,
+          "Test high threshold"
+        )
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Only 2 more votes (total 3/4)
       await consensusManager.connect(watchdog2).vote(proposalId, true)
@@ -196,13 +213,17 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
         [qc1.address, false]
       )
 
-      const tx = await consensusManager.connect(watchdog1).proposeAction(
-        ProposalType.StatusChange,
-        proposalData,
-        "Controversial proposal"
-      )
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeAction(
+          ProposalType.StatusChange,
+          proposalData,
+          "Controversial proposal"
+        )
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Negative votes
       await consensusManager.connect(watchdog2).vote(proposalId, false)
@@ -226,13 +247,13 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
         [qc1.address, false] // Try to deactivate legitimate QC
       )
 
-      const tx = await consensusManager.connect(byzantineWatchdog).proposeAction(
-        ProposalType.StatusChange,
-        maliciousData,
-        "Fake issue"
-      )
+      const tx = await consensusManager
+        .connect(byzantineWatchdog)
+        .proposeAction(ProposalType.StatusChange, maliciousData, "Fake issue")
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Honest watchdogs vote against
       await consensusManager.connect(watchdog1).vote(proposalId, false)
@@ -256,13 +277,17 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
         [qc2.address, true]
       )
 
-      const tx = await consensusManager.connect(watchdog1).proposeAction(
-        ProposalType.StatusChange,
-        proposalData,
-        "Legitimate proposal"
-      )
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeAction(
+          ProposalType.StatusChange,
+          proposalData,
+          "Legitimate proposal"
+        )
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Byzantine actor votes
       await consensusManager.connect(byzantineWatchdog).vote(proposalId, true)
@@ -285,20 +310,16 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
       )
 
       // First proposal succeeds
-      await consensusManager.connect(byzantineWatchdog).proposeAction(
-        ProposalType.StatusChange,
-        data,
-        "Spam 1"
-      )
+      await consensusManager
+        .connect(byzantineWatchdog)
+        .proposeAction(ProposalType.StatusChange, data, "Spam 1")
 
       // Subsequent proposals should have cooldown or limits
       // (Implementation would need rate limiting)
       // For now, we test that system can handle multiple proposals
-      await consensusManager.connect(byzantineWatchdog).proposeAction(
-        ProposalType.StatusChange,
-        data,
-        "Spam 2"
-      )
+      await consensusManager
+        .connect(byzantineWatchdog)
+        .proposeAction(ProposalType.StatusChange, data, "Spam 2")
 
       // System should still function with honest majority
       const legitimateData = ethers.utils.defaultAbiCoder.encode(
@@ -306,24 +327,29 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
         [qc2.address, true]
       )
 
-      const tx = await consensusManager.connect(watchdog1).proposeAction(
-        ProposalType.StatusChange,
-        legitimateData,
-        "Legitimate after spam"
-      )
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeAction(
+          ProposalType.StatusChange,
+          legitimateData,
+          "Legitimate after spam"
+        )
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Honest majority can still pass legitimate proposals
       await expect(
         consensusManager.connect(watchdog2).vote(proposalId, true)
-      )
-        .to.emit(consensusManager, "ProposalExecuted")
+      ).to.emit(consensusManager, "ProposalExecuted")
     })
 
     it("should handle Byzantine coalition (2 actors) but maintain safety", async () => {
       // Add Byzantine watchdog to consensus
-      await consensusManager.connect(governance).addWatchdog(byzantineWatchdog.address)
+      await consensusManager
+        .connect(governance)
+        .addWatchdog(byzantineWatchdog.address)
 
       // Two Byzantine actors collude
       const maliciousData = ethers.utils.defaultAbiCoder.encode(
@@ -331,18 +357,20 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
         [qc1.address, false]
       )
 
-      const tx = await consensusManager.connect(byzantineWatchdog).proposeAction(
-        ProposalType.StatusChange,
-        maliciousData,
-        "Collusion attack"
-      )
+      const tx = await consensusManager
+        .connect(byzantineWatchdog)
+        .proposeAction(
+          ProposalType.StatusChange,
+          maliciousData,
+          "Collusion attack"
+        )
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Second Byzantine actor votes
-      await expect(
-        consensusManager.connect(watchdog5).vote(proposalId, true)
-      )
+      await expect(consensusManager.connect(watchdog5).vote(proposalId, true))
         .to.emit(consensusManager, "ProposalExecuted")
         .withArgs(proposalId)
 
@@ -367,22 +395,22 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
       )
 
       // Create two proposals simultaneously
-      const tx1 = await consensusManager.connect(watchdog1).proposeAction(
-        ProposalType.StatusChange,
-        data1,
-        "Proposal 1"
-      )
-      const tx2 = await consensusManager.connect(watchdog2).proposeAction(
-        ProposalType.StatusChange,
-        data2,
-        "Proposal 2"
-      )
+      const tx1 = await consensusManager
+        .connect(watchdog1)
+        .proposeAction(ProposalType.StatusChange, data1, "Proposal 1")
+      const tx2 = await consensusManager
+        .connect(watchdog2)
+        .proposeAction(ProposalType.StatusChange, data2, "Proposal 2")
 
       const receipt1 = await tx1.wait()
       const receipt2 = await tx2.wait()
 
-      const proposalId1 = receipt1.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
-      const proposalId2 = receipt2.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId1 = receipt1.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
+      const proposalId2 = receipt2.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Vote on both proposals
       await consensusManager.connect(watchdog3).vote(proposalId1, true)
@@ -403,22 +431,20 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
         [nonExistentQC, false]
       )
 
-      const tx = await consensusManager.connect(watchdog1).proposeAction(
-        ProposalType.StatusChange,
-        data,
-        "Invalid QC proposal"
-      )
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeAction(ProposalType.StatusChange, data, "Invalid QC proposal")
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Vote to execute
       await consensusManager.connect(watchdog2).vote(proposalId, true)
 
       // Execution should fail gracefully
       // The QCManager should revert on non-existent QC
-      await expect(
-        qcManager.qcs(nonExistentQC)
-      ).to.not.be.reverted // Can query, but QC won't exist
+      await expect(qcManager.qcs(nonExistentQC)).to.not.be.reverted // Can query, but QC won't exist
     })
 
     it("should enforce voting period strictly", async () => {
@@ -427,21 +453,24 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
         [qc1.address, true]
       )
 
-      const tx = await consensusManager.connect(watchdog1).proposeAction(
-        ProposalType.StatusChange,
-        data,
-        "Time-sensitive proposal"
-      )
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeAction(
+          ProposalType.StatusChange,
+          data,
+          "Time-sensitive proposal"
+        )
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // Fast forward to just before deadline
       await helpers.time.increaseTime(VOTING_PERIOD - 10)
 
       // Vote should still work
-      await expect(
-        consensusManager.connect(watchdog2).vote(proposalId, true)
-      ).to.not.be.reverted
+      await expect(consensusManager.connect(watchdog2).vote(proposalId, true))
+        .to.not.be.reverted
 
       // Fast forward past deadline
       await helpers.time.increaseTime(20)
@@ -457,10 +486,9 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
     it("should allow governance to update consensus thresholds", async () => {
       // Change threshold for status changes to 3-of-5
       await expect(
-        consensusManager.connect(governance).updateConsensusThreshold(
-          ProposalType.StatusChange,
-          3
-        )
+        consensusManager
+          .connect(governance)
+          .updateConsensusThreshold(ProposalType.StatusChange, 3)
       )
         .to.emit(consensusManager, "ConsensusThresholdUpdated")
         .withArgs(ProposalType.StatusChange, 3)
@@ -471,25 +499,24 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
         [qc1.address, false]
       )
 
-      const tx = await consensusManager.connect(watchdog1).proposeAction(
-        ProposalType.StatusChange,
-        data,
-        "Test new threshold"
-      )
+      const tx = await consensusManager
+        .connect(watchdog1)
+        .proposeAction(ProposalType.StatusChange, data, "Test new threshold")
       const receipt = await tx.wait()
-      const proposalId = receipt.events?.find(e => e.event === "ProposalCreated")?.args?.proposalId
+      const proposalId = receipt.events?.find(
+        (e) => e.event === "ProposalCreated"
+      )?.args?.proposalId
 
       // 2 votes (total 2/5) should not execute
       await consensusManager.connect(watchdog2).vote(proposalId, true)
-      
+
       let proposal = await consensusManager.proposals(proposalId)
       expect(proposal.executed).to.be.false
 
       // 3rd vote should trigger execution
       await expect(
         consensusManager.connect(watchdog3).vote(proposalId, true)
-      )
-        .to.emit(consensusManager, "ProposalExecuted")
+      ).to.emit(consensusManager, "ProposalExecuted")
     })
 
     it("should handle watchdog removal and addition", async () => {
@@ -502,15 +529,15 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
 
       // Removed watchdog cannot propose
       await expect(
-        consensusManager.connect(watchdog5).proposeAction(
-          ProposalType.StatusChange,
-          "0x",
-          "Should fail"
-        )
+        consensusManager
+          .connect(watchdog5)
+          .proposeAction(ProposalType.StatusChange, "0x", "Should fail")
       ).to.be.revertedWith("Not authorized watchdog")
 
       // Add new watchdog
-      const newWatchdog = await helpers.signers.getUnnamedSigners().then(s => s[10])
+      const newWatchdog = await helpers.signers
+        .getUnnamedSigners()
+        .then((s) => s[10])
       await expect(
         consensusManager.connect(governance).addWatchdog(newWatchdog.address)
       )
@@ -524,11 +551,13 @@ describe("WatchdogConsensusManager Voting & Byzantine Fault Tests", () => {
       )
 
       await expect(
-        consensusManager.connect(newWatchdog).proposeAction(
-          ProposalType.StatusChange,
-          data,
-          "New watchdog proposal"
-        )
+        consensusManager
+          .connect(newWatchdog)
+          .proposeAction(
+            ProposalType.StatusChange,
+            data,
+            "New watchdog proposal"
+          )
       ).to.not.be.reverted
     })
   })

@@ -180,9 +180,7 @@ export abstract class BaseAccountControlIntegration {
 
     // Deploy QCWatchdog
     const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
-    this.qcWatchdog = await QCWatchdog.deploy(
-      this.protocolRegistry.address
-    )
+    this.qcWatchdog = await QCWatchdog.deploy(this.protocolRegistry.address)
     await this.qcWatchdog.deployed()
   }
 

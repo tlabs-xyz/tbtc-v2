@@ -24,7 +24,7 @@ const { createSnapshot, restoreSnapshot } = helpers.snapshot
 describe("System Integration Tests", () => {
   let ctx: IntegrationTestContext
   let qcAddress2: SignerWithAddress
-  
+
   before(async () => {
     const signers = await ethers.getSigners()
     qcAddress2 = signers[9]
@@ -43,9 +43,11 @@ describe("System Integration Tests", () => {
     it("should handle complete QC onboarding with SPV validation", async () => {
       // Register QC
       await ctx.qcData.registerQC(ctx.qcAddress.address, TEST_AMOUNTS.LARGE)
-      
+
       expect(await ctx.qcData.isQCRegistered(ctx.qcAddress.address)).to.be.true
-      expect(await ctx.qcData.getQCStatus(ctx.qcAddress.address)).to.equal(QCStatus.Active)
+      expect(await ctx.qcData.getQCStatus(ctx.qcAddress.address)).to.equal(
+        QCStatus.Active
+      )
 
       // Register wallet with SPV proof
       const { challenge, txInfo, proof } = createMockSpvData()
@@ -66,22 +68,24 @@ describe("System Integration Tests", () => {
           challenge
         )
 
-      expect(await ctx.qcData.isWalletRegistered(TEST_DATA.BTC_ADDRESSES.TEST)).to.be.true
+      expect(await ctx.qcData.isWalletRegistered(TEST_DATA.BTC_ADDRESSES.TEST))
+        .to.be.true
 
       // Submit reserves and verify solvency
       await ctx.qcReserveLedger
         .connect(ctx.watchdog1)
         .submitReserveAttestation(ctx.qcAddress.address, TEST_AMOUNTS.MEDIUM)
 
-      expect(await ctx.qcManager.verifyQCSolvency(ctx.qcAddress.address)).to.be.true
+      expect(await ctx.qcManager.verifyQCSolvency(ctx.qcAddress.address)).to.be
+        .true
     })
 
     it("should handle SPV validation failures gracefully", async () => {
       await ctx.qcData.registerQC(ctx.qcAddress.address, TEST_AMOUNTS.LARGE)
-      
+
       // Configure SPV validator to reject
       ctx.mockSpvValidator.verifyWalletControl.returns(false)
-      
+
       const { challenge, txInfo, proof } = createMockSpvData()
       const encodedProof = ethers.utils.defaultAbiCoder.encode(
         [
@@ -102,7 +106,8 @@ describe("System Integration Tests", () => {
           )
       ).to.be.revertedWith("SPVVerificationFailed")
 
-      expect(await ctx.qcData.isWalletRegistered(TEST_DATA.BTC_ADDRESSES.TEST)).to.be.false
+      expect(await ctx.qcData.isWalletRegistered(TEST_DATA.BTC_ADDRESSES.TEST))
+        .to.be.false
     })
   })
 
@@ -139,12 +144,10 @@ describe("System Integration Tests", () => {
         [ctx.qcAddress.address, TEST_AMOUNTS.SMALL]
       )
 
-      await createAndExecuteProposal(
-        ctx,
-        mintProposalData,
-        "Mint 10 tBTC",
-        [ctx.watchdog1, ctx.watchdog2]
-      )
+      await createAndExecuteProposal(ctx, mintProposalData, "Mint 10 tBTC", [
+        ctx.watchdog1,
+        ctx.watchdog2,
+      ])
 
       // Verify minting occurred through Bank
       if (ctx.bank) {
@@ -174,7 +177,9 @@ describe("System Integration Tests", () => {
         )
 
       const receipt = await tx.wait()
-      const event = receipt.events?.find((e) => e.event === "RedemptionInitiated")
+      const event = receipt.events?.find(
+        (e) => e.event === "RedemptionInitiated"
+      )
       const redemptionId = event?.args?.redemptionId
 
       // Advance time past timeout
@@ -197,7 +202,11 @@ describe("System Integration Tests", () => {
     it("should handle consensus-based QC status changes", async () => {
       const proposalData = ethers.utils.defaultAbiCoder.encode(
         ["address", "uint8", "bytes32"],
-        [ctx.qcAddress.address, QCStatus.UnderReview, ethers.utils.id("SUSPICIOUS")]
+        [
+          ctx.qcAddress.address,
+          QCStatus.UnderReview,
+          ethers.utils.id("SUSPICIOUS"),
+        ]
       )
 
       await createAndExecuteProposal(
@@ -225,9 +234,9 @@ describe("System Integration Tests", () => {
         ctx.qcAddress.address,
         TEST_AMOUNTS.LARGE
       )
-      
+
       const proposals = []
-      
+
       // Create multiple proposals rapidly
       for (let i = 0; i < 5; i++) {
         const proposalId = await createAndExecuteProposal(
@@ -237,7 +246,9 @@ describe("System Integration Tests", () => {
             [ctx.qcAddress.address, ethers.utils.parseEther(`${(i + 1) * 10}`)]
           ),
           `Mint ${(i + 1) * 10} tBTC`,
-          i % 2 === 0 ? [ctx.watchdog1, ctx.watchdog2, ctx.watchdog3] : [ctx.watchdog1, ctx.watchdog2]
+          i % 2 === 0
+            ? [ctx.watchdog1, ctx.watchdog2, ctx.watchdog3]
+            : [ctx.watchdog1, ctx.watchdog2]
         )
         proposals.push(proposalId)
       }
@@ -259,13 +270,14 @@ describe("System Integration Tests", () => {
 
     it("should handle emergency pause and recovery", async () => {
       // Trigger emergency
-      await triggerEmergencyPause(
-        ctx,
-        ctx.qcAddress.address,
-        [ctx.watchdog1, ctx.watchdog2, ctx.watchdog3]
-      )
+      await triggerEmergencyPause(ctx, ctx.qcAddress.address, [
+        ctx.watchdog1,
+        ctx.watchdog2,
+        ctx.watchdog3,
+      ])
 
-      expect(await ctx.watchdogMonitor.isEmergencyPaused(ctx.qcAddress.address)).to.be.true
+      expect(await ctx.watchdogMonitor.isEmergencyPaused(ctx.qcAddress.address))
+        .to.be.true
 
       // Operations blocked
       const canMint = await ctx.basicMintingPolicy.canMint(
@@ -335,14 +347,16 @@ describe("System Integration Tests", () => {
 
     it("should handle independent QC emergencies", async () => {
       // Trigger emergency for QC1 only
-      await triggerEmergencyPause(
-        ctx,
-        ctx.qcAddress.address,
-        [ctx.watchdog1, ctx.watchdog2, ctx.watchdog3]
-      )
+      await triggerEmergencyPause(ctx, ctx.qcAddress.address, [
+        ctx.watchdog1,
+        ctx.watchdog2,
+        ctx.watchdog3,
+      ])
 
-      expect(await ctx.watchdogMonitor.isEmergencyPaused(ctx.qcAddress.address)).to.be.true
-      expect(await ctx.watchdogMonitor.isEmergencyPaused(qcAddress2.address)).to.be.false
+      expect(await ctx.watchdogMonitor.isEmergencyPaused(ctx.qcAddress.address))
+        .to.be.true
+      expect(await ctx.watchdogMonitor.isEmergencyPaused(qcAddress2.address)).to
+        .be.false
 
       // QC1 blocked, QC2 operational
       const canMintQC1 = await ctx.basicMintingPolicy.canMint(
@@ -440,7 +454,9 @@ describe("System Integration Tests", () => {
 
       const totalMinted = mintAmount.mul(operations)
       expect(await ctx.tbtc.balanceOf(ctx.user1.address)).to.equal(totalMinted)
-      expect(await ctx.qcData.getQCMintedAmount(ctx.qcAddress.address)).to.equal(totalMinted)
+      expect(
+        await ctx.qcData.getQCMintedAmount(ctx.qcAddress.address)
+      ).to.equal(totalMinted)
     })
   })
 
@@ -476,19 +492,24 @@ describe("System Integration Tests", () => {
       )
 
       // QC approves vault
-      await ctx.bank.connect(ctx.qcAddress).approveBalance(
-        ctx.vault.address,
-        TEST_AMOUNTS.SMALL.mul(5)
-      )
+      await ctx.bank
+        .connect(ctx.qcAddress)
+        .approveBalance(ctx.vault.address, TEST_AMOUNTS.SMALL.mul(5))
 
       // Multiple users mint from same QC balance
       await ctx.vault.connect(ctx.user1).mint(TEST_AMOUNTS.SMALL.mul(2))
       await ctx.vault.connect(ctx.user2).mint(TEST_AMOUNTS.SMALL)
 
       // Verify distribution
-      expect(await ctx.tbtc.balanceOf(ctx.user1.address)).to.equal(TEST_AMOUNTS.SMALL.mul(2))
-      expect(await ctx.tbtc.balanceOf(ctx.user2.address)).to.equal(TEST_AMOUNTS.SMALL)
-      expect(await ctx.bank.balanceOf(ctx.qcAddress.address)).to.equal(TEST_AMOUNTS.SMALL.mul(2))
+      expect(await ctx.tbtc.balanceOf(ctx.user1.address)).to.equal(
+        TEST_AMOUNTS.SMALL.mul(2)
+      )
+      expect(await ctx.tbtc.balanceOf(ctx.user2.address)).to.equal(
+        TEST_AMOUNTS.SMALL
+      )
+      expect(await ctx.bank.balanceOf(ctx.qcAddress.address)).to.equal(
+        TEST_AMOUNTS.SMALL.mul(2)
+      )
     })
   })
 
@@ -506,8 +527,12 @@ describe("System Integration Tests", () => {
       )
 
       // Deploy new policy
-      const NewPolicyFactory = await ethers.getContractFactory("BasicMintingPolicy")
-      const newPolicy = await NewPolicyFactory.deploy(ctx.protocolRegistry.address)
+      const NewPolicyFactory = await ethers.getContractFactory(
+        "BasicMintingPolicy"
+      )
+      const newPolicy = await NewPolicyFactory.deploy(
+        ctx.protocolRegistry.address
+      )
       await newPolicy.deployed()
 
       // Update registry
@@ -529,7 +554,9 @@ describe("System Integration Tests", () => {
         TEST_AMOUNTS.SMALL
       )
 
-      expect(await ctx.tbtc.balanceOf(ctx.user1.address)).to.equal(TEST_AMOUNTS.SMALL.mul(2))
+      expect(await ctx.tbtc.balanceOf(ctx.user1.address)).to.equal(
+        TEST_AMOUNTS.SMALL.mul(2)
+      )
     })
 
     it("should handle dynamic watchdog configuration", async () => {

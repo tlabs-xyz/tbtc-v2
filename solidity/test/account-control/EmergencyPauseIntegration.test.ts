@@ -2,7 +2,7 @@ import chai, { expect } from "chai"
 import { ethers, helpers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
-import { 
+import {
   QCMinter,
   QCRedeemer,
   BasicMintingPolicy,
@@ -15,7 +15,7 @@ import {
   Bank,
   TBTCVault,
   IMintingPolicy,
-  IRedemptionPolicy
+  IRedemptionPolicy,
 } from "../../typechain"
 
 chai.use(smock.matchers)
@@ -35,7 +35,7 @@ describe("Emergency Pause Integration", () => {
   let basicRedemptionPolicy: BasicRedemptionPolicy
   let systemState: SystemState
   let protocolRegistry: ProtocolRegistry
-  
+
   // Mock contracts
   let mockQcData: FakeContract<QCData>
   let mockTbtc: FakeContract<TBTC>
@@ -46,7 +46,7 @@ describe("Emergency Pause Integration", () => {
   let PAUSER_ROLE: string
   let MINTER_ROLE: string
   let REDEEMER_ROLE: string
-  
+
   // Service keys
   let SYSTEM_STATE_KEY: string
   let MINTING_POLICY_KEY: string
@@ -70,9 +70,9 @@ describe("Emergency Pause Integration", () => {
 
     // Generate role constants
     PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")
-    MINTER_ROLE = ethers.utils.id("MINTER_ROLE") 
+    MINTER_ROLE = ethers.utils.id("MINTER_ROLE")
     REDEEMER_ROLE = ethers.utils.id("REDEEMER_ROLE")
-    
+
     // Generate service keys
     SYSTEM_STATE_KEY = ethers.utils.id("SYSTEM_STATE")
     MINTING_POLICY_KEY = ethers.utils.id("MINTING_POLICY")
@@ -87,7 +87,9 @@ describe("Emergency Pause Integration", () => {
     await createSnapshot()
 
     // Deploy ProtocolRegistry
-    const ProtocolRegistryFactory = await ethers.getContractFactory("ProtocolRegistry")
+    const ProtocolRegistryFactory = await ethers.getContractFactory(
+      "ProtocolRegistry"
+    )
     protocolRegistry = await ProtocolRegistryFactory.deploy()
     await protocolRegistry.deployed()
 
@@ -95,7 +97,7 @@ describe("Emergency Pause Integration", () => {
     const SystemStateFactory = await ethers.getContractFactory("SystemState")
     systemState = await SystemStateFactory.deploy()
     await systemState.deployed()
-    
+
     // Grant PAUSER_ROLE to pauser
     await systemState.grantRole(PAUSER_ROLE, pauser.address)
 
@@ -105,8 +107,10 @@ describe("Emergency Pause Integration", () => {
     mockBank = await smock.fake<Bank>("Bank")
     mockTbtcVault = await smock.fake<TBTCVault>("TBTCVault")
 
-    // Deploy BasicMintingPolicy 
-    const BasicMintingPolicyFactory = await ethers.getContractFactory("BasicMintingPolicy")
+    // Deploy BasicMintingPolicy
+    const BasicMintingPolicyFactory = await ethers.getContractFactory(
+      "BasicMintingPolicy"
+    )
     basicMintingPolicy = await BasicMintingPolicyFactory.deploy(
       protocolRegistry.address,
       mockBank.address,
@@ -116,7 +120,9 @@ describe("Emergency Pause Integration", () => {
     await basicMintingPolicy.deployed()
 
     // Deploy BasicRedemptionPolicy
-    const BasicRedemptionPolicyFactory = await ethers.getContractFactory("BasicRedemptionPolicy")
+    const BasicRedemptionPolicyFactory = await ethers.getContractFactory(
+      "BasicRedemptionPolicy"
+    )
     basicRedemptionPolicy = await BasicRedemptionPolicyFactory.deploy(
       protocolRegistry.address
     )
@@ -126,7 +132,7 @@ describe("Emergency Pause Integration", () => {
     const QCMinterFactory = await ethers.getContractFactory("QCMinter")
     qcMinter = await QCMinterFactory.deploy(protocolRegistry.address)
     await qcMinter.deployed()
-    
+
     // Grant MINTER_ROLE to user for testing
     await qcMinter.grantRole(MINTER_ROLE, user.address)
     await basicMintingPolicy.grantRole(MINTER_ROLE, qcMinter.address)
@@ -135,18 +141,30 @@ describe("Emergency Pause Integration", () => {
     const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer")
     qcRedeemer = await QCRedeemerFactory.deploy(protocolRegistry.address)
     await qcRedeemer.deployed()
-    
+
     // Grant REDEEMER_ROLE for testing
     await basicRedemptionPolicy.grantRole(REDEEMER_ROLE, qcRedeemer.address)
 
     // Register services in ProtocolRegistry
-    await protocolRegistry.registerService(SYSTEM_STATE_KEY, systemState.address)
-    await protocolRegistry.registerService(MINTING_POLICY_KEY, basicMintingPolicy.address)
-    await protocolRegistry.registerService(REDEMPTION_POLICY_KEY, basicRedemptionPolicy.address)
+    await protocolRegistry.registerService(
+      SYSTEM_STATE_KEY,
+      systemState.address
+    )
+    await protocolRegistry.registerService(
+      MINTING_POLICY_KEY,
+      basicMintingPolicy.address
+    )
+    await protocolRegistry.registerService(
+      REDEMPTION_POLICY_KEY,
+      basicRedemptionPolicy.address
+    )
     await protocolRegistry.registerService(QC_DATA_KEY, mockQcData.address)
     await protocolRegistry.registerService(TBTC_TOKEN_KEY, mockTbtc.address)
     await protocolRegistry.registerService(BANK_KEY, mockBank.address)
-    await protocolRegistry.registerService(TBTC_VAULT_KEY, mockTbtcVault.address)
+    await protocolRegistry.registerService(
+      TBTC_VAULT_KEY,
+      mockTbtcVault.address
+    )
 
     // Set up basic mock responses for successful operations
     mockQcData.isQCRegistered.returns(true)
@@ -162,7 +180,8 @@ describe("Emergency Pause Integration", () => {
 
   describe("QCMinter Emergency Pause Integration", () => {
     it("should allow minting when QC is not emergency paused", async () => {
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .false
 
       await expect(
         qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
@@ -171,8 +190,11 @@ describe("Emergency Pause Integration", () => {
 
     it("should block minting when QC is emergency paused", async () => {
       // Emergency pause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.true
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .true
 
       // Attempt to mint should revert
       await expect(
@@ -182,9 +204,12 @@ describe("Emergency Pause Integration", () => {
 
     it("should allow minting after emergency unpause", async () => {
       // Emergency pause then unpause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
       await systemState.connect(pauser).emergencyUnpauseQC(qcAddress.address)
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .false
 
       // Should be able to mint again
       await expect(
@@ -197,33 +222,52 @@ describe("Emergency Pause Integration", () => {
     const userBtcAddress = "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"
 
     it("should allow redemption when QC is not emergency paused", async () => {
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .false
 
       await expect(
-        qcRedeemer.initiateRedemption(qcAddress.address, mintAmount, userBtcAddress)
+        qcRedeemer.initiateRedemption(
+          qcAddress.address,
+          mintAmount,
+          userBtcAddress
+        )
       ).to.not.be.reverted
     })
 
     it("should block redemption when QC is emergency paused", async () => {
       // Emergency pause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.true
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .true
 
       // Attempt to redeem should revert
       await expect(
-        qcRedeemer.initiateRedemption(qcAddress.address, mintAmount, userBtcAddress)
+        qcRedeemer.initiateRedemption(
+          qcAddress.address,
+          mintAmount,
+          userBtcAddress
+        )
       ).to.be.revertedWith("QCIsEmergencyPaused")
     })
 
     it("should allow redemption after emergency unpause", async () => {
       // Emergency pause then unpause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
       await systemState.connect(pauser).emergencyUnpauseQC(qcAddress.address)
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .false
 
       // Should be able to redeem again
       await expect(
-        qcRedeemer.initiateRedemption(qcAddress.address, mintAmount, userBtcAddress)
+        qcRedeemer.initiateRedemption(
+          qcAddress.address,
+          mintAmount,
+          userBtcAddress
+        )
       ).to.not.be.reverted
     })
   })
@@ -235,33 +279,53 @@ describe("Emergency Pause Integration", () => {
     })
 
     it("should approve minting when QC is not emergency paused", async () => {
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .false
 
       await expect(
-        basicMintingPolicy.connect(user).requestMint(qcAddress.address, user.address, mintAmount)
+        basicMintingPolicy
+          .connect(user)
+          .requestMint(qcAddress.address, user.address, mintAmount)
       ).to.not.be.reverted
     })
 
     it("should reject minting when QC is emergency paused", async () => {
       // Emergency pause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.true
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .true
 
       // Attempt to mint should revert
       await expect(
-        basicMintingPolicy.connect(user).requestMint(qcAddress.address, user.address, mintAmount)
+        basicMintingPolicy
+          .connect(user)
+          .requestMint(qcAddress.address, user.address, mintAmount)
       ).to.be.revertedWith("QCIsEmergencyPaused")
     })
 
     it("should emit MintRejected event when QC is emergency paused", async () => {
       // Emergency pause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
 
       // Should emit rejection event
       await expect(
-        basicMintingPolicy.connect(user).requestMint(qcAddress.address, user.address, mintAmount)
-      ).to.emit(basicMintingPolicy, "MintRejected")
-        .withArgs(qcAddress.address, user.address, mintAmount, "QC emergency paused", user.address, anyValue)
+        basicMintingPolicy
+          .connect(user)
+          .requestMint(qcAddress.address, user.address, mintAmount)
+      )
+        .to.emit(basicMintingPolicy, "MintRejected")
+        .withArgs(
+          qcAddress.address,
+          user.address,
+          mintAmount,
+          "QC emergency paused",
+          user.address,
+          anyValue
+        )
     })
   })
 
@@ -275,42 +339,55 @@ describe("Emergency Pause Integration", () => {
     })
 
     it("should validate redemption when QC is not emergency paused", async () => {
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .false
 
-      expect(await basicRedemptionPolicy.validateRedemptionRequest(
-        user.address, 
-        qcAddress.address, 
-        mintAmount
-      )).to.be.true
+      expect(
+        await basicRedemptionPolicy.validateRedemptionRequest(
+          user.address,
+          qcAddress.address,
+          mintAmount
+        )
+      ).to.be.true
     })
 
     it("should reject redemption validation when QC is emergency paused", async () => {
       // Emergency pause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.true
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .true
 
       // Validation should return false
-      expect(await basicRedemptionPolicy.validateRedemptionRequest(
-        user.address, 
-        qcAddress.address, 
-        mintAmount
-      )).to.be.false
+      expect(
+        await basicRedemptionPolicy.validateRedemptionRequest(
+          user.address,
+          qcAddress.address,
+          mintAmount
+        )
+      ).to.be.false
     })
 
     it("should reject redemption request when QC is emergency paused", async () => {
       // Emergency pause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.true
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .true
 
       // Request should revert due to validation failure
       await expect(
-        basicRedemptionPolicy.connect(user).requestRedemption(
-          redemptionId,
-          qcAddress.address,
-          user.address,
-          mintAmount,
-          userBtcAddress
-        )
+        basicRedemptionPolicy
+          .connect(user)
+          .requestRedemption(
+            redemptionId,
+            qcAddress.address,
+            user.address,
+            mintAmount,
+            userBtcAddress
+          )
       ).to.be.revertedWith("ValidationFailed")
     })
   })
@@ -323,14 +400,21 @@ describe("Emergency Pause Integration", () => {
       await expect(
         qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
       ).to.not.be.reverted
-      
+
       await expect(
-        qcRedeemer.initiateRedemption(qcAddress.address, mintAmount, userBtcAddress)
+        qcRedeemer.initiateRedemption(
+          qcAddress.address,
+          mintAmount,
+          userBtcAddress
+        )
       ).to.not.be.reverted
 
       // Emergency pause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.true
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .true
 
       // All operations should now be blocked
       await expect(
@@ -338,23 +422,33 @@ describe("Emergency Pause Integration", () => {
       ).to.be.revertedWith("QCIsEmergencyPaused")
 
       await expect(
-        qcRedeemer.initiateRedemption(qcAddress.address, mintAmount, userBtcAddress)
+        qcRedeemer.initiateRedemption(
+          qcAddress.address,
+          mintAmount,
+          userBtcAddress
+        )
       ).to.be.revertedWith("QCIsEmergencyPaused")
 
-      expect(await basicRedemptionPolicy.validateRedemptionRequest(
-        user.address, 
-        qcAddress.address, 
-        mintAmount
-      )).to.be.false
+      expect(
+        await basicRedemptionPolicy.validateRedemptionRequest(
+          user.address,
+          qcAddress.address,
+          mintAmount
+        )
+      ).to.be.false
     })
 
     it("should only affect the specific emergency paused QC, not others", async () => {
       const [, , , anotherQC] = await ethers.getSigners()
 
       // Emergency pause only one QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.true
-      expect(await systemState.isQCEmergencyPaused(anotherQC.address)).to.be.false
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .true
+      expect(await systemState.isQCEmergencyPaused(anotherQC.address)).to.be
+        .false
 
       // Operations should be blocked for paused QC
       await expect(
@@ -369,9 +463,12 @@ describe("Emergency Pause Integration", () => {
 
     it("should restore all operations after emergency unpause", async () => {
       // Emergency pause then unpause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
       await systemState.connect(pauser).emergencyUnpauseQC(qcAddress.address)
-      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be.false
+      expect(await systemState.isQCEmergencyPaused(qcAddress.address)).to.be
+        .false
 
       // All operations should work again
       await expect(
@@ -379,14 +476,20 @@ describe("Emergency Pause Integration", () => {
       ).to.not.be.reverted
 
       await expect(
-        qcRedeemer.initiateRedemption(qcAddress.address, mintAmount, userBtcAddress)
+        qcRedeemer.initiateRedemption(
+          qcAddress.address,
+          mintAmount,
+          userBtcAddress
+        )
       ).to.not.be.reverted
 
-      expect(await basicRedemptionPolicy.validateRedemptionRequest(
-        user.address, 
-        qcAddress.address, 
-        mintAmount
-      )).to.be.true
+      expect(
+        await basicRedemptionPolicy.validateRedemptionRequest(
+          user.address,
+          qcAddress.address,
+          mintAmount
+        )
+      ).to.be.true
     })
   })
 
@@ -394,23 +497,33 @@ describe("Emergency Pause Integration", () => {
     it("should only allow PAUSER_ROLE to emergency pause QCs", async () => {
       // Non-pauser should not be able to pause
       await expect(
-        systemState.connect(thirdParty).emergencyPauseQC(qcAddress.address, emergencyReason)
-      ).to.be.revertedWith(`AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`)
+        systemState
+          .connect(thirdParty)
+          .emergencyPauseQC(qcAddress.address, emergencyReason)
+      ).to.be.revertedWith(
+        `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
+      )
 
       // Pauser should be able to pause
       await expect(
-        systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
+        systemState
+          .connect(pauser)
+          .emergencyPauseQC(qcAddress.address, emergencyReason)
       ).to.not.be.reverted
     })
 
     it("should only allow PAUSER_ROLE to emergency unpause QCs", async () => {
       // First pause the QC
-      await systemState.connect(pauser).emergencyPauseQC(qcAddress.address, emergencyReason)
+      await systemState
+        .connect(pauser)
+        .emergencyPauseQC(qcAddress.address, emergencyReason)
 
       // Non-pauser should not be able to unpause
       await expect(
         systemState.connect(thirdParty).emergencyUnpauseQC(qcAddress.address)
-      ).to.be.revertedWith(`AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`)
+      ).to.be.revertedWith(
+        `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
+      )
 
       // Pauser should be able to unpause
       await expect(
