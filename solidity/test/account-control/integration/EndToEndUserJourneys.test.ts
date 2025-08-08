@@ -319,8 +319,6 @@ describe("End-to-End User Journeys", () => {
       )
 
       // PHASE 1: Retail minting
-      console.log("Phase 1: Retail Minting")
-      
       // 1.1 Multiple small mints
       const retailAmounts = [
         ethers.utils.parseEther("0.1"),  // 0.1 tBTC

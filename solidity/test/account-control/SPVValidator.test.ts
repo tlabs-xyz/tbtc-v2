@@ -1,5 +1,5 @@
-import { ethers, helpers } from "hardhat"
 import { expect } from "chai"
+import { ethers, helpers } from "hardhat"
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers"
 
 import type { SPVValidator, LightRelayStub, SystemTestRelay } from "../../typechain"

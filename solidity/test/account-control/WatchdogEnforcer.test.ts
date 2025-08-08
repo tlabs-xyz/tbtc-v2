@@ -42,8 +42,11 @@ describe("WatchdogEnforcer", () => {
   const minCollateralRatio = 100 // 100% = 1:1 ratio
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, watchdog, qcAddress, randomUser] = await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    watchdog = signers[1]
+    qcAddress = signers[2]
+    randomUser = signers[3]
 
     // Generate role hashes
     MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")

@@ -1,5 +1,5 @@
-import { ethers } from "hardhat"
 import { expect } from "chai"
+import { ethers } from "hardhat"
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers"
 
 import type { SPVValidator, SystemTestRelay } from "../../typechain"
@@ -99,8 +99,8 @@ describe("SPVValidator Integration Tests", () => {
   }
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer] = await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
 
     // Deploy relay stub with realistic difficulty values
     const SystemTestRelay = await ethers.getContractFactory("SystemTestRelay")

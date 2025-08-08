@@ -66,9 +66,12 @@ describe("Account Control System - Integration Test", () => {
   let ARBITER_ROLE: string
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, governance, qcAddress, user, watchdog] =
-      await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    governance = signers[1]
+    qcAddress = signers[2]
+    user = signers[3]
+    watchdog = signers[4]
 
     // Generate service keys
     QC_DATA_KEY = ethers.utils.id("QC_DATA")
