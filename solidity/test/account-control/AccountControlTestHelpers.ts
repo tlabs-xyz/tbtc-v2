@@ -119,7 +119,7 @@ export interface AccountControlFixture {
   systemState: SystemState
   qcMinter: QCMinter
   qcRedeemer: QCRedeemer
-  qcQCReserveLedger: QCReserveLedger
+  qcReserveLedger: QCReserveLedger
   basicMintingPolicy: BasicMintingPolicy
   basicRedemptionPolicy: BasicRedemptionPolicy
   qcWatchdog: QCWatchdog
@@ -146,9 +146,9 @@ export interface AccountControlFixture {
 export interface SecurityTestFixture
   extends Omit<AccountControlFixture, "tbtc"> {
   // Mock TBTC token for security tests
-  tbtc: FakeContract<TBTC>
+  tbtc: any // Using MockTBTCToken
   // Mock SPV validator for security tests
-  mockSpvValidator: FakeContract<SPVValidator>
+  mockSpvValidator: any // Using MockSPVValidator
 }
 
 /**
@@ -189,16 +189,17 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   const QCReserveLedgerFactory = await ethers.getContractFactory(
     "QCReserveLedger"
   )
-  const qcQCReserveLedger = await QCReserveLedgerFactory.deploy(
-    protocolRegistry.address
-  )
-  await qcQCReserveLedger.deployed()
+  const qcReserveLedger = await QCReserveLedgerFactory.deploy()
+  await qcReserveLedger.deployed()
 
   // Deploy policy contracts
   const BasicMintingPolicyFactory = await ethers.getContractFactory(
     "BasicMintingPolicy"
   )
   const basicMintingPolicy = await BasicMintingPolicyFactory.deploy(
+    deployer.address, // bank placeholder
+    deployer.address, // tbtcVault placeholder
+    deployer.address, // tbtc placeholder
     protocolRegistry.address
   )
   await basicMintingPolicy.deployed()
@@ -211,12 +212,15 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   )
   await basicRedemptionPolicy.deployed()
 
-  // Deploy QCWatchdog
-  const QCWatchdogFactory = await ethers.getContractFactory(
-    "QCWatchdog"
+  // Deploy WatchdogEnforcer
+  const WatchdogEnforcerFactory = await ethers.getContractFactory(
+    "WatchdogEnforcer"
   )
-  const qcWatchdog = await QCWatchdogFactory.deploy(
-    protocolRegistry.address
+  const qcWatchdog = await WatchdogEnforcerFactory.deploy(
+    qcReserveLedger.address,
+    qcManager.address,
+    qcData.address,
+    systemState.address
   )
   await qcWatchdog.deployed()
 
@@ -230,7 +234,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     qcRedeemer.address,
     qcData.address,
     systemState.address,
-    qcQCReserveLedger.address
+    qcReserveLedger.address
   )
   await watchdogAutomatedEnforcement.deployed()
 
@@ -274,7 +278,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   )
   await protocolRegistry.setService(
     SERVICE_KEYS.QC_RESERVE_LEDGER,
-    qcQCReserveLedger.address
+    qcReserveLedger.address
   )
   await protocolRegistry.setService(
     SERVICE_KEYS.MINTING_POLICY,
@@ -309,7 +313,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
   await qcManager.grantRole(ROLES.REGISTRAR_ROLE, watchdog.address)
   await qcManager.grantRole(ROLES.ARBITER_ROLE, watchdog.address)
   await qcManager.grantRole(ROLES.QC_ADMIN_ROLE, basicMintingPolicy.address) // Grant role to policy for minting
-  await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
+  await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
   await qcWatchdog.grantRole(ROLES.WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
   // Grant roles for Automated Decision Framework
@@ -335,7 +339,7 @@ export async function deployAccountControlFixture(): Promise<AccountControlFixtu
     systemState,
     qcMinter,
     qcRedeemer,
-    qcQCReserveLedger,
+    qcReserveLedger,
     basicMintingPolicy,
     basicRedemptionPolicy,
     qcWatchdog,
@@ -358,51 +362,71 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
   const [deployer, governance, qcAddress, user, watchdog] =
     await ethers.getSigners()
 
+  console.log("Deploying ProtocolRegistry...")
   // Deploy ProtocolRegistry
   const ProtocolRegistryFactory = await ethers.getContractFactory(
     "ProtocolRegistry"
   )
   const protocolRegistry = await ProtocolRegistryFactory.deploy()
   await protocolRegistry.deployed()
+  console.log("ProtocolRegistry deployed")
 
   // Deploy core contracts
+  console.log("About to deploy QCData...")
   const QCDataFactory = await ethers.getContractFactory("QCData")
   const qcData = await QCDataFactory.deploy()
   await qcData.deployed()
+  console.log("QCData deployed")
 
+  console.log("About to deploy SystemState...")
   const SystemStateFactory = await ethers.getContractFactory("SystemState")
   const systemState = await SystemStateFactory.deploy()
   await systemState.deployed()
+  console.log("SystemState deployed")
 
+  console.log("About to deploy QCManager...")
   const QCManagerFactory = await ethers.getContractFactory("QCManager")
   const qcManager = await QCManagerFactory.deploy(protocolRegistry.address)
   await qcManager.deployed()
+  console.log("QCManager deployed")
 
+  console.log("About to deploy QCMinter...")
   const QCMinterFactory = await ethers.getContractFactory("QCMinter")
   const qcMinter = await QCMinterFactory.deploy(protocolRegistry.address)
   await qcMinter.deployed()
+  console.log("QCMinter deployed")
 
+  console.log("About to deploy QCRedeemer...")
   const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer")
   const qcRedeemer = await QCRedeemerFactory.deploy(protocolRegistry.address)
   await qcRedeemer.deployed()
+  console.log("QCRedeemer deployed")
 
+  console.log("About to deploy QCReserveLedger...")
   const QCReserveLedgerFactory = await ethers.getContractFactory(
     "QCReserveLedger"
   )
-  const qcQCReserveLedger = await QCReserveLedgerFactory.deploy(
-    protocolRegistry.address
-  )
-  await qcQCReserveLedger.deployed()
+  const qcReserveLedger = await QCReserveLedgerFactory.deploy()
+  await qcReserveLedger.deployed()
+  console.log("QCReserveLedger deployed")
 
   // Deploy policy contracts
+  console.log("About to deploy BasicMintingPolicy...")
   const BasicMintingPolicyFactory = await ethers.getContractFactory(
     "BasicMintingPolicy"
   )
+  // For testing, we'll use placeholder addresses for bank, tbtcVault, and tbtc
+  // These will be replaced with proper mocks later in the setup
   const basicMintingPolicy = await BasicMintingPolicyFactory.deploy(
+    deployer.address, // bank placeholder
+    deployer.address, // tbtcVault placeholder
+    deployer.address, // tbtc placeholder
     protocolRegistry.address
   )
   await basicMintingPolicy.deployed()
+  console.log("BasicMintingPolicy deployed")
 
+  console.log("About to deploy BasicRedemptionPolicy...")
   const BasicRedemptionPolicyFactory = await ethers.getContractFactory(
     "BasicRedemptionPolicy"
   )
@@ -410,27 +434,37 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
     protocolRegistry.address
   )
   await basicRedemptionPolicy.deployed()
+  console.log("BasicRedemptionPolicy deployed")
 
-  // Deploy QCWatchdog
-  const QCWatchdogFactory = await ethers.getContractFactory(
-    "QCWatchdog"
+  // Deploy WatchdogEnforcer
+  console.log("About to deploy WatchdogEnforcer...")
+  const WatchdogEnforcerFactory = await ethers.getContractFactory(
+    "WatchdogEnforcer"
   )
-  const qcWatchdog = await QCWatchdogFactory.deploy(
-    protocolRegistry.address
+  const qcWatchdog = await WatchdogEnforcerFactory.deploy(
+    qcReserveLedger.address,
+    qcManager.address,
+    qcData.address,
+    systemState.address
   )
   await qcWatchdog.deployed()
+  console.log("WatchdogEnforcer deployed")
 
-  // Create mock TBTC token for security tests
-  const tbtc = await smock.fake<TBTC>("TBTC")
+  console.log("About to deploy MockTBTCToken...")
+  // Deploy mock TBTC token for security tests
+  const MockTBTCTokenFactory = await ethers.getContractFactory("MockTBTCToken")
+  const tbtc = await MockTBTCTokenFactory.deploy()
+  await tbtc.deployed()
+  console.log("MockTBTCToken deployed")
 
-  // Create mock SPV validator for security tests
-  const mockSpvValidator = await smock.fake<SPVValidator>("SPVValidator")
+  console.log("About to deploy MockSPVValidator...")
+  // Deploy mock SPV validator for security tests
+  const MockSPVValidatorFactory = await ethers.getContractFactory("MockSPVValidator")
+  const mockSpvValidator = await MockSPVValidatorFactory.deploy()
+  await mockSpvValidator.deployed()
+  console.log("MockSPVValidator deployed")
 
-  // Configure SPV validator to return true for wallet control verification
-  mockSpvValidator.verifyWalletControl.returns(true)
-
-  // Configure SPV validator to return true for redemption fulfillment verification
-  mockSpvValidator.verifyRedemptionFulfillment.returns(true)
+  // MockSPVValidator is configured to return true by default
 
   // Register all services in ProtocolRegistry
   await protocolRegistry.setService(SERVICE_KEYS.QC_DATA, qcData.address)
@@ -446,7 +480,7 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
   )
   await protocolRegistry.setService(
     SERVICE_KEYS.QC_RESERVE_LEDGER,
-    qcQCReserveLedger.address
+    qcReserveLedger.address
   )
   await protocolRegistry.setService(
     SERVICE_KEYS.MINTING_POLICY,
@@ -467,16 +501,16 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
   await qcManager.grantRole(ROLES.REGISTRAR_ROLE, watchdog.address)
   await qcManager.grantRole(ROLES.ARBITER_ROLE, watchdog.address)
   await qcManager.grantRole(ROLES.QC_ADMIN_ROLE, basicMintingPolicy.address) // Grant role to policy for minting
-  await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
+  await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
   await qcWatchdog.grantRole(ROLES.WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
   // Grant roles to QCWatchdog contract so it can call other contracts
   await qcManager.grantRole(ROLES.REGISTRAR_ROLE, qcWatchdog.address)
   await qcManager.grantRole(ROLES.ARBITER_ROLE, qcWatchdog.address)
-  await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, qcWatchdog.address)
+  await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, qcWatchdog.address)
 
   // Grant QCManager the ATTESTER_ROLE so it can update reserves during wallet deregistration
-  await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, qcManager.address)
+  await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, qcManager.address)
 
   // Register SPV validator in protocol registry
   await protocolRegistry.setService(
@@ -493,7 +527,7 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
     systemState,
     qcMinter,
     qcRedeemer,
-    qcQCReserveLedger,
+    qcReserveLedger,
     basicMintingPolicy,
     basicRedemptionPolicy,
     qcWatchdog,
@@ -516,7 +550,7 @@ export async function setupQCWithWallets(
   walletAddresses: string[] = [TEST_DATA.BTC_ADDRESSES.TEST],
   reserveBalance: typeof ethers.BigNumber = TEST_DATA.AMOUNTS.RESERVE_BALANCE
 ) {
-  const { qcData, qcManager, qcQCReserveLedger, watchdog } = fixture
+  const { qcData, qcManager, qcReserveLedger, watchdog } = fixture
 
   // Register QC directly via QCData for testing
   await qcData.registerQC(qcAddress, ethers.utils.parseEther("1000"))
@@ -533,9 +567,9 @@ export async function setupQCWithWallets(
   }, Promise.resolve())
 
   // Submit reserve attestation
-  await qcQCReserveLedger
+  await qcReserveLedger
     .connect(watchdog)
-    .submitReserveAttestation(qcAddress, reserveBalance)
+    .submitAttestation(qcAddress, reserveBalance)
 }
 
 /**
@@ -803,7 +837,7 @@ export function validateTestFixture(fixture: AccountControlFixture): void {
     "systemState",
     "qcMinter",
     "qcRedeemer",
-    "qcQCReserveLedger",
+    "qcReserveLedger",
     "basicMintingPolicy",
     "basicRedemptionPolicy",
     "qcWatchdog",
