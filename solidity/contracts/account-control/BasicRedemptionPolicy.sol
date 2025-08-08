@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/IRedemptionPolicy.sol";
 import "./ProtocolRegistry.sol";
 import "./QCData.sol";
@@ -19,7 +20,7 @@ import "./interfaces/ISPVValidator.sol";
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - ARBITER_ROLE: Can record fulfillments and flag defaults
 /// - REDEEMER_ROLE: Can request redemptions (typically granted to QCRedeemer contract)
-contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
+contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl, ReentrancyGuard {
     // Custom errors for gas-efficient reverts
     error InvalidRedemptionId();
     error RedemptionIdAlreadyUsed(bytes32 redemptionId);
@@ -235,13 +236,14 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
     /// @param txInfo Bitcoin transaction information
     /// @param proof SPV proof of transaction inclusion
     /// @return success True if the fulfillment was successfully recorded
+    /// @dev SECURITY: nonReentrant protects against double-fulfillment via reentrancy
     function recordFulfillment(
         bytes32 redemptionId,
         string calldata userBtcAddress,
         uint64 expectedAmount,
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
-    ) external override onlyRole(ARBITER_ROLE) returns (bool success) {
+    ) external override onlyRole(ARBITER_ROLE) nonReentrant returns (bool success) {
         // Input validation
         if (redemptionId == bytes32(0)) {
             revert InvalidRedemptionId();
