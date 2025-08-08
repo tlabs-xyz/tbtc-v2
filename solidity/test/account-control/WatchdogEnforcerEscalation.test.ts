@@ -44,8 +44,12 @@ describe("WatchdogEnforcer Escalation", () => {
   const REQUIRED_AMOUNT = ethers.utils.parseEther("12")
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, watchdog, qcAddress, pauser, thirdParty] = await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    watchdog = signers[1]
+    qcAddress = signers[2]
+    pauser = signers[3]
+    thirdParty = signers[4]
 
     // Generate role constants
     PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")

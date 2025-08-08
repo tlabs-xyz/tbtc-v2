@@ -47,9 +47,12 @@ describe("BasicRedemptionPolicy", () => {
   const bitcoinAddress = "bc1qtest123456789"
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, governance, user, qcAddress, thirdParty] =
-      await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    governance = signers[1]
+    user = signers[2]
+    qcAddress = signers[3]
+    thirdParty = signers[4]
 
     // Generate service keys
     QC_DATA_KEY = ethers.utils.id("QC_DATA")

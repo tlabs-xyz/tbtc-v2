@@ -16,7 +16,6 @@ describe("QCReserveLedger", () => {
   let reserveLedger: QCReserveLedger
 
   const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
-  // const MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE") // Role doesn't exist in current contract
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
 
   before(async () => {
@@ -43,7 +42,6 @@ describe("QCReserveLedger", () => {
     await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester2.address)
     await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester3.address)
     await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester4.address)
-    // await reserveLedger.connect(deployer).grantRole(MANAGER_ROLE, qcManager.address) // Role doesn't exist
   })
 
   afterEach(async () => {
@@ -56,7 +54,6 @@ describe("QCReserveLedger", () => {
       expect(await reserveLedger.attestationTimeout()).to.equal(21600) // 6 hours
       expect(await reserveLedger.maxStaleness()).to.equal(86400) // 24 hours
       expect(await reserveLedger.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true
-      // expect(await reserveLedger.hasRole(MANAGER_ROLE, deployer.address)).to.be.true // Role doesn't exist
     })
   })
 
