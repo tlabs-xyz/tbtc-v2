@@ -26,8 +26,11 @@ describe("QCMinter", () => {
   const mintId = ethers.utils.id("test_mint_id")
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, user, qcAddress, thirdParty] = await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    user = signers[1]
+    qcAddress = signers[2]
+    thirdParty = signers[3]
 
     // Generate service keys
     MINTING_POLICY_KEY = ethers.utils.id("MINTING_POLICY")
