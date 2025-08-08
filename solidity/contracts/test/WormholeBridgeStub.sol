@@ -16,9 +16,7 @@ contract WormholeBridgeStub is IWormholeTokenBridge {
 
     // Two simple events allowing to assert Wormhole bridge functions are
     // called.
-    // solhint-disable-next-line event-name-camelcase
     event WormholeBridgeStub_completeTransferWithPayload(bytes encodedVm);
-    // solhint-disable-next-line event-name-camelcase
     event WormholeBridgeStub_transferTokens(
         address token,
         uint256 amount,
@@ -27,7 +25,6 @@ contract WormholeBridgeStub is IWormholeTokenBridge {
         uint256 arbiterFee,
         uint32 nonce
     );
-    // solhint-disable-next-line event-name-camelcase
     event WormholeBridgeStub_transferTokensWithPayload(
         address token,
         uint256 amount,
