@@ -84,39 +84,39 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 
 #### 3.1.1 Happy Path
 
-1. **DAO Queues QC Onboarding** (Time-locked action)
+1. **DAO Registers QC** (Instant action)
 
-   - DAO calls `QCManager.registerQC(qcAddress, maxMintingCap)`
-   - 7-day waiting period begins
-   - Event: `GovernanceActionQueued`
+   - DAO calls `QCManager.registerQC(qcAddress, maxMintingCap)` with `QC_GOVERNANCE_ROLE`
+   - QC status immediately set to `Active` in QCData
+   - Events: `QCRegistrationInitiated`, `QCOnboarded`
 
-2. **DAO Executes QC Onboarding** (After time-lock)
+2. **QC Initiates Wallet Registration**
 
-   - System performs instant validation and onboarding
-   - QC status set to `Active` in QCData
-   - Event: `QCOnboarded`
-
-3. **QC Registers Bitcoin Wallets**
    - QC generates Bitcoin addresses and creates OP_RETURN proof
-   - QC calls `QCManager.requestWalletRegistration(btcAddress, spvProof)`
-   - Watchdog validates proof and calls `QCManager.finalizeWalletRegistration(qc, btcAddress)`
+   - QC submits wallet registration request (off-chain or via separate interface)
+   - Event: `WalletRegistrationRequested`
+
+3. **Watchdog Validates and Registers Wallet**
+   - Watchdog validates OP_RETURN proof using `SPVValidator`
+   - Watchdog calls `QCManager.registerWallet(qc, btcAddress, spvProof)` with `REGISTRAR_ROLE`
    - Wallet status set to `Active`
-   - Events: `WalletRegistrationRequested`, `WalletRegistered`
+   - Event: `WalletRegistered`
 
 **Script Requirements**:
 
 - Deploy all system contracts
-- Set up DAO governance roles
+- Set up DAO governance roles (`QC_GOVERNANCE_ROLE`)
+- Set up watchdog roles (`REGISTRAR_ROLE`, `ATTESTER_ROLE`)
 - Generate Bitcoin addresses and OP_RETURN proofs
-- Implement time-lock waiting and execution
 - Validate final QC state and wallet registrations
 
 #### 3.1.2 Error Scenarios
 
 - **Invalid QC Address**: Zero address validation
-- **Insufficient Time-lock**: Attempt execution before delay expires
+- **Insufficient Capacity**: Zero minting capacity provided
 - **Invalid SPV Proof**: Watchdog rejects wallet registration
 - **Duplicate Registration**: Attempt to register same QC twice
+- **Unauthorized Role**: Non-governance attempts QC registration
 
 ### 3.2 Reserve Attestation Flow
 
@@ -131,13 +131,13 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
    - Multiple attesters monitor registered Bitcoin addresses off-chain
    - Each calculates total reserves across all QC wallets
 
-2. **Oracle Consensus Submission**
+2. **Attestation Submission and Consensus**
 
-   - Each attester calls `ReserveOracle.submitAttestation(qc, balance)`
-   - Oracle collects attestations until threshold met (minimum 3)
-   - Median consensus calculated automatically
-   - Oracle pushes consensus to `QCReserveLedger.recordConsensusAttestation()`
-   - Events: `AttestationSubmitted`, `ConsensusReached`, `QCSolvencyVerified`
+   - Each attester calls `QCReserveLedger.submitAttestation(qc, balance)` with `ATTESTER_ROLE`
+   - System collects attestations until `consensusThreshold` met (default 3)
+   - Median consensus calculated automatically when threshold reached
+   - Reserve balance updated in QCReserveLedger
+   - Events: `AttestationSubmitted`, `ConsensusReached`, `ReserveUpdated`
 
 3. **Automated Status Management**
    - Anyone can call `WatchdogEnforcer.enforceObjectiveViolation()` if undercollateralized
@@ -166,22 +166,24 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 
 #### 3.3.1 Happy Path
 
-1. **User Requests QC Minting**
+1. **QC Requests Minting** (On behalf of user)
 
-   - User calls `QCMinter.requestQCMint(qcAddress, amount)`
-   - QCMinter delegates to `BasicMintingPolicy.requestMint()`
+   - QC calls `QCMinter.requestQCMint(qcAddress, amount)` with `MINTER_ROLE`
+   - QCMinter delegates to `BasicMintingPolicy.requestMint(qc, user, amount)`
 
 2. **Policy Validation**
 
-   - Check QC status is `Active`
-   - Verify reserve freshness (attestation not stale)
-   - Check available minting capacity
-   - Validate amount against limits
+   - Check system not paused and QC not emergency paused
+   - Check amount within bounds (`minMintAmount` to `maxMintAmount`)
+   - Verify QC status is `Active`
+   - Check available minting capacity against reserves
 
-3. **Token Minting**
-   - Policy calls `TBTC.mint(user, amount)`
-   - Update QC's minted balance in QCData
-   - Events: `QCMintRequested`, `TBTCMinted`
+3. **Direct Bank Integration and Auto-Minting**
+   - Convert tBTC amount to satoshis (`amount / SATOSHI_MULTIPLIER`)
+   - Create Bank balance: `bank.increaseBalanceAndCall(tbtcVault, [user], [satoshis])`
+   - Auto-triggers TBTCVault minting of tBTC tokens to user
+   - Update QC's minted amount in QCData
+   - Events: `QCBankBalanceCreated`, `QCBackedDepositCredited`, `MintCompleted`
 
 **Script Requirements**:
 
@@ -207,22 +209,24 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 
 1. **User Initiates Redemption**
 
-   - User calls `QCRedeemer.initiateRedemption(qcAddress, amount)`
-   - QCRedeemer burns user's tBTC tokens
-   - Create redemption record with `Pending` status
-   - Generate unique redemption ID
+   - User calls `QCRedeemer.initiateRedemption(qc, amount, userBtcAddress)`
+   - QCRedeemer burns user's tBTC tokens immediately 
+   - Creates redemption record with `Pending` status
+   - Generates unique collision-resistant redemption ID
+   - Event: `RedemptionRequested`
 
 2. **QC Fulfillment Process**
 
-   - QC receives redemption request
-   - QC sends Bitcoin to user's address on Bitcoin network
-   - QC provides transaction details to watchdog
+   - QC monitors for redemption requests (via events or API notifications)
+   - QC sends Bitcoin to user's specified Bitcoin address within `redemptionTimeout` (7 days)
+   - QC notifies watchdog of fulfillment transaction details
 
-3. **Watchdog Verification**
-   - Watchdog monitors Bitcoin network for fulfillment
-   - On successful payment: calls `BasicRedemptionPolicy.recordFulfillment(redemptionId, spvProof)`
+3. **Watchdog Verification and Completion**
+   - Watchdog monitors Bitcoin network for fulfillment transaction
+   - On successful payment: calls `BasicRedemptionPolicy.recordFulfillment(redemptionId, userBtcAddress, expectedAmount, txInfo, spvProof)` with `ARBITER_ROLE`
+   - SPV proof validates Bitcoin transaction inclusion
    - Redemption status changes to `Fulfilled`
-   - Events: `RedemptionRequested`, `RedemptionFulfilled`
+   - Event: `RedemptionFulfilledByPolicy`
 
 **Script Requirements**:
 
@@ -233,12 +237,12 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 
 #### 3.4.2 Timeout Scenarios
 
-1. **Redemption Timeout**
-   - Watchdog monitors for timeout expiration
-   - Calls `BasicRedemptionPolicy.flagDefault(redemptionId)`
+1. **Redemption Timeout and Default**
+   - Watchdog monitors for timeout expiration (`redemptionTimeout` = 7 days from SystemState)
+   - If QC fails to fulfill within timeout: calls `BasicRedemptionPolicy.flagDefault(redemptionId, reason)` with `ARBITER_ROLE`
    - Redemption status changes to `Defaulted`
-   - QC status may change to `UnderReview`
-   - Event: `RedemptionDefaulted`
+   - QC may face status change to `UnderReview` based on failure patterns
+   - Event: `RedemptionDefaultedByPolicy`
 
 **Script Requirements**:
 
@@ -391,7 +395,7 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 
 1. **Add Attester**
 
-   - DAO grants ATTESTER_ROLE to entity via `ReserveOracle.grantRole()`
+   - DAO grants ATTESTER_ROLE to entity via `QCReserveLedger.grantRole()`
    - Minimum 3 attesters maintained at all times
 
 2. **Remove Attester**
@@ -709,30 +713,20 @@ export class QCOnboardingFlow extends BaseFlowTest {
     const { qcManager } = this.contracts
     const { governance, qc, watchdog } = this.signers
 
-    // Step 1: Queue QC Onboarding (Time-locked)
-    console.log("Step 1: Queueing QC onboarding...")
+    // Step 1: Register QC (Instant)
+    console.log("Step 1: Registering QC...")
     const maxMintingCap = ethers.utils.parseEther("1000")
 
     await qcManager.connect(governance).registerQC(qc.address, maxMintingCap)
-    console.log("✅ QC onboarding queued with 7-day delay")
-
-    // Step 2: Wait for time-lock period
-    console.log("Step 2: Waiting for time-lock period...")
-    await time.increase(7 * 24 * 60 * 60) // 7 days
-    console.log("✅ Time-lock period elapsed")
-
-    // Step 3: Execute QC Onboarding
-    console.log("Step 3: Executing QC onboarding...")
-    await qcManager.connect(governance)
-    // No additional step needed - instant execution
+    console.log("✅ QC registered and activated instantly")
 
     // Verify QC status
     const qcStatus = await qcManager.getQCStatus(qc.address)
     expect(qcStatus).to.equal(1) // Active
     console.log("✅ QC onboarded successfully with Active status")
 
-    // Step 4: Register Bitcoin Wallet
-    console.log("Step 4: Registering Bitcoin wallet...")
+    // Step 2: Register Bitcoin Wallet
+    console.log("Step 2: Registering Bitcoin wallet...")
     const btcAddress = generateBitcoinAddress()
     const proof = createOPReturnProof(qc.address, btcAddress)
 
