@@ -1127,211 +1127,64 @@ describe("BasicRedemptionPolicy", () => {
     })
   })
 
-  describe("bulkHandleRedemptions", () => {
-    const redemptionId1 = ethers.utils.id("redemption1")
-    const redemptionId2 = ethers.utils.id("redemption2")
-    const reason = ethers.utils.id("test_reason")
-    const BulkAction = {
-      FULFILL: 0,
-      DEFAULT: 1,
-    }
+  describe("getRedemptionTimeout", () => {
+    it("should return correct timeout from SystemState", async () => {
+      const expectedTimeout = 86400 // 24 hours in seconds
+      mockSystemState.redemptionTimeout.returns(expectedTimeout)
 
-    context("when called by admin", () => {
-      beforeEach(async () => {
-        // Grant admin role to the deployer for this test
-        await basicRedemptionPolicy.grantRole(
-          ethers.constants.HashZero,
-          deployer.address
-        )
-      })
+      const timeout = await basicRedemptionPolicy.getRedemptionTimeout()
 
-      it("should bulk fulfill redemptions", async () => {
-        // Request redemptions first
-        await basicRedemptionPolicy.requestRedemption(
-          redemptionId1,
-          qcAddress.address,
-          user.address,
-          redemptionAmount,
-          bitcoinAddress
-        )
-        await basicRedemptionPolicy.requestRedemption(
-          redemptionId2,
-          qcAddress.address,
-          user.address,
-          redemptionAmount,
-          bitcoinAddress
-        )
-
-        const tx = await basicRedemptionPolicy.bulkHandleRedemptions(
-          [redemptionId1, redemptionId2],
-          BulkAction.FULFILL,
-          ethers.constants.HashZero
-        )
-
-        expect(await basicRedemptionPolicy.isRedemptionFulfilled(redemptionId1))
-          .to.be.true
-        expect(await basicRedemptionPolicy.isRedemptionFulfilled(redemptionId2))
-          .to.be.true
-
-        const receipt = await tx.wait()
-        const { timestamp } = await ethers.provider.getBlock(
-          receipt.blockNumber
-        )
-
-        await expect(tx)
-          .to.emit(basicRedemptionPolicy, "RedemptionFulfilledByPolicy")
-          .withArgs(redemptionId1, deployer.address, timestamp)
-        await expect(tx)
-          .to.emit(basicRedemptionPolicy, "RedemptionFulfilledByPolicy")
-          .withArgs(redemptionId2, deployer.address, timestamp)
-      })
-
-      it("should bulk default redemptions", async () => {
-        // Request redemptions first
-        await basicRedemptionPolicy.requestRedemption(
-          redemptionId1,
-          qcAddress.address,
-          user.address,
-          redemptionAmount,
-          bitcoinAddress
-        )
-        await basicRedemptionPolicy.requestRedemption(
-          redemptionId2,
-          qcAddress.address,
-          user.address,
-          redemptionAmount,
-          bitcoinAddress
-        )
-
-        const tx = await basicRedemptionPolicy.bulkHandleRedemptions(
-          [redemptionId1, redemptionId2],
-          BulkAction.DEFAULT,
-          reason
-        )
-
-        const [defaulted1, reason1] =
-          await basicRedemptionPolicy.isRedemptionDefaulted(redemptionId1)
-        const [defaulted2, reason2] =
-          await basicRedemptionPolicy.isRedemptionDefaulted(redemptionId2)
-
-        expect(defaulted1).to.be.true
-        expect(reason1).to.equal(reason)
-        expect(defaulted2).to.be.true
-        expect(reason2).to.equal(reason)
-
-        const receipt = await tx.wait()
-        const { timestamp } = await ethers.provider.getBlock(
-          receipt.blockNumber
-        )
-
-        await expect(tx)
-          .to.emit(basicRedemptionPolicy, "RedemptionDefaultedByPolicy")
-          .withArgs(redemptionId1, reason, deployer.address, timestamp)
-        await expect(tx)
-          .to.emit(basicRedemptionPolicy, "RedemptionDefaultedByPolicy")
-          .withArgs(redemptionId2, reason, deployer.address, timestamp)
-      })
-
-      it("should skip already processed redemptions", async () => {
-        // Request and fulfill one redemption first
-        await basicRedemptionPolicy.requestRedemption(
-          redemptionId1,
-          qcAddress.address,
-          user.address,
-          redemptionAmount,
-          bitcoinAddress
-        )
-        const mockSpvData = createMockSpvData()
-        await basicRedemptionPolicy.recordFulfillment(
-          redemptionId1,
-          bitcoinAddress,
-          100000,
-          mockSpvData.txInfo,
-          mockSpvData.proof
-        )
-
-        // Request the second redemption as well
-        await basicRedemptionPolicy.requestRedemption(
-          redemptionId2,
-          qcAddress.address,
-          user.address,
-          redemptionAmount,
-          bitcoinAddress
-        )
-
-        const tx = await basicRedemptionPolicy.bulkHandleRedemptions(
-          [redemptionId1, redemptionId2],
-          BulkAction.DEFAULT,
-          reason
-        )
-
-        // First should remain fulfilled
-        expect(await basicRedemptionPolicy.isRedemptionFulfilled(redemptionId1))
-          .to.be.true
-        // Second should be defaulted
-        const [defaulted2, reason2] =
-          await basicRedemptionPolicy.isRedemptionDefaulted(redemptionId2)
-        expect(defaulted2).to.be.true
-        expect(reason2).to.equal(reason)
-
-        // Should only emit event for the newly processed redemption
-        const receipt = await tx.wait()
-        const { timestamp } = await ethers.provider.getBlock(
-          receipt.blockNumber
-        )
-
-        await expect(tx)
-          .to.emit(basicRedemptionPolicy, "RedemptionDefaultedByPolicy")
-          .withArgs(redemptionId2, reason, deployer.address, timestamp)
-
-        // Verify only one event was emitted (for redemptionId2, not redemptionId1)
-        const events =
-          receipt.events?.filter(
-            (e) => e.event === "RedemptionDefaultedByPolicy"
-          ) || []
-        expect(events.length).to.equal(1)
-        expect(events[0].args?.redemptionId).to.equal(redemptionId2)
-      })
+      expect(mockSystemState.redemptionTimeout).to.have.been.called
+      expect(timeout).to.equal(expectedTimeout)
     })
 
-    context("when called by non-admin", () => {
-      it("should revert", async () => {
-        await expect(
-          basicRedemptionPolicy
-            .connect(thirdParty)
-            .bulkHandleRedemptions(
-              [redemptionId1],
-              BulkAction.FULFILL,
-              ethers.constants.HashZero
-            )
-        ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${
-            ethers.constants.HashZero
-          }`
-        )
-      })
+    it("should handle different timeout values", async () => {
+      const timeoutValues = [
+        3600,   // 1 hour
+        86400,  // 24 hours  
+        604800, // 7 days
+        2592000 // 30 days
+      ]
+
+      for (const expectedTimeout of timeoutValues) {
+        mockSystemState.redemptionTimeout.returns(expectedTimeout)
+        
+        const timeout = await basicRedemptionPolicy.getRedemptionTimeout()
+        expect(timeout).to.equal(expectedTimeout)
+      }
     })
 
-    context("when called with invalid parameters", () => {
-      it("should revert with no redemption IDs", async () => {
-        await expect(
-          basicRedemptionPolicy.bulkHandleRedemptions(
-            [],
-            BulkAction.FULFILL,
-            ethers.constants.HashZero
-          )
-        ).to.be.reverted
-      })
+    it("should handle SystemState unavailability gracefully", async () => {
+      // Mock SystemState to revert when called
+      mockSystemState.redemptionTimeout.reverts("SystemState unavailable")
 
-      it("should revert when defaulting with no reason", async () => {
-        await expect(
-          basicRedemptionPolicy.bulkHandleRedemptions(
-            [redemptionId1],
-            BulkAction.DEFAULT,
-            ethers.constants.HashZero
-          )
-        ).to.be.reverted
-      })
+      await expect(
+        basicRedemptionPolicy.getRedemptionTimeout()
+      ).to.be.revertedWith("SystemState unavailable")
+    })
+
+    it("should be a view function with minimal gas cost", async () => {
+      const expectedTimeout = 86400
+      mockSystemState.redemptionTimeout.returns(expectedTimeout)
+
+      const gasEstimate = await basicRedemptionPolicy.estimateGas.getRedemptionTimeout()
+      expect(gasEstimate).to.be.lt(50000) // Should be very cheap for view function
+    })
+
+    it("should return zero when SystemState returns zero", async () => {
+      mockSystemState.redemptionTimeout.returns(0)
+
+      const timeout = await basicRedemptionPolicy.getRedemptionTimeout()
+      expect(timeout).to.equal(0)
+    })
+
+    it("should handle maximum timeout values", async () => {
+      const maxTimeout = ethers.constants.MaxUint256
+      mockSystemState.redemptionTimeout.returns(maxTimeout)
+
+      const timeout = await basicRedemptionPolicy.getRedemptionTimeout()
+      expect(timeout).to.equal(maxTimeout)
     })
   })
+
 })
