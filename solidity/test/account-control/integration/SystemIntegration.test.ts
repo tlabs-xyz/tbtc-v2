@@ -450,6 +450,7 @@ describe("System Integration Tests", () => {
     })
 
     it("should integrate with Bank and Vault systems", async () => {
+      // Skip if V2 contracts (Bank, Vault) are not available in the test environment
       if (!ctx.bank || !ctx.vault) {
         this.skip()
         return

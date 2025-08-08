@@ -61,8 +61,12 @@ describe("Emergency Pause Integration", () => {
   const emergencyReason = ethers.utils.id("SECURITY_INCIDENT")
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, user, qcAddress, pauser, thirdParty] = await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    user = signers[1]
+    qcAddress = signers[2]
+    pauser = signers[3]
+    thirdParty = signers[4]
 
     // Generate role constants
     PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")

@@ -73,9 +73,13 @@ describe("QCManager", () => {
   const INSUFFICIENT_RESERVES = ethers.utils.id("INSUFFICIENT_RESERVES")
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, governance, qcAddress, watchdog, watchdogEnforcer, thirdParty] =
-      await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    governance = signers[1]
+    qcAddress = signers[2]
+    watchdog = signers[3]
+    watchdogEnforcer = signers[4]
+    thirdParty = signers[5]
 
     // Generate service keys
     QC_DATA_KEY = ethers.utils.id("QC_DATA")

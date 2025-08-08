@@ -227,7 +227,7 @@ describe("Time-Based Attack Scenarios", () => {
           ethers.utils.parseUnits("10", 18),
           validLegacyBtc
         )
-      ).to.be.reverted // Attacker is not authorized
+      ).to.be.revertedWith("AccessControl: account")
       
       // Complete victim's redemption
       const redemptionId = 0 // First redemption

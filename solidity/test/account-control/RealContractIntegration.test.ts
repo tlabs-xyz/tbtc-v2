@@ -113,8 +113,6 @@ describe("Real Contract Integration - Phase 1 & 2", () => {
     await createSnapshot()
 
     // Deploy ALL real contracts - no mocks!
-    console.log("Deploying all real contracts...")
-    
     // 1. Deploy Protocol Registry
     const ProtocolRegistryFactory = await ethers.getContractFactory("ProtocolRegistry")
     protocolRegistry = await ProtocolRegistryFactory.deploy()
@@ -199,8 +197,6 @@ describe("Real Contract Integration - Phase 1 & 2", () => {
 
     // Grant necessary roles across all contracts
     await setupRoles()
-
-    console.log("All real contracts deployed and configured!")
   })
 
   afterEach(async () => {
@@ -302,8 +298,6 @@ describe("Real Contract Integration - Phase 1 & 2", () => {
       expect(await tbtc.balanceOf(user1.address)).to.equal(0)
       
       // === FULFILLMENT PHASE ===
-      console.log("Starting fulfillment phase...")
-      
       // Use real SPV data for fulfillment
       const spvData = ValidMainnetProof
       await qcRedeemer.recordRedemptionFulfillment(

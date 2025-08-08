@@ -21,8 +21,11 @@ describe("ProtocolRegistry", () => {
   let ANOTHER_SERVICE_KEY: string
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, governance, thirdParty, mockService] = await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    governance = signers[1]
+    thirdParty = signers[2]
+    mockService = signers[3]
 
     // Generate role hashes
     PARAMETER_ADMIN_ROLE = ethers.utils.id("PARAMETER_ADMIN_ROLE")

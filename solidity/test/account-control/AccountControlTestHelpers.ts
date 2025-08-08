@@ -362,56 +362,41 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
   const [deployer, governance, qcAddress, user, watchdog] =
     await ethers.getSigners()
 
-  console.log("Deploying ProtocolRegistry...")
   // Deploy ProtocolRegistry
   const ProtocolRegistryFactory = await ethers.getContractFactory(
     "ProtocolRegistry"
   )
   const protocolRegistry = await ProtocolRegistryFactory.deploy()
   await protocolRegistry.deployed()
-  console.log("ProtocolRegistry deployed")
 
   // Deploy core contracts
-  console.log("About to deploy QCData...")
   const QCDataFactory = await ethers.getContractFactory("QCData")
   const qcData = await QCDataFactory.deploy()
   await qcData.deployed()
-  console.log("QCData deployed")
 
-  console.log("About to deploy SystemState...")
   const SystemStateFactory = await ethers.getContractFactory("SystemState")
   const systemState = await SystemStateFactory.deploy()
   await systemState.deployed()
-  console.log("SystemState deployed")
 
-  console.log("About to deploy QCManager...")
   const QCManagerFactory = await ethers.getContractFactory("QCManager")
   const qcManager = await QCManagerFactory.deploy(protocolRegistry.address)
   await qcManager.deployed()
-  console.log("QCManager deployed")
 
-  console.log("About to deploy QCMinter...")
   const QCMinterFactory = await ethers.getContractFactory("QCMinter")
   const qcMinter = await QCMinterFactory.deploy(protocolRegistry.address)
   await qcMinter.deployed()
-  console.log("QCMinter deployed")
 
-  console.log("About to deploy QCRedeemer...")
   const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer")
   const qcRedeemer = await QCRedeemerFactory.deploy(protocolRegistry.address)
   await qcRedeemer.deployed()
-  console.log("QCRedeemer deployed")
 
-  console.log("About to deploy QCReserveLedger...")
   const QCReserveLedgerFactory = await ethers.getContractFactory(
     "QCReserveLedger"
   )
   const qcReserveLedger = await QCReserveLedgerFactory.deploy()
   await qcReserveLedger.deployed()
-  console.log("QCReserveLedger deployed")
 
   // Deploy policy contracts
-  console.log("About to deploy BasicMintingPolicy...")
   const BasicMintingPolicyFactory = await ethers.getContractFactory(
     "BasicMintingPolicy"
   )
@@ -424,9 +409,7 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
     protocolRegistry.address
   )
   await basicMintingPolicy.deployed()
-  console.log("BasicMintingPolicy deployed")
 
-  console.log("About to deploy BasicRedemptionPolicy...")
   const BasicRedemptionPolicyFactory = await ethers.getContractFactory(
     "BasicRedemptionPolicy"
   )
@@ -434,10 +417,8 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
     protocolRegistry.address
   )
   await basicRedemptionPolicy.deployed()
-  console.log("BasicRedemptionPolicy deployed")
 
   // Deploy WatchdogEnforcer
-  console.log("About to deploy WatchdogEnforcer...")
   const WatchdogEnforcerFactory = await ethers.getContractFactory(
     "WatchdogEnforcer"
   )
@@ -448,21 +429,16 @@ export async function deploySecurityTestFixture(): Promise<SecurityTestFixture> 
     systemState.address
   )
   await qcWatchdog.deployed()
-  console.log("WatchdogEnforcer deployed")
 
-  console.log("About to deploy MockTBTCToken...")
   // Deploy mock TBTC token for security tests
   const MockTBTCTokenFactory = await ethers.getContractFactory("MockTBTCToken")
   const tbtc = await MockTBTCTokenFactory.deploy()
   await tbtc.deployed()
-  console.log("MockTBTCToken deployed")
 
-  console.log("About to deploy MockSPVValidator...")
   // Deploy mock SPV validator for security tests
   const MockSPVValidatorFactory = await ethers.getContractFactory("MockSPVValidator")
   const mockSpvValidator = await MockSPVValidatorFactory.deploy()
   await mockSpvValidator.deployed()
-  console.log("MockSPVValidator deployed")
 
   // MockSPVValidator is configured to return true by default
 
