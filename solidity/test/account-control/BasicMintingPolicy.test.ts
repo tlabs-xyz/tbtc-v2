@@ -391,4 +391,195 @@ describe("BasicMintingPolicy - Direct Bank Integration", () => {
       expect(isEligibleAfter).to.be.false
     })
   })
+
+  describe("getAvailableMintingCapacity", () => {
+    beforeEach(async () => {
+      // Setup QC with reserves
+      const reserveBalance = ethers.utils.parseEther("100") // 100 tBTC reserves
+      await qcQCReserveLedger.grantRole(
+        ethers.utils.id("ATTESTER_ROLE"),
+        deployer.address
+      )
+      await qcQCReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
+    })
+
+    it("should return correct available capacity for active QC", async () => {
+      const capacity = await basicMintingPolicy.getAvailableMintingCapacity(qc.address)
+      
+      // Should return positive capacity based on reserve balance and system parameters
+      expect(capacity).to.be.gt(0)
+      expect(capacity).to.be.lte(ethers.utils.parseEther("100"))
+    })
+
+    it("should return zero capacity for revoked QC", async () => {
+      // Revoke the QC
+      await qcManager.setQCStatus(qc.address, 2, ethers.utils.id("TEST_REVOKE")) // Revoked
+      
+      const capacity = await basicMintingPolicy.getAvailableMintingCapacity(qc.address)
+      expect(capacity).to.equal(0)
+    })
+
+    it("should return zero capacity for unregistered QC", async () => {
+      const unregisteredQC = unauthorized.address
+      
+      const capacity = await basicMintingPolicy.getAvailableMintingCapacity(unregisteredQC)
+      expect(capacity).to.equal(0)
+    })
+
+    it("should handle QC with insufficient reserves", async () => {
+      // Submit very low reserve balance
+      const lowReserveBalance = ethers.utils.parseEther("0.001")
+      await qcQCReserveLedger.submitReserveAttestation(qc.address, lowReserveBalance)
+      
+      const capacity = await basicMintingPolicy.getAvailableMintingCapacity(qc.address)
+      expect(capacity).to.be.lte(lowReserveBalance)
+    })
+
+    it("should be a view function with minimal gas cost", async () => {
+      const gasEstimate = await basicMintingPolicy.estimateGas.getAvailableMintingCapacity(qc.address)
+      expect(gasEstimate).to.be.lt(50000) // Should be very cheap for view function
+    })
+
+    it("should handle stale reserve attestations", async () => {
+      // Fast forward time beyond stale threshold
+      await ethers.provider.send("evm_increaseTime", [86400 + 1]) // 24 hours + 1 second
+      await ethers.provider.send("evm_mine", [])
+      
+      const capacity = await basicMintingPolicy.getAvailableMintingCapacity(qc.address)
+      expect(capacity).to.equal(0) // Should be zero for stale reserves
+    })
+  })
+
+  describe("Edge Cases and Validation", () => {
+    beforeEach(async () => {
+      // Setup QC with reserves for edge case testing
+      const reserveBalance = ethers.utils.parseEther("100")
+      await qcQCReserveLedger.grantRole(
+        ethers.utils.id("ATTESTER_ROLE"),
+        deployer.address
+      )
+      await qcQCReserveLedger.submitReserveAttestation(qc.address, reserveBalance)
+    })
+
+    describe("Invalid Addresses", () => {
+      it("should revert requestMint with zero QC address", async () => {
+        const mintAmount = ethers.utils.parseEther("1")
+        
+        await expect(
+          basicMintingPolicy.requestMint(
+            ethers.constants.AddressZero,
+            user.address,
+            mintAmount
+          )
+        ).to.be.revertedWith("InvalidQCAddress")
+      })
+
+      it("should revert requestMint with zero user address", async () => {
+        const mintAmount = ethers.utils.parseEther("1")
+        
+        await expect(
+          basicMintingPolicy.requestMint(
+            qc.address,
+            ethers.constants.AddressZero,
+            mintAmount
+          )
+        ).to.be.revertedWith("InvalidUserAddress")
+      })
+
+      it("should return zero capacity for zero QC address", async () => {
+        const capacity = await basicMintingPolicy.getAvailableMintingCapacity(
+          ethers.constants.AddressZero
+        )
+        expect(capacity).to.equal(0)
+      })
+    })
+
+    describe("Amount Range Validation", () => {
+      it("should revert requestMint with amount below minimum", async () => {
+        // Get current minimum mint amount from SystemState
+        const minMintAmount = await systemState.minMintAmount()
+        const belowMinAmount = minMintAmount.sub(1)
+        
+        await expect(
+          basicMintingPolicy.requestMint(qc.address, user.address, belowMinAmount)
+        ).to.be.revertedWith("AmountOutsideAllowedRange")
+      })
+
+      it("should revert requestMint with amount above maximum", async () => {
+        // Get current maximum mint amount from SystemState
+        const maxMintAmount = await systemState.maxMintAmount()
+        const aboveMaxAmount = maxMintAmount.add(1)
+        
+        await expect(
+          basicMintingPolicy.requestMint(qc.address, user.address, aboveMaxAmount)
+        ).to.be.revertedWith("AmountOutsideAllowedRange")
+      })
+
+      it("should revert requestMint with zero amount", async () => {
+        await expect(
+          basicMintingPolicy.requestMint(qc.address, user.address, 0)
+        ).to.be.revertedWith("AmountOutsideAllowedRange")
+      })
+
+      it("should accept amount exactly at minimum", async () => {
+        const minMintAmount = await systemState.minMintAmount()
+        
+        await expect(
+          basicMintingPolicy.requestMint(qc.address, user.address, minMintAmount)
+        ).to.not.be.reverted
+      })
+
+      it("should accept amount exactly at maximum", async () => {
+        const maxMintAmount = await systemState.maxMintAmount()
+        
+        // Need to ensure QC has sufficient reserves for max amount
+        const largeReserveBalance = maxMintAmount.mul(2)
+        await qcQCReserveLedger.submitReserveAttestation(qc.address, largeReserveBalance)
+        
+        await expect(
+          basicMintingPolicy.requestMint(qc.address, user.address, maxMintAmount)
+        ).to.not.be.reverted
+      })
+    })
+
+    describe("Emergency Pause Scenarios", () => {
+      it("should revert requestMint when QC is emergency paused", async () => {
+        // Pause the QC using SystemState emergency functions
+        const PAUSER_ROLE = await systemState.PAUSER_ROLE()
+        await systemState.grantRole(PAUSER_ROLE, deployer.address)
+        
+        await systemState.emergencyPauseQC(qc.address, ethers.utils.id("TEST_EMERGENCY"))
+        
+        const mintAmount = ethers.utils.parseEther("1")
+        await expect(
+          basicMintingPolicy.requestMint(qc.address, user.address, mintAmount)
+        ).to.be.revertedWith("QCIsEmergencyPaused")
+      })
+
+      it("should return zero capacity when QC is emergency paused", async () => {
+        // Pause the QC
+        const PAUSER_ROLE = await systemState.PAUSER_ROLE()
+        await systemState.grantRole(PAUSER_ROLE, deployer.address)
+        
+        await systemState.emergencyPauseQC(qc.address, ethers.utils.id("TEST_EMERGENCY"))
+        
+        const capacity = await basicMintingPolicy.getAvailableMintingCapacity(qc.address)
+        expect(capacity).to.equal(0)
+      })
+
+      it("should work normally after QC is unpaused", async () => {
+        // Pause and then unpause the QC
+        const PAUSER_ROLE = await systemState.PAUSER_ROLE()
+        await systemState.grantRole(PAUSER_ROLE, deployer.address)
+        
+        await systemState.emergencyPauseQC(qc.address, ethers.utils.id("TEST_EMERGENCY"))
+        await systemState.emergencyUnpauseQC(qc.address)
+        
+        const mintAmount = ethers.utils.parseEther("1")
+        await expect(
+          basicMintingPolicy.requestMint(qc.address, user.address, mintAmount)
+        ).to.not.be.reverted
+      })
+    })
+  })
 })
