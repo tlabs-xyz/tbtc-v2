@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/IRedemptionPolicy.sol";
 import "./ProtocolRegistry.sol";
 import "./QCData.sol";
@@ -19,7 +20,7 @@ import "./interfaces/ISPVValidator.sol";
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - ARBITER_ROLE: Can record fulfillments and flag defaults
 /// - REDEEMER_ROLE: Can request redemptions (typically granted to QCRedeemer contract)
-contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
+contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl, ReentrancyGuard {
     // Custom errors for gas-efficient reverts
     error InvalidRedemptionId();
     error RedemptionIdAlreadyUsed(bytes32 redemptionId);
@@ -82,6 +83,15 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
         uint256 timestamp
     );
 
+    /// @dev Emitted when a redemption request fails
+    event RedemptionRequestFailed(
+        address indexed qc,
+        address indexed user,
+        uint256 amount,
+        string reason,
+        address attemptedBy
+    );
+
     constructor(address _protocolRegistry) {
         protocolRegistry = ProtocolRegistry(_protocolRegistry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -109,6 +119,9 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
             protocolRegistry.getService(SYSTEM_STATE_KEY)
         );
         if (systemState.isRedemptionPaused()) {
+            return false;
+        }
+        if (systemState.isQCEmergencyPaused(qc)) {
             return false;
         }
 
@@ -160,14 +173,17 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
     ) external onlyRole(REDEEMER_ROLE) returns (bool success) {
         // Validate redemption-specific inputs only
         if (redemptionId == bytes32(0)) {
+            emit RedemptionRequestFailed(qc, user, amount, "INVALID_REDEMPTION_ID", msg.sender);
             revert InvalidRedemptionId();
         }
 
         if (requestedRedemptions[redemptionId]) {
+            emit RedemptionRequestFailed(qc, user, amount, "REDEMPTION_ID_ALREADY_USED", msg.sender);
             revert RedemptionIdAlreadyUsed(redemptionId);
         }
 
         if (bytes(btcAddress).length == 0) {
+            emit RedemptionRequestFailed(qc, user, amount, "INVALID_BITCOIN_ADDRESS", msg.sender);
             revert InvalidBitcoinAddress(btcAddress);
         }
 
@@ -178,12 +194,14 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
                 addr[0] == 0x33 ||
                 (addr[0] == 0x62 && addr.length > 1 && addr[1] == 0x63))
         ) {
+            emit RedemptionRequestFailed(qc, user, amount, "INVALID_BITCOIN_ADDRESS_FORMAT", msg.sender);
             revert InvalidBitcoinAddressFormat(btcAddress);
         }
 
         // Use validateRedemptionRequest for all other validation
         // This includes: zero address checks, amount validation, system state, QC status, and balance checks
         if (!validateRedemptionRequest(user, qc, amount)) {
+            emit RedemptionRequestFailed(qc, user, amount, "VALIDATION_FAILED", msg.sender);
             revert ValidationFailed(user, qc, amount);
         }
 
@@ -218,13 +236,14 @@ contract BasicRedemptionPolicy is IRedemptionPolicy, AccessControl {
     /// @param txInfo Bitcoin transaction information
     /// @param proof SPV proof of transaction inclusion
     /// @return success True if the fulfillment was successfully recorded
+    /// @dev SECURITY: nonReentrant protects against double-fulfillment via reentrancy
     function recordFulfillment(
         bytes32 redemptionId,
         string calldata userBtcAddress,
         uint64 expectedAmount,
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
-    ) external override onlyRole(ARBITER_ROLE) returns (bool success) {
+    ) external override onlyRole(ARBITER_ROLE) nonReentrant returns (bool success) {
         // Input validation
         if (redemptionId == bytes32(0)) {
             revert InvalidRedemptionId();

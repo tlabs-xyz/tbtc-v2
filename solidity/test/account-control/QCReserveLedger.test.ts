@@ -1,533 +1,605 @@
 import { expect } from "chai"
 import { ethers, helpers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import { QCReserveLedger, ProtocolRegistry, SystemState } from "../../typechain"
-import {
-  getTimeUntilStale,
-  getAttestationHistoryCount,
-  getAttestationHistoryPaginated,
-} from "../helpers/qcReserveLedgerHelpers"
+import { QCReserveLedger } from "../../typechain"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
-const { time } = helpers
 
 describe("QCReserveLedger", () => {
   let deployer: SignerWithAddress
-  let governance: SignerWithAddress
-  let attester: SignerWithAddress
+  let attester1: SignerWithAddress
+  let attester2: SignerWithAddress
+  let attester3: SignerWithAddress
+  let attester4: SignerWithAddress
   let qcAddress: SignerWithAddress
-  let thirdParty: SignerWithAddress
+  let qcManager: SignerWithAddress
+  let reserveLedger: QCReserveLedger
 
-  let qcReserveLedger: QCReserveLedger
-  let protocolRegistry: ProtocolRegistry
-  let systemState: SystemState
-
-  // Roles
-  let ATTESTER_ROLE: string
-
-  // Test data
-  const reserveBalance = ethers.utils.parseEther("10")
-  const newReserveBalance = ethers.utils.parseEther("15")
+  const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
+  const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, governance, attester, qcAddress, thirdParty] =
-      await ethers.getSigners()
-
-    // Generate role hashes
-    ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    attester1 = signers[1]
+    attester2 = signers[2]
+    attester3 = signers[3]
+    attester4 = signers[4]
+    qcAddress = signers[5]
+    qcManager = signers[6]
   })
 
   beforeEach(async () => {
     await createSnapshot()
-
-    // Deploy ProtocolRegistry
-    const ProtocolRegistryFactory = await ethers.getContractFactory(
-      "ProtocolRegistry"
-    )
-    protocolRegistry = await ProtocolRegistryFactory.deploy()
-    await protocolRegistry.deployed()
-
-    // Deploy SystemState
-    const SystemStateFactory = await ethers.getContractFactory("SystemState")
-    systemState = await SystemStateFactory.deploy()
-    await systemState.deployed()
-
-    // Register SystemState in ProtocolRegistry
-    const SYSTEM_STATE_KEY = ethers.utils.id("SYSTEM_STATE")
-    await protocolRegistry.setService(SYSTEM_STATE_KEY, systemState.address)
-
+    
     // Deploy QCReserveLedger
-    const QCReserveLedgerFactory = await ethers.getContractFactory(
-      "QCReserveLedger"
-    )
-    qcReserveLedger = await QCReserveLedgerFactory.deploy(
-      protocolRegistry.address
-    )
-    await qcReserveLedger.deployed()
-
+    const QCReserveLedgerFactory = await ethers.getContractFactory("QCReserveLedger")
+    reserveLedger = await QCReserveLedgerFactory.deploy()
+    await reserveLedger.deployed()
+    
     // Grant roles
-    await qcReserveLedger.grantRole(ATTESTER_ROLE, attester.address)
+    await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester1.address)
+    await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester2.address)
+    await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester3.address)
+    await reserveLedger.connect(deployer).grantRole(ATTESTER_ROLE, attester4.address)
   })
 
   afterEach(async () => {
     await restoreSnapshot()
   })
 
-  describe("Deployment", () => {
-    it("should grant deployer all roles", async () => {
-      const DEFAULT_ADMIN_ROLE = await qcReserveLedger.DEFAULT_ADMIN_ROLE()
-      expect(
-        await qcReserveLedger.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)
-      ).to.be.true
-      expect(await qcReserveLedger.hasRole(ATTESTER_ROLE, deployer.address)).to
-        .be.true
-    })
-
-    it("should have correct role constants", async () => {
-      expect(await qcReserveLedger.ATTESTER_ROLE()).to.equal(ATTESTER_ROLE)
+  describe("Initialization", () => {
+    it("should set correct initial values", async () => {
+      expect(await reserveLedger.consensusThreshold()).to.equal(3)
+      expect(await reserveLedger.attestationTimeout()).to.equal(21600) // 6 hours
+      expect(await reserveLedger.maxStaleness()).to.equal(86400) // 24 hours
+      expect(await reserveLedger.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true
     })
   })
 
-  describe("Reserve Attestation", () => {
-    context("when called by attester", () => {
-      it("should submit attestation successfully", async () => {
-        const tx = await qcReserveLedger
-          .connect(attester)
-          .submitReserveAttestation(qcAddress.address, reserveBalance)
-        const block = await ethers.provider.getBlock(tx.blockNumber as number)
-        const blockTimestamp = block.timestamp
-
-        const attestation = await qcReserveLedger.getCurrentAttestation(
-          qcAddress.address
-        )
-        expect(attestation.balance).to.equal(reserveBalance)
-        expect(attestation.timestamp).to.equal(blockTimestamp)
-
-        await expect(tx)
-          .to.emit(qcReserveLedger, "ReserveAttestationSubmitted")
-          .withArgs(
-            attester.address,
-            qcAddress.address,
-            reserveBalance,
-            0, // oldBalance
-            blockTimestamp,
-            tx.blockNumber
-          )
-      })
-
-      it("should update existing attestation", async () => {
-        await qcReserveLedger
-          .connect(attester)
-          .submitReserveAttestation(qcAddress.address, reserveBalance)
-
-        // Move time forward
-        await time.increaseTime(3600)
-
-        const tx = await qcReserveLedger
-          .connect(attester)
-          .submitReserveAttestation(qcAddress.address, newReserveBalance)
-        const block = await ethers.provider.getBlock(tx.blockNumber as number)
-        const blockTimestamp = block.timestamp
-
-        const attestation = await qcReserveLedger.getCurrentAttestation(
-          qcAddress.address
-        )
-        expect(attestation.balance).to.equal(newReserveBalance)
-        expect(attestation.timestamp).to.equal(blockTimestamp)
-
-        await expect(tx)
-          .to.emit(qcReserveLedger, "ReserveAttestationSubmitted")
-          .withArgs(
-            attester.address,
-            qcAddress.address,
-            newReserveBalance,
-            reserveBalance, // oldBalance
-            blockTimestamp,
-            tx.blockNumber
-          )
-      })
-
-      it("should handle zero balance attestation", async () => {
-        const tx = await qcReserveLedger
-          .connect(attester)
-          .submitReserveAttestation(qcAddress.address, 0)
-
-        const attestation = await qcReserveLedger.getCurrentAttestation(
-          qcAddress.address
-        )
-        expect(attestation.balance).to.equal(0)
-        expect(attestation.timestamp).to.be.gt(0)
-
-        await expect(tx).to.emit(qcReserveLedger, "ReserveAttestationSubmitted")
-      })
-
-      it("should handle maximum balance attestation", async () => {
-        const maxBalance = ethers.constants.MaxUint256
-        await qcReserveLedger
-          .connect(attester)
-          .submitReserveAttestation(qcAddress.address, maxBalance)
-
-        const attestation = await qcReserveLedger.getCurrentAttestation(
-          qcAddress.address
-        )
-        expect(attestation.balance).to.equal(maxBalance)
-      })
-
-      it("should revert with zero QC address", async () => {
-        await expect(
-          qcReserveLedger
-            .connect(attester)
-            .submitReserveAttestation(
-              ethers.constants.AddressZero,
-              reserveBalance
-            )
-        ).to.be.revertedWith("InvalidQCAddress")
-      })
+  describe("submitAttestation", () => {
+    it("should allow attester to submit attestation", async () => {
+      const balance = ethers.utils.parseEther("100")
+      
+      const tx = await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance)
+      await expect(tx).to.emit(reserveLedger, "AttestationSubmitted")
+      
+      const attestation = await reserveLedger.pendingAttestations(qcAddress.address, attester1.address)
+      expect(attestation.balance).to.equal(balance)
+      expect(attestation.attester).to.equal(attester1.address)
     })
-
-    context("when called by non-attester", () => {
-      it("should revert", async () => {
-        await expect(
-          qcReserveLedger
-            .connect(thirdParty)
-            .submitReserveAttestation(qcAddress.address, reserveBalance)
-        ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${ATTESTER_ROLE}`
-        )
-      })
-    })
-  })
-
-  describe("Reserve Information Retrieval", () => {
-    beforeEach(async () => {
-      await qcReserveLedger
-        .connect(attester)
-        .submitReserveAttestation(qcAddress.address, reserveBalance)
-    })
-
-    describe("getCurrentAttestation", () => {
-      it("should return correct attestation data", async () => {
-        const tx = await qcReserveLedger
-          .connect(attester)
-          .submitReserveAttestation(qcAddress.address, reserveBalance)
-        const block = await ethers.provider.getBlock(tx.blockNumber as number)
-        const blockTimestamp = block.timestamp
-
-        const attestation = await qcReserveLedger.getCurrentAttestation(
-          qcAddress.address
-        )
-
-        expect(attestation.balance).to.equal(reserveBalance)
-        expect(attestation.timestamp).to.equal(blockTimestamp)
-        expect(attestation.attester).to.equal(attester.address)
-        expect(attestation.isValid).to.be.true
-      })
-
-      it("should return empty attestation for non-existent QC", async () => {
-        const attestation = await qcReserveLedger.getCurrentAttestation(
-          thirdParty.address
-        )
-
-        expect(attestation.balance).to.equal(0)
-        expect(attestation.timestamp).to.equal(0)
-        expect(attestation.attester).to.equal(ethers.constants.AddressZero)
-        expect(attestation.isValid).to.be.false
-      })
-    })
-
-    describe("getReserveBalanceAndStaleness", () => {
-      context("when attestation is fresh", () => {
-        it("should return balance and false staleness", async () => {
-          const [balance, isStale] =
-            await qcReserveLedger.getReserveBalanceAndStaleness(
-              qcAddress.address
-            )
-          expect(balance).to.equal(reserveBalance)
-          expect(isStale).to.be.false
-        })
-      })
-
-      context("when attestation is stale", () => {
-        it("should return balance and true staleness", async () => {
-          const staleThreshold = await systemState.staleThreshold()
-          await time.increaseTime(staleThreshold.toNumber() + 1)
-
-          const [balance, isStale] =
-            await qcReserveLedger.getReserveBalanceAndStaleness(
-              qcAddress.address
-            )
-          expect(balance).to.equal(reserveBalance)
-          expect(isStale).to.be.true
-        })
-      })
-
-      context("when attestation is invalid", () => {
-        it("should return zero balance and true staleness", async () => {
-          await qcReserveLedger.invalidateAttestation(
-            qcAddress.address,
-            ethers.utils.id("test")
-          )
-
-          const [balance, isStale] =
-            await qcReserveLedger.getReserveBalanceAndStaleness(
-              qcAddress.address
-            )
-          expect(balance).to.equal(0)
-          expect(isStale).to.be.true
-        })
-      })
-
-      context("when QC does not exist", () => {
-        it("should return zero balance and true staleness", async () => {
-          const [balance, isStale] =
-            await qcReserveLedger.getReserveBalanceAndStaleness(
-              thirdParty.address
-            )
-          expect(balance).to.equal(0)
-          expect(isStale).to.be.true
-        })
-      })
-    })
-
-    describe("isAttestationStale", () => {
-      it("should return false if attestation is fresh", async () => {
-        expect(await qcReserveLedger.isAttestationStale(qcAddress.address)).to
-          .be.false
-      })
-
-      it("should return true if attestation is stale", async () => {
-        const staleThreshold = await systemState.staleThreshold()
-        await time.increaseTime(staleThreshold.toNumber() + 1)
-        expect(await qcReserveLedger.isAttestationStale(qcAddress.address)).to
-          .be.true
-      })
-
-      it("should return true for non-existent QC", async () => {
-        expect(await qcReserveLedger.isAttestationStale(thirdParty.address)).to
-          .be.true
-      })
-    })
-
-    describe("getTimeUntilStale (using helper)", () => {
-      it("should return correct time remaining", async () => {
-        const staleThreshold = await systemState.staleThreshold()
-        const currentBlock = await ethers.provider.getBlock("latest")
-        const timeUntilStale = await getTimeUntilStale(
-          qcReserveLedger,
-          systemState,
-          qcAddress.address,
-          currentBlock.timestamp
-        )
-        expect(timeUntilStale).to.be.closeTo(staleThreshold, 1)
-      })
-
-      it("should return 0 if attestation is stale", async () => {
-        const staleThreshold = await systemState.staleThreshold()
-        await time.increaseTime(staleThreshold.toNumber() + 1)
-        const currentBlock = await ethers.provider.getBlock("latest")
-        const timeUntilStale = await getTimeUntilStale(
-          qcReserveLedger,
-          systemState,
-          qcAddress.address,
-          currentBlock.timestamp
-        )
-        expect(timeUntilStale).to.equal(0)
-      })
-
-      it("should return 0 for non-existent QC", async () => {
-        const currentBlock = await ethers.provider.getBlock("latest")
-        const timeUntilStale = await getTimeUntilStale(
-          qcReserveLedger,
-          systemState,
-          thirdParty.address,
-          currentBlock.timestamp
-        )
-        expect(timeUntilStale).to.equal(0)
-      })
-    })
-  })
-
-  describe("Attestation Invalidation", () => {
-    beforeEach(async () => {
-      await qcReserveLedger
-        .connect(attester)
-        .submitReserveAttestation(qcAddress.address, reserveBalance)
-    })
-
-    context("when called by admin", () => {
-      it("should invalidate an attestation", async () => {
-        const reason = ethers.utils.formatBytes32String("fraud")
-        const tx = await qcReserveLedger.invalidateAttestation(
-          qcAddress.address,
-          reason
-        )
-        const block = await ethers.provider.getBlock(tx.blockNumber as number)
-        const blockTimestamp = block.timestamp
-
-        const attestation = await qcReserveLedger.getCurrentAttestation(
-          qcAddress.address
-        )
-        expect(attestation.isValid).to.be.false
-
-        await expect(tx)
-          .to.emit(qcReserveLedger, "AttestationInvalidated")
-          .withArgs(qcAddress.address, blockTimestamp, reason, deployer.address)
-      })
-
-      it("should revert for non-existent attestation", async () => {
-        await expect(
-          qcReserveLedger.invalidateAttestation(
-            thirdParty.address,
-            ethers.utils.formatBytes32String("test")
-          )
-        ).to.be.revertedWith("NoAttestationExists")
-      })
-
-      it("should revert with empty reason", async () => {
-        await expect(
-          qcReserveLedger.invalidateAttestation(
-            qcAddress.address,
-            ethers.constants.HashZero
-          )
-        ).to.be.revertedWith("ReasonRequired")
-      })
-    })
-
-    context("when called by non-admin", () => {
-      it("should revert", async () => {
-        const DEFAULT_ADMIN_ROLE = await qcReserveLedger.DEFAULT_ADMIN_ROLE()
-        await expect(
-          qcReserveLedger
-            .connect(thirdParty)
-            .invalidateAttestation(
-              qcAddress.address,
-              ethers.utils.formatBytes32String("test")
-            )
-        ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
-        )
-      })
-    })
-  })
-
-  describe("Attestation History", () => {
-    it("should return full attestation history", async () => {
-      await qcReserveLedger
-        .connect(attester)
-        .submitReserveAttestation(qcAddress.address, reserveBalance)
-      await qcReserveLedger
-        .connect(attester)
-        .submitReserveAttestation(qcAddress.address, newReserveBalance)
-
-      const history = await qcReserveLedger.getAttestationHistory(
-        qcAddress.address
-      )
-      expect(history.length).to.equal(2)
-      expect(history[0].balance).to.equal(reserveBalance)
-      expect(history[1].balance).to.equal(newReserveBalance)
-    })
-
-    it("should return paginated history", async () => {
-      const attestationPromises = []
-      for (let i = 0; i < 5; i++) {
-        attestationPromises.push(
-          qcReserveLedger
-            .connect(attester)
-            .submitReserveAttestation(qcAddress.address, reserveBalance.add(i))
-        )
-      }
-      await Promise.all(attestationPromises)
-
-      const history = await getAttestationHistoryPaginated(
-        qcReserveLedger,
-        qcAddress.address,
-        1,
-        2
-      )
-      expect(history.length).to.equal(2)
-      expect(history[0].balance).to.equal(reserveBalance.add(1))
-      expect(history[1].balance).to.equal(reserveBalance.add(2))
-    })
-
-    it("should return correct history count (using helper)", async () => {
-      await qcReserveLedger
-        .connect(attester)
-        .submitReserveAttestation(qcAddress.address, reserveBalance)
-      const count = await getAttestationHistoryCount(
-        qcReserveLedger,
-        qcAddress.address
-      )
-      expect(count).to.equal(1)
-    })
-  })
-
-  describe("Access Control", () => {
-    it("should allow admin to grant roles", async () => {
-      await qcReserveLedger.grantRole(ATTESTER_ROLE, thirdParty.address)
-      expect(await qcReserveLedger.hasRole(ATTESTER_ROLE, thirdParty.address))
-        .to.be.true
-    })
-
-    it("should allow admin to revoke roles", async () => {
-      await qcReserveLedger.grantRole(ATTESTER_ROLE, thirdParty.address)
-      await qcReserveLedger.revokeRole(ATTESTER_ROLE, thirdParty.address)
-      expect(await qcReserveLedger.hasRole(ATTESTER_ROLE, thirdParty.address))
-        .to.be.false
-    })
-
-    it("should not allow non-admin to grant roles", async () => {
-      const DEFAULT_ADMIN_ROLE = await qcReserveLedger.DEFAULT_ADMIN_ROLE()
+    
+    it("should revert if not attester", async () => {
+      const balance = ethers.utils.parseEther("100")
+      
       await expect(
-        qcReserveLedger
-          .connect(thirdParty)
-          .grantRole(ATTESTER_ROLE, attester.address)
-      ).to.be.revertedWith(
-        `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
-      )
+        reserveLedger.connect(qcAddress).submitAttestation(qcAddress.address, balance)
+      ).to.be.revertedWith(`AccessControl: account ${qcAddress.address.toLowerCase()} is missing role ${ATTESTER_ROLE}`)
+    })
+    
+    it("should allow zero balance attestations", async () => {
+      const tx = await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, 0)
+      await expect(tx).to.emit(reserveLedger, "AttestationSubmitted")
+      
+      const attestation = await reserveLedger.pendingAttestations(qcAddress.address, attester1.address)
+      expect(attestation.balance).to.equal(0)
+      expect(attestation.attester).to.equal(attester1.address)
     })
   })
 
-  describe("Integration with SystemState", () => {
-    it("should use updated stale threshold from SystemState", async () => {
-      const PARAMETER_ADMIN_ROLE = await systemState.PARAMETER_ADMIN_ROLE()
-      await systemState.grantRole(PARAMETER_ADMIN_ROLE, governance.address)
-      const newStaleThreshold = 7200
-      await systemState.connect(governance).setStaleThreshold(newStaleThreshold)
-
-      await qcReserveLedger
-        .connect(attester)
-        .submitReserveAttestation(qcAddress.address, reserveBalance)
-
-      await time.increaseTime(newStaleThreshold - 10)
-      expect(await qcReserveLedger.isAttestationStale(qcAddress.address)).to.be
-        .false
-
-      await time.increaseTime(20)
-      expect(await qcReserveLedger.isAttestationStale(qcAddress.address)).to.be
-        .true
+  describe("Consensus mechanism", () => {
+    it("should reach consensus with 3 matching attestations", async () => {
+      const balance = ethers.utils.parseEther("100")
+      
+      // Submit 3 attestations with same balance
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, balance)
+      
+      // Third attestation should trigger consensus
+      const tx = await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, balance)
+      await expect(tx).to.emit(reserveLedger, "ConsensusReached")
+      
+      // Check that reserve was updated
+      const [reserveBalance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(balance)
+      expect(isStale).to.be.false
+    })
+    
+    it("should calculate median for different values", async () => {
+      // Submit 3 different attestations
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("90"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Third attestation should trigger consensus with median value
+      const tx = await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("110"))
+      await expect(tx).to.emit(reserveLedger, "ConsensusReached")
+      
+      // Verify median was calculated correctly (median of 90, 100, 110 is 100)
+      const [reserveBalance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(ethers.utils.parseEther("100"))
+    })
+    
+    it("should handle even number of attestations", async () => {
+      // Update threshold to 4
+      await reserveLedger.connect(deployer).setConsensusThreshold(4)
+      
+      // Submit 4 attestations
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("80"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("90"))
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Fourth attestation triggers consensus
+      await expect(
+        reserveLedger.connect(attester4).submitAttestation(qcAddress.address, ethers.utils.parseEther("110"))
+      ).to.emit(reserveLedger, "ConsensusReached")
+      
+      // Median of [80, 90, 100, 110] = (90 + 100) / 2 = 95
+      const [reserveBalance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(ethers.utils.parseEther("95"))
+    })
+    
+    it("should not reach consensus with insufficient attestations", async () => {
+      const balance = ethers.utils.parseEther("100")
+      
+      // Submit only 2 attestations (threshold is 3)
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance)
+      await expect(
+        reserveLedger.connect(attester2).submitAttestation(qcAddress.address, balance)
+      ).to.not.emit(reserveLedger, "ConsensusReached")
+      
+      // Check that reserve was not updated
+      const [reserveBalance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(0)
+    })
+    
+    it("should clear pending attestations after consensus", async () => {
+      const balance = ethers.utils.parseEther("100")
+      
+      // Reach consensus
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, balance)
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, balance)
+      
+      // Check that pending attestations were cleared
+      const attestation1 = await reserveLedger.pendingAttestations(qcAddress.address, attester1.address)
+      expect(attestation1.balance).to.equal(0)
+      expect(attestation1.timestamp).to.equal(0)
     })
   })
 
+  describe("getReserveBalanceAndStaleness", () => {
+    beforeEach(async () => {
+      // Set up a reserve balance
+      const balance = ethers.utils.parseEther("100")
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, balance)
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, balance)
+    })
+    
+    it("should return correct balance and freshness", async () => {
+      const [balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(ethers.utils.parseEther("100"))
+      expect(isStale).to.be.false
+    })
+    
+    it("should mark as stale after timeout", async () => {
+      // Advance time beyond maxStaleness (24 hours)
+      await ethers.provider.send("evm_increaseTime", [86401]) // 24 hours + 1 second
+      await ethers.provider.send("evm_mine", [])
+      
+      const [balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(ethers.utils.parseEther("100"))
+      expect(isStale).to.be.true
+    })
+  })
+
+  // updateReserveBalance function doesn't exist in current contract
+
+  describe("Configuration", () => {
+    describe("setConsensusThreshold", () => {
+      it("should allow admin to update threshold", async () => {
+        await expect(
+          reserveLedger.connect(deployer).setConsensusThreshold(5)
+        ).to.emit(reserveLedger, "ConsensusThresholdUpdated")
+          .withArgs(3, 5)
+        
+        expect(await reserveLedger.consensusThreshold()).to.equal(5)
+      })
+      
+      it("should revert if not admin", async () => {
+        await expect(
+          reserveLedger.connect(attester1).setConsensusThreshold(5)
+        ).to.be.revertedWith(`AccessControl: account ${attester1.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`)
+      })
+      
+      it("should revert if threshold is zero", async () => {
+        await expect(
+          reserveLedger.connect(deployer).setConsensusThreshold(0)
+        ).to.be.revertedWith("InvalidThreshold")
+      })
+    })
+    
+    describe("setAttestationTimeout", () => {
+      it("should allow admin to update timeout", async () => {
+        await expect(
+          reserveLedger.connect(deployer).setAttestationTimeout(7200)
+        ).to.emit(reserveLedger, "AttestationTimeoutUpdated")
+          .withArgs(21600, 7200)
+        
+        expect(await reserveLedger.attestationTimeout()).to.equal(7200)
+      })
+      
+      it("should revert if not admin", async () => {
+        await expect(
+          reserveLedger.connect(attester1).setAttestationTimeout(7200)
+        ).to.be.revertedWith(`AccessControl: account ${attester1.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`)
+      })
+      
+      it("should revert if timeout is zero", async () => {
+        await expect(
+          reserveLedger.connect(deployer).setAttestationTimeout(0)
+        ).to.be.revertedWith("InvalidTimeout")
+      })
+    })
+    
+    describe("setMaxStaleness", () => {
+      it("should allow admin to update max staleness", async () => {
+        await expect(
+          reserveLedger.connect(deployer).setMaxStaleness(172800) // 48 hours
+        ).to.emit(reserveLedger, "MaxStalenessUpdated")
+          .withArgs(86400, 172800)
+        
+        expect(await reserveLedger.maxStaleness()).to.equal(172800)
+      })
+      
+      it("should revert if staleness is zero", async () => {
+        await expect(
+          reserveLedger.connect(deployer).setMaxStaleness(0)
+        ).to.be.revertedWith("InvalidTimeout")
+      })
+      
+      it("should revert if not admin", async () => {
+        await expect(
+          reserveLedger.connect(attester1).setMaxStaleness(172800)
+        ).to.be.revertedWith(`AccessControl: account ${attester1.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`)
+      })
+    })
+  })
+
+  describe("Staleness Tracking", () => {
+    // isReserveStale function doesn't exist in current contract
+    /* it("should detect stale reserve data", async () => {
+      // Initially stale (never updated)
+      let [isStale, timeSinceUpdate] = await reserveLedger.isReserveStale(qcAddress.address)
+      expect(isStale).to.be.true
+      expect(timeSinceUpdate).to.equal(ethers.constants.MaxUint256)
+      
+      // Submit consensus
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Should be fresh now
+      ;[isStale, timeSinceUpdate] = await reserveLedger.isReserveStale(qcAddress.address)
+      expect(isStale).to.be.false
+      expect(timeSinceUpdate).to.be.lt(10) // Less than 10 seconds
+      
+      // Advance time beyond maxStaleness (24 hours)
+      await ethers.provider.send("evm_increaseTime", [86401])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Should be stale now
+      ;[isStale, timeSinceUpdate] = await reserveLedger.isReserveStale(qcAddress.address)
+      expect(isStale).to.be.true
+      expect(timeSinceUpdate).to.be.gt(86400)
+    }) */
+    
+    it("should report staleness in getReserveBalanceAndStaleness", async () => {
+      // Submit consensus
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Should be fresh
+      let [balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(ethers.utils.parseEther("100"))
+      expect(isStale).to.be.false
+      
+      // Advance time beyond maxStaleness
+      await ethers.provider.send("evm_increaseTime", [86401])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Should be stale but balance preserved
+      ;[balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(ethers.utils.parseEther("100"))
+      expect(isStale).to.be.true
+    })
+  })
+
+  describe("Zero Balance Scenarios", () => {
+    it("should reach consensus with zero balances", async () => {
+      // Submit 3 attestations with zero balance
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, 0)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, 0)
+      
+      // Third attestation should trigger consensus
+      const tx = await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, 0)
+      await expect(tx).to.emit(reserveLedger, "ConsensusReached")
+      
+      // Check that reserve was updated to zero
+      const [reserveBalance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(0)
+      expect(isStale).to.be.false
+    })
+    
+    it("should handle median calculation with some zero values", async () => {
+      // Submit attestations with mix of zero and non-zero values
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, 0)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Third attestation should trigger consensus with median
+      const tx = await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("50"))
+      await expect(tx).to.emit(reserveLedger, "ConsensusReached")
+      
+      // Verify median was calculated correctly (median of 0, 50, 100 is 50)
+      const [reserveBalance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(ethers.utils.parseEther("50"))
+    })
+    
+    it("should support QC lifecycle from zero to funded and back", async () => {
+      // Start with zero balance (new QC)
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, 0)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, 0)
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, 0)
+      
+      let [balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(0)
+      expect(isStale).to.be.false
+      
+      // QC gets funded
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("1000"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("1000"))
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("1000"))
+      
+      ;[balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(ethers.utils.parseEther("1000"))
+      expect(isStale).to.be.false
+      
+      // QC winds down to zero (offboarding)
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, 0)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, 0)
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, 0)
+      
+      ;[balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(0)
+      expect(isStale).to.be.false
+    })
+    
+    it("should handle temporary zero balance between operations", async () => {
+      // Start with funded QC
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("500"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("500"))
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("500"))
+      
+      // Temporary zero balance
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, 0)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, 0)
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, 0)
+      
+      let [balance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(0)
+      
+      // Refunded
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("300"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("300"))
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("300"))
+      
+      ;[balance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(ethers.utils.parseEther("300"))
+    })
+  })
+  
   describe("Edge cases", () => {
-    it("should handle attestation for multiple QCs", async () => {
-      const anotherQc = thirdParty
-      await qcReserveLedger
-        .connect(attester)
-        .submitReserveAttestation(qcAddress.address, reserveBalance)
-      await qcReserveLedger
-        .connect(attester)
-        .submitReserveAttestation(anotherQc.address, newReserveBalance)
+    it("should handle attester updating their attestation", async () => {
+      // First attestation
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Update attestation
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("150"))
+      
+      // Check that attestation was updated
+      const attestation = await reserveLedger.pendingAttestations(qcAddress.address, attester1.address)
+      expect(attestation.balance).to.equal(ethers.utils.parseEther("150"))
+    })
+    
+    it("should ignore expired attestations when calculating consensus", async () => {
+      // Submit first attestation
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Advance time beyond attestation timeout (6 hours)
+      await ethers.provider.send("evm_increaseTime", [21601])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Submit two more attestations
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("200"))
+      
+      // This should not trigger consensus because first attestation is expired
+      await expect(
+        reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("200"))
+      ).to.not.emit(reserveLedger, "ConsensusReached")
+      
+      // Add fourth attestation to reach consensus with only fresh attestations
+      const tx = await reserveLedger.connect(attester4).submitAttestation(qcAddress.address, ethers.utils.parseEther("200"))
+      await expect(tx).to.emit(reserveLedger, "ConsensusReached")
+    })
+  })
 
-      const [balance1, stale1] =
-        await qcReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
-      const [balance2, stale2] =
-        await qcReserveLedger.getReserveBalanceAndStaleness(anotherQc.address)
-
-      expect(balance1).to.equal(reserveBalance)
-      expect(stale1).to.be.false
-      expect(balance2).to.equal(newReserveBalance)
-      expect(stale2).to.be.false
+  describe("forceConsensus", () => {
+    let arbiter: SignerWithAddress
+    const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
+    
+    beforeEach(async () => {
+      arbiter = deployer // deployer has ARBITER_ROLE by default
+    })
+    
+    it("should allow arbiter to force consensus with one attestation", async () => {
+      const balance = ethers.utils.parseEther("100")
+      
+      // Submit only one attestation (below threshold)
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance)
+      
+      // Force consensus
+      const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
+        .withArgs(
+          qcAddress.address, 
+          balance, 
+          1, 
+          arbiter.address,
+          [attester1.address],
+          [balance]
+        )
+      await expect(tx).to.emit(reserveLedger, "ReserveUpdated")
+      
+      // Verify reserve was updated
+      const [reserveBalance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(balance)
+      expect(isStale).to.be.false
+    })
+    
+    it("should allow arbiter to force consensus with two attestations", async () => {
+      // Submit two different attestations (below threshold)
+      const balance1 = ethers.utils.parseEther("90")
+      const balance2 = ethers.utils.parseEther("110")
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance1)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, balance2)
+      
+      // Force consensus
+      const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
+        .withArgs(
+          qcAddress.address,
+          ethers.utils.parseEther("100"), // median of 90 and 110
+          2,
+          arbiter.address,
+          [attester1.address, attester2.address],
+          [balance1, balance2]
+        )
+      
+      // Verify median was calculated (median of 90, 110 is 100)
+      const [reserveBalance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(ethers.utils.parseEther("100"))
+    })
+    
+    it("should revert if no valid attestations", async () => {
+      // No attestations submitted
+      await expect(
+        reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      ).to.be.revertedWith("No valid attestations to force consensus")
+    })
+    
+    it("should revert if not arbiter", async () => {
+      // Submit attestation
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Try to force consensus without ARBITER_ROLE
+      await expect(
+        reserveLedger.connect(attester1).forceConsensus(qcAddress.address)
+      ).to.be.revertedWith(`AccessControl: account ${attester1.address.toLowerCase()} is missing role ${ARBITER_ROLE}`)
+    })
+    
+    it("should only use valid (non-expired) attestations", async () => {
+      // Submit first attestation
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("50"))
+      
+      // Advance time beyond attestation timeout
+      await ethers.provider.send("evm_increaseTime", [21601]) // 6 hours + 1 second
+      await ethers.provider.send("evm_mine", [])
+      
+      // Submit fresh attestation
+      const freshBalance = ethers.utils.parseEther("100")
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, freshBalance)
+      
+      // Force consensus should only use the fresh attestation
+      const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
+        .withArgs(
+          qcAddress.address, 
+          freshBalance, 
+          1, 
+          arbiter.address,
+          [attester2.address], // Only attester2's attestation is valid
+          [freshBalance]
+        )
+      
+      const [reserveBalance] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(reserveBalance).to.equal(freshBalance)
+    })
+    
+    it("should clear pending attestations after forced consensus", async () => {
+      // Submit attestations
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Force consensus
+      await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // Check that pending attestations were cleared
+      const attestation1 = await reserveLedger.pendingAttestations(qcAddress.address, attester1.address)
+      expect(attestation1.balance).to.equal(0)
+      expect(attestation1.timestamp).to.equal(0)
+    })
+    
+    it("should handle emergency scenario with stale reserves", async () => {
+      // Set up initial reserve
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      await reserveLedger.connect(attester3).submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
+      
+      // Advance time to make reserves stale
+      await ethers.provider.send("evm_increaseTime", [86401]) // 24 hours + 1 second
+      await ethers.provider.send("evm_mine", [])
+      
+      // Verify reserves are stale
+      let [balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(isStale).to.be.true
+      
+      // Submit new attestation (but not enough for consensus)
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("150"))
+      
+      // Arbiter forces consensus with available attestation
+      await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // Verify reserves are updated and no longer stale
+      ;[balance, isStale] = await reserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(ethers.utils.parseEther("150"))
+      expect(isStale).to.be.false
+    })
+    
+    it("should emit correct attester arrays with multiple attestations", async () => {
+      // Submit multiple attestations with different values
+      const balance1 = ethers.utils.parseEther("80")
+      const balance2 = ethers.utils.parseEther("90")
+      const balance3 = ethers.utils.parseEther("100")
+      
+      await reserveLedger.connect(attester1).submitAttestation(qcAddress.address, balance1)
+      await reserveLedger.connect(attester2).submitAttestation(qcAddress.address, balance2)
+      
+      // Note: attesters are processed in the order they appear in pendingAttesters array
+      // which is the order they first submitted attestations
+      
+      const tx = await reserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // Verify event includes all attesters and their balances
+      await expect(tx).to.emit(reserveLedger, "ForcedConsensusReached")
+        .withArgs(
+          qcAddress.address,
+          ethers.utils.parseEther("85"), // median of 80 and 90
+          2,
+          arbiter.address,
+          [attester1.address, attester2.address],
+          [balance1, balance2]
+        )
     })
   })
 })

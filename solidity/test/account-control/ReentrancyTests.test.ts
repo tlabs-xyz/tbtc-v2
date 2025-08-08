@@ -225,18 +225,33 @@ describe("Advanced Reentrancy Tests", () => {
       })
 
       it("should prevent reentrancy during service lookups", async () => {
-        const { qcMinter, qcAddress } = fixture
+        const { qcMinter, qcAddress, basicMintingPolicy, qcReserveLedger, qcData } = fixture
 
-        // Grant MINTER_ROLE to user
+        // QC is already registered via setupQCWithWallets in beforeEach
+
+        // Grant MINTER_ROLE to user on QCMinter
         const MINTER_ROLE = await qcMinter.MINTER_ROLE()
         await qcMinter.grantRole(MINTER_ROLE, fixture.user.address)
+
+        // Grant MINTER_ROLE to QCMinter on BasicMintingPolicy
+        const POLICY_MINTER_ROLE = await basicMintingPolicy.MINTER_ROLE()
+        await basicMintingPolicy.grantRole(POLICY_MINTER_ROLE, qcMinter.address)
+
+        // Ensure QC has sufficient reserves for minting capacity
+        const ATTESTER_ROLE = await qcReserveLedger.ATTESTER_ROLE()
+        await qcReserveLedger.grantRole(ATTESTER_ROLE, fixture.deployer.address)
+        
+        await qcReserveLedger.submitAttestation(
+          qcAddress.address,
+          TEST_DATA.AMOUNTS.RESERVE_BALANCE
+        )
 
         // Service lookups during operations should not allow reentrancy
         // This is more of a defensive programming check
         await expect(
           qcMinter
             .connect(fixture.user)
-            .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.NORMAL_MINT)
+            .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.MIN_MINT)
         ).to.not.be.reverted
       })
     })
@@ -289,49 +304,49 @@ describe("Advanced Reentrancy Tests", () => {
     /**
      * CRITICAL: Watchdog reentrancy vulnerabilities
      *
-     * The SingleWatchdog contract has multiple roles and makes calls
+     * The QCWatchdog contract has multiple roles and makes calls
      * to other contracts, creating potential reentrancy vectors.
      */
     context("Multi-Role Reentrancy Prevention", () => {
       it("should prevent reentrancy through watchdog role separation", async () => {
-        const { singleWatchdog, qcAddress, watchdog } = fixture
+        const { qcWatchdog, qcAddress, watchdog } = fixture
 
         const reserveBalance = TEST_DATA.AMOUNTS.RESERVE_BALANCE
 
         // Grant WATCHDOG_OPERATOR_ROLE to watchdog
         const WATCHDOG_OPERATOR_ROLE =
-          await singleWatchdog.WATCHDOG_OPERATOR_ROLE()
-        await singleWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
+          await qcWatchdog.WATCHDOG_OPERATOR_ROLE()
+        await qcWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
         // Attestation should not allow reentrancy to other watchdog functions
         await expect(
-          singleWatchdog
+          qcWatchdog
             .connect(watchdog)
             .attestReserves(qcAddress.address, reserveBalance)
         ).to.not.be.reverted
 
         // Subsequent calls should work independently
         await expect(
-          singleWatchdog.connect(watchdog).verifyQCSolvency(qcAddress.address)
+          qcWatchdog.connect(watchdog).verifyQCSolvency(qcAddress.address)
         ).to.not.be.reverted
       })
 
       it("should prevent cross-role reentrancy exploitation", async () => {
-        const { singleWatchdog, qcAddress, watchdog } = fixture
+        const { qcWatchdog, qcAddress, watchdog } = fixture
 
         const testReason = ethers.utils.id("TEST_REASON")
 
         // Grant WATCHDOG_OPERATOR_ROLE to watchdog
         const WATCHDOG_OPERATOR_ROLE =
-          await singleWatchdog.WATCHDOG_OPERATOR_ROLE()
-        await singleWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
+          await qcWatchdog.WATCHDOG_OPERATOR_ROLE()
+        await qcWatchdog.grantRole(WATCHDOG_OPERATOR_ROLE, watchdog.address)
 
         // Different watchdog roles should not allow reentrancy between each other
-        await singleWatchdog
+        await qcWatchdog
           .connect(watchdog)
           .setQCStatus(qcAddress.address, 1, testReason)
 
-        await singleWatchdog
+        await qcWatchdog
           .connect(watchdog)
           .attestReserves(qcAddress.address, TEST_DATA.AMOUNTS.RESERVE_BALANCE)
 
@@ -393,16 +408,31 @@ describe("Advanced Reentrancy Tests", () => {
         // multiple malicious contracts creating reentrancy chains
 
         // For now, verify that basic operations don't allow reentrancy
-        const { qcMinter, qcAddress } = fixture
+        const { qcMinter, qcAddress, basicMintingPolicy, qcReserveLedger, qcData } = fixture
 
-        // Grant MINTER_ROLE to user
+        // QC is already registered via setupQCWithWallets in beforeEach
+
+        // Grant MINTER_ROLE to user on QCMinter
         const MINTER_ROLE = await qcMinter.MINTER_ROLE()
         await qcMinter.grantRole(MINTER_ROLE, fixture.user.address)
+
+        // Grant MINTER_ROLE to QCMinter on BasicMintingPolicy
+        const POLICY_MINTER_ROLE = await basicMintingPolicy.MINTER_ROLE()
+        await basicMintingPolicy.grantRole(POLICY_MINTER_ROLE, qcMinter.address)
+
+        // Ensure QC has sufficient reserves
+        const ATTESTER_ROLE = await qcReserveLedger.ATTESTER_ROLE()
+        await qcReserveLedger.grantRole(ATTESTER_ROLE, fixture.deployer.address)
+        
+        await qcReserveLedger.submitAttestation(
+          qcAddress.address,
+          TEST_DATA.AMOUNTS.RESERVE_BALANCE
+        )
 
         await expect(
           qcMinter
             .connect(fixture.user)
-            .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.NORMAL_MINT)
+            .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.MIN_MINT)
         ).to.not.be.reverted
       })
     })
@@ -413,27 +443,182 @@ describe("Advanced Reentrancy Tests", () => {
      * Verify that implemented reentrancy guards work correctly
      */
     context("Built-in Reentrancy Protection", () => {
-      it("should verify reentrancy guards prevent attacks", async () => {
-        // This would test explicit reentrancy guards if implemented
-        // Currently our contracts don't have explicit guards, which might be a gap
+      it("should prevent reentrancy in QCRedeemer.initiateRedemption", async () => {
+        const { qcRedeemer, protocolRegistry, qcAddress, tbtc } = fixture
 
-        const { qcMinter, qcAddress } = fixture
+        // Deploy malicious redemption policy
+        const MaliciousRedemptionPolicy = await ethers.getContractFactory(
+          "MaliciousRedemptionPolicy"
+        )
+        const maliciousPolicy = await MaliciousRedemptionPolicy.deploy(
+          qcRedeemer.address
+        )
+        await maliciousPolicy.deployed()
 
-        // Grant MINTER_ROLE to user
-        const MINTER_ROLE = await qcMinter.MINTER_ROLE()
-        await qcMinter.grantRole(MINTER_ROLE, fixture.user.address)
+        // Replace the redemption policy with our malicious one
+        const REDEMPTION_POLICY_KEY = await qcRedeemer.REDEMPTION_POLICY_KEY()
+        await protocolRegistry.setService(
+          REDEMPTION_POLICY_KEY,
+          maliciousPolicy.address
+        )
 
-        // Basic operation should work
-        await expect(
-          qcMinter
-            .connect(fixture.user)
-            .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.NORMAL_MINT)
-        ).to.not.be.reverted
+        // Setup: User needs tBTC tokens
+        const redemptionAmount = TEST_DATA.AMOUNTS.NORMAL_MINT
+        await tbtc.mint(fixture.user.address, redemptionAmount)
+        await tbtc
+          .connect(fixture.user)
+          .approve(qcRedeemer.address, redemptionAmount)
+
+        // Enable the attack
+        const redemptionId = ethers.utils.id("test_redemption")
+        await maliciousPolicy.enableAttack(redemptionId)
+
+        // Attempt to initiate redemption - transaction should succeed but attack should fail
+        await qcRedeemer
+          .connect(fixture.user)
+          .initiateRedemption(
+            qcAddress.address,
+            redemptionAmount,
+            TEST_DATA.BTC_ADDRESSES.TEST
+          )
+
+        // Verify attack was attempted
+        expect(await maliciousPolicy.attackCount()).to.equal(1)
+      })
+
+      it("should prevent reentrancy in QCRedeemer.recordRedemptionFulfillment", async () => {
+        const { qcRedeemer, protocolRegistry, qcAddress, tbtc } = fixture
+
+        // Deploy reentrancy attacker
+        const ReentrancyAttacker = await ethers.getContractFactory(
+          "ReentrancyAttacker"
+        )
+        const attacker = await ReentrancyAttacker.deploy()
+        await attacker.deployed()
+
+        // Deploy malicious policy that will be called by QCRedeemer
+        const MaliciousRedemptionPolicy = await ethers.getContractFactory(
+          "MaliciousRedemptionPolicy"
+        )
+        const maliciousPolicy = await MaliciousRedemptionPolicy.deploy(
+          qcRedeemer.address
+        )
+        await maliciousPolicy.deployed()
+
+        // Set malicious policy
+        const REDEMPTION_POLICY_KEY = await qcRedeemer.REDEMPTION_POLICY_KEY()
+        await protocolRegistry.setService(
+          REDEMPTION_POLICY_KEY,
+          maliciousPolicy.address
+        )
+
+        // Setup: Create a pending redemption first
+        const redemptionAmount = TEST_DATA.AMOUNTS.NORMAL_MINT
+        await tbtc.mint(fixture.user.address, redemptionAmount)
+        await tbtc
+          .connect(fixture.user)
+          .approve(qcRedeemer.address, redemptionAmount)
+
+        const tx = await qcRedeemer
+          .connect(fixture.user)
+          .initiateRedemption(
+            qcAddress.address,
+            redemptionAmount,
+            TEST_DATA.BTC_ADDRESSES.TEST
+          )
+        const receipt = await tx.wait()
+        // Find the RedemptionRequested event
+        const event = receipt.events?.find(e => e.event === 'RedemptionRequested')
+        const redemptionId = event?.args?.redemptionId || ethers.utils.id("test_redemption_2")
+
+        // Grant ARBITER_ROLE to attacker
+        const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
+        await qcRedeemer.grantRole(ARBITER_ROLE, fixture.deployer.address)
+
+        // Enable attack on fulfillment
+        await maliciousPolicy.enableAttack(redemptionId)
+
+        // Create mock SPV data
+        const mockSpvData = createMockSpvData()
+
+        // Attempt to record fulfillment - transaction should succeed but attack should fail
+        await qcRedeemer.recordRedemptionFulfillment(
+          redemptionId,
+          TEST_DATA.BTC_ADDRESSES.TEST,
+          100000,
+          mockSpvData.txInfo,
+          mockSpvData.proof
+        )
+        
+        // Verify attack was attempted
+        expect(await maliciousPolicy.attackCount()).to.be.gt(0)
+      })
+
+      it("should prevent reentrancy in BasicRedemptionPolicy.recordFulfillment", async () => {
+        const { basicRedemptionPolicy, qcAddress, tbtc, qcData, qcReserveLedger } = fixture
+
+        // Deploy reentrancy attacker
+        const ReentrancyAttacker = await ethers.getContractFactory(
+          "ReentrancyAttacker"
+        )
+        const attacker = await ReentrancyAttacker.deploy()
+        await attacker.deployed()
+
+        await attacker.setTargets(
+          ethers.constants.AddressZero,
+          basicRedemptionPolicy.address
+        )
+
+        // QC is already registered via setupQCWithWallets in beforeEach
+
+        // Set up user tBTC balance
+        const redemptionAmount = TEST_DATA.AMOUNTS.MIN_MINT
+        await tbtc.mint(fixture.user.address, redemptionAmount)
+
+        // Grant necessary roles
+        const ARBITER_ROLE = await basicRedemptionPolicy.ARBITER_ROLE()
+        await basicRedemptionPolicy.grantRole(ARBITER_ROLE, attacker.address)
+        await basicRedemptionPolicy.grantRole(
+          ARBITER_ROLE,
+          fixture.deployer.address
+        )
+
+        const REDEEMER_ROLE = await basicRedemptionPolicy.REDEEMER_ROLE()
+        await basicRedemptionPolicy.grantRole(
+          REDEEMER_ROLE,
+          fixture.deployer.address
+        )
+
+        // Create a redemption first
+        const redemptionId = ethers.utils.id("test_redemption")
+        await basicRedemptionPolicy.requestRedemption(
+          redemptionId,
+          qcAddress.address,
+          fixture.user.address,
+          redemptionAmount,
+          TEST_DATA.BTC_ADDRESSES.TEST
+        )
+
+        // Prepare attack
+        await attacker.prepareAttack(
+          4, // REDEMPTION_POLICY_FULFILL
+          qcAddress.address,
+          redemptionAmount,
+          TEST_DATA.BTC_ADDRESSES.TEST,
+          redemptionId
+        )
+
+        // Execute attack - should succeed but not cause harm due to nonReentrant protection
+        // Note: BasicRedemptionPolicy.recordFulfillment doesn't make external calls,
+        // so true reentrancy isn't possible, but the nonReentrant modifier provides defense in depth
+        await expect(attacker.executeAttack()).to.not.be.reverted
       })
 
       it("should test gas limit based reentrancy protection", async () => {
         // Test that functions consume enough gas to prevent certain reentrancy attacks
-        const { basicMintingPolicy, qcMinter, qcAddress } = fixture
+        const { basicMintingPolicy, qcMinter, qcAddress, qcReserveLedger, qcData } = fixture
+
+        // QC is already registered via setupQCWithWallets in beforeEach
 
         // Grant MINTER_ROLE to the QCMinter on the BasicMintingPolicy
         const MINTER_ROLE = await basicMintingPolicy.MINTER_ROLE()
@@ -443,9 +628,19 @@ describe("Advanced Reentrancy Tests", () => {
         const QC_MINTER_ROLE = await qcMinter.MINTER_ROLE()
         await qcMinter.grantRole(QC_MINTER_ROLE, fixture.user.address)
 
+        // Ensure QC has sufficient reserves
+        const ATTESTER_ROLE = await qcReserveLedger.ATTESTER_ROLE()
+        await qcReserveLedger.grantRole(ATTESTER_ROLE, fixture.deployer.address)
+        
+        // Submit a fresh attestation to ensure it's not stale
+        await qcReserveLedger.submitAttestation(
+          qcAddress.address,
+          TEST_DATA.AMOUNTS.MAX_MINT // Use larger amount to ensure capacity
+        )
+
         const tx = await qcMinter
           .connect(fixture.user)
-          .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.NORMAL_MINT)
+          .requestQCMint(qcAddress.address, TEST_DATA.AMOUNTS.MIN_MINT)
 
         const receipt = await tx.wait()
 

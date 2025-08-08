@@ -11,12 +11,12 @@ import { QCReserveLedger, SystemState } from "../../typechain"
  * Replaces the removed getTimeUntilStale() function
  */
 export async function getTimeUntilStale(
-  qcReserveLedger: QCReserveLedger,
+  qcQCReserveLedger: QCReserveLedger,
   systemState: SystemState,
   qcAddress: string,
   currentTimestamp: number
 ): Promise<BigNumber> {
-  const attestation = await qcReserveLedger.getCurrentAttestation(qcAddress)
+  const attestation = await qcQCReserveLedger.getCurrentAttestation(qcAddress)
 
   if (!attestation.isValid || attestation.timestamp.eq(0)) {
     return BigNumber.from(0)
@@ -37,11 +37,11 @@ export async function getTimeUntilStale(
  * Replaces the removed getAttestationHistoryCount() function
  */
 export async function getAttestationHistoryCount(
-  qcReserveLedger: QCReserveLedger,
+  qcQCReserveLedger: QCReserveLedger,
   qcAddress: string
 ): Promise<number> {
   // Get the full attestation history array
-  const history = await qcReserveLedger.getAttestationHistory(qcAddress)
+  const history = await qcQCReserveLedger.getAttestationHistory(qcAddress)
   return history.length
 }
 
@@ -50,13 +50,13 @@ export async function getAttestationHistoryCount(
  * Replaces the removed getAttestationHistoryPaginated() function
  */
 export async function getAttestationHistoryPaginated(
-  qcReserveLedger: QCReserveLedger,
+  qcQCReserveLedger: QCReserveLedger,
   qcAddress: string,
   offset: number,
   limit: number
 ): Promise<any[]> {
   // Get the full attestation history array
-  const fullHistory = await qcReserveLedger.getAttestationHistory(qcAddress)
+  const fullHistory = await qcQCReserveLedger.getAttestationHistory(qcAddress)
 
   if (offset >= fullHistory.length) {
     return []
@@ -72,14 +72,14 @@ export async function getAttestationHistoryPaginated(
  * Note: This requires reading the attestedQCs array which is still public
  */
 export async function getAttestedQCs(
-  qcReserveLedger: QCReserveLedger
+  qcQCReserveLedger: QCReserveLedger
 ): Promise<string[]> {
   const qcs: string[] = []
   let index = 0
 
   try {
     while (true) {
-      const qc = await qcReserveLedger.attestedQCs(index)
+      const qc = await qcQCReserveLedger.attestedQCs(index)
       qcs.push(qc)
       index++
     }
@@ -95,7 +95,7 @@ export async function getAttestedQCs(
  * Replaces the removed getAttestationSummary() function
  */
 export async function getAttestationSummary(
-  qcReserveLedger: QCReserveLedger,
+  qcQCReserveLedger: QCReserveLedger,
   systemState: SystemState,
   currentTimestamp: number
 ): Promise<{
@@ -103,14 +103,14 @@ export async function getAttestationSummary(
   totalBalance: BigNumber
   staleCount: number
 }> {
-  const qcs = await getAttestedQCs(qcReserveLedger)
+  const qcs = await getAttestedQCs(qcQCReserveLedger)
   const staleThreshold = await systemState.staleThreshold()
 
   let totalBalance = BigNumber.from(0)
   let staleCount = 0
 
   for (const qc of qcs) {
-    const attestation = await qcReserveLedger.getCurrentAttestation(qc)
+    const attestation = await qcQCReserveLedger.getCurrentAttestation(qc)
 
     if (attestation.isValid && !attestation.timestamp.eq(0)) {
       totalBalance = totalBalance.add(attestation.balance)
@@ -137,13 +137,13 @@ export async function getAttestationSummary(
  * Replaces the removed getLatestAttestationTimestamps() function
  */
 export async function getLatestAttestationTimestamps(
-  qcReserveLedger: QCReserveLedger,
+  qcQCReserveLedger: QCReserveLedger,
   qcs: string[]
 ): Promise<BigNumber[]> {
   const timestamps = []
 
   for (const qc of qcs) {
-    const attestation = await qcReserveLedger.getCurrentAttestation(qc)
+    const attestation = await qcQCReserveLedger.getCurrentAttestation(qc)
     timestamps.push(attestation.timestamp)
   }
 
@@ -155,7 +155,7 @@ export async function getLatestAttestationTimestamps(
  * Replaces the removed checkMultipleStaleAttestations() function
  */
 export async function checkMultipleStaleAttestations(
-  qcReserveLedger: QCReserveLedger,
+  qcQCReserveLedger: QCReserveLedger,
   systemState: SystemState,
   qcs: string[],
   currentTimestamp: number
@@ -164,7 +164,7 @@ export async function checkMultipleStaleAttestations(
   const staleThreshold = await systemState.staleThreshold()
 
   for (const qc of qcs) {
-    const attestation = await qcReserveLedger.getCurrentAttestation(qc)
+    const attestation = await qcQCReserveLedger.getCurrentAttestation(qc)
 
     if (!attestation.isValid || attestation.timestamp.eq(0)) {
       staleFlags.push(true)

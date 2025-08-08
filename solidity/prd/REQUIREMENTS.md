@@ -1,8 +1,8 @@
 # tBTC v2 Account Control - Requirements Specification
 
-**Document Version**: 3.0  
-**Date**: 2025-07-11  
-**Architecture**: Direct Bank Integration  
+**Document Version**: 4.0  
+**Date**: 2025-08-06  
+**Architecture**: Simplified Watchdog System  
 **Purpose**: Complete requirements specification (source of truth)  
 **Related Documents**: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION.md](IMPLEMENTATION.md), [FLOWS.md](FLOWS.md)
 
@@ -43,7 +43,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 - **Primary**: Qualified Custodians (regulated institutional entities)
 - **Secondary**: tBTC token holders, DeFi protocol integrators
-- **Operational**: tBTC DAO governance, Watchdog, system administrators
+- **Operational**: tBTC DAO governance, Oracle attesters, Watchdog reporters, system administrators
 
 ---
 
@@ -176,22 +176,26 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 ### 3.4 Reserve Management
 
-#### 3.4.1 Optimistic Watchdog Quorum Attestation (REQ-FUNC-RES-001)
-**Requirement**: The system MUST implement optimistic N-of-M watchdog quorum for reserve attestation
+#### 3.4.1 Simplified Watchdog Architecture (REQ-FUNC-RES-001)
+**Requirement**: The system MUST implement a simplified watchdog architecture focused on objective enforcement
 
-- **Optimistic Execution**: Primary validator submits attestations optimistically
-- **Challenge Period**: 1-24 hour window for other watchdogs to object
-- **Escalating Consensus**: Progressive delays based on objection count (1h→4h→12h→24h)
-- **MEV-Resistant Selection**: Primary validator selection using blockhash randomness
-- **Approval Mechanism**: Explicit approvals required for highly disputed operations (≥3 objections)
+**Current Design (v2.0)**:
+- **Oracle Problem**: QCReserveLedger provides multi-attester consensus for reserve balances
+- **Enforcement**: WatchdogEnforcer allows permissionless triggering of objective violations
+- **Decision Problem**: Direct DAO action for any governance decisions
+
+**Key Components**:
+- **WatchdogReasonCodes**: Machine-readable violation codes for automated validation
+- **QCReserveLedger**: Median consensus from 3+ attesters, eliminates single trust point
+- **WatchdogEnforcer**: Anyone can trigger enforcement with valid reason codes
 
 **Acceptance Criteria**:
-- Only active watchdogs can submit attestations as primary validators
-- Primary validator determined by MEV-resistant selection algorithm
-- Challenge period allows other watchdogs to object with evidence
-- Operations execute after challenge period expires (unless insufficient approvals)
-- Automatic QC status change to UnderReview if undercollateralized
-- ReentrancyGuard protection on all operation executions
+- Multiple attesters submit reserve balances, oracle calculates median
+- Machine-readable reason codes enable automated validation
+- Enforcement events provide transparency for DAO monitoring
+- Permissionless enforcement of objective violations (INSUFFICIENT_RESERVES, STALE_ATTESTATIONS)
+- All operations protected by ReentrancyGuard and comprehensive access control
+- The system achieves 90%+ automation for measurable violations
 
 #### 3.4.2 Proof-of-Reserves Process (REQ-FUNC-POR-001)
 
@@ -336,9 +340,10 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 - **DEFAULT_ADMIN_ROLE**: DAO governance (grant/revoke roles)
 - **MINTER_ROLE**: QCMinter contract (request minting operations)
-- **ATTESTER_ROLE**: Watchdog (submit reserve attestations)
-- **REGISTRAR_ROLE**: Watchdog (finalize wallet registrations)
-- **ARBITER_ROLE**: Watchdog (QC status changes, default flagging)
+- **ATTESTER_ROLE**: ReserveOracle and individual attesters (submit reserve attestations)
+- **REGISTRAR_ROLE**: Authorized entities (finalize wallet registrations)
+- **ARBITER_ROLE**: WatchdogEnforcer (objective violation enforcement)
+- **WATCHDOG_ROLE**: Subjective reporters (submit observations)
 - **PAUSER_ROLE**: Emergency Council (granular function pausing)
 
 **Acceptance Criteria**:
@@ -391,10 +396,10 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 #### 5.4.1 Watchdog Security (REQ-SEC-WATCHDOG-001)
 
-- **Single Trusted Entity**: DAO-appointed Watchdog with multiple roles
-- **Role Consolidation**: ATTESTER_ROLE, REGISTRAR_ROLE, ARBITER_ROLE in one entity
-- **DAO Oversight**: Emergency replacement procedures through governance
-- **Backup Procedures**: Failover mechanisms for Watchdog unavailability
+- **Distributed Trust**: Multiple attesters for oracle consensus (no single point of failure)
+- **Permissionless Enforcement**: Anyone can trigger objective violations with valid proof
+- **Transparent Reporting**: All subjective observations emit public events
+- **DAO Oversight**: Direct governance action on reports without intermediaries
 
 #### 5.4.2 Emergency Response (REQ-SEC-EMERGENCY-001)
 
@@ -515,10 +520,10 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 #### 7.2.1 Watchdog Integration (REQ-INT-WATCHDOG-001)
 
-- **Role Assignment**: Single entity with ATTESTER_ROLE, REGISTRAR_ROLE, ARBITER_ROLE
+- **Oracle Attesters**: Multiple entities submit reserve attestations for consensus
+- **Subjective Reporters**: Watchdogs submit observations via events
 - **Data Sources**: Integration with Bitcoin blockchain explorers
-- **Response Times**: Real-time monitoring with appropriate response SLAs
-- **Backup Systems**: DAO oversight and replacement mechanisms
+- **Permissionless Enforcement**: Anyone can trigger violations with proof
 
 #### 7.2.2 Monitoring Integration (REQ-INT-MON-001)
 
@@ -932,7 +937,7 @@ The success of this implementation depends on careful execution of these require
 **Document Control**
 
 - **Version**: 3.0 (Consolidated Source of Truth)
-- **Replaces**: account-control-requirements.md
+- **Purpose**: Consolidated requirements specification
 - **Approval Required From**: tBTC DAO, Technical Team, Security Team
 - **Next Review Date**: 2025-08-11
 - **Distribution**: All project stakeholders, development team, governance council
