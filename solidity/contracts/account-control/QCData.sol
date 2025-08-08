@@ -91,7 +91,7 @@ contract QCData is AccessControl {
         address indexed qc,
         string btcAddress,
         address indexed registeredBy,
-        uint256 indexed timestamp
+        uint256 timestamp
     );
 
     /// @dev Emitted when wallet deregistration is requested
@@ -99,7 +99,7 @@ contract QCData is AccessControl {
         address indexed qc,
         string btcAddress,
         address indexed requestedBy,
-        uint256 indexed timestamp
+        uint256 timestamp
     );
 
     /// @dev Emitted when wallet deregistration is finalized
@@ -107,7 +107,7 @@ contract QCData is AccessControl {
         address indexed qc,
         string btcAddress,
         address indexed finalizedBy,
-        uint256 indexed timestamp
+        uint256 timestamp
     );
 
     /// @dev Emitted when QC minted amount is updated
@@ -132,14 +132,14 @@ contract QCData is AccessControl {
     event QCManagerRoleGranted(
         address indexed manager,
         address indexed grantedBy,
-        uint256 indexed timestamp
+        uint256 timestamp
     );
 
     /// @dev Emitted when QC manager role is revoked
     event QCManagerRoleRevoked(
         address indexed manager,
         address indexed revokedBy,
-        uint256 indexed timestamp
+        uint256 timestamp
     );
 
     constructor() {

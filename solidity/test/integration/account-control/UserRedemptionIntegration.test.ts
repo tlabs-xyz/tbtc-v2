@@ -480,7 +480,7 @@ class UserRedemptionIntegration extends BaseAccountControlIntegration {
     const totalReserves = ethers.utils.parseEther("200")
     const currentTimestamp = await this.getBlockTimestamp()
 
-    await this.qcReserveLedger
+    await this.qcQCReserveLedger
       .connect(this.watchdog)
       .submitAttestation(this.qc.address, totalReserves, currentTimestamp)
 

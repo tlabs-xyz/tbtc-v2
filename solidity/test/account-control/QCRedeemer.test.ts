@@ -41,9 +41,13 @@ describe("QCRedeemer", () => {
   const validLegacyBtc = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, governance, user, qcAddress, watchdog, thirdParty] =
-      await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    governance = signers[1]
+    user = signers[2]
+    qcAddress = signers[3]
+    watchdog = signers[4]
+    thirdParty = signers[5]
 
     // Generate service keys
     REDEMPTION_POLICY_KEY = ethers.utils.id("REDEMPTION_POLICY")

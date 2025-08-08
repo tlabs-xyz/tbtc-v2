@@ -1,8 +1,8 @@
 # Account Control Architecture for tBTC v2
 
-**Document Version**: 1.0  
-**Date**: 2025-07-11  
-**Architecture**: Direct Bank Integration  
+**Document Version**: 2.0  
+**Date**: 2025-08-06  
+**Architecture**: Simplified Watchdog System  
 **Status**: Production Ready
 
 ---
@@ -16,17 +16,18 @@ Welcome to the Account Control system documentation. This feature extends tBTC v
 | Document                                   | Purpose                             | Audience                 |
 | ------------------------------------------ | ----------------------------------- | ------------------------ |
 | **[REQUIREMENTS.md](REQUIREMENTS.md)**     | Complete requirements specification | All stakeholders         |
-| **[ARCHITECTURE.md](ARCHITECTURE.md)**     | Detailed technical architecture     | Architects, developers   |
-| **[IMPLEMENTATION.md](IMPLEMENTATION.md)** | Code patterns and deployment        | Developers, DevOps       |
+| **[../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)**     | Detailed technical architecture     | Architects, developers   |
+| **[../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md)** | Code patterns and deployment        | Developers, DevOps       |
 | **[FLOWS.md](FLOWS.md)**                   | User journeys and sequences         | Product, QA, integrators |
 
 ### 📚 Reference Documents
 
 | Document                                                       | Purpose                      | Audience                |
 | -------------------------------------------------------------- | ---------------------------- | ----------------------- |
-| **[SPV_IMPLEMENTATION_GUIDE.md](SPV_IMPLEMENTATION_GUIDE.md)** | SPV integration details      | Blockchain developers   |
-| **[FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md)**           | V2 roadmap and enhancements  | Product, architects     |
-| **[RESEARCH.md](RESEARCH.md)**                                 | Background research findings | Researchers, architects |
+| **[../docs/CURRENT_SYSTEM_STATE.md](../docs/CURRENT_SYSTEM_STATE.md)** | Current system state (truth source) | All stakeholders |
+| **[../docs/WATCHDOG_FINAL_ARCHITECTURE.md](../docs/WATCHDOG_FINAL_ARCHITECTURE.md)** | Watchdog system architecture | Technical teams |
+| **[../docs/future-enhancements/FUTURE_ENHANCEMENTS.md](../docs/future-enhancements/FUTURE_ENHANCEMENTS.md)**           | V2 roadmap and enhancements  | Product, architects     |
+| **[../DOCUMENTATION_MAP.md](../DOCUMENTATION_MAP.md)** | Complete documentation navigation | All stakeholders |
 
 ---
 
@@ -38,7 +39,7 @@ Account Control enables **Qualified Custodians** (regulated institutional entiti
 
 ### Key Innovation: Direct Bank Integration
 
-Unlike abstraction-layer approaches, Account Control integrates directly with the existing tBTC Bank/Vault architecture:
+Account Control integrates directly with the existing tBTC Bank/Vault architecture:
 
 ```
 User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
@@ -48,7 +49,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 
 - **🏦 Direct Bank Integration**: Seamless integration with proven Bank/Vault infrastructure
 - **🔧 Modular Architecture**: Policy-driven contracts enable future upgrades without disruption
-- **👁️ Single Watchdog**: DAO-appointed entity for Proof-of-Reserves attestations
+- **👁️ Simplified Watchdog**: Multi-attester consensus + permissionless enforcement
 - **🛡️ Segregated Reserves**: Individual QC reserves prevent systemic gridlock
 - **⚡ Simple State Machine**: Clean 3-state QC model (Active, UnderReview, Revoked)
 
@@ -65,14 +66,22 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 
 ### System Components
 
-| Component              | Purpose                  | Key Features                                      |
-| ---------------------- | ------------------------ | ------------------------------------------------- |
-| **BasicMintingPolicy** | Direct Bank integration  | Auto-minting, capacity validation, error handling |
-| **ProtocolRegistry**   | Central service registry | Component upgrades, dependency management         |
-| **QCManager**          | Business logic           | Stateless QC management, capacity calculations    |
-| **QCData**             | Storage layer            | Pure storage, gas-optimized, audit-friendly       |
-| **QCMinter**           | Stable entry point       | Policy delegation, emergency pause                |
-| **QCRedeemer**         | Redemption engine        | Lifecycle management, default handling            |
+#### Core Account Control
+| Component                       | Purpose                      | Key Features                                      |
+| ------------------------------- | ---------------------------- | ------------------------------------------------- |
+| **BasicMintingPolicy**          | Direct Bank integration      | Auto-minting, capacity validation, error handling |
+| **ProtocolRegistry**            | Central service registry     | Component upgrades, dependency management         |
+| **QCManager**                   | Business logic               | Stateless QC management, capacity calculations    |
+| **QCData**                      | Storage layer                | Pure storage, gas-optimized, audit-friendly       |
+| **QCMinter**                    | Stable entry point           | Policy delegation, emergency pause                |
+| **QCRedeemer**                  | Redemption engine            | Lifecycle management, default handling            |
+
+#### Simplified Watchdog System (v2.0)
+| Component                       | Purpose                      | Key Features                                      |
+| ------------------------------- | ---------------------------- | ------------------------------------------------- |
+| **WatchdogReasonCodes**         | Machine-readable violations  | Standardized codes for automated validation       |
+| **QCReserveLedger**             | Multi-attester consensus     | Median calculation, eliminates single trust point |
+| **WatchdogEnforcer**            | Permissionless enforcement   | Anyone can trigger objective violations           |
 
 ### Integration with Existing tBTC v2
 
@@ -90,21 +99,22 @@ The system deploys as an **independent contract suite** without modifying existi
 ### For Developers
 
 1. **Start with**: [REQUIREMENTS.md](REQUIREMENTS.md) - Understand what we're building
-2. **Then read**: [ARCHITECTURE.md](ARCHITECTURE.md) - Learn the technical design
-3. **Implementation**: [IMPLEMENTATION.md](IMPLEMENTATION.md) - Deploy and configure
+2. **Then read**: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) - Learn the technical design
+3. **Implementation**: [../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md) - Deploy and configure
 4. **User flows**: [FLOWS.md](FLOWS.md) - Understand user journeys
+5. **Watchdog operations**: [../docs/WATCHDOG_GUIDE.md](../docs/WATCHDOG_GUIDE.md) - Complete watchdog system guide
 
 ### For Product Managers
 
 1. **Business case**: [REQUIREMENTS.md](REQUIREMENTS.md) - Section 2 (Business Requirements)
 2. **User experience**: [FLOWS.md](FLOWS.md) - Complete user journey documentation
-3. **Future roadmap**: [FUTURE_ENHANCEMENTS.md](FUTURE_ENHANCEMENTS.md) - V2 evolution path
+3. **Future roadmap**: [../docs/future-enhancements/FUTURE_ENHANCEMENTS.md](../docs/future-enhancements/FUTURE_ENHANCEMENTS.md) - V2 evolution path
 
 ### For Security Reviewers
 
 1. **Security requirements**: [REQUIREMENTS.md](REQUIREMENTS.md) - Section 5 (Security Requirements)
-2. **Architecture security**: [ARCHITECTURE.md](ARCHITECTURE.md) - Section 6 (Security Considerations)
-3. **Implementation security**: [IMPLEMENTATION.md](IMPLEMENTATION.md) - Security patterns and access control
+2. **Architecture security**: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) - Complete security model
+3. **Implementation security**: [../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md) - Security patterns and access control
 
 ### For QCs (Qualified Custodians)
 
@@ -148,17 +158,33 @@ The system deploys as an **independent contract suite** without modifying existi
 - **Gas Efficiency**: Direct integration reduces transaction costs
 - **Reduced Risk**: Fewer contracts in the critical path
 
-### Why Single Watchdog?
+### Watchdog System Design
 
-- **Operational Simplicity**: Clear responsibility and accountability
-- **Faster Response**: No consensus delays for critical operations
-- **DAO Oversight**: Watchdog appointed and monitored by DAO
-- **Future Evolution**: Clear path to M-of-N decentralization in V2
+The watchdog system focuses on objective, measurable violations through three key solutions:
+
+1. **Oracle Problem** (Objective Facts)
+   - Solution: Multi-attester consensus via `QCReserveLedger`
+   - Multiple attesters submit reserve balances, median calculation prevents manipulation
+
+2. **Enforcement Problem** (Objective Violations)
+   - Solution: Permissionless enforcement via `WatchdogEnforcer`
+   - Anyone can trigger enforcement for verifiable violations
+
+3. **Decision Problem** (Governance Actions)
+   - Solution: Direct DAO action for any non-automated decisions
+   - DAO monitors enforcement events and can override if needed
+
+#### System Benefits
+- **Minimal Contracts**: 3-contract architecture for clarity and efficiency
+- **Machine-Readable**: Reason codes enable automated validation
+- **Trust Distribution**: No single points of failure
+- **Permissionless Enforcement**: Anyone can trigger objective violations
+- **Gas Optimization**: Minimal state, fewer cross-contract calls
 
 ### Why Policy-Driven Architecture?
 
 - **Upgradeability**: Business logic can evolve without core contract changes
-- **Future-Proofing**: Clear path from attestation-based V1 to crypto-economic V2
+- **Future-Proofing**: Clear upgrade path to future crypto-economic enhancements
 - **Interface Stability**: Core contracts maintain stable interfaces
 - **Risk Management**: Isolated upgrade risks to policy contracts only
 
@@ -184,6 +210,8 @@ The system deploys as an **independent contract suite** without modifying existi
 | Version | Date       | Changes                                    |
 | ------- | ---------- | ------------------------------------------ |
 | 1.0     | 2025-07-11 | Initial consolidated documentation release |
+| 1.1     | 2025-08-04 | Dual-path watchdog + automated framework  |
+| 2.0     | 2025-08-06 | Simplified watchdog system finalized     |
 
 ---
 

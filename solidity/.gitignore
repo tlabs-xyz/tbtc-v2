@@ -14,7 +14,6 @@
 
 # OpenZeppelin
 /.openzeppelin/unknown-*.json
-.serena
 
 /flows
 /stil*.md # enable later
