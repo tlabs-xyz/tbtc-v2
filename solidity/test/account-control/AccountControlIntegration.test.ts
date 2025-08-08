@@ -12,10 +12,8 @@ import {
   QCReserveLedger,
   BasicMintingPolicy,
   BasicRedemptionPolicy,
-  SingleWatchdog,
   TBTC,
   SPVValidator,
-  QCBridge,
   Bank,
   TBTCVault,
 } from "../../typechain"
@@ -35,13 +33,13 @@ describe("Account Control System - Integration Test", () => {
   let qcData: QCData
   let systemState: SystemState
   let qcManager: QCManager
-  let qcReserveLedger: QCReserveLedger
+  let qcQCReserveLedger: QCReserveLedger
   let basicMintingPolicy: BasicMintingPolicy
   let basicRedemptionPolicy: BasicRedemptionPolicy
-  let singleWatchdog: SingleWatchdog
+  let qcWatchdog: FakeContract<QCManager> // Mock QCWatchdog using QCManager interface
   let tbtc: TBTC
   let mockSpvValidator: FakeContract<SPVValidator>
-  let qcBridge: QCBridge
+  // let qcBridge: QCBridge // Not used in this test
   let bank: Bank
   let tbtcVault: TBTCVault
 
@@ -68,9 +66,12 @@ describe("Account Control System - Integration Test", () => {
   let ARBITER_ROLE: string
 
   before(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-extra-semi
-    ;[deployer, governance, qcAddress, user, watchdog] =
-      await ethers.getSigners()
+    const signers = await ethers.getSigners()
+    deployer = signers[0]
+    governance = signers[1]
+    qcAddress = signers[2]
+    user = signers[3]
+    watchdog = signers[4]
 
     // Generate service keys
     QC_DATA_KEY = ethers.utils.id("QC_DATA")
@@ -154,10 +155,8 @@ describe("Account Control System - Integration Test", () => {
     const QCReserveLedgerFactory = await ethers.getContractFactory(
       "QCReserveLedger"
     )
-    qcReserveLedger = await QCReserveLedgerFactory.deploy(
-      protocolRegistry.address
-    )
-    await qcReserveLedger.deployed()
+    qcQCReserveLedger = await QCReserveLedgerFactory.deploy()
+    await qcQCReserveLedger.deployed()
 
     const BasicMintingPolicyFactory = await ethers.getContractFactory(
       "BasicMintingPolicy"
@@ -175,14 +174,11 @@ describe("Account Control System - Integration Test", () => {
     )
     await basicRedemptionPolicy.deployed()
 
-    // Phase 4: Watchdog Integration
-    const SingleWatchdogFactory = await ethers.getContractFactory(
-      "SingleWatchdog"
-    )
-    singleWatchdog = await SingleWatchdogFactory.deploy(
-      protocolRegistry.address
-    )
-    await singleWatchdog.deployed()
+    // Phase 4: Watchdog Integration (Mock since QCWatchdog doesn't exist)
+    qcWatchdog = await smock.fake<QCManager>("QCManager")
+    // Set up basic mock behaviors for qcWatchdog
+    qcWatchdog.registerQC.returns()
+    qcWatchdog.setQCStatus.returns()
 
     // Phase 5: System Configuration
     await configureSystem()
@@ -195,7 +191,7 @@ describe("Account Control System - Integration Test", () => {
     await protocolRegistry.setService(QC_MANAGER_KEY, qcManager.address)
     await protocolRegistry.setService(
       QC_RESERVE_LEDGER_KEY,
-      qcReserveLedger.address
+      qcQCReserveLedger.address
     )
     await protocolRegistry.setService(
       MINTING_POLICY_KEY,
@@ -230,11 +226,11 @@ describe("Account Control System - Integration Test", () => {
     await bank.setAuthorizedBalanceIncreaser(basicMintingPolicy.address, true)
 
     // Setup Watchdog roles
-    await qcReserveLedger.grantRole(ATTESTER_ROLE, singleWatchdog.address)
-    await qcManager.grantRole(REGISTRAR_ROLE, singleWatchdog.address)
-    await qcManager.grantRole(ARBITER_ROLE, singleWatchdog.address)
-    await qcRedeemer.grantRole(ARBITER_ROLE, singleWatchdog.address)
-    await basicRedemptionPolicy.grantRole(ARBITER_ROLE, singleWatchdog.address)
+    await qcQCReserveLedger.grantRole(ATTESTER_ROLE, qcWatchdog.address)
+    await qcManager.grantRole(REGISTRAR_ROLE, qcWatchdog.address)
+    await qcManager.grantRole(ARBITER_ROLE, qcWatchdog.address)
+    await qcRedeemer.grantRole(ARBITER_ROLE, qcWatchdog.address)
+    await basicRedemptionPolicy.grantRole(ARBITER_ROLE, qcWatchdog.address)
 
     // Grant QCRedeemer the ARBITER role in BasicRedemptionPolicy so it can record fulfillments
     await basicRedemptionPolicy.grantRole(ARBITER_ROLE, qcRedeemer.address)
@@ -244,8 +240,8 @@ describe("Account Control System - Integration Test", () => {
     await basicRedemptionPolicy.grantRole(REDEEMER_ROLE, qcRedeemer.address)
 
     // Grant watchdog operator role
-    await singleWatchdog.grantRole(
-      await singleWatchdog.WATCHDOG_OPERATOR_ROLE(),
+    await qcWatchdog.grantRole(
+      await qcWatchdog.WATCHDOG_OPERATOR_ROLE(),
       watchdog.address
     )
   }
@@ -258,10 +254,10 @@ describe("Account Control System - Integration Test", () => {
       expect(qcData.address).to.be.properAddress
       expect(systemState.address).to.be.properAddress
       expect(qcManager.address).to.be.properAddress
-      expect(qcReserveLedger.address).to.be.properAddress
+      expect(qcQCReserveLedger.address).to.be.properAddress
       expect(basicMintingPolicy.address).to.be.properAddress
       expect(basicRedemptionPolicy.address).to.be.properAddress
-      expect(singleWatchdog.address).to.be.properAddress
+      expect(qcWatchdog.address).to.be.properAddress
     })
 
     it("should register all services correctly", async () => {
@@ -275,7 +271,7 @@ describe("Account Control System - Integration Test", () => {
         qcManager.address
       )
       expect(await protocolRegistry.getService(QC_RESERVE_LEDGER_KEY)).to.equal(
-        qcReserveLedger.address
+        qcQCReserveLedger.address
       )
       expect(await protocolRegistry.getService(MINTING_POLICY_KEY)).to.equal(
         basicMintingPolicy.address
@@ -286,17 +282,17 @@ describe("Account Control System - Integration Test", () => {
     })
 
     it("should verify Watchdog has necessary roles", async () => {
-      const hasAttesterRole = await qcReserveLedger.hasRole(
+      const hasAttesterRole = await qcQCReserveLedger.hasRole(
         ATTESTER_ROLE,
-        singleWatchdog.address
+        qcWatchdog.address
       )
       const hasRegistrarRole = await qcManager.hasRole(
         REGISTRAR_ROLE,
-        singleWatchdog.address
+        qcWatchdog.address
       )
       const hasArbiterRole = await qcManager.hasRole(
         ARBITER_ROLE,
-        singleWatchdog.address
+        qcWatchdog.address
       )
 
       expect(hasAttesterRole).to.be.true
@@ -330,7 +326,7 @@ describe("Account Control System - Integration Test", () => {
       // Register wallet via Watchdog
       const { challenge, txInfo, proof } = createMockSpvData("wallet_reg_test")
 
-      // Encode the SPV proof data as expected by SingleWatchdog
+      // Encode the SPV proof data as expected by QCWatchdog
       const spvProofData = ethers.utils.defaultAbiCoder.encode(
         [
           "tuple(bytes4,bytes,bytes,bytes4)",
@@ -353,7 +349,7 @@ describe("Account Control System - Integration Test", () => {
         ]
       )
 
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .registerWalletWithProof(
           qcAddress.address,
@@ -379,16 +375,16 @@ describe("Account Control System - Integration Test", () => {
         ethers.utils.parseEther("1000")
       )
 
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
-      const attestation = await qcReserveLedger.getCurrentAttestation(
+      const attestation = await qcQCReserveLedger.getCurrentAttestation(
         qcAddress.address
       )
       expect(attestation.balance).to.equal(initialReserveBalance)
       expect(attestation.isValid).to.be.true
-      expect(attestation.attester).to.equal(singleWatchdog.address)
+      expect(attestation.attester).to.equal(qcWatchdog.address)
     })
 
     it("should detect stale attestations", async () => {
@@ -397,12 +393,12 @@ describe("Account Control System - Integration Test", () => {
         ethers.utils.parseEther("1000")
       )
 
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
       // Initially not stale
-      const isStale = await qcReserveLedger.isAttestationStale(
+      const isStale = await qcQCReserveLedger.isAttestationStale(
         qcAddress.address
       )
       expect(isStale).to.be.false
@@ -419,7 +415,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
@@ -457,7 +453,7 @@ describe("Account Control System - Integration Test", () => {
         ethers.utils.id("TEST_REVIEW")
       ) // UnderReview
 
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
@@ -479,7 +475,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, initialReserveBalance)
 
@@ -524,7 +520,7 @@ describe("Account Control System - Integration Test", () => {
       const mockSpvData = createMockSpvData()
       const expectedAmount = mintAmount.div(ethers.BigNumber.from(10).pow(10)) // Convert from 18 decimals to 8 decimals (satoshis)
 
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .recordRedemptionFulfillment(
           redemptionId,
@@ -555,7 +551,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
 
@@ -653,7 +649,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
 
@@ -667,21 +663,16 @@ describe("Account Control System - Integration Test", () => {
     })
   })
 
-  describe("QCBridge Integration", () => {
-    it("should enable minting via TBTCVault after QCBridge deposit", async () => {
-      // This test verifies the complete integration flow:
-      // 1. BasicMintingPolicy creates Bank balance via QCBridge
-      // 2. User can then call TBTCVault.mint() to consume Bank balance
-      // 3. User receives tBTC tokens through standard Vault flow
-
-      // Note: This test is a placeholder for the QCBridge integration
-      // Full implementation would require:
-      // - Deploy Bank, TBTCVault, and QCBridge contracts
-      // - Update BasicMintingPolicy to use QCBridge
-      // - Configure proper access controls
-      // - Test the complete flow from QC → Bank → TBTCVault → tBTC
-
-      // For now, we verify the existing direct minting still works
+  describe("Direct QC Minting Integration", () => {
+    it("should enable direct QC minting through QCMinter", async () => {
+      // This test verifies the current direct minting integration flow:
+      // 1. QC registers with sufficient capacity
+      // 2. Watchdog attests QC reserves
+      // 3. User requests mint through QCMinter
+      // 4. User receives tBTC tokens directly
+      //
+      // NOTE: Future QCBridge integration would replace this direct minting
+      // with a flow through Bank → TBTCVault → tBTC tokens
       const totalSupplyBefore = await tbtc.totalSupply()
 
       // Grant MINTER_ROLE to user on QCMinter
@@ -693,7 +684,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
 
@@ -711,6 +702,41 @@ describe("Account Control System - Integration Test", () => {
       expect(totalSupplyAfter).to.equal(
         totalSupplyBefore.add(ethers.utils.parseEther("1"))
       )
+
+      // Verify QC minted amount was updated
+      const qcInfo = await qcData.getQC(qcAddress.address)
+      expect(qcInfo.totalMintedAmount).to.equal(ethers.utils.parseEther("1"))
+    })
+
+    it("should handle QC capacity limits properly", async () => {
+      // Setup QC with limited capacity
+      await qcData.registerQC(
+        qcAddress.address,
+        ethers.utils.parseEther("2") // Only 2 tBTC capacity
+      )
+      await qcWatchdog
+        .connect(watchdog)
+        .attestReserves(qcAddress.address, ethers.utils.parseEther("5"))
+
+      // Grant MINTER_ROLE to user
+      const QC_MINTER_ROLE = await qcMinter.MINTER_ROLE()
+      await qcMinter.grantRole(QC_MINTER_ROLE, user.address)
+
+      // First mint should succeed
+      await qcMinter
+        .connect(user)
+        .requestQCMint(qcAddress.address, ethers.utils.parseEther("1"))
+
+      // Second mint pushing over capacity should fail
+      await expect(
+        qcMinter
+          .connect(user)
+          .requestQCMint(qcAddress.address, ethers.utils.parseEther("2"))
+      ).to.be.reverted
+
+      // Verify only the first mint succeeded
+      const userBalance = await tbtc.balanceOf(user.address)
+      expect(userBalance).to.equal(ethers.utils.parseEther("1"))
     })
   })
 
@@ -729,7 +755,7 @@ describe("Account Control System - Integration Test", () => {
         qcAddress.address,
         ethers.utils.parseEther("1000")
       )
-      await singleWatchdog
+      await qcWatchdog
         .connect(watchdog)
         .attestReserves(qcAddress.address, ethers.utils.parseEther("10"))
       await qcMinter
@@ -750,6 +776,454 @@ describe("Account Control System - Integration Test", () => {
         .transfer(deployer.address, ethers.utils.parseEther("1"))
       const deployerBalance = await tbtc.balanceOf(deployer.address)
       expect(deployerBalance).to.equal(ethers.utils.parseEther("1"))
+    })
+  })
+
+  describe("Watchdog Consensus Integration", () => {
+    let watchdogConsensusManager: any
+    let watchdogMonitor: any
+    let watchdog1: SignerWithAddress
+    let watchdog2: SignerWithAddress
+    let watchdog3: SignerWithAddress
+
+    before(async () => {
+      // Get additional signers for watchdogs
+      ;[, , , , , watchdog1, watchdog2, watchdog3] = await ethers.getSigners()
+
+      // Deploy WatchdogConsensusManager
+      const WatchdogConsensusManager = await ethers.getContractFactory("WatchdogConsensusManager")
+      watchdogConsensusManager = await WatchdogConsensusManager.deploy(
+        qcManager.address,
+        qcRedeemer.address,
+        qcData.address
+      )
+      await watchdogConsensusManager.deployed()
+
+      // Deploy WatchdogMonitor
+      const WatchdogMonitor = await ethers.getContractFactory("WatchdogMonitor")  
+      watchdogMonitor = await WatchdogMonitor.deploy(
+        watchdogConsensusManager.address,
+        qcData.address
+      )
+      await watchdogMonitor.deployed()
+
+      // Grant roles
+      const WATCHDOG_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("WATCHDOG_ROLE"))
+      const MANAGER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MANAGER_ROLE"))
+      const ARBITER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ARBITER_ROLE"))
+
+      await watchdogConsensusManager.grantRole(MANAGER_ROLE, governance.address)
+      await watchdogConsensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog1.address)
+      await watchdogConsensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog2.address)
+      await watchdogConsensusManager.connect(governance).grantRole(WATCHDOG_ROLE, watchdog3.address)
+
+      // Grant ARBITER_ROLE to consensus manager in QCManager
+      await qcManager.grantRole(ARBITER_ROLE, watchdogConsensusManager.address)
+    })
+
+    it("should handle complete QC status change flow via consensus", async () => {
+      // Ensure QC is registered and active
+      const isRegistered = await qcData.isQCRegistered(qcAddress.address)
+      if (!isRegistered) {
+        await qcManager
+          .connect(governance)
+          .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+      }
+
+      // Verify QC is initially active
+      const initialStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(initialStatus).to.equal(0) // Active
+
+      // Watchdog1 proposes status change to UnderReview
+      const reason = "Detected suspicious activity in reserve attestations"
+      const newStatus = 1 // UnderReview
+      
+      const proposalTx = await watchdogConsensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress.address, newStatus, reason)
+      const proposalReceipt = await proposalTx.wait()
+      const proposalId = proposalReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Verify proposal exists but not executed yet (only 1 vote, need 2)
+      let proposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(proposal.executed).to.equal(false)
+      expect(proposal.voteCount).to.equal(1)
+
+      // QC should still be active
+      let currentStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(currentStatus).to.equal(0) // Still Active
+
+      // Watchdog2 votes - should trigger execution (reaches 2-of-5 threshold)
+      const voteTx = await watchdogConsensusManager.connect(watchdog2).vote(proposalId) 
+      const voteReceipt = await voteTx.wait()
+      
+      // Should have execution event
+      const executionEvent = voteReceipt.events?.find(e => e.event === 'ProposalExecuted')
+      expect(executionEvent).to.not.be.undefined
+
+      // Verify proposal is now executed
+      proposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(proposal.executed).to.equal(true)
+      expect(proposal.voteCount).to.equal(2)
+
+      // Verify QC status was actually changed
+      currentStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(currentStatus).to.equal(1) // UnderReview
+
+      // Verify minting is now blocked due to status change
+      await expect(
+        qcMinter.connect(qcAddress).requestQCMint(qcAddress.address, ethers.utils.parseEther("10"))
+      ).to.be.reverted // Should fail because QC is UnderReview
+    })
+
+    it("should handle wallet deregistration consensus flow", async () => {
+      // Ensure QC has a registered wallet first
+      const btcAddress = "bc1qintegrationtestwallet" 
+      
+      // For test purposes, assume wallet is already registered
+      // In real scenario, this would have been done via SPV proof
+      
+      // Watchdog1 proposes wallet deregistration due to security concern
+      const reason = "Wallet appears to be compromised based on transaction patterns"
+      
+      const proposalTx = await watchdogConsensusManager
+        .connect(watchdog1)
+        .proposeWalletDeregistration(qcAddress.address, btcAddress, reason)
+      const proposalReceipt = await proposalTx.wait()
+      const proposalId = proposalReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Verify proposal type and initial state
+      const proposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(proposal.proposalType).to.equal(1) // WALLET_DEREGISTRATION
+      expect(proposal.executed).to.equal(false)
+      expect(proposal.voteCount).to.equal(1)
+
+      // Watchdog2 and Watchdog3 vote (should reach 2-vote threshold and execute)
+      await watchdogConsensusManager.connect(watchdog2).vote(proposalId)
+      
+      // Verify execution occurred
+      const finalProposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(finalProposal.executed).to.equal(true)
+      expect(finalProposal.voteCount).to.equal(2)
+    })
+
+    it("should demonstrate complete emergency response workflow", async () => {
+      // Scenario: Multiple watchdogs detect QC issues and coordinate response
+      
+      // Step 1: First watchdog detects issue and proposes status change
+      const emergencyReason = "URGENT: QC reserves appear to be moved to unknown addresses"
+      
+      const statusProposalTx = await watchdogConsensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress.address, 2, emergencyReason) // 2 = Revoked
+      const statusReceipt = await statusProposalTx.wait()
+      const statusProposalId = statusReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Step 2: Second watchdog confirms the issue and votes
+      await watchdogConsensusManager.connect(watchdog2).vote(statusProposalId)
+
+      // Step 3: Verify QC is now revoked
+      const finalStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(finalStatus).to.equal(2) // Revoked
+
+      // Step 4: Verify all QC operations are now blocked
+      await expect(
+        qcMinter.connect(qcAddress).requestQCMint(qcAddress.address, ethers.utils.parseEther("1"))
+      ).to.be.reverted // Should fail because QC is Revoked
+
+      // Step 5: Demonstrate that consensus can handle concurrent proposals
+      const redemptionId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("emergency-redemption-123"))
+      const defaultReason = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_REVOKED"))
+      
+      const redemptionProposalTx = await watchdogConsensusManager
+        .connect(watchdog3)
+        .proposeRedemptionDefault(redemptionId, defaultReason, "QC revoked, defaulting pending redemptions")
+      const redemptionReceipt = await redemptionProposalTx.wait()
+      const redemptionProposalId = redemptionReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Another watchdog votes to execute redemption defaults
+      await watchdogConsensusManager.connect(watchdog1).vote(redemptionProposalId)
+
+      // Verify both emergency proposals were executed
+      const statusProposal = await watchdogConsensusManager.getProposal(statusProposalId)
+      const redemptionProposal = await watchdogConsensusManager.getProposal(redemptionProposalId)
+      
+      expect(statusProposal.executed).to.equal(true)
+      expect(redemptionProposal.executed).to.equal(true)
+    })
+
+    it("should demonstrate M-of-N parameter adjustment and impact", async () => {
+      // Start with default 2-of-5, change to 3-of-5 for higher security
+      await watchdogConsensusManager.connect(governance).updateConsensusParams(3, 5)
+
+      // Verify parameters updated
+      const params = await watchdogConsensusManager.getConsensusParams()
+      expect(params.required).to.equal(3)
+      expect(params.total).to.equal(5)
+
+      // Test that proposals now require 3 votes
+      const testReason = "Testing 3-of-5 consensus requirement"
+      const proposalTx = await watchdogConsensusManager
+        .connect(watchdog1)
+        .proposeStatusChange(qcAddress.address, 0, testReason) // Back to Active
+      const proposalReceipt = await proposalTx.wait()
+      const proposalId = proposalReceipt.events?.find(e => e.event === 'ProposalCreated')?.args?.proposalId
+
+      // Two votes should not be enough (1 from proposer + 1 additional = 2 < 3)
+      await watchdogConsensusManager.connect(watchdog2).vote(proposalId)
+      
+      let proposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(proposal.executed).to.equal(false)
+      expect(proposal.voteCount).to.equal(2)
+
+      // Third vote should trigger execution
+      await watchdogConsensusManager.connect(watchdog3).vote(proposalId)
+      
+      proposal = await watchdogConsensusManager.getProposal(proposalId)
+      expect(proposal.executed).to.equal(true)
+      expect(proposal.voteCount).to.equal(3)
+
+      // Verify QC status was changed back to Active
+      const finalStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(finalStatus).to.equal(0) // Active again
+    })
+  })
+
+  describe("Emergency Consensus Integration", () => {
+    let attester1: SignerWithAddress
+    let attester2: SignerWithAddress
+    let attester3: SignerWithAddress
+    let arbiter: SignerWithAddress
+    let watchdogEnforcer: SignerWithAddress
+    
+    const STALE_ATTESTATIONS = ethers.utils.id("STALE_ATTESTATIONS")
+    const maxStaleness = 86400 // 24 hours
+    
+    beforeEach(async () => {
+      // Get additional signers for testing
+      const signers = await ethers.getSigners()
+      attester1 = signers[5]
+      attester2 = signers[6]
+      attester3 = signers[7]
+      arbiter = signers[8]
+      watchdogEnforcer = signers[9]
+      
+      // Grant ATTESTER_ROLE to our attesters
+      await qcQCReserveLedger.grantRole(ATTESTER_ROLE, attester1.address)
+      await qcQCReserveLedger.grantRole(ATTESTER_ROLE, attester2.address)
+      await qcQCReserveLedger.grantRole(ATTESTER_ROLE, attester3.address)
+      
+      // Grant ARBITER_ROLE to our arbiter
+      await qcQCReserveLedger.grantRole(ARBITER_ROLE, arbiter.address)
+      await qcManager.grantRole(ARBITER_ROLE, arbiter.address)
+      
+      // Register a QC
+      await qcManager.connect(qcWatchdog.address).registerQC(qcAddress.address, initialCapacity)
+      
+      // Setup initial consensus for the QC
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qcAddress.address, reserveBalance)
+      await qcQCReserveLedger.connect(attester2).submitAttestation(qcAddress.address, reserveBalance)
+      await qcQCReserveLedger.connect(attester3).submitAttestation(qcAddress.address, reserveBalance)
+      
+      // Verify initial state
+      const [balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(reserveBalance)
+      expect(isStale).to.be.false
+    })
+    
+    it("should handle complete emergency consensus workflow", async () => {
+      // 1. Advance time to make reserves stale (> 24 hours)
+      await ethers.provider.send("evm_increaseTime", [maxStaleness + 1])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Verify reserves are now stale
+      let [balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(isStale).to.be.true
+      
+      // 2. Anyone can trigger enforcement for stale attestations
+      // For this test, we'll manually set the QC to UnderReview to simulate WatchdogEnforcer
+      await qcManager.connect(qcWatchdog.address).setQCStatus(
+        qcAddress.address, 
+        1, // UnderReview
+        STALE_ATTESTATIONS
+      )
+      
+      // Verify QC is now UnderReview
+      let qcStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(qcStatus).to.equal(1) // UnderReview
+      
+      // Verify minting is blocked
+      await expect(
+        basicMintingPolicy.checkMintingAllowed(qcAddress.address, ethers.utils.parseEther("10"))
+      ).to.be.revertedWith("QCNotActive")
+      
+      // 3. Submit fresh attestations (but only 2, below threshold of 3)
+      const newReserveBalance = ethers.utils.parseEther("600")
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qcAddress.address, newReserveBalance)
+      await qcQCReserveLedger.connect(attester2).submitAttestation(qcAddress.address, newReserveBalance)
+      
+      // Verify consensus was NOT reached (need 3 attestations)
+      ;[balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(reserveBalance) // Still old balance
+      expect(isStale).to.be.true // Still stale
+      
+      // 4. Arbiter forces consensus with available attestations
+      const tx = await qcQCReserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // Verify ForcedConsensusReached event
+      await expect(tx).to.emit(qcQCReserveLedger, "ForcedConsensusReached")
+        .withArgs(
+          qcAddress.address,
+          newReserveBalance,
+          2,
+          arbiter.address,
+          [attester1.address, attester2.address],
+          [newReserveBalance, newReserveBalance]
+        )
+      
+      // 5. Verify reserves are updated and no longer stale
+      ;[balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(newReserveBalance)
+      expect(isStale).to.be.false
+      
+      // 6. Arbiter moves QC back to Active status
+      await qcManager.connect(arbiter).setQCStatus(
+        qcAddress.address,
+        0, // Active
+        ethers.utils.id("RESERVES_RESTORED")
+      )
+      
+      // Verify QC is Active again
+      qcStatus = await qcData.getQCStatus(qcAddress.address)
+      expect(qcStatus).to.equal(0) // Active
+      
+      // 7. Verify minting is allowed again
+      const canMint = await basicMintingPolicy.checkMintingAllowed(
+        qcAddress.address, 
+        ethers.utils.parseEther("10")
+      )
+      expect(canMint).to.be.true
+    })
+    
+    it("should allow attestations to continue during UnderReview", async () => {
+      // Make reserves stale
+      await ethers.provider.send("evm_increaseTime", [maxStaleness + 1])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Set QC to UnderReview
+      await qcManager.connect(qcWatchdog.address).setQCStatus(
+        qcAddress.address,
+        1, // UnderReview
+        STALE_ATTESTATIONS
+      )
+      
+      // Submit attestations while QC is UnderReview
+      const newBalance1 = ethers.utils.parseEther("700")
+      const newBalance2 = ethers.utils.parseEther("750")
+      const newBalance3 = ethers.utils.parseEther("800")
+      
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qcAddress.address, newBalance1)
+      await qcQCReserveLedger.connect(attester2).submitAttestation(qcAddress.address, newBalance2)
+      
+      // Force consensus with partial attestations
+      await qcQCReserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // Submit another attestation after forced consensus
+      await qcQCReserveLedger.connect(attester3).submitAttestation(qcAddress.address, newBalance3)
+      
+      // Now regular consensus should work with fresh attestations
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qcAddress.address, newBalance3)
+      await qcQCReserveLedger.connect(attester2).submitAttestation(qcAddress.address, newBalance3)
+      
+      // Verify consensus was reached normally
+      const [balance, isStale] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      expect(balance).to.equal(newBalance3)
+      expect(isStale).to.be.false
+    })
+    
+    it("should prevent minting when reserves are stale", async () => {
+      // Advance time to make reserves stale
+      await ethers.provider.send("evm_increaseTime", [maxStaleness + 1])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Minting should still work if QC is Active (policy doesn't check staleness directly)
+      const mintAmount = ethers.utils.parseEther("100")
+      const canMint = await basicMintingPolicy.checkMintingAllowed(qcAddress.address, mintAmount)
+      expect(canMint).to.be.true
+      
+      // But after UnderReview, minting is blocked
+      await qcManager.connect(qcWatchdog.address).setQCStatus(
+        qcAddress.address,
+        1, // UnderReview
+        STALE_ATTESTATIONS
+      )
+      
+      await expect(
+        basicMintingPolicy.checkMintingAllowed(qcAddress.address, mintAmount)
+      ).to.be.revertedWith("QCNotActive")
+    })
+    
+    it("should allow redemptions to continue during UnderReview", async () => {
+      // First mint some tBTC
+      const mintAmount = ethers.utils.parseEther("100")
+      await basicMintingPolicy.connect(qcWatchdog.address).executeMinting(
+        qcAddress.address,
+        user.address,
+        mintAmount
+      )
+      
+      // Make reserves stale and set UnderReview
+      await ethers.provider.send("evm_increaseTime", [maxStaleness + 1])
+      await ethers.provider.send("evm_mine", [])
+      
+      await qcManager.connect(qcWatchdog.address).setQCStatus(
+        qcAddress.address,
+        1, // UnderReview
+        STALE_ATTESTATIONS
+      )
+      
+      // Redemptions should still be allowed during UnderReview
+      const redeemAmount = ethers.utils.parseEther("50")
+      const canRedeem = await basicRedemptionPolicy.canRequestRedemption(
+        qcAddress.address,
+        redeemAmount
+      )
+      expect(canRedeem).to.be.true
+    })
+    
+    it("should handle multiple QCs independently", async () => {
+      // Register second QC
+      const signers = await ethers.getSigners()
+      const qc2 = signers[10]
+      await qcManager.connect(qcWatchdog.address).registerQC(qc2.address, initialCapacity)
+      
+      // Set up initial consensus for QC2
+      const qc2Balance = ethers.utils.parseEther("1000")
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qc2.address, qc2Balance)
+      await qcQCReserveLedger.connect(attester2).submitAttestation(qc2.address, qc2Balance)
+      await qcQCReserveLedger.connect(attester3).submitAttestation(qc2.address, qc2Balance)
+      
+      // Make QC1 reserves stale
+      await ethers.provider.send("evm_increaseTime", [maxStaleness + 1])
+      await ethers.provider.send("evm_mine", [])
+      
+      // Both QCs should be stale now
+      let [balance1, isStale1] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      let [balance2, isStale2] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qc2.address)
+      expect(isStale1).to.be.true
+      expect(isStale2).to.be.true
+      
+      // Force consensus only for QC1
+      await qcQCReserveLedger.connect(attester1).submitAttestation(qcAddress.address, ethers.utils.parseEther("550"))
+      await qcQCReserveLedger.connect(arbiter).forceConsensus(qcAddress.address)
+      
+      // QC1 should be fresh, QC2 still stale
+      ;[balance1, isStale1] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qcAddress.address)
+      ;[balance2, isStale2] = await qcQCReserveLedger.getReserveBalanceAndStaleness(qc2.address)
+      expect(isStale1).to.be.false
+      expect(isStale2).to.be.true
+      expect(balance1).to.equal(ethers.utils.parseEther("550"))
+      expect(balance2).to.equal(qc2Balance)
     })
   })
 })

@@ -79,7 +79,7 @@ class QCMintingIntegration extends BaseAccountControlIntegration {
 
     // Check reserve freshness
     const lastAttestationTime =
-      await this.qcReserveLedger.getLastAttestationTime(this.qc.address)
+      await this.qcQCReserveLedger.getLastAttestationTime(this.qc.address)
     const currentTime = await this.getBlockTimestamp()
     expect(currentTime - lastAttestationTime).to.be.lte(
       this.TEST_PARAMS.ATTESTATION_STALE_THRESHOLD
@@ -365,7 +365,7 @@ class QCMintingIntegration extends BaseAccountControlIntegration {
     const lowReserves = ethers.utils.parseEther("0.5")
     const currentTimestamp = await this.getBlockTimestamp()
 
-    await this.qcReserveLedger
+    await this.qcQCReserveLedger
       .connect(this.watchdog)
       .submitAttestation(this.qc.address, lowReserves, currentTimestamp)
 
@@ -417,7 +417,7 @@ class QCMintingIntegration extends BaseAccountControlIntegration {
     const totalReserves = ethers.utils.parseEther("200") // 200 BTC - plenty for testing
     const currentTimestamp = await this.getBlockTimestamp()
 
-    await this.qcReserveLedger
+    await this.qcQCReserveLedger
       .connect(this.watchdog)
       .submitAttestation(this.qc.address, totalReserves, currentTimestamp)
   }

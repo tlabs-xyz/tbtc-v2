@@ -11,7 +11,7 @@ import type {
   QCMinter,
   BasicMintingPolicy,
   QCReserveLedger,
-  SingleWatchdog,
+  QCWatchdog,
   Bank,
   TBTCVault,
   TBTC,
@@ -30,8 +30,8 @@ describe("Simple Account Control Integration Test", () => {
   let systemState: SystemState
   let qcMinter: QCMinter
   let basicMintingPolicy: BasicMintingPolicy
-  let qcReserveLedger: QCReserveLedger
-  let singleWatchdog: SingleWatchdog
+  let qcQCReserveLedger: QCReserveLedger
+  let qcWatchdog: QCWatchdog
 
   // Mock contracts
   let mockBank: FakeContract<Bank>
@@ -100,12 +100,12 @@ describe("Simple Account Control Integration Test", () => {
     await basicMintingPolicy.deployed()
 
     const QCReserveLedger = await ethers.getContractFactory("QCReserveLedger")
-    qcReserveLedger = await QCReserveLedger.deploy(protocolRegistry.address)
-    await qcReserveLedger.deployed()
+    qcQCReserveLedger = await QCReserveLedger.deploy(protocolRegistry.address)
+    await qcQCReserveLedger.deployed()
 
-    const SingleWatchdog = await ethers.getContractFactory("SingleWatchdog")
-    singleWatchdog = await SingleWatchdog.deploy(protocolRegistry.address)
-    await singleWatchdog.deployed()
+    const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
+    qcWatchdog = await QCWatchdog.deploy(protocolRegistry.address)
+    await qcWatchdog.deployed()
 
     // Register services
     await protocolRegistry.setService(SERVICE_KEYS.QC_DATA, qcData.address)
@@ -123,15 +123,15 @@ describe("Simple Account Control Integration Test", () => {
     )
     await protocolRegistry.setService(
       SERVICE_KEYS.QC_RESERVE_LEDGER,
-      qcReserveLedger.address
+      qcQCReserveLedger.address
     )
     await protocolRegistry.setService(
       SERVICE_KEYS.WATCHDOG,
-      singleWatchdog.address
+      qcWatchdog.address
     )
 
     // Set up roles
-    await qcReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
+    await qcQCReserveLedger.grantRole(ROLES.ATTESTER_ROLE, watchdog.address)
     await qcManager.grantRole(ROLES.REGISTRAR_ROLE, watchdog.address)
     await qcManager.grantRole(ROLES.ARBITER_ROLE, watchdog.address)
     await qcManager.grantRole(ROLES.DEFAULT_ADMIN_ROLE, governance.address)
@@ -154,7 +154,7 @@ describe("Simple Account Control Integration Test", () => {
     ).to.equal(basicMintingPolicy.address)
 
     // Verify roles
-    expect(await qcReserveLedger.hasRole(ROLES.ATTESTER_ROLE, watchdog.address))
+    expect(await qcQCReserveLedger.hasRole(ROLES.ATTESTER_ROLE, watchdog.address))
       .to.be.true
     expect(await qcManager.hasRole(ROLES.REGISTRAR_ROLE, watchdog.address)).to
       .be.true
@@ -183,12 +183,12 @@ describe("Simple Account Control Integration Test", () => {
     await qcManager.connect(governance).registerQC(qc.address, maxMintingCap)
 
     // Submit attestation (correct method signature - only qc and balance)
-    await qcReserveLedger
+    await qcQCReserveLedger
       .connect(watchdog)
       .submitReserveAttestation(qc.address, reserves)
 
     // Verify attestation exists
-    const attestation = await qcReserveLedger.getCurrentAttestation(qc.address)
+    const attestation = await qcQCReserveLedger.getCurrentAttestation(qc.address)
     expect(attestation.balance).to.equal(reserves)
 
     console.log("✅ Reserve attestation test completed")
