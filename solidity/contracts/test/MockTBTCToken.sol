@@ -28,4 +28,10 @@ contract MockTBTCToken is ERC20 {
         }
         return super.approve(spender, amount);
     }
+    
+    function burnFrom(address account, uint256 amount) public returns (bool) {
+        _spendAllowance(account, _msgSender(), amount);
+        _burn(account, amount);
+        return true;
+    }
 }

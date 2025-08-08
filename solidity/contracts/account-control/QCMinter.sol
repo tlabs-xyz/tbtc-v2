@@ -4,23 +4,24 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/IMintingPolicy.sol";
 import "./ProtocolRegistry.sol";
+import "./SystemState.sol";
 
 /// @title QCMinter
-/// @dev Stable entry point for tBTC minting with Policy delegation.
-/// Acts as a focused contract that delegates core validation and minting
-/// logic to a pluggable "Minting Policy" contract, allowing minting rules
-/// to be upgraded without changing the core minter contract.
+/// @notice Stable entry point for tBTC minting with Policy delegation
+/// @dev Acts as a focused contract that delegates core validation and minting
+///      logic to a pluggable "Minting Policy" contract, allowing minting rules
+///      to be upgraded without changing the core minter contract.
 ///
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - MINTER_ROLE: Can request QC mints
 contract QCMinter is AccessControl {
-    // Custom errors for gas-efficient reverts
     error InvalidQCAddress();
     error InvalidAmount();
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant MINTING_POLICY_KEY = keccak256("MINTING_POLICY");
+    bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
 
     ProtocolRegistry public immutable protocolRegistry;
 
@@ -54,6 +55,14 @@ contract QCMinter is AccessControl {
         if (qc == address(0)) revert InvalidQCAddress();
         if (amount == 0) revert InvalidAmount();
 
+        // Check if QC is emergency paused
+        SystemState systemState = SystemState(
+            protocolRegistry.getService(SYSTEM_STATE_KEY)
+        );
+        if (systemState.isQCEmergencyPaused(qc)) {
+            revert SystemState.QCIsEmergencyPaused(qc);
+        }
+
         // Get active minting policy from registry
         IMintingPolicy policy = IMintingPolicy(
             protocolRegistry.getService(MINTING_POLICY_KEY)
@@ -82,7 +91,6 @@ contract QCMinter is AccessControl {
         view
         returns (uint256 availableCapacity)
     {
-        // Cache policy service to avoid redundant SLOAD operations
         IMintingPolicy policy = IMintingPolicy(
             protocolRegistry.getService(MINTING_POLICY_KEY)
         );
@@ -105,4 +113,5 @@ contract QCMinter is AccessControl {
 
         return policy.checkMintingEligibility(qc, amount);
     }
+
 }

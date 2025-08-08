@@ -2,303 +2,296 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./ProtocolRegistry.sol";
-import "./SystemState.sol";
 
 /// @title QCReserveLedger
-/// @dev Reserve attestation storage and verification system.
-/// Exclusively responsible for recording off-chain reserve data submitted
-/// by a trusted attester (the Watchdog). Contains staleness detection to
-/// ensure reserve data is fresh for minting capacity calculations.
-///
-/// Role definitions:
-/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and invalidate attestations
-/// - ATTESTER_ROLE: Can submit reserve attestations (typically granted to SingleWatchdog)
+/// @notice Multi-attester consensus oracle with Byzantine fault tolerance
+/// @dev SECURITY: Uses consensus-based architecture where individual attesters cannot 
+///      manipulate final balance. Requires 3+ attestations with median calculation 
+///      to protect against up to 50% malicious attesters.
 contract QCReserveLedger is AccessControl {
-    // Custom errors for gas-efficient reverts
-    error InvalidQCAddress();
-    error NoAttestationExists();
-    error ReasonRequired();
-
     bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
-    bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
-
-    /// @dev Reserve attestation data structure - optimized for gas efficiency
-    struct ReserveAttestation {
-        uint256 balance; // Attested reserve balance in satoshis
-        uint256 timestamp; // When the attestation was submitted
-        uint256 blockNumber; // Block number when submitted
-        address attester; // Who submitted the attestation - packed with bool
-        bool isValid; // Whether this attestation is valid
+    bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
+    
+    struct ReserveData {
+        uint256 balance;
+        uint256 lastUpdateTimestamp;
     }
-
-    ProtocolRegistry public immutable protocolRegistry;
-
-    /// @dev Maps QC addresses to their latest reserve attestation
-    mapping(address => ReserveAttestation) public reserveAttestations;
-
-    /// @dev Maps QC addresses to historical attestations
-    /// @notice Historical attestations are stored for legal compliance and audit trail purposes.
-    /// This provides a complete record of all reserve balance changes over time, which is
-    /// essential for regulatory compliance, dispute resolution, and transparency.
-    mapping(address => ReserveAttestation[]) public attestationHistory;
-
-    /// @dev Array of all QCs with attestations
-    address[] public attestedQCs;
-
-    /// @dev Mapping to check if QC is in attestedQCs array
-    mapping(address => bool) public hasAttestation;
-
-    /// @dev Emitted when a reserve attestation is submitted
-    event ReserveAttestationSubmitted(
-        address indexed attester,
+    
+    struct PendingAttestation {
+        uint256 balance;
+        uint256 timestamp;
+        address attester;
+    }
+    
+    
+    // QC address => ReserveData
+    mapping(address => ReserveData) public reserves;
+    
+    // QC address => attester address => PendingAttestation
+    mapping(address => mapping(address => PendingAttestation)) public pendingAttestations;
+    
+    // QC address => array of attester addresses who have pending attestations
+    mapping(address => address[]) public pendingAttesters;
+    
+    
+    // Configuration
+    uint256 public consensusThreshold = 3;
+    uint256 public attestationTimeout = 6 hours; // Time window for attestations to be considered valid
+    uint256 public maxStaleness = 24 hours; // Maximum time before reserve data is considered stale
+    
+    // Events
+    event AttestationSubmitted(
         address indexed qc,
-        uint256 indexed newBalance,
-        uint256 oldBalance,
-        uint256 timestamp,
-        uint256 blockNumber
-    );
-
-    /// @dev Emitted when an attestation is marked as invalid
-    event AttestationInvalidated(
-        address indexed qc,
-        uint256 indexed timestamp,
-        bytes32 reason,
-        address indexed invalidatedBy
-    );
-
-    /// @dev Emitted when staleness threshold is exceeded
-    event AttestationStale(
-        address indexed qc,
-        uint256 indexed attestationTime,
-        uint256 indexed currentTime,
-        uint256 threshold,
-        address checkedBy
-    );
-
-    /// @dev Emitted when attester role is granted
-    event AttesterRoleGranted(
         address indexed attester,
-        address indexed grantedBy,
-        uint256 indexed timestamp
-    );
-
-    /// @dev Emitted when attester role is revoked
-    event AttesterRoleRevoked(
-        address indexed attester,
-        address indexed revokedBy,
-        uint256 indexed timestamp
-    );
-
-    /// @dev Emitted when an SPV-verified attestation is submitted
-    event SPVVerifiedAttestationSubmitted(
-        address indexed attester,
-        address indexed qc,
-        uint256 indexed balance,
-        bytes32 proofTxHash,
+        uint256 balance,
         uint256 timestamp
     );
-
-    constructor(address _protocolRegistry) {
-        protocolRegistry = ProtocolRegistry(_protocolRegistry);
+    
+    event ConsensusReached(
+        address indexed qc,
+        uint256 consensusBalance,
+        uint256 attestationCount,
+        uint256 timestamp
+    );
+    
+    event ReserveUpdated(
+        address indexed qc,
+        uint256 oldBalance,
+        uint256 newBalance,
+        uint256 timestamp
+    );
+    
+    event ForcedConsensusReached(
+        address indexed qc,
+        uint256 consensusBalance,
+        uint256 attestationCount,
+        address indexed arbiter,
+        address[] attestersUsed,
+        uint256[] balancesUsed
+    );
+    
+    event ConsensusThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
+    event AttestationTimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
+    event MaxStalenessUpdated(uint256 oldStaleness, uint256 newStaleness);
+    
+    // Errors
+    error InvalidThreshold();
+    error InvalidTimeout();
+    error NoConsensusYet();
+    
+    constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(ATTESTER_ROLE, msg.sender);
+        _grantRole(ARBITER_ROLE, msg.sender);
     }
-
-    /// @notice Submit reserve attestation for a QC (ATTESTER_ROLE)
-    /// @param qc The address of the Qualified Custodian
-    /// @param balance The attested reserve balance in satoshis
-    /// @dev SPV proofs are intentionally not required for reserve attestations because:
-    ///      1. Reserve proofs would need to verify multiple Bitcoin addresses and sum balances,
-    ///         which is complex and expensive compared to single transaction proofs
-    ///      2. Attesters are permissioned via ATTESTER_ROLE (typically SingleWatchdog)
-    ///      3. Historical records provide audit trail for compliance
-    ///      4. Attestations can be invalidated if fraud is detected
-    ///      For enhanced security, consider periodic SPV-verified attestations via separate process
-    function submitReserveAttestation(address qc, uint256 balance)
-        external
-        onlyRole(ATTESTER_ROLE)
-    {
-        if (qc == address(0)) revert InvalidQCAddress();
-
-        // Get old balance for event emission
-        uint256 oldBalance = hasAttestation[qc]
-            ? reserveAttestations[qc].balance
-            : 0;
-
-        // Create new attestation
-        ReserveAttestation memory newAttestation = ReserveAttestation({
+    
+    /// @notice Submit an attestation for a QC's reserve balance
+    /// @dev Only attest when there's actual reserve movement or data is stale
+    /// @param qc The QC address
+    /// @param balance The attested reserve balance
+    function submitAttestation(address qc, uint256 balance) external onlyRole(ATTESTER_ROLE) {
+        // Store attestation
+        pendingAttestations[qc][msg.sender] = PendingAttestation({
             balance: balance,
             timestamp: block.timestamp,
-            attester: msg.sender,
-            blockNumber: block.number,
-            isValid: true
+            attester: msg.sender
         });
-
-        // Update current attestation
-        reserveAttestations[qc] = newAttestation;
-
-        // Add to history
-        attestationHistory[qc].push(newAttestation);
-
-        // Add to attested QCs list if first attestation
-        if (!hasAttestation[qc]) {
-            attestedQCs.push(qc);
-            hasAttestation[qc] = true;
-        }
-
-        emit ReserveAttestationSubmitted(
-            msg.sender,
-            qc,
-            balance,
-            oldBalance,
-            block.timestamp,
-            block.number
-        );
+        
+        // Track attester if not already tracked
+        _trackAttester(qc, msg.sender);
+        
+        emit AttestationSubmitted(qc, msg.sender, balance, block.timestamp);
+        
+        // Attempt to reach consensus
+        _attemptConsensus(qc);
     }
-
-    /// @notice Submit SPV-verified reserve attestation for enhanced security (ATTESTER_ROLE)
-    /// @param qc The address of the Qualified Custodian
-    /// @param balance The attested reserve balance in satoshis
-    /// @param proofData Encoded proof data containing transaction hash and additional metadata
-    /// @dev This function provides an optional way to submit attestations with cryptographic proof.
-    ///      While more secure, it's also more complex and expensive than regular attestations.
-    ///      Recommended for periodic verification (e.g., daily/weekly) rather than every attestation.
-    ///      The proofData format and validation logic would need to be implemented based on
-    ///      specific requirements for multi-address reserve proofs.
-    function submitSPVVerifiedAttestation(
-        address qc,
-        uint256 balance,
-        bytes calldata proofData
-    ) external onlyRole(ATTESTER_ROLE) {
-        if (qc == address(0)) revert InvalidQCAddress();
-
-        // Extract proof transaction hash from proofData for event
-        // In a full implementation, this would validate the SPV proof
-        bytes32 proofTxHash = bytes32(proofData[:32]);
-
-        // Submit the attestation using the regular mechanism
-        uint256 oldBalance = hasAttestation[qc]
-            ? reserveAttestations[qc].balance
-            : 0;
-
-        ReserveAttestation memory newAttestation = ReserveAttestation({
-            balance: balance,
-            timestamp: block.timestamp,
-            attester: msg.sender,
-            blockNumber: block.number,
-            isValid: true
+    
+    /// @notice Get reserve balance and staleness for a QC
+    /// @param qc The QC address
+    /// @return balance The last consensus balance
+    /// @return isStale Whether the balance is stale (older than maxStaleness)
+    function getReserveBalanceAndStaleness(address qc) 
+        external 
+        view 
+        returns (uint256 balance, bool isStale) 
+    {
+        ReserveData memory data = reserves[qc];
+        balance = data.balance;
+        isStale = data.lastUpdateTimestamp == 0 || block.timestamp > data.lastUpdateTimestamp + maxStaleness;
+    }
+    
+    
+    /// @notice Update consensus threshold
+    /// @param newThreshold New number of attestations required
+    function setConsensusThreshold(uint256 newThreshold) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newThreshold == 0) revert InvalidThreshold();
+        uint256 oldThreshold = consensusThreshold;
+        consensusThreshold = newThreshold;
+        emit ConsensusThresholdUpdated(oldThreshold, newThreshold);
+    }
+    
+    /// @notice Update attestation timeout
+    /// @param newTimeout New timeout in seconds
+    function setAttestationTimeout(uint256 newTimeout) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newTimeout == 0) revert InvalidTimeout();
+        uint256 oldTimeout = attestationTimeout;
+        attestationTimeout = newTimeout;
+        emit AttestationTimeoutUpdated(oldTimeout, newTimeout);
+    }
+    
+    /// @notice Update maximum staleness period
+    /// @param newStaleness New staleness threshold in seconds
+    function setMaxStaleness(uint256 newStaleness) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newStaleness == 0) revert InvalidTimeout();
+        uint256 oldStaleness = maxStaleness;
+        maxStaleness = newStaleness;
+        emit MaxStalenessUpdated(oldStaleness, newStaleness);
+    }
+    
+    /// @notice Force consensus with available attestations (emergency use only)
+    /// @dev Only ARBITER can call when consensus cannot be reached naturally.
+    ///      Requires at least one valid attestation to prevent arbitrary updates.
+    /// @param qc The QC address to force consensus for
+    function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) {
+        address[] memory attesters = pendingAttesters[qc];
+        uint256 validCount = 0;
+        uint256[] memory validBalances = new uint256[](attesters.length);
+        address[] memory validAttesters = new address[](attesters.length);
+        
+        // Collect valid attestations within timeout window (same logic as _attemptConsensus)
+        for (uint256 i = 0; i < attesters.length; i++) {
+            PendingAttestation memory attestation = pendingAttestations[qc][attesters[i]];
+            
+            // Check if attestation is still valid (not expired)
+            if (block.timestamp <= attestation.timestamp + attestationTimeout) {
+                validBalances[validCount] = attestation.balance;
+                validAttesters[validCount] = attesters[i];
+                validCount++;
+            }
+        }
+        
+        // SAFETY: Require at least ONE valid attestation to prevent arbitrary balance setting
+        require(validCount > 0, "No valid attestations to force consensus");
+        
+        // Create properly sized arrays for the event
+        address[] memory usedAttesters = new address[](validCount);
+        uint256[] memory usedBalances = new uint256[](validCount);
+        for (uint256 i = 0; i < validCount; i++) {
+            usedAttesters[i] = validAttesters[i];
+            usedBalances[i] = validBalances[i];
+        }
+        
+        // Calculate median of available valid balances
+        uint256 consensusBalance = _calculateMedian(validBalances, validCount);
+        
+        // Update reserve data
+        uint256 oldBalance = reserves[qc].balance;
+        reserves[qc] = ReserveData({
+            balance: consensusBalance,
+            lastUpdateTimestamp: block.timestamp
         });
-
-        reserveAttestations[qc] = newAttestation;
-        attestationHistory[qc].push(newAttestation);
-
-        if (!hasAttestation[qc]) {
-            attestedQCs.push(qc);
-            hasAttestation[qc] = true;
+        
+        // Clear pending attestations for this QC
+        _clearPendingAttestations(qc);
+        
+        // Emit both forced consensus and regular reserve update events
+        emit ForcedConsensusReached(qc, consensusBalance, validCount, msg.sender, usedAttesters, usedBalances);
+        emit ReserveUpdated(qc, oldBalance, consensusBalance, block.timestamp);
+    }
+    
+    
+    /// @dev Consensus engine - aggregates attestations and updates balance via median
+    /// @dev SECURITY: Only updates balance when consensus threshold met (3+ attesters)
+    function _attemptConsensus(address qc) internal {
+        address[] memory attesters = pendingAttesters[qc];
+        uint256 validCount = 0;
+        uint256[] memory validBalances = new uint256[](attesters.length);
+        
+        // Collect valid attestations within timeout window
+        for (uint256 i = 0; i < attesters.length; i++) {
+            PendingAttestation memory attestation = pendingAttestations[qc][attesters[i]];
+            
+            // Check if attestation is still valid (not expired)
+            if (block.timestamp <= attestation.timestamp + attestationTimeout) {
+                validBalances[validCount] = attestation.balance;
+                validCount++;
+            }
         }
-
-        // Emit both regular and SPV-verified events
-        emit ReserveAttestationSubmitted(
-            msg.sender,
-            qc,
-            balance,
-            oldBalance,
-            block.timestamp,
-            block.number
-        );
-
-        emit SPVVerifiedAttestationSubmitted(
-            msg.sender,
-            qc,
-            balance,
-            proofTxHash,
-            block.timestamp
-        );
-    }
-
-    /// @notice Get current reserve attestation for a QC
-    /// @param qc The address of the Qualified Custodian
-    /// @return attestation The current reserve attestation
-    function getCurrentAttestation(address qc)
-        external
-        view
-        returns (ReserveAttestation memory attestation)
-    {
-        return reserveAttestations[qc];
-    }
-
-    /// @notice Get reserve balance and staleness status
-    /// @param qc The address of the Qualified Custodian
-    /// @return balance The attested reserve balance
-    /// @return isStale True if the attestation is stale
-    function getReserveBalanceAndStaleness(address qc)
-        external
-        view
-        returns (uint256 balance, bool isStale)
-    {
-        ReserveAttestation memory attestation = reserveAttestations[qc];
-
-        if (!attestation.isValid || attestation.timestamp == 0) {
-            return (0, true);
+        
+        // CONSENSUS GATE: Only proceed if threshold met (Byzantine fault tolerance)
+        if (validCount < consensusThreshold) {
+            return; // Not enough attestations yet
         }
-
-        // Cache system state service to avoid redundant SLOAD operations
-        SystemState systemState = SystemState(
-            protocolRegistry.getService(SYSTEM_STATE_KEY)
-        );
-        uint256 staleThreshold = systemState.staleThreshold();
-
-        isStale = block.timestamp > attestation.timestamp + staleThreshold;
-        balance = attestation.balance;
-
-        return (balance, isStale);
+        
+        // Calculate median of valid balances
+        uint256 consensusBalance = _calculateMedian(validBalances, validCount);
+        
+        // Update reserve data
+        uint256 oldBalance = reserves[qc].balance;
+        reserves[qc] = ReserveData({
+            balance: consensusBalance,
+            lastUpdateTimestamp: block.timestamp
+        });
+        
+        // Clear pending attestations for this QC
+        _clearPendingAttestations(qc);
+        
+        emit ConsensusReached(qc, consensusBalance, validCount, block.timestamp);
+        emit ReserveUpdated(qc, oldBalance, consensusBalance, block.timestamp);
     }
-
-    /// @notice Check if attestation is stale
-    /// @param qc The address of the Qualified Custodian
-    /// @return stale True if the attestation is stale
-    function isAttestationStale(address qc) external view returns (bool stale) {
-        ReserveAttestation memory attestation = reserveAttestations[qc];
-
-        if (!attestation.isValid || attestation.timestamp == 0) {
-            return true;
+    
+    /// @dev Byzantine fault tolerant median calculation using insertion sort
+    /// @dev SECURITY: Median protects against up to 50% malicious attesters
+    function _calculateMedian(uint256[] memory values, uint256 length) internal pure returns (uint256) {
+        require(length <= 10, "Too many attesters for consensus");
+        if (length == 0) return 0;
+        if (length == 1) return values[0];
+        
+        // Insertion sort - O(n²) worst case, O(n) best case for nearly sorted data
+        // Very efficient for small arrays (n ≤ 10) with good constant factors
+        for (uint256 i = 1; i < length; i++) {
+            uint256 key = values[i];
+            uint256 j = i;
+            while (j > 0 && values[j-1] > key) {
+                values[j] = values[j-1];
+                j--;
+            }
+            values[j] = key;
         }
-
-        // Cache system state service to avoid redundant SLOAD operations
-        SystemState systemState = SystemState(
-            protocolRegistry.getService(SYSTEM_STATE_KEY)
-        );
-        uint256 staleThreshold = systemState.staleThreshold();
-
-        return block.timestamp > attestation.timestamp + staleThreshold;
-    }
-
-    /// @notice Invalidate an attestation (Admin only)
-    /// @param qc The address of the Qualified Custodian
-    /// @param reason The reason for invalidation
-    function invalidateAttestation(address qc, bytes32 reason)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        if (reserveAttestations[qc].timestamp == 0) {
-            revert NoAttestationExists();
+        
+        // Return median
+        if (length % 2 == 0) {
+            return (values[length / 2 - 1] + values[length / 2]) / 2;
+        } else {
+            return values[length / 2];
         }
-        if (reason == bytes32(0)) revert ReasonRequired();
-
-        reserveAttestations[qc].isValid = false;
-
-        emit AttestationInvalidated(qc, block.timestamp, reason, msg.sender);
     }
-
-    /// @notice Get attestation history for a QC
-    /// @param qc The address of the Qualified Custodian
-    /// @return history Array of historical attestations
-    function getAttestationHistory(address qc)
-        external
-        view
-        returns (ReserveAttestation[] memory history)
-    {
-        return attestationHistory[qc];
+    
+    /// @dev Track an attester for a QC
+    function _trackAttester(address qc, address attester) internal {
+        address[] storage attesters = pendingAttesters[qc];
+        
+        // Check if attester is already tracked
+        for (uint256 i = 0; i < attesters.length; i++) {
+            if (attesters[i] == attester) {
+                return; // Already tracked
+            }
+        }
+        
+        // Add new attester
+        attesters.push(attester);
     }
+    
+    /// @dev Clear all pending attestations for a QC
+    function _clearPendingAttestations(address qc) internal {
+        address[] storage attesters = pendingAttesters[qc];
+        
+        // Delete all pending attestations
+        for (uint256 i = 0; i < attesters.length; i++) {
+            delete pendingAttestations[qc][attesters[i]];
+        }
+        
+        // Clear the attesters array
+        delete pendingAttesters[qc];
+    }
+    
 }

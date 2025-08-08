@@ -243,7 +243,7 @@ class CompleteFlowIntegration extends BaseAccountControlIntegration {
       const reserves = ethers.utils.parseEther(`${100 + i * 10}`)
       const timestamp = await this.getBlockTimestamp()
 
-      await this.qcReserveLedger
+      await this.qcQCReserveLedger
         .connect(this.watchdog)
         .submitAttestation(this.qc.address, reserves, timestamp)
 
@@ -294,13 +294,13 @@ class CompleteFlowIntegration extends BaseAccountControlIntegration {
     const totalReserves = ethers.utils.parseEther("200")
     const currentTimestamp = await this.getBlockTimestamp()
 
-    await this.qcReserveLedger
+    await this.qcQCReserveLedger
       .connect(this.watchdog)
       .submitAttestation(this.qc.address, totalReserves, currentTimestamp)
 
     // Verify attestation stored
     const lastAttestationTime =
-      await this.qcReserveLedger.getLastAttestationTime(this.qc.address)
+      await this.qcQCReserveLedger.getLastAttestationTime(this.qc.address)
     expect(lastAttestationTime).to.equal(currentTimestamp)
 
     console.log("✅ Reserve Attestation completed")
@@ -384,7 +384,7 @@ class CompleteFlowIntegration extends BaseAccountControlIntegration {
 
     // Verify attestation is fresh
     const lastAttestationTime =
-      await this.qcReserveLedger.getLastAttestationTime(this.qc.address)
+      await this.qcQCReserveLedger.getLastAttestationTime(this.qc.address)
     const currentTime = await this.getBlockTimestamp()
     expect(currentTime - lastAttestationTime).to.be.lte(
       this.TEST_PARAMS.ATTESTATION_STALE_THRESHOLD

@@ -2,8 +2,10 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/IRedemptionPolicy.sol";
 import "./ProtocolRegistry.sol";
+import "./SystemState.sol";
 import "../token/TBTC.sol";
 import "../bridge/BitcoinTx.sol";
 
@@ -24,7 +26,7 @@ import "../bridge/BitcoinTx.sol";
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - REDEEMER_ROLE: Reserved for future functionality (currently unused)
 /// - ARBITER_ROLE: Can record redemption fulfillments and flag defaults
-contract QCRedeemer is AccessControl {
+contract QCRedeemer is AccessControl, ReentrancyGuard {
     // Custom errors for gas-efficient reverts
     error InvalidQCAddress();
     error InvalidAmount();
@@ -43,6 +45,7 @@ contract QCRedeemer is AccessControl {
     bytes32 public constant REDEMPTION_POLICY_KEY =
         keccak256("REDEMPTION_POLICY");
     bytes32 public constant TBTC_TOKEN_KEY = keccak256("TBTC_TOKEN");
+    bytes32 public constant SYSTEM_STATE_KEY = keccak256("SYSTEM_STATE");
 
     /// @dev Redemption status enumeration
     enum RedemptionStatus {
@@ -116,11 +119,12 @@ contract QCRedeemer is AccessControl {
     /// @param amount The amount of tBTC to redeem
     /// @param userBtcAddress The user's Bitcoin address
     /// @return redemptionId Unique identifier for this redemption request
+    /// @dev SECURITY: nonReentrant protects against reentrancy via TBTC burnFrom and policy external calls
     function initiateRedemption(
         address qc,
         uint256 amount,
         string calldata userBtcAddress
-    ) external returns (bytes32 redemptionId) {
+    ) external nonReentrant returns (bytes32 redemptionId) {
         if (qc == address(0)) revert InvalidQCAddress();
         if (amount == 0) revert InvalidAmount();
         if (bytes(userBtcAddress).length == 0) revert BitcoinAddressRequired();
@@ -131,6 +135,14 @@ contract QCRedeemer is AccessControl {
                 (addr[0] == 0x62 && addr.length > 1 && addr[1] == 0x63))
         ) {
             revert InvalidBitcoinAddressFormat();
+        }
+
+        // Check if QC is emergency paused
+        SystemState systemState = SystemState(
+            protocolRegistry.getService(SYSTEM_STATE_KEY)
+        );
+        if (systemState.isQCEmergencyPaused(qc)) {
+            revert SystemState.QCIsEmergencyPaused(qc);
         }
 
         IRedemptionPolicy policy = IRedemptionPolicy(
@@ -182,13 +194,14 @@ contract QCRedeemer is AccessControl {
     /// @param expectedAmount The expected payment amount in satoshis
     /// @param txInfo Bitcoin transaction information
     /// @param proof SPV proof of transaction inclusion
+    /// @dev SECURITY: nonReentrant protects against reentrancy via policy external calls
     function recordRedemptionFulfillment(
         bytes32 redemptionId,
         string calldata userBtcAddress,
         uint64 expectedAmount,
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
-    ) external onlyRole(ARBITER_ROLE) {
+    ) external onlyRole(ARBITER_ROLE) nonReentrant {
         if (redemptions[redemptionId].status != RedemptionStatus.Pending) {
             revert RedemptionNotPending();
         }
@@ -228,9 +241,11 @@ contract QCRedeemer is AccessControl {
     /// @notice Flag a redemption as defaulted (ARBITER_ROLE)
     /// @param redemptionId The unique identifier of the redemption
     /// @param reason The reason for the default
+    /// @dev SECURITY: nonReentrant protects against reentrancy via policy external calls
     function flagDefaultedRedemption(bytes32 redemptionId, bytes32 reason)
         external
         onlyRole(ARBITER_ROLE)
+        nonReentrant
     {
         if (redemptions[redemptionId].status != RedemptionStatus.Pending) {
             revert RedemptionNotPending();

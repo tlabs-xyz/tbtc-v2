@@ -108,6 +108,13 @@ contract SPVValidator is AccessControl {
         uint256 timestamp
     );
 
+    /// @notice Emitted when SPV proof data is stored for external verification
+    event SPVProofStored(
+        bytes32 indexed operationId,
+        bytes spvProof,
+        BitcoinTx.Info txInfo
+    );
+
     /// @notice Constructor
     /// @param _relay Address of the relay contract (same as Bridge uses)
     /// @param _txProofDifficultyFactor Difficulty factor (same as Bridge uses)
@@ -209,6 +216,14 @@ contract SPVValidator is AccessControl {
             block.timestamp
         );
 
+        // Store SPV proof for external verification
+        bytes32 operationId = keccak256(abi.encodePacked(qc, btcAddress));
+        emit SPVProofStored(
+            operationId,
+            abi.encode(txInfo, proof),
+            txInfo
+        );
+
         return true;
     }
 
@@ -245,6 +260,13 @@ contract SPVValidator is AccessControl {
             txHash,
             msg.sender,
             block.timestamp
+        );
+
+        // Store SPV proof for external verification
+        emit SPVProofStored(
+            redemptionId,
+            abi.encode(txInfo, proof),
+            txInfo
         );
 
         return true;

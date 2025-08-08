@@ -4,15 +4,40 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /// @title SystemState
-/// @dev Global system state and emergency controls.
-/// Holds global parameters and emergency controls (e.g., pause flags),
-/// providing a single, auditable location for system-wide state.
-/// Implements granular pause mechanisms for surgical response to threats.
+/// @dev Global system state and emergency controls for the tBTC v2 Account Control system.
+/// 
+/// This contract serves as the central control plane for emergency response and system-wide
+/// parameters. It provides both granular function-level pauses and QC-specific emergency
+/// controls to enable surgical responses to threats while minimizing system-wide impact.
 ///
-/// Role definitions:
-/// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and set emergency council
-/// - PARAMETER_ADMIN_ROLE: Can update all system parameters
-/// - PAUSER_ROLE: Can pause/unpause system functions
+/// ## Emergency Control Architecture
+/// 
+/// ### Global Pause Mechanisms
+/// - **Function-Specific Pauses**: Can pause minting, redemption, registry, wallet registration independently
+/// - **Time-Limited Duration**: All pauses expire automatically after emergencyPauseDuration (default 7 days)
+/// - **No Global Kill Switch**: Intentional design to prevent single points of failure
+/// 
+/// ### QC-Specific Emergency Controls  
+/// - **Individual QC Pausing**: Target specific qualified custodians without affecting others
+/// - **Reason Code Tracking**: Machine-readable reason codes for automated integration
+/// - **Reversible Operations**: Both pause and unpause functions for incident response
+/// - **Integration Ready**: Provides modifier for other contracts to check pause status
+/// 
+/// ### Integration with Watchdog System
+/// - **Automated Triggering**: WatchdogEnforcer calls emergencyPauseQC() for violations
+/// - **Threshold Monitoring**: Automated systems monitor collateral ratios and attestation staleness  
+/// - **Event-Driven Monitoring**: Comprehensive event logging for off-chain monitoring systems
+/// 
+/// ## Role Definitions
+/// - **DEFAULT_ADMIN_ROLE**: Can grant/revoke roles and set emergency council
+/// - **PARAMETER_ADMIN_ROLE**: Can update all system parameters within bounds
+/// - **PAUSER_ROLE**: Can pause/unpause system functions and individual QCs
+/// 
+/// ## Security Features
+/// - **Role-Based Access Control**: All emergency functions protected by OpenZeppelin AccessControl
+/// - **Parameter Bounds Validation**: Hard-coded limits prevent malicious parameter changes
+/// - **Comprehensive Event Logging**: Full audit trail for all emergency actions
+/// - **Expiry Mechanisms**: Automatic recovery from time-limited emergency states
 contract SystemState is AccessControl {
     bytes32 public constant PARAMETER_ADMIN_ROLE =
         keccak256("PARAMETER_ADMIN_ROLE");
@@ -42,6 +67,9 @@ contract SystemState is AccessControl {
     error RedemptionIsPaused();
     error RegistryOperationsArePaused();
     error WalletRegistrationIsPaused();
+    error QCIsEmergencyPaused(address qc);
+    error QCNotEmergencyPaused(address qc);
+    error QCEmergencyPauseExpired(address qc);
 
     /// @dev Global pause flags for granular emergency controls
     bool public isMintingPaused;
@@ -56,10 +84,17 @@ contract SystemState is AccessControl {
     uint256 public minMintAmount; // Minimum amount for minting operations
     uint256 public maxMintAmount; // Maximum amount for single minting operation
 
+    /// @dev Automated enforcement parameters
+    uint256 public minCollateralRatio; // Minimum collateral ratio percentage (e.g., 90 for 90%)
+    uint256 public failureThreshold; // Number of failures before enforcement action
+    uint256 public failureWindow; // Time window for counting failures
+
     /// @dev Emergency parameters
     address public emergencyCouncil; // Emergency council address
     uint256 public emergencyPauseDuration; // Maximum duration for emergency pauses
     mapping(bytes32 => uint256) public pauseTimestamps; // Tracks when pauses were activated
+    mapping(address => bool) public qcEmergencyPauses; // Tracks QC-specific emergency pauses
+    mapping(address => uint256) public qcPauseTimestamps; // Tracks when QCs were emergency paused
 
     // =================== STANDARDIZED EVENTS ===================
 
@@ -145,6 +180,25 @@ contract SystemState is AccessControl {
         address indexed updatedBy
     );
 
+    /// @dev Emitted when automated enforcement parameters are updated
+    event MinCollateralRatioUpdated(
+        uint256 indexed oldRatio,
+        uint256 indexed newRatio,
+        address indexed updatedBy
+    );
+
+    event FailureThresholdUpdated(
+        uint256 indexed oldThreshold,
+        uint256 indexed newThreshold,
+        address indexed updatedBy
+    );
+
+    event FailureWindowUpdated(
+        uint256 indexed oldWindow,
+        uint256 indexed newWindow,
+        address indexed updatedBy
+    );
+
     /// @dev Events for role management are inherited from AccessControl
 
     // =================== MODIFIERS ===================
@@ -175,6 +229,11 @@ contract SystemState is AccessControl {
         minMintAmount = 0.01 ether; // Minimum 0.01 tBTC
         maxMintAmount = 1000 ether; // Maximum 1000 tBTC per transaction
         emergencyPauseDuration = 7 days; // Emergency pauses last max 7 days
+
+        // Set automated enforcement defaults
+        minCollateralRatio = 100; // 100% minimum collateral ratio
+        failureThreshold = 3; // 3 failures trigger enforcement
+        failureWindow = 7 days; // Count failures over 7 days
     }
 
     // =================== PAUSE FUNCTIONS ===================
@@ -361,6 +420,152 @@ contract SystemState is AccessControl {
         emit EmergencyCouncilUpdated(oldCouncil, newCouncil, msg.sender);
     }
 
+    // =================== AUTOMATED ENFORCEMENT PARAMETERS ===================
+
+    /// @notice Update minimum collateral ratio
+    /// @param newRatio The new minimum collateral ratio percentage (e.g., 90 for 90%)
+    function setMinCollateralRatio(uint256 newRatio)
+        external
+        onlyRole(PARAMETER_ADMIN_ROLE)
+    {
+        if (newRatio < 100 || newRatio > 200) revert InvalidAmount(); // Min 100%, Max 200%
+
+        uint256 oldRatio = minCollateralRatio;
+        minCollateralRatio = newRatio;
+
+        emit MinCollateralRatioUpdated(oldRatio, newRatio, msg.sender);
+    }
+
+    /// @notice Update failure threshold
+    /// @param newThreshold The new failure threshold count
+    function setFailureThreshold(uint256 newThreshold)
+        external
+        onlyRole(PARAMETER_ADMIN_ROLE)
+    {
+        if (newThreshold == 0 || newThreshold > 10) revert InvalidThreshold();
+
+        uint256 oldThreshold = failureThreshold;
+        failureThreshold = newThreshold;
+
+        emit FailureThresholdUpdated(oldThreshold, newThreshold, msg.sender);
+    }
+
+    /// @notice Update failure counting window
+    /// @param newWindow The new failure counting window in seconds
+    function setFailureWindow(uint256 newWindow)
+        external
+        onlyRole(PARAMETER_ADMIN_ROLE)
+    {
+        if (newWindow == 0) revert InvalidDuration();
+        if (newWindow > 30 days) revert DurationTooLong(newWindow, 30 days);
+
+        uint256 oldWindow = failureWindow;
+        failureWindow = newWindow;
+
+        emit FailureWindowUpdated(oldWindow, newWindow, msg.sender);
+    }
+
+    /// @notice Emergency pause for a specific QC (called by automated systems)
+    /// @dev This function provides granular emergency control for individual QCs without
+    ///      affecting the entire system. It's designed to be called by:
+    ///      - WatchdogEnforcer contracts for automated violation detection
+    ///      - Emergency council for manual incident response
+    ///      - Threshold monitoring contracts for automated risk management
+    /// 
+    /// @param qc The QC address to pause - must be a valid non-zero address
+    /// @param reason Machine-readable reason code for the pause. Common codes:
+    ///               - keccak256("INSUFFICIENT_COLLATERAL") - Below minimum ratio
+    ///               - keccak256("STALE_ATTESTATIONS") - Reserve data too old
+    ///               - keccak256("COMPLIANCE_VIOLATION") - Regulatory issue
+    ///               - keccak256("SECURITY_INCIDENT") - Security breach
+    ///               - keccak256("TECHNICAL_FAILURE") - System malfunction
+    /// 
+    /// @custom:security Only callable by PAUSER_ROLE holders (emergency council)
+    /// @custom:events Emits QCEmergencyPaused and EmergencyActionTaken events
+    /// @custom:integration Other contracts should check qcNotEmergencyPaused modifier
+    /// 
+    /// Example usage in WatchdogEnforcer:
+    /// ```solidity
+    /// if (reserves < minCollateral) {
+    ///     systemState.emergencyPauseQC(qc, keccak256("INSUFFICIENT_COLLATERAL"));
+    /// }
+    /// ```
+    function emergencyPauseQC(address qc, bytes32 reason) 
+        external 
+        onlyRole(PAUSER_ROLE) 
+    {
+        if (qc == address(0)) revert InvalidCouncilAddress();
+        if (qcEmergencyPauses[qc]) revert QCIsEmergencyPaused(qc);
+        
+        qcEmergencyPauses[qc] = true;
+        qcPauseTimestamps[qc] = block.timestamp;
+        
+        emit QCEmergencyPaused(qc, msg.sender, block.timestamp, reason);
+        emit EmergencyActionTaken(
+            qc,
+            "QC_EMERGENCY_PAUSE",
+            msg.sender,
+            block.timestamp
+        );
+    }
+
+    /// @notice Remove emergency pause from a specific QC
+    /// @dev This function allows recovery from emergency situations by unpausing a QC.
+    ///      Should be called after:
+    ///      - The underlying issue has been resolved
+    ///      - QC has been validated as safe to resume operations  
+    ///      - Appropriate monitoring has been restored
+    /// 
+    /// @param qc The QC address to unpause - must be currently paused
+    /// 
+    /// @custom:security Only callable by PAUSER_ROLE holders (emergency council)
+    /// @custom:validation Reverts if QC is not currently emergency paused
+    /// @custom:events Emits QCEmergencyUnpaused and EmergencyActionTaken events
+    /// @custom:cleanup Removes pause timestamp to prevent stale data
+    /// 
+    /// Example recovery procedure:
+    /// ```solidity
+    /// // After verifying QC has fixed compliance issues
+    /// systemState.emergencyUnpauseQC(problematicQC);
+    /// // QC can now resume normal operations
+    /// ```
+    function emergencyUnpauseQC(address qc) external onlyRole(PAUSER_ROLE) {
+        if (!qcEmergencyPauses[qc]) revert QCNotEmergencyPaused(qc);
+        
+        qcEmergencyPauses[qc] = false;
+        delete qcPauseTimestamps[qc];
+        
+        emit QCEmergencyUnpaused(qc, msg.sender, block.timestamp);
+        emit EmergencyActionTaken(
+            qc,
+            "QC_EMERGENCY_UNPAUSE",
+            msg.sender,
+            block.timestamp
+        );
+    }
+
+
+    /// @dev Emergency action events
+    event EmergencyActionTaken(
+        address indexed target,
+        bytes32 indexed action,
+        address indexed triggeredBy,
+        uint256 timestamp
+    );
+
+    event QCEmergencyPaused(
+        address indexed qc,
+        address indexed triggeredBy,
+        uint256 indexed timestamp,
+        bytes32 reason
+    );
+
+    event QCEmergencyUnpaused(
+        address indexed qc,
+        address indexed triggeredBy,
+        uint256 indexed timestamp
+    );
+
     // =================== VIEW FUNCTIONS ===================
 
     /// @notice Check if function is paused
@@ -408,5 +613,61 @@ contract SystemState is AccessControl {
         uint256 pauseTime = pauseTimestamps[pauseKey];
         if (pauseTime == 0) return false;
         return block.timestamp > pauseTime + emergencyPauseDuration;
+    }
+
+    /// @notice Check if a QC is currently emergency paused
+    /// @param qc The QC address to check
+    /// @return paused True if the QC is emergency paused
+    function isQCEmergencyPaused(address qc) external view returns (bool paused) {
+        return qcEmergencyPauses[qc];
+    }
+
+    /// @notice Check if a QC's emergency pause has expired
+    /// @param qc The QC address to check
+    /// @return expired True if the QC's emergency pause has expired
+    function isQCEmergencyPauseExpired(address qc) 
+        external 
+        view 
+        returns (bool expired) 
+    {
+        uint256 pauseTime = qcPauseTimestamps[qc];
+        if (pauseTime == 0) return false;
+        return block.timestamp > pauseTime + emergencyPauseDuration;
+    }
+
+    /// @notice Get QC pause timestamp
+    /// @param qc The QC address
+    /// @return timestamp When the QC was paused (0 if not paused)
+    function getQCPauseTimestamp(address qc) 
+        external 
+        view 
+        returns (uint256 timestamp) 
+    {
+        return qcPauseTimestamps[qc];
+    }
+
+    /// @notice Modifier to check if QC operations are allowed
+    /// @dev This modifier should be used by all contracts that perform QC-specific operations
+    ///      to ensure they respect emergency pause states. It integrates seamlessly with
+    ///      existing access control patterns.
+    /// 
+    /// @param qc The QC address to check for emergency pause status
+    /// 
+    /// @custom:integration Add this modifier to QC-specific functions:
+    /// ```solidity
+    /// function mintFromQC(address qc, uint256 amount) 
+    ///     external 
+    ///     qcNotEmergencyPaused(qc)
+    ///     onlyRole(MINTER_ROLE)
+    /// {
+    ///     // Minting logic here - will revert if QC is emergency paused
+    /// }
+    /// ```
+    /// 
+    /// @custom:error Reverts with QCIsEmergencyPaused(qc) if QC is paused
+    /// @custom:gas Low gas cost check - just reads from storage mapping
+    modifier qcNotEmergencyPaused(address qc) {
+        if (qcEmergencyPauses[qc]) revert QCIsEmergencyPaused(qc);
+        _;
     }
 }

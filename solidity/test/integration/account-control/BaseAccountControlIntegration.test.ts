@@ -13,7 +13,7 @@ import type {
   BasicMintingPolicy,
   BasicRedemptionPolicy,
   QCReserveLedger,
-  SingleWatchdog,
+  QCWatchdog,
   QCBridge,
   Bank,
   TBTCVault,
@@ -39,8 +39,8 @@ export abstract class BaseAccountControlIntegration {
   protected qcRedeemer: QCRedeemer
   protected basicMintingPolicy: BasicMintingPolicy
   protected basicRedemptionPolicy: BasicRedemptionPolicy
-  protected qcReserveLedger: QCReserveLedger
-  protected singleWatchdog: SingleWatchdog
+  protected qcQCReserveLedger: QCReserveLedger
+  protected qcWatchdog: QCWatchdog
   protected qcBridge: QCBridge
   protected bank: FakeContract<Bank>
   protected tbtcVault: FakeContract<TBTCVault>
@@ -173,17 +173,17 @@ export abstract class BaseAccountControlIntegration {
 
     // Deploy QCReserveLedger
     const QCReserveLedger = await ethers.getContractFactory("QCReserveLedger")
-    this.qcReserveLedger = await QCReserveLedger.deploy(
+    this.qcQCReserveLedger = await QCReserveLedger.deploy(
       this.protocolRegistry.address
     )
-    await this.qcReserveLedger.deployed()
+    await this.qcQCReserveLedger.deployed()
 
-    // Deploy SingleWatchdog
-    const SingleWatchdog = await ethers.getContractFactory("SingleWatchdog")
-    this.singleWatchdog = await SingleWatchdog.deploy(
+    // Deploy QCWatchdog
+    const QCWatchdog = await ethers.getContractFactory("QCWatchdog")
+    this.qcWatchdog = await QCWatchdog.deploy(
       this.protocolRegistry.address
     )
-    await this.singleWatchdog.deployed()
+    await this.qcWatchdog.deployed()
   }
 
   private async configureServices() {
@@ -218,12 +218,12 @@ export abstract class BaseAccountControlIntegration {
       .connect(this.deployer)
       .setService(
         this.SERVICE_KEYS.QC_RESERVE_LEDGER,
-        this.qcReserveLedger.address
+        this.qcQCReserveLedger.address
       )
 
     await this.protocolRegistry
       .connect(this.deployer)
-      .setService(this.SERVICE_KEYS.WATCHDOG, this.singleWatchdog.address)
+      .setService(this.SERVICE_KEYS.WATCHDOG, this.qcWatchdog.address)
 
     await this.protocolRegistry
       .connect(this.deployer)
@@ -237,7 +237,7 @@ export abstract class BaseAccountControlIntegration {
       .grantRole(this.ROLES.DEFAULT_ADMIN_ROLE, this.governance.address)
 
     // Grant watchdog roles
-    await this.qcReserveLedger
+    await this.qcQCReserveLedger
       .connect(this.deployer)
       .grantRole(this.ROLES.ATTESTER_ROLE, this.watchdog.address)
 
