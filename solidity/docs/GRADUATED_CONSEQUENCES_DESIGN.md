@@ -9,44 +9,49 @@
 
 ## Executive Summary
 
-This document proposes a graduated consequence system for handling redemption defaults in the Account Control system. Instead of immediately revoking a QC upon first default, the system implements progressive penalties that allow recovery from operational issues while protecting users.
+This document describes the graduated consequence system for handling redemption defaults in the Account Control system, now integrated with the 5-state QC management model. The system implements progressive penalties through state transitions (Active → MintingPaused → Paused/UnderReview → Revoked) that allow recovery from operational issues while protecting users.
 
 ## Current State Analysis
 
-### Existing QC Status Model
+### Current 5-State QC Model
 
 ```solidity
 enum QCStatus {
-    Active,        // Fully operational
-    UnderReview,   // Minting paused, review in progress  
-    Revoked        // Permanently terminated
+    Active,         // Fully operational
+    MintingPaused,  // Can fulfill but cannot mint (self-initiated or violation)
+    Paused,         // Cannot mint or fulfill (maintenance mode)
+    UnderReview,    // Council review, can fulfill but not mint
+    Revoked         // Permanently terminated
 }
 ```
 
-### Current Default Handling Flow
+### 5-State Default Handling Flow
 
 1. Redemption timeout occurs
-2. Watchdog calls `flagDefaultedRedemption()`
-3. Redemption marked as `Defaulted`
-4. **Gap**: No automatic QC status change
-5. Manual intervention required to revoke QC
+2. Watchdog/Arbiter calls `handleRedemptionDefault()`
+3. QCStateManager applies graduated consequence:
+   - First default: Active → MintingPaused
+   - Second default: MintingPaused → UnderReview
+   - Third default: UnderReview → Revoked
+4. QC can recover by clearing backlog and meeting conditions
 
-### Problems with Current Design
+### Benefits of 5-State Design
 
-1. **Binary Consequences**: First default → manual decision → likely Revoked
-2. **No Recovery Path**: Once Revoked, QC cannot recover
-3. **Operational Rigidity**: Temporary issues treated same as systematic failures
-4. **Manual Dependency**: Requires human decision for each default
+1. **Graduated Response**: Progressive penalties match violation severity
+2. **Recovery Paths**: Multiple opportunities to restore good standing
+3. **Network Continuity**: 60% of states preserve fulfillment capability
+4. **Automated Enforcement**: State transitions triggered automatically
 
-## Proposed Graduated Consequence System
+## Integrated 5-State Consequence System
 
-### Enhanced State Model
+### State Model with Graduated Consequences
 
 ```solidity
 enum QCStatus {
     Active,           // Fully operational
-    UnderReview,      // Minting paused, must clear backlog
-    Probation,        // NEW: Can fulfill but cannot take new redemptions
+    MintingPaused,    // First consequence - can fulfill, cannot mint
+    Paused,           // Maintenance mode - temporary full pause
+    UnderReview,      // Council review - can fulfill, cannot mint
     Revoked           // Permanently terminated
 }
 ```
@@ -66,20 +71,29 @@ struct QCDefaultHistory {
 ### Progressive Consequence Logic
 
 ```
-First Default (Active → UnderReview):
+First Default (Active → MintingPaused):
 - Minting capabilities suspended
-- Must fulfill all pending redemptions
-- Can return to Active after clearing backlog
+- Can still fulfill redemptions (network continuity)
+- Must clear backlog to return to Active
+- 90-day window before next penalty tier
 
-Second Default (UnderReview → Probation):
-- Cannot accept new redemptions
-- Must fulfill existing obligations
-- Extended monitoring period (30 days)
+Second Default (MintingPaused → UnderReview):
+- Council review triggered
+- Can still fulfill existing redemptions
+- Requires council approval to return to Active
+- Evidence of systemic issues needed
 
-Third Default (Probation → Revoked):
+Third Default (UnderReview → Revoked):
 - Permanent revocation
+- All operations halted
 - Legal recourse activated
 - User compensation procedures initiated
+
+Alternative Path (Operational Issues):
+Active → MintingPaused → Paused (self-initiated)
+- QC recognizes need for maintenance
+- Uses renewable pause credit
+- 48h to resolve or auto-escalates to UnderReview
 ```
 
 ## Implementation Design
@@ -89,13 +103,14 @@ Third Default (Probation → Revoked):
 #### QCData.sol Modifications
 
 ```solidity
-// Add to QCData.sol
+// Updated QCData.sol with 5-state model
 contract QCData {
-    // Existing enum with new state
+    // 5-state enum
     enum QCStatus {
         Active,
-        UnderReview,
-        Probation,    // NEW
+        MintingPaused,  // First tier consequence
+        Paused,         // Maintenance mode
+        UnderReview,    // Council review
         Revoked
     }
     
@@ -142,29 +157,28 @@ contract QCData {
 
 ### 2. State Transition Logic
 
-#### QCManager.sol Updates
+#### Integration with QCStateManager
 
 ```solidity
-// Add to QCManager.sol
-contract QCManager {
-    // NEW: Graduated consequence handler
+// QCStateManager handles graduated consequences
+contract QCStateManager {
+    // Graduated consequence handler integrated with 5-state model
     function handleRedemptionDefault(
         address qc,
-        bytes32 redemptionId,
-        bytes32 reason
+        bytes32 redemptionId
     ) external onlyRole(ARBITER_ROLE) {
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
-        QCData.DefaultHistory memory history = qcData.getDefaultHistory(qc);
+        DefaultHistory storage history = defaultHistories[qc];
         
         // Record the default
-        qcData.recordDefault(qc, redemptionId);
+        history.totalDefaults++;
+        history.lastDefaultTimestamp = block.timestamp;
         
-        // Determine new status based on history and current status
+        // Determine new status based on 5-state progression
         QCData.QCStatus newStatus = determineConsequence(
             currentStatus,
             history.totalDefaults,
-            history.consecutiveDefaults,
-            history.defaultsWhileUnderReview
+            history.consecutiveDefaults
         );
         
         if (newStatus != currentStatus) {
@@ -179,62 +193,60 @@ contract QCManager {
         }
     }
     
-    // NEW: Consequence determination logic
+    // Consequence determination with 5-state model
     function determineConsequence(
         QCData.QCStatus currentStatus,
         uint256 totalDefaults,
-        uint256 consecutiveDefaults,
-        uint256 defaultsWhileUnderReview
-    ) internal pure returns (QCData.QCStatus) {
+        uint256 consecutiveDefaults
+    ) internal view returns (QCData.QCStatus) {
         // If already revoked, stay revoked
         if (currentStatus == QCData.QCStatus.Revoked) {
             return QCData.QCStatus.Revoked;
         }
         
-        // Pattern-based escalation
+        // 5-state progression for defaults
         if (currentStatus == QCData.QCStatus.Active) {
-            // First default from Active → UnderReview
-            return QCData.QCStatus.UnderReview;
-        } else if (currentStatus == QCData.QCStatus.UnderReview) {
-            // Default while UnderReview
-            if (defaultsWhileUnderReview >= 2) {
-                // Multiple defaults while under review → Revoked
-                return QCData.QCStatus.Revoked;
+            // First default: Active → MintingPaused
+            return QCData.QCStatus.MintingPaused;
+        } else if (currentStatus == QCData.QCStatus.MintingPaused) {
+            // Second default within window: MintingPaused → UnderReview
+            if (block.timestamp - history.lastDefaultTimestamp <= DEFAULT_PENALTY_WINDOW) {
+                return QCData.QCStatus.UnderReview;
             } else {
-                // First default while under review → Probation
-                return QCData.QCStatus.Probation;
+                // Outside window, stay in MintingPaused (reset progression)
+                return QCData.QCStatus.MintingPaused;
             }
-        } else if (currentStatus == QCData.QCStatus.Probation) {
-            // Any default while on probation → Revoked
+        } else if (currentStatus == QCData.QCStatus.UnderReview) {
+            // Third default: UnderReview → Revoked
             return QCData.QCStatus.Revoked;
+        } else if (currentStatus == QCData.QCStatus.Paused) {
+            // Default during pause → UnderReview (serious issue)
+            return QCData.QCStatus.UnderReview;
         }
         
         return currentStatus;
     }
     
-    // NEW: Recovery mechanism
+    // Recovery mechanism for 5-state model
     function clearQCBacklog(address qc) external onlyRole(ARBITER_ROLE) {
         // Check if QC has fulfilled all pending redemptions
         if (!hasUnfulfilledRedemptions(qc)) {
             QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+            DefaultHistory memory history = defaultHistories[qc];
             
-            if (currentStatus == QCData.QCStatus.UnderReview) {
-                // Can return to Active if backlog cleared
-                qcData.setQCStatus(
-                    qc,
-                    QCData.QCStatus.Active,
-                    keccak256("BACKLOG_CLEARED")
-                );
-            } else if (currentStatus == QCData.QCStatus.Probation) {
-                // Probation requires time period (30 days) without issues
-                QCData.DefaultHistory memory history = qcData.getDefaultHistory(qc);
-                if (block.timestamp - history.lastDefaultTimestamp > 30 days) {
-                    qcData.setQCStatus(
+            if (currentStatus == QCData.QCStatus.MintingPaused) {
+                // Can return to Active if backlog cleared and time passed
+                if (block.timestamp - history.lastDefaultTimestamp > RECOVERY_PERIOD) {
+                    _executeStatusChange(
                         qc,
                         QCData.QCStatus.Active,
-                        keccak256("PROBATION_COMPLETED")
+                        keccak256("BACKLOG_CLEARED_RECOVERY")
                     );
                 }
+            } else if (currentStatus == QCData.QCStatus.UnderReview) {
+                // Council must approve return to Active
+                // This function just marks eligibility
+                emit QCEligibleForRecovery(qc, block.timestamp);
             }
         }
     }
@@ -282,27 +294,39 @@ function flagDefault(bytes32 redemptionId, bytes32 reason)
 
 ### 4. Operational Restrictions
 
-#### QCRedeemer.sol Updates
+#### Policy Integration Updates
 
 ```solidity
-// Modify initiateRedemption to check for Probation status
-function initiateRedemption(
+// BasicRedemptionPolicy.sol - Updated for 5-state model
+function canInitiateRedemption(
     address qc,
-    uint256 amount,
-    string calldata userBtcAddress
-) external nonReentrant returns (bytes32 redemptionId) {
-    // Existing validation...
-    
-    // NEW: Check if QC can accept new redemptions
+    uint256 amount
+) external view returns (bool) {
     QCData.QCStatus qcStatus = qcData.getQCStatus(qc);
-    if (qcStatus == QCData.QCStatus.Probation) {
-        revert QCOnProbationCannotAcceptRedemptions();
-    }
-    if (qcStatus == QCData.QCStatus.Revoked) {
-        revert QCRevoked();
+    
+    // Only Active state can accept new redemptions
+    if (qcStatus != QCData.QCStatus.Active) {
+        return false;
     }
     
-    // Continue with existing logic...
+    // Additional checks...
+    return true;
+}
+
+function canFulfillRedemption(
+    address qc,
+    bytes32 redemptionId
+) external view returns (bool) {
+    QCData.QCStatus qcStatus = qcData.getQCStatus(qc);
+    
+    // Active, MintingPaused, and UnderReview can fulfill
+    // This preserves network continuity (60% of states)
+    if (qcStatus == QCData.QCStatus.Paused || 
+        qcStatus == QCData.QCStatus.Revoked) {
+        return false;
+    }
+    
+    return true;
 }
 ```
 
@@ -329,21 +353,26 @@ function initiateRedemption(
 
 ### Scenario 1: First Default Recovery
 ```javascript
-it("should move QC to UnderReview on first default and allow recovery", async () => {
+it("should move QC to MintingPaused on first default and allow recovery", async () => {
     // QC starts Active
     expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.Active);
     
     // Redemption defaults
-    await watchdog.flagDefaultedRedemption(redemptionId, "TIMEOUT");
+    await qcStateManager.handleRedemptionDefault(qc, redemptionId);
     
-    // QC moves to UnderReview
-    expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.UnderReview);
+    // QC moves to MintingPaused (can still fulfill)
+    expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.MintingPaused);
+    expect(await qcData.canQCFulfill(qc)).to.be.true;
+    expect(await qcData.canQCMint(qc)).to.be.false;
     
     // QC fulfills all pending redemptions
     await fulfillAllPendingRedemptions(qc);
     
+    // Wait for recovery period
+    await time.increase(90 * 24 * 60 * 60); // 90 days
+    
     // Arbiter clears backlog
-    await qcManager.clearQCBacklog(qc);
+    await qcStateManager.clearQCBacklog(qc);
     
     // QC returns to Active
     expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.Active);
@@ -352,60 +381,64 @@ it("should move QC to UnderReview on first default and allow recovery", async ()
 
 ### Scenario 2: Progressive Escalation
 ```javascript
-it("should escalate through UnderReview → Probation → Revoked", async () => {
-    // First default: Active → UnderReview
-    await triggerDefault(redemption1);
+it("should escalate through MintingPaused → UnderReview → Revoked", async () => {
+    // First default: Active → MintingPaused
+    await qcStateManager.handleRedemptionDefault(qc, redemption1);
+    expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.MintingPaused);
+    
+    // Second default within window: MintingPaused → UnderReview
+    await qcStateManager.handleRedemptionDefault(qc, redemption2);
     expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.UnderReview);
     
-    // Second default: UnderReview → Probation
-    await triggerDefault(redemption2);
-    expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.Probation);
-    
-    // Third default: Probation → Revoked
-    await triggerDefault(redemption3);
+    // Third default: UnderReview → Revoked
+    await qcStateManager.handleRedemptionDefault(qc, redemption3);
     expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.Revoked);
 });
 ```
 
-### Scenario 3: Probation Period
+### Scenario 3: Self-Pause with Auto-Escalation
 ```javascript
-it("should enforce 30-day probation period", async () => {
-    // QC on probation
-    await qcData.setQCStatus(qc, QCStatus.Probation);
+it("should handle self-pause with 48h auto-escalation", async () => {
+    // QC self-initiates pause
+    await qcStateManager.selfPause(qc, PauseLevel.MintingOnly);
+    expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.MintingPaused);
     
-    // Cannot accept new redemptions
-    await expect(
-        qcRedeemer.initiateRedemption(qc, amount, btcAddress)
-    ).to.be.revertedWith("QCOnProbationCannotAcceptRedemptions");
+    // Can still fulfill redemptions
+    expect(await qcData.canQCFulfill(qc)).to.be.true;
     
-    // After 30 days without issues
-    await time.increase(30 * 24 * 60 * 60);
-    await qcManager.clearQCBacklog(qc);
+    // QC escalates to full pause
+    await qcStateManager.selfPause(qc, PauseLevel.Full);
+    expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.Paused);
     
-    // Returns to Active
-    expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.Active);
+    // After 48 hours without resolution
+    await time.increase(48 * 60 * 60);
+    await watchdogEnforcer.checkQCEscalations([qc]);
+    
+    // Auto-escalates to UnderReview
+    expect(await qcData.getQCStatus(qc)).to.equal(QCStatus.UnderReview);
 });
 ```
 
-## Benefits
+## Benefits of 5-State Model
 
 ### For QCs
-- **Recovery Opportunity**: Can recover from operational issues
-- **Clear Expectations**: Know exactly what triggers each consequence
-- **Proportional Response**: Minor issues don't result in termination
-- **Time to Fix**: Grace period to resolve systemic problems
+- **Recovery Opportunity**: Multiple paths to restore good standing
+- **Self-Management**: Can initiate pauses for maintenance
+- **Renewable Credits**: Regular pause credits for operational needs
+- **Network Continuity**: Can fulfill redemptions in 60% of states
+- **Clear Progression**: Predictable consequences for violations
 
 ### For Users
-- **Better Service**: QCs incentivized to fulfill on time
-- **Transparency**: Can see QC operational history
-- **Risk Assessment**: Can choose QCs based on track record
-- **Protection**: Serial defaulters still get revoked
+- **Better Availability**: Redemptions continue in most pause states
+- **Graduated Response**: Issues handled proportionally
+- **Transparency**: Clear visibility into QC operational status
+- **Protection**: Progressive enforcement prevents sudden disruption
 
 ### For Protocol
-- **Operational Flexibility**: Handles edge cases gracefully
-- **Reduced Manual Intervention**: Automated state transitions
-- **Data-Driven Decisions**: Clear metrics for QC performance
-- **Maintains Security**: Bad actors still removed from system
+- **Network Resilience**: 60% of states preserve core functionality
+- **Automated Enforcement**: Watchdog-triggered escalations
+- **Flexible Operations**: Handles maintenance and emergencies
+- **Data-Driven**: Clear metrics for QC health monitoring
 
 ## Risk Analysis
 
@@ -431,10 +464,12 @@ The following parameters should be configurable via governance:
 
 ```solidity
 struct ConsequenceParameters {
-    uint256 probationPeriod;           // Default: 30 days
-    uint256 consecutiveDefaultWindow;   // Default: 30 days
-    uint256 maxDefaultsInUnderReview;   // Default: 2
-    uint256 maxDefaultsInProbation;     // Default: 1
+    uint256 pauseExpiryTime;           // Default: 48 hours
+    uint256 pauseCreditInterval;       // Default: 90 days
+    uint256 defaultPenaltyWindow;      // Default: 90 days
+    uint256 recoveryPeriod;            // Default: 90 days
+    uint256 redemptionGracePeriod;     // Default: 8 hours
+    uint256 maxConsecutiveDefaults;    // Default: 3
 }
 ```
 
@@ -467,14 +502,15 @@ struct ConsequenceParameters {
 
 ## Conclusion
 
-The graduated consequence system provides a more nuanced and operationally friendly approach to handling redemption defaults. By introducing progressive penalties and recovery mechanisms, the system:
+The 5-state graduated consequence system provides a sophisticated approach to QC management that balances network continuity with risk management. Key achievements:
 
-1. Protects users while allowing QCs to recover from operational issues
-2. Reduces the need for manual intervention
-3. Provides clear incentives for timely redemption fulfillment
-4. Maintains security by still removing bad actors
+1. **Network Continuity**: 60% of states preserve redemption fulfillment
+2. **Self-Recovery**: QCs can manage operational issues proactively
+3. **Automated Escalation**: 48-hour timers prevent indefinite pauses
+4. **Progressive Enforcement**: Violations trigger proportional responses
+5. **Renewable Resources**: Pause credits refresh every 90 days
 
-This design balances the need for strict enforcement with operational reality, creating a more sustainable and scalable system for institutional custody operations.
+This design enables institutional custodians to operate reliably while protecting users through graduated enforcement, creating a resilient and scalable custody ecosystem for tBTC.
 
 ---
 

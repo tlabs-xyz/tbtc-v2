@@ -31,10 +31,7 @@ contract TestEmergencyIntegration {
 
     /// @notice Test function for QC-specific operations (minting simulation)
     /// @param qc The QC address
-    function testQCMinting(
-        address qc,
-        uint256 /* amount */
-    ) external {
+    function testQCMinting(address qc, uint256 /* amount */) external {
         if (systemState.isQCEmergencyPaused(qc)) {
             revert SystemState.QCIsEmergencyPaused(qc);
         }
@@ -44,10 +41,7 @@ contract TestEmergencyIntegration {
 
     /// @notice Test function for QC-specific operations (redemption simulation)
     /// @param qc The QC address
-    function testQCRedemption(
-        address qc,
-        uint256 /* amount */
-    ) external {
+    function testQCRedemption(address qc, uint256 /* amount */) external {
         if (systemState.isQCEmergencyPaused(qc)) {
             revert SystemState.QCIsEmergencyPaused(qc);
         }

@@ -37,12 +37,14 @@ This document provides a complete inventory of user flows in the tBTC v2 Account
 ### 1.3 Key Components
 
 - **ProtocolRegistry**: Central address book for modular upgrades
-- **QCManager**: Core QC lifecycle and status management
+- **QCManager**: Core QC lifecycle and status management  
+- **QCStateManager**: 5-state transition logic and auto-escalation
+- **QCRenewablePause**: Renewable pause credit system
 - **QCMinter/QCRedeemer**: Entry points for minting/redemption
 - **Policy Contracts**: Upgradeable business logic (BasicMintingPolicy, BasicRedemptionPolicy)
 - **QCReserveLedger**: Reserve attestation management
 - **ReserveOracle**: Multi-attester consensus for reserve balances
-- **WatchdogEnforcer**: Permissionless enforcement of objective violations
+- **WatchdogEnforcer**: Permissionless enforcement with auto-escalation checks
 
 ---
 
@@ -60,11 +62,22 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 
 ### 2.2 Key States and Transitions
 
-#### QC Status States
+#### QC Status States (5-State Model)
 
 - **Active**: Fully operational, can mint and fulfill redemptions
-- **UnderReview**: Minting paused, review in progress, cannot mint
+- **MintingPaused**: Can fulfill redemptions but cannot mint (self-initiated or watchdog)
+- **Paused**: Cannot mint or fulfill (self-initiated maintenance mode, 48h max)
+- **UnderReview**: Can fulfill but cannot mint (council review required)
 - **Revoked**: Permanently terminated, no operations allowed
+
+#### State Transition Rules
+```
+Active ↔ MintingPaused (QC self-pause for routine maintenance)
+MintingPaused → Paused (QC escalates for full maintenance)  
+Paused → UnderReview (Auto-escalation after 48h if not resumed)
+MintingPaused/Paused → Active (QC resumes early)
+UnderReview → Active/Revoked (Council decision)
+```
 
 #### Redemption States
 
@@ -237,18 +250,23 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 
 #### 3.4.2 Timeout Scenarios
 
-1. **Redemption Timeout and Default**
-   - Watchdog monitors for timeout expiration (`redemptionTimeout` = 7 days from SystemState)
-   - If QC fails to fulfill within timeout: calls `BasicRedemptionPolicy.flagDefault(redemptionId, reason)` with `ARBITER_ROLE`
+1. **Redemption Timeout with Graduated Consequences**
+   - Watchdog monitors for timeout expiration
+   - Calls `QCStateManager.handleRedemptionDefault(qc, redemptionId)`
    - Redemption status changes to `Defaulted`
-   - QC may face status change to `UnderReview` based on failure patterns
-   - Event: `RedemptionDefaultedByPolicy`
+   - QC status transitions based on graduated consequences:
+     - 1st default: Active → MintingPaused
+     - 2nd default (within 90d): MintingPaused → UnderReview  
+     - 3rd default: UnderReview → Revoked
+   - Events: `RedemptionDefaulted`, `QCStatusChanged`
 
 **Script Requirements**:
 
 - Test timeout calculations and monitoring
-- Validate default flagging process
-- Test QC status changes on defaults
+- Validate graduated consequence logic (1st, 2nd, 3rd defaults)
+- Test QC recovery paths (backlog clearance)
+- Test 90-day penalty window expiration
+- Validate network continuity (60% states allow fulfillment)
 
 ### 3.5 Wallet Management Flow
 
@@ -276,7 +294,53 @@ User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC
 - Validate solvency checks during deregistration
 - Test race condition prevention
 
-### 3.6 Policy Upgrade Flow
+### 3.6 QC Self-Pause Flow (5-State Model)
+
+**Flow ID**: `QC-PAUSE-001`  
+**Priority**: Critical  
+**Participants**: QC, QCStateManager, WatchdogEnforcer
+
+#### 3.6.1 Routine Maintenance (MintingPaused)
+
+1. **QC Self-Initiates Pause**
+   - QC calls `QCStateManager.selfPause(PauseLevel.MintingOnly, "ROUTINE_MAINTENANCE")`
+   - Consumes 1 renewable pause credit
+   - QC status changes to `MintingPaused`
+   - Can still fulfill redemptions (network continuity)
+   - 48h timer starts
+
+2. **Early Resume**
+   - QC can call `QCStateManager.resumeSelfPause()` anytime before 48h
+   - QC status returns to `Active`
+   - 48h timer cleared
+
+3. **Auto-Escalation**
+   - If not resumed within 48h
+   - Watchdog calls `WatchdogEnforcer.checkQCEscalations([qc])`
+   - QC status auto-escalates to `UnderReview`
+   - Council intervention required
+
+#### 3.6.2 Critical Maintenance (Full Pause)
+
+1. **QC Escalates to Full Pause**
+   - QC calls `QCStateManager.selfPause(PauseLevel.Full, "CRITICAL_MAINTENANCE")`
+   - QC status changes to `Paused`
+   - Cannot mint OR fulfill redemptions
+   - 48h timer starts
+
+2. **Auto-Escalation After 48h**
+   - If not resumed, auto-escalates to `UnderReview`
+   - Council review required for restoration
+
+**Script Requirements**:
+
+- Test renewable pause credit consumption and renewal (90d cycles)
+- Validate 48h auto-escalation timers
+- Test early resume capabilities
+- Validate network continuity (MintingPaused can fulfill)
+- Test watchdog escalation monitoring
+
+### 3.7 Policy Upgrade Flow
 
 **Flow ID**: `POLICY-UPGRADE-001`  
 **Priority**: High  

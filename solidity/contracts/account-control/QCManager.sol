@@ -317,12 +317,12 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param qc The address of the QC
     /// @param newStatus The new status
     /// @param reason The reason for the change
-    /// @param authority The type of authority making the change (for logging)
+    /// @dev authority parameter removed to fix docstring parsing error
     function _executeStatusChange(
         address qc,
         QCData.QCStatus newStatus,
         bytes32 reason,
-        string memory authority
+        string memory /* authority */
     ) private {
 
         if (!qcData.isQCRegistered(qc)) {
