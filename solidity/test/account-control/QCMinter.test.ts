@@ -2,15 +2,15 @@ import chai, { expect } from "chai"
 import { ethers, helpers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
-import { 
-  QCMinter, 
-  ProtocolRegistry, 
-  Bank, 
-  TBTCVault, 
+import {
+  QCMinter,
+  ProtocolRegistry,
+  Bank,
+  TBTCVault,
   TBTC,
   SystemState,
   QCData,
-  QCManager
+  QCManager,
 } from "../../typechain"
 
 chai.use(smock.matchers)
@@ -97,13 +97,13 @@ describe("QCMinter", () => {
     mockSystemState.isQCEmergencyPaused.returns(false)
     mockSystemState.minMintAmount.returns(ethers.utils.parseEther("0.01"))
     mockSystemState.maxMintAmount.returns(ethers.utils.parseEther("1000"))
-    
+
     mockQCData.getQCStatus.returns(1) // Active status
     mockQCData.getQCMintedAmount.returns(0)
-    
+
     mockQCManager.getAvailableMintingCapacity.returns(maxMintingCapacity)
     mockQCManager.updateQCMintedAmount.returns()
-    
+
     mockBank.authorizedBalanceIncreasers.returns(true)
     mockBank.increaseBalanceAndCall.returns()
   })
@@ -160,9 +160,9 @@ describe("QCMinter", () => {
           .connect(user)
           .requestQCMint(qcAddress.address, mintAmount)
 
-        expect(mockQCManager.getAvailableMintingCapacity).to.have.been.calledWith(
-          qcAddress.address
-        )
+        expect(
+          mockQCManager.getAvailableMintingCapacity
+        ).to.have.been.calledWith(qcAddress.address)
       })
 
       it("should increase balance in Bank", async () => {
@@ -194,16 +194,14 @@ describe("QCMinter", () => {
           .requestQCMint(qcAddress.address, mintAmount)
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
 
-        await expect(tx)
-          .to.emit(qcMinter, "QCMintRequested")
-          .withArgs(
-            qcAddress.address,
-            user.address,
-            mintAmount,
-            ethers.utils.hexZeroPad("0x", 32), // mintId will be generated
-            user.address,
-            currentBlock.timestamp
-          )
+        await expect(tx).to.emit(qcMinter, "QCMintRequested").withArgs(
+          qcAddress.address,
+          user.address,
+          mintAmount,
+          ethers.utils.hexZeroPad("0x", 32), // mintId will be generated
+          user.address,
+          currentBlock.timestamp
+        )
       })
 
       it("should emit MintCompleted event", async () => {
@@ -212,8 +210,7 @@ describe("QCMinter", () => {
           .requestQCMint(qcAddress.address, mintAmount)
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
 
-        await expect(tx)
-          .to.emit(qcMinter, "MintCompleted")
+        await expect(tx).to.emit(qcMinter, "MintCompleted")
       })
     })
 
@@ -273,9 +270,7 @@ describe("QCMinter", () => {
 
     context("when amount exceeds capacity", () => {
       beforeEach(async () => {
-        mockQCManager.getAvailableMintingCapacity.returns(
-          mintAmount.sub(1)
-        )
+        mockQCManager.getAvailableMintingCapacity.returns(mintAmount.sub(1))
       })
 
       it("should revert", async () => {
@@ -314,9 +309,9 @@ describe("QCMinter", () => {
         qcAddress.address
       )
 
-      expect(
-        mockQCManager.getAvailableMintingCapacity
-      ).to.have.been.calledWith(qcAddress.address)
+      expect(mockQCManager.getAvailableMintingCapacity).to.have.been.calledWith(
+        qcAddress.address
+      )
       expect(result).to.equal(availableCapacity)
     })
   })
@@ -355,7 +350,7 @@ describe("QCMinter", () => {
     context("when amount is out of range", () => {
       it("should return false for amount below minimum", async () => {
         mockSystemState.minMintAmount.returns(mintAmount.add(1))
-        
+
         const result = await qcMinter.checkMintingEligibility(
           qcAddress.address,
           mintAmount
@@ -365,7 +360,7 @@ describe("QCMinter", () => {
 
       it("should return false for amount above maximum", async () => {
         mockSystemState.maxMintAmount.returns(mintAmount.sub(1))
-        
+
         const result = await qcMinter.checkMintingEligibility(
           qcAddress.address,
           mintAmount
@@ -407,7 +402,9 @@ describe("QCMinter", () => {
     context("when caller does not have MINTER_ROLE", () => {
       it("should revert requestQCMint", async () => {
         await expect(
-          qcMinter.connect(thirdParty).requestQCMint(qcAddress.address, mintAmount)
+          qcMinter
+            .connect(thirdParty)
+            .requestQCMint(qcAddress.address, mintAmount)
         ).to.be.reverted
       })
     })
@@ -420,7 +417,9 @@ describe("QCMinter", () => {
 
       it("should allow requestQCMint", async () => {
         await expect(
-          qcMinter.connect(thirdParty).requestQCMint(qcAddress.address, mintAmount)
+          qcMinter
+            .connect(thirdParty)
+            .requestQCMint(qcAddress.address, mintAmount)
         ).to.not.be.reverted
       })
     })

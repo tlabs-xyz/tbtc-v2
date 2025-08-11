@@ -87,7 +87,7 @@ class IntegrationTestRunner {
   }
 
   private printSummary(): void {
-    console.log(chalk.blue("\n" + "=".repeat(60)))
+    console.log(chalk.blue(`\n${"=".repeat(60)}`))
     console.log(chalk.blue("📊 Integration Test Summary"))
     console.log(chalk.blue("=".repeat(60)))
 

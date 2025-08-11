@@ -1,5 +1,5 @@
-import { ProtocolRegistry } from "../../typechain"
 import { ethers } from "ethers"
+import { ProtocolRegistry } from "../../typechain"
 
 /**
  * Shared test helper functions for policy updates

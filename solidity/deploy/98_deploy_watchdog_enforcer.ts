@@ -27,11 +27,13 @@ const func: DeployFunction = async function DeployWatchdogEnforcer(
     ],
     log: true,
   })
-  
+
   log(`✅ WatchdogEnforcer deployed at ${watchdogEnforcer.address}`)
   log("")
   log("Watchdog System deployment complete!")
-  log("Next steps: Run 99_configure_account_control_system.ts to configure roles and connections")
+  log(
+    "Next steps: Run 99_configure_account_control_system.ts to configure roles and connections"
+  )
 }
 
 func.tags = ["WatchdogEnforcer", "Watchdog"]

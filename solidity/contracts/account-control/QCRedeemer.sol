@@ -7,7 +7,6 @@ import "./QCData.sol";
 import "./SystemState.sol";
 import "../token/TBTC.sol";
 import "../bridge/BitcoinTx.sol";
-import "./interfaces/IQCRedeemer.sol";
 
 /// @title QCRedeemer
 /// @dev Direct implementation for tBTC redemption with QC backing.
@@ -26,7 +25,7 @@ import "./interfaces/IQCRedeemer.sol";
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - REDEEMER_ROLE: Reserved for future functionality (currently unused)
 /// - ARBITER_ROLE: Can record redemption fulfillments and flag defaults
-contract QCRedeemer is AccessControl, ReentrancyGuard, IQCRedeemer {
+contract QCRedeemer is AccessControl, ReentrancyGuard {
     // Custom errors for gas-efficient reverts
     error InvalidQCAddress();
     error InvalidAmount();

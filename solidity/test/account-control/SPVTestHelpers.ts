@@ -151,15 +151,16 @@ export class SPVTestHelpers {
       emptyInputs: {
         version: "0x02000000",
         inputVector: "0x00",
-        outputVector:
-          "0x01" + "00e1f50500000000" + "1976a914" + "a".repeat(40) + "88ac",
+        outputVector: `${"0x01" + "00e1f50500000000" + "1976a914"}${"a".repeat(
+          40
+        )}88ac`,
         locktime: "0x00000000",
       },
 
       // Empty output vector (invalid)
       emptyOutputs: {
         version: "0x02000000",
-        inputVector: "0x01" + "a".repeat(72) + "ffffffff",
+        inputVector: `0x01${"a".repeat(72)}ffffffff`,
         outputVector: "0x00",
         locktime: "0x00000000",
       },
@@ -167,9 +168,10 @@ export class SPVTestHelpers {
       // Invalid version
       invalidVersion: {
         version: "0x00000000", // Version 0 is invalid
-        inputVector: "0x01" + "a".repeat(72) + "ffffffff",
-        outputVector:
-          "0x01" + "00e1f50500000000" + "1976a914" + "a".repeat(40) + "88ac",
+        inputVector: `0x01${"a".repeat(72)}ffffffff`,
+        outputVector: `${"0x01" + "00e1f50500000000" + "1976a914"}${"a".repeat(
+          40
+        )}88ac`,
         locktime: "0x00000000",
       },
     }
@@ -195,7 +197,7 @@ export class SPVTestHelpers {
     for (let i = 0; i < outputCount; i++) {
       // 8 bytes for value (little-endian)
       const valueHex = data.slice(0, 16)
-      const value = BigInt("0x" + valueHex.match(/../g)!.reverse().join(""))
+      const value = BigInt(`0x${valueHex.match(/../g)!.reverse().join("")}`)
       data = data.slice(16)
 
       // 1 byte for script length

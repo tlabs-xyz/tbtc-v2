@@ -14,7 +14,7 @@ export async function getQCStatusDirect(
   qcData: QCData,
   qc: string
 ): Promise<number> {
-  return await qcData.getQCStatus(qc)
+  return qcData.getQCStatus(qc)
 }
 
 /**
@@ -25,7 +25,7 @@ export async function getQCWalletsDirect(
   qcData: QCData,
   qc: string
 ): Promise<string[]> {
-  return await qcData.getQCWallets(qc)
+  return qcData.getQCWallets(qc)
 }
 
 /**

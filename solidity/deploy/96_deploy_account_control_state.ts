@@ -4,7 +4,7 @@ import { DeployFunction } from "hardhat-deploy/types"
 const func: DeployFunction = async function DeployAccountControlState(
   hre: HardhatRuntimeEnvironment
 ) {
-  const { getNamedAccounts, deployments, helpers } = hre
+  const { getNamedAccounts, deployments, network } = hre
   const { deployer } = await getNamedAccounts()
   const { deploy, log, get } = deployments
 
@@ -13,20 +13,18 @@ const func: DeployFunction = async function DeployAccountControlState(
   // Phase 2: State Management Layer
   log("Phase 2: Deploying State Management Layer")
 
-  const protocolRegistry = await get("ProtocolRegistry")
-
-  // Deploy QCData - Storage layer with 3-state models
+  // Deploy QCData - Storage layer with 5-state models
   const qcData = await deploy("QCData", {
     from: deployer,
     log: true,
-    waitConfirmations: helpers.network?.confirmations || 1,
+    waitConfirmations: network.live ? 5 : 1,
   })
 
   // Deploy SystemState - Global configuration and emergency controls
   const systemState = await deploy("SystemState", {
     from: deployer,
     log: true,
-    waitConfirmations: helpers.network?.confirmations || 1,
+    waitConfirmations: network.live ? 5 : 1,
   })
 
   // Get dependencies for QCManager direct injection
@@ -37,7 +35,7 @@ const func: DeployFunction = async function DeployAccountControlState(
     from: deployer,
     args: [qcData.address, systemState.address, qcReserveLedger.address],
     log: true,
-    waitConfirmations: helpers.network?.confirmations || 1,
+    waitConfirmations: network.live ? 5 : 1,
   })
 
   log("Phase 2 completed: State management layer deployed")
@@ -48,4 +46,4 @@ const func: DeployFunction = async function DeployAccountControlState(
 
 export default func
 func.tags = ["AccountControlState", "QCData", "SystemState", "QCManager"]
-func.dependencies = ["AccountControlCore", "QCReserveLedger"]
+func.dependencies = ["QCReserveLedger"]
