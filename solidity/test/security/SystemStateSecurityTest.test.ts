@@ -2,7 +2,6 @@ import { ethers, helpers, waffle } from "hardhat"
 import { expect } from "chai"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { SystemState } from "../../typechain"
-import { time } from "@nomicfoundation/hardhat-network-helpers"
 
 const { loadFixture } = waffle
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
@@ -112,7 +111,8 @@ describe("SystemState Security Tests", () => {
 
       it("should track pause timestamps", async () => {
         const pauseTx = await systemState.connect(pauser).pauseMinting()
-        const pauseTime = await time.latest()
+        const block = await ethers.provider.getBlock('latest')
+        const pauseTime = block.timestamp
 
         const mintingPauseKey = ethers.utils.keccak256(
           ethers.utils.toUtf8Bytes("MINTING_PAUSE")
@@ -151,10 +151,12 @@ describe("SystemState Security Tests", () => {
 
       it("should track pause duration for monitoring", async () => {
         await systemState.connect(pauser).pauseMinting()
-        const pauseTime = await time.latest()
+        const block = await ethers.provider.getBlock('latest')
+        const pauseTime = block.timestamp
 
         // Advance time
-        await time.increase(60 * 60) // 1 hour
+        await helpers.time.increaseTime(60 * 60) // 1 hour
+        await helpers.mine()
 
         // Pause timestamp should be accessible for duration calculation
         const mintingPauseKey = ethers.utils.keccak256(

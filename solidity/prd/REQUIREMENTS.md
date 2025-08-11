@@ -92,17 +92,21 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 #### 3.1.2 Modular Contract System (REQ-FUNC-MOD-001)
 
-**Requirement**: The system MUST implement a modular, upgradeable contract architecture
+**Requirement**: The system MUST implement a modular, upgradeable contract architecture with 5-state management
 
 - ProtocolRegistry as central service registry
 - Data/logic separation (QCData.sol storage, QCManager.sol logic)
+- 5-state management contracts (QCStateManager.sol, QCRenewablePause.sol)
 - Policy-driven operations through IMintingPolicy and IRedemptionPolicy
 - Independent component upgradeability
 
 **Acceptance Criteria**:
 
 - All contracts reference services through ProtocolRegistry
-- QCData owned by QCManager with clear access control
+- QCStateManager handles 5-state transitions and auto-escalation
+- QCRenewablePause manages pause credits and renewal logic
+- QCData updated with 5-state enum and STATE_MANAGER_ROLE
+- Policy contracts support 5-state validation (Active only mints, 60% can fulfill)
 - Policy contracts upgradeable via registry updates
 - No direct contract-to-contract dependencies
 
@@ -110,17 +114,21 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 #### 3.2.1 QC State Machine (REQ-FUNC-QC-001)
 
-**Requirement**: The system MUST implement a simple 3-state QC status system
+**Requirement**: The system MUST implement a 5-state QC management model with renewable pause credits
 
 - **Active**: QC fully operational with minting/redemption rights
-- **UnderReview**: QC minting rights paused pending review
+- **MintingPaused**: QC can fulfill redemptions but cannot mint (self-initiated or watchdog)
+- **Paused**: QC cannot mint or fulfill (self-initiated maintenance mode, 48h max)
+- **UnderReview**: QC can fulfill but cannot mint (council review required)
 - **Revoked**: QC rights permanently terminated
 
 **Acceptance Criteria**:
 
-- State transitions: Active ↔ UnderReview, any → Revoked
-- Status changes require ARBITER_ROLE authorization
-- QCStatusChanged events emitted with reason
+- State transitions: Active ↔ MintingPaused, MintingPaused → Paused → UnderReview (auto-escalation)
+- Self-pause functions with renewable credits (1 credit per 90 days)
+- 48-hour auto-escalation timer for self-initiated pauses
+- Network continuity: 60% of states (Active, MintingPaused, UnderReview) allow fulfillment
+- Status changes emit QCStatusChanged events with reason codes
 - Recovery path from UnderReview to Active
 
 #### 3.2.2 Wallet Management (REQ-FUNC-WALLET-001)
@@ -152,11 +160,12 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Acceptance Criteria**:
 
-- Validation: QC Active status, sufficient capacity, system not paused
-- Amount validation against min/max limits from SystemState
+- Validation: QC Active status only (MintingPaused/Paused/UnderReview reject minting)
+- Amount validation against min/max limits from SystemState  
 - Bank.increaseBalanceAndCall() for auto-minting path
 - Bank.increaseBalance() for manual minting path
 - MintCompleted events with full transaction details
+- Clear rejection reasons for each non-Active state
 
 #### 3.3.2 Capacity Management (REQ-FUNC-CAP-001)
 
@@ -237,19 +246,21 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 #### 3.5.2 Delinquency Enforcement (REQ-FUNC-DELIN-001)
 
-**Requirement**: The system MUST implement automatic delinquency enforcement
+**Requirement**: The system MUST implement graduated consequence enforcement for defaults
 
 - Watchdog monitoring of redemption fulfillments
-- Automatic QC status change to Revoked upon default
-- Default handling with loss socialization
-- Legal recourse integration points
+- Progressive QC status changes through 5-state model (Active → MintingPaused → UnderReview → Revoked)
+- Default handling with graduated consequences and recovery paths
+- Legal recourse integration for terminal revocation
 
 **Acceptance Criteria**:
 
 - Watchdog monitors Bitcoin network for fulfillment transactions
-- Automatic status change to Revoked upon confirmed default
-- RedemptionDefaulted events with full audit trail
-- Integration with off-chain legal enforcement mechanisms
+- Graduated consequence progression: 1st default → MintingPaused, 2nd → UnderReview, 3rd → Revoked
+- Recovery paths: QCs can return to Active by clearing backlogs within time windows
+- RedemptionDefaulted events with full audit trail and consequence level
+- Integration with QCStateManager for automated consequence application
+- Integration with off-chain legal enforcement for terminal revocations
 
 ### 3.6 Emergency Controls
 
