@@ -101,10 +101,10 @@ The system deploys as an **independent contract suite** without modifying existi
 ### For Developers
 
 1. **Start with**: [REQUIREMENTS.md](REQUIREMENTS.md) - Understand what we're building
-2. **Then read**: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) - Learn the technical design
-3. **Implementation**: [../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md) - Deploy and configure
-4. **User flows**: [FLOWS.md](FLOWS.md) - Understand user journeys
-5. **Watchdog operations**: [../docs/WATCHDOG_GUIDE.md](../docs/WATCHDOG_GUIDE.md) - Complete watchdog system guide
+2. **Technical spec**: [../V1.1_ACCOUNT_CONTROL_SPECIFICATION.md](../V1.1_ACCOUNT_CONTROL_SPECIFICATION.md) - Complete technical reference
+3. **Architecture**: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) - System architecture details
+4. **Implementation**: [../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md) - Deploy and configure
+5. **User flows**: [FLOWS.md](FLOWS.md) - Understand user journeys
 
 ### For Product Managers
 
