@@ -958,7 +958,7 @@ export class QCOnboardingFlow extends BaseFlowTest {
 
     // Verify QC status
     const qcStatus = await qcManager.getQCStatus(qc.address)
-    expect(qcStatus).to.equal(1) // Active
+    expect(qcStatus).to.equal(0) // Active
     console.log("✅ QC onboarded successfully with Active status")
 
     // Step 2: Register Bitcoin Wallet
@@ -1341,20 +1341,20 @@ The Account Control system is deployed with the following components:
 - **Impact**: Registered QCs cannot mint without separate role granting step
 - **Location**: QCMinter.sol line 148-155, deploy script line 158-159
 
-**Bug #3 - Flow 3.4 User Redemption (MOST CRITICAL)**:
+**Bug #3 - Flow 3.4 User Redemption**: ✅ RESOLVED
 - **Documentation Claims**: "MintingPaused QCs can fulfill redemptions (network continuity)"
-- **Actual Implementation**: Only Active OR UnderReview QCs can redeem (line 439-441)
-- **Impact**: BREAKS NETWORK CONTINUITY - MintingPaused QCs cannot fulfill redemptions
-- **Location**: QCRedeemer.sol _validateRedemptionRequest() function
-- **Contradiction**: canQCFulfill() allows MintingPaused but redemption validation rejects it
+- **Previous Issue**: Only Active OR UnderReview QCs could redeem (breaking network continuity)
+- **Resolution**: Added MintingPaused to allowed redemption statuses (QCRedeemer.sol lines 441)  
+- **Status**: Fixed - MintingPaused QCs can now fulfill redemptions as documented
 
 #### 9.2.3 Stubbed/Pending Implementation ⚠️
 
-**SPV Proof Verification**: Currently stubbed in multiple contracts
-- `QCManager.registerWallet()` - SPV validation returns true (line 184)
-- `QCRedeemer._verifySPVProof()` - Always returns true (line 582-585)
-- **Impact**: Bitcoin transaction validation not enforced
-- **Status**: TODO for production implementation
+**SPV Proof Verification**: Currently stubbed in multiple contracts ⚠️ DEVELOPMENT ONLY
+- `QCManager._verifyWalletControl()` - SPV validation returns true (line 651)  
+- `QCRedeemer._verifySPVProof()` - Always returns true (line 587)
+- **Impact**: Bitcoin transaction validation not enforced - allows any proof to pass
+- **Status**: TODO for production implementation - requires Bridge SPV infrastructure integration
+- **Security**: DO NOT deploy to production without implementing actual SPV validation
 
 **IQCRedeemer Interface Methods**: Placeholder implementations in QCRedeemer
 - `hasUnfulfilledRedemptions(qc)` - Always returns false (line 625)

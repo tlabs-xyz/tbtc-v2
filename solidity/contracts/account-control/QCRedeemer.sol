@@ -433,10 +433,12 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             return false;
         }
 
-        // QC can be Active or UnderReview for redemptions (more permissive than minting)
+        // QC can be Active, MintingPaused, or UnderReview for redemptions (more permissive than minting)
+        // MintingPaused QCs can fulfill redemptions to maintain network continuity
         QCData.QCStatus qcStatus = qcData.getQCStatus(qc);
         if (
             qcStatus != QCData.QCStatus.Active &&
+            qcStatus != QCData.QCStatus.MintingPaused &&
             qcStatus != QCData.QCStatus.UnderReview
         ) {
             return false;
