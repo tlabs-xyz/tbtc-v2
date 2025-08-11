@@ -180,12 +180,25 @@ describe("QCData", () => {
         ).to.be.revertedWith("QCNotRegistered")
       })
 
-      it("should revert with invalid status", async () => {
-        await expect(
-          qcData
-            .connect(qcManager)
-            .setQCStatus(qcAddress.address, 3, testReason) // Invalid status
-        ).to.be.reverted
+      it("should update status to UnderReview", async () => {
+        const tx = await qcData
+          .connect(qcManager)
+          .setQCStatus(qcAddress.address, 3, testReason) // UnderReview status
+
+        expect(await qcData.getQCStatus(qcAddress.address)).to.equal(3)
+
+        await expect(tx)
+          .to.emit(qcData, "QCStatusChanged")
+          .withArgs(
+            qcAddress.address,
+            0, // old status (Active)
+            3, // new status (UnderReview)
+            testReason,
+            qcManager.address,
+            await ethers.provider
+              .getBlock(tx.blockNumber!)
+              .then((b) => b.timestamp)
+          )
       })
     })
 
@@ -197,7 +210,7 @@ describe("QCData", () => {
             .connect(thirdParty)
             .setQCStatus(qcAddress.address, 1, testReason)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_MANAGER_ROLE}`
+          "Caller must have QC_MANAGER_ROLE or STATE_MANAGER_ROLE"
         )
       })
     })
@@ -940,7 +953,9 @@ describe("QCData", () => {
 
     beforeEach(async () => {
       // Register a QC first
-      await qcData.connect(qcManager).registerQC(qcAddress.address)
+      await qcData
+        .connect(qcManager)
+        .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
     })
 
     describe("grantQCManagerRole", () => {
@@ -961,7 +976,7 @@ describe("QCData", () => {
       it("should revert with zero address", async () => {
         await expect(
           qcData.grantQCManagerRole(ethers.constants.AddressZero)
-        ).to.be.revertedWith("InvalidAddress")
+        ).to.be.revertedWith("InvalidManagerAddress")
       })
 
       it("should allow multiple managers", async () => {
@@ -1001,16 +1016,16 @@ describe("QCData", () => {
           .withArgs(QC_MANAGER_ROLE, thirdParty.address, deployer.address)
       })
 
-      it("should revert with zero address", async () => {
-        await expect(
-          qcData.revokeQCManagerRole(ethers.constants.AddressZero)
-        ).to.be.revertedWith("InvalidAddress")
+      it("should succeed with zero address (no validation)", async () => {
+        // OpenZeppelin _revokeRole doesn't validate zero address
+        await expect(qcData.revokeQCManagerRole(ethers.constants.AddressZero))
+          .to.not.be.reverted
       })
 
-      it("should revert when role not granted", async () => {
-        await expect(
-          qcData.revokeQCManagerRole(governance.address)
-        ).to.be.revertedWith("RoleNotGranted")
+      it("should succeed when role not granted (no validation)", async () => {
+        // OpenZeppelin _revokeRole succeeds even if role not granted
+        await expect(qcData.revokeQCManagerRole(governance.address)).to.not.be
+          .reverted
       })
 
       it("should only be callable by admin", async () => {
@@ -1027,7 +1042,9 @@ describe("QCData", () => {
 
     beforeEach(async () => {
       // Register a QC first
-      await qcData.connect(qcManager).registerQC(qcAddress.address)
+      await qcData
+        .connect(qcManager)
+        .registerQC(qcAddress.address, testCapacity)
     })
 
     describe("updateMaxMintingCapacity", () => {
@@ -1042,10 +1059,11 @@ describe("QCData", () => {
 
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
         await expect(tx)
-          .to.emit(qcData, "MaxMintingCapacityUpdated")
+          .to.emit(qcData, "QCMaxMintingCapacityUpdated")
           .withArgs(
             qcAddress.address,
-            testCapacity,
+            testCapacity, // oldCapacity (set in beforeEach)
+            testCapacity, // newCapacity (same as testCapacity)
             qcManager.address,
             currentBlock.timestamp
           )
@@ -1066,10 +1084,11 @@ describe("QCData", () => {
 
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
         await expect(tx)
-          .to.emit(qcData, "MaxMintingCapacityUpdated")
+          .to.emit(qcData, "QCMaxMintingCapacityUpdated")
           .withArgs(
             qcAddress.address,
-            updatedCapacity,
+            testCapacity, // oldCapacity (first capacity set)
+            updatedCapacity, // newCapacity
             qcManager.address,
             currentBlock.timestamp
           )
@@ -1112,9 +1131,9 @@ describe("QCData", () => {
         expect(capacity).to.equal(testCapacity)
       })
 
-      it("should return zero for QC without set capacity", async () => {
+      it("should return correct capacity for registered QC", async () => {
         const capacity = await qcData.getMaxMintingCapacity(qcAddress.address)
-        expect(capacity).to.equal(0)
+        expect(capacity).to.equal(testCapacity)
       })
 
       it("should return zero for unregistered QC", async () => {

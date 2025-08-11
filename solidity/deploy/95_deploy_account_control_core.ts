@@ -4,7 +4,7 @@ import { DeployFunction } from "hardhat-deploy/types"
 const func: DeployFunction = async function DeployAccountControlCore(
   hre: HardhatRuntimeEnvironment
 ) {
-  const { getNamedAccounts, deployments, helpers } = hre
+  const { getNamedAccounts, deployments, network } = hre
   const { deployer } = await getNamedAccounts()
   const { deploy, log } = deployments
 
@@ -32,22 +32,18 @@ const func: DeployFunction = async function DeployAccountControlCore(
       tbtc.address,
       qcData.address,
       systemState.address,
-      qcManager.address
+      qcManager.address,
     ],
     log: true,
-    waitConfirmations: helpers.network?.confirmations || 1,
+    waitConfirmations: network.live ? 5 : 1,
   })
 
   // Deploy QCRedeemer - Direct injection pattern
   const qcRedeemer = await deploy("QCRedeemer", {
     from: deployer,
-    args: [
-      tbtc.address,
-      qcData.address,
-      systemState.address
-    ],
+    args: [tbtc.address, qcData.address, systemState.address],
     log: true,
-    waitConfirmations: helpers.network?.confirmations || 1,
+    waitConfirmations: network.live ? 5 : 1,
   })
 
   log("Phase 1 completed: Core contract layer deployed with direct injection")

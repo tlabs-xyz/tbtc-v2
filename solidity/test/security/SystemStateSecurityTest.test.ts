@@ -111,7 +111,7 @@ describe("SystemState Security Tests", () => {
 
       it("should track pause timestamps", async () => {
         const pauseTx = await systemState.connect(pauser).pauseMinting()
-        const block = await ethers.provider.getBlock('latest')
+        const block = await ethers.provider.getBlock("latest")
         const pauseTime = block.timestamp
 
         const mintingPauseKey = ethers.utils.keccak256(
@@ -151,7 +151,7 @@ describe("SystemState Security Tests", () => {
 
       it("should track pause duration for monitoring", async () => {
         await systemState.connect(pauser).pauseMinting()
-        const block = await ethers.provider.getBlock('latest')
+        const block = await ethers.provider.getBlock("latest")
         const pauseTime = block.timestamp
 
         // Advance time

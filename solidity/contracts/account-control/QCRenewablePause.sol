@@ -3,9 +3,8 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "./interfaces/IQCData.sol";
-import "./interfaces/IQCRedeemer.sol";
-import "./interfaces/IProtocolRegistry.sol";
+import "./QCData.sol";
+import "./QCRedeemer.sol";
 
 /// @title QCRenewablePause
 /// @notice Manages renewable pause credits for QC self-management
@@ -50,8 +49,8 @@ contract QCRenewablePause is Initializable, AccessControlUpgradeable {
     // =================== STATE VARIABLES ===================
     
     mapping(address => PauseCredit) public pauseCredits;
-    IQCData public qcData;
-    IProtocolRegistry public protocolRegistry;
+    QCData public qcData;
+    QCRedeemer public qcRedeemer;
     address public qcStateManager;
     
     // =================== EVENTS ===================
@@ -95,12 +94,12 @@ contract QCRenewablePause is Initializable, AccessControlUpgradeable {
     
     function initialize(
         address _qcData,
-        address _protocolRegistry
+        address _qcRedeemer
     ) external initializer {
         __AccessControl_init();
         
-        qcData = IQCData(_qcData);
-        protocolRegistry = IProtocolRegistry(_protocolRegistry);
+        qcData = QCData(_qcData);
+        qcRedeemer = QCRedeemer(_qcRedeemer);
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
@@ -129,8 +128,8 @@ contract QCRenewablePause is Initializable, AccessControlUpgradeable {
         }
         
         // Check QC is active
-        try qcData.getQCStatus(qc) returns (IQCData.QCStatus status) {
-            if (status != IQCData.QCStatus.Active) {
+        try qcData.getQCStatus(qc) returns (QCData.QCStatus status) {
+            if (status != QCData.QCStatus.Active) {
                 return false;
             }
         } catch {
@@ -164,8 +163,8 @@ contract QCRenewablePause is Initializable, AccessControlUpgradeable {
         if (bytes(reason).length == 0) revert ReasonRequired();
         
         // Check QC status
-        IQCData.QCStatus status = qcData.getQCStatus(qc);
-        if (status != IQCData.QCStatus.Active) revert QCNotActive();
+        QCData.QCStatus status = qcData.getQCStatus(qc);
+        if (status != QCData.QCStatus.Active) revert QCNotActive();
         
         // Deadline protection
         uint256 earliestDeadline = getEarliestRedemptionDeadline(qc);
@@ -191,8 +190,8 @@ contract QCRenewablePause is Initializable, AccessControlUpgradeable {
         PauseCredit storage credit = pauseCredits[qc];
         
         // Validate conditions
-        IQCData.QCStatus status = qcData.getQCStatus(qc);
-        if (status != IQCData.QCStatus.Active) revert QCNotActive();
+        QCData.QCStatus status = qcData.getQCStatus(qc);
+        if (status != QCData.QCStatus.Active) revert QCNotActive();
         if (credit.hasCredit) revert CreditAlreadyAvailable();
         if (credit.lastUsed == 0) revert NeverUsedCredit();
         if (block.timestamp < credit.creditRenewTime) revert RenewalPeriodNotMet();
@@ -290,9 +289,8 @@ contract QCRenewablePause is Initializable, AccessControlUpgradeable {
         view 
         returns (uint256 deadline) 
     {
-        try protocolRegistry.getService("QC_REDEEMER") returns (address redeemerAddr) {
-            IQCRedeemer redeemer = IQCRedeemer(redeemerAddr);
-            return redeemer.getEarliestRedemptionDeadline(qc);
+        try qcRedeemer.getEarliestRedemptionDeadline(qc) returns (uint256 deadline) {
+            return deadline;
         } catch {
             return 0;
         }

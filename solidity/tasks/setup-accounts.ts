@@ -164,7 +164,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
     }
 
     console.log("⚖️  Balancing ETH between accounts...\n")
-    console.log(`📊 Funding Analysis:`)
+    console.log("📊 Funding Analysis:")
     console.log(`   Total needed: ${totalNeeded.toFixed(6)} ETH`)
     console.log(`   Total available: ${totalAvailable.toFixed(6)} ETH`)
 
@@ -172,12 +172,11 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
       const deficit = totalNeeded - totalAvailable
       console.log(`   ❌ Deficit: ${deficit.toFixed(6)} ETH`)
       console.log(
-        `   ⚠️  You need to add more ETH to the accounts before balancing.\n`
+        "   ⚠️  You need to add more ETH to the accounts before balancing.\n"
       )
       return
-    } else {
-      console.log(`   ✅ Sufficient funds available\n`)
     }
+    console.log("   ✅ Sufficient funds available\n")
 
     // Find funding source
     let bestAccount: DerivedAccount | null = null
@@ -240,14 +239,14 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
 
           // Wait for transaction confirmation
           await tx.wait()
-          console.log(`   ✅ Confirmed\n`)
+          console.log("   ✅ Confirmed\n")
         } catch (error) {
           console.log(`   ❌ Failed: ${error.message}\n`)
         }
       }
     }
 
-    console.log(`🎉 Balancing complete!`)
+    console.log("🎉 Balancing complete!")
     console.log(`   Total transferred: ${totalTransferred.toFixed(6)} ETH`)
     console.log(`   Transactions: ${transactions.length}\n`)
 
@@ -320,7 +319,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
       `# Account derivation: ${DERIVATION_PATH_BASE}N where N = 0 to ${
         ACCOUNT_COUNT - 1
       }`,
-      "# Total accounts: " + ACCOUNT_COUNT,
+      `# Total accounts: ${ACCOUNT_COUNT}`,
       "# Funding ultra-scaled: 0.0005-0.007 ETH per account (exactly 0.02 ETH total)",
       "#",
       "# ============================================================================="
@@ -330,7 +329,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
     fs.writeFileSync(envPath, envContent.join("\n"))
 
     console.log(`✅ .env file generated at: ${envPath}`)
-    console.log(`🔧 Remember to set your Sepolia RPC URL in the .env file\n`)
+    console.log("🔧 Remember to set your Sepolia RPC URL in the .env file\n")
 
     // Final summary
     console.log("📋 Final Account Summary:")
@@ -375,7 +374,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
         `⚠️  Still need: ${stillNeeded.toFixed(6)} ETH to meet all targets`
       )
     } else {
-      console.log(`✅ All accounts sufficiently funded!`)
+      console.log("✅ All accounts sufficiently funded!")
     }
 
     console.log("\n🎯 Next steps:")
