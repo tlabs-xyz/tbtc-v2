@@ -31,12 +31,11 @@ const func: DeployFunction = async function DeployAccountControlState(
 
   // Get dependencies for QCManager direct injection
   const qcReserveLedger = await get("QCReserveLedger")
-  const spvValidator = await get("SPVValidator")
 
   // Deploy QCManager - Business logic with direct dependencies
   const qcManager = await deploy("QCManager", {
     from: deployer,
-    args: [qcData.address, systemState.address, qcReserveLedger.address, spvValidator.address],
+    args: [qcData.address, systemState.address, qcReserveLedger.address],
     log: true,
     waitConfirmations: helpers.network?.confirmations || 1,
   })
@@ -49,4 +48,4 @@ const func: DeployFunction = async function DeployAccountControlState(
 
 export default func
 func.tags = ["AccountControlState", "QCData", "SystemState", "QCManager"]
-func.dependencies = ["AccountControlCore", "QCReserveLedger", "SPVValidator"]
+func.dependencies = ["AccountControlCore", "QCReserveLedger"]

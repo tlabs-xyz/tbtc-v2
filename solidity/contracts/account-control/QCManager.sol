@@ -344,7 +344,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
             newStatus,
             reason,
             msg.sender,
-            authority,
+            "AUTHORITY",
             block.timestamp
         );
     }
