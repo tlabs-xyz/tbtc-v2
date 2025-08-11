@@ -333,7 +333,7 @@ describe("Role-Based Access Control Security Tests", () => {
         .connect(operator1)
         .proposeStatusChange(randomUser.address, 2, "Test reason")
       const receipt = await tx.wait()
-      const proposalId = receipt.events[0].args.proposalId
+      const { proposalId } = receipt.events[0].args
 
       // Try to vote without role
       await expect(

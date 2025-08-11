@@ -1,8 +1,8 @@
 # Account Control User Flows and Sequences
 
-**Document Version**: 2.0  
-**Date**: 2025-08-06  
-**Architecture**: Simplified Watchdog System  
+**Document Version**: 3.0  
+**Date**: 2025-08-11  
+**Architecture**: Simplified Account Control System  
 **Purpose**: User journeys and sequence diagrams for Account Control system  
 **Related Documents**: [README.md](README.md), [REQUIREMENTS.md](REQUIREMENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION.md](IMPLEMENTATION.md)
 
@@ -34,28 +34,25 @@ This document provides a complete inventory of user flows in the tBTC v2 Account
 - **DAO Governance**: Decentralized governance managing system parameters
 - **Emergency Council**: Entity with pause/unpause capabilities
 
-### 1.3 Key Components
+### 1.3 Key System Components
 
-- **ProtocolRegistry**: Central address book for modular upgrades
-- **QCManager**: Core QC lifecycle and status management  
-- **QCStateManager**: 5-state transition logic and auto-escalation
-- **QCRenewablePause**: Renewable pause credit system
-- **QCMinter/QCRedeemer**: Entry points for minting/redemption
-- **Policy Contracts**: Upgradeable business logic (BasicMintingPolicy, BasicRedemptionPolicy)
-- **QCReserveLedger**: Reserve attestation management
-- **ReserveOracle**: Multi-attester consensus for reserve balances
-- **WatchdogEnforcer**: Permissionless enforcement with auto-escalation checks
+**Core Components**:
+- **QCManager**: Manages QC registration, status, and Bitcoin wallet associations
+- **QCMinter**: Handles minting requests from QCs on behalf of users
+- **QCRedeemer**: Processes redemption requests from users
+- **QCData**: Stores QC information and status
+- **SystemState**: Manages system-wide parameters and emergency controls
+- **QCReserveLedger**: Tracks Bitcoin reserves via multi-attester consensus
+- **WatchdogEnforcer**: Monitors and enforces collateralization requirements
 
 ---
 
 ## 2. System Overview
 
-### 2.1 Architecture Flow
+### 2.1 System Flow
 
 ```
-User Request → QCMinter/QCRedeemer → Policy Contract → Core Logic → TBTC Token
-                         ↓
-            ProtocolRegistry (Service Discovery)
+User Request → QCMinter/QCRedeemer → Bank → TBTC Token
                          ↓
             QCManager ← QCData (State) → QCReserveLedger (Attestations)
 ```
@@ -123,7 +120,24 @@ UnderReview → Active/Revoked (Council decision)
 - Generate Bitcoin addresses and OP_RETURN proofs
 - Validate final QC state and wallet registrations
 
-#### 3.1.2 Error Scenarios
+4. **Initial Zero Balance Attestation**
+
+   - Attesters submit initial zero balance for newly registered QC
+   - Establishes baseline monitoring from registration
+   - No monitoring blind spots during initial setup period
+
+5. **Pause Credit Initialization** (⚠️ **Manual Step Required**)
+
+   - Admin must call `QCRenewablePause.grantInitialCredit(qc)` separately
+   - **Not automatic** - requires explicit admin action with DEFAULT_ADMIN_ROLE
+   - Credit becomes available only after manual grant
+   - 90-day renewal cycle begins from first credit usage
+
+#### 3.1.2 Complete Lifecycle Support
+
+The onboarding flow now supports the complete QC lifecycle from registration through wind-down, including zero balance monitoring and renewable pause credits.
+
+#### 3.1.3 Error Scenarios
 
 - **Invalid QC Address**: Zero address validation
 - **Insufficient Capacity**: Zero minting capacity provided
@@ -143,20 +157,22 @@ UnderReview → Active/Revoked (Council decision)
 
    - Multiple attesters monitor registered Bitcoin addresses off-chain
    - Each calculates total reserves across all QC wallets
+   - Zero balances are accepted (for new QCs or wind-down)
 
 2. **Attestation Submission and Consensus**
 
-   - Each attester calls `QCReserveLedger.submitAttestation(qc, balance)` with `ATTESTER_ROLE`
+   - Each attester calls `submitAttestation(qc, balance)` with `ATTESTER_ROLE`
+   - Zero balance attestations are now accepted
    - System collects attestations until `consensusThreshold` met (default 3)
    - Median consensus calculated automatically when threshold reached
    - Reserve balance updated in QCReserveLedger
    - Events: `AttestationSubmitted`, `ConsensusReached`, `ReserveUpdated`
 
 3. **Automated Status Management**
-   - Anyone can call `WatchdogEnforcer.enforceObjectiveViolation()` if undercollateralized
+   - Anyone can call enforcement if undercollateralized
    - If violation confirmed: QC status changes to `UnderReview`
    - Minting capabilities suspended
-   - Event: `QCStatusChanged`
+   - Zero balance QCs remain monitored but cannot mint
 
 **Script Requirements**:
 
@@ -175,34 +191,35 @@ UnderReview → Active/Revoked (Council decision)
 
 **Flow ID**: `QC-MINT-001`  
 **Priority**: Critical  
-**Participants**: End User, QC, BasicMintingPolicy, TBTC Token
+**Participants**: End User, QC, System
 
 #### 3.3.1 Happy Path
 
-1. **QC Requests Minting** (On behalf of user)
+1. **QC Requests Minting** (On behalf of user) (⚠️ **MINTER_ROLE Required**)
 
-   - QC calls `QCMinter.requestQCMint(qcAddress, amount)` with `MINTER_ROLE`
-   - QCMinter delegates to `BasicMintingPolicy.requestMint(qc, user, amount)`
+   - QC calls `QCMinter.requestQCMint(qc, amount)` with MINTER_ROLE 
+   - **Prerequisites**: QC must have been granted MINTER_ROLE after registration
+   - **Manual Step**: Admin must call `QCMinter.grantRole(MINTER_ROLE, qcAddress)` 
+   - System validates the request
 
-2. **Policy Validation**
+2. **System Validation**
 
-   - Check system not paused and QC not emergency paused
-   - Check amount within bounds (`minMintAmount` to `maxMintAmount`)
-   - Verify QC status is `Active`
-   - Check available minting capacity against reserves
+   - Confirms system is not paused
+   - Verifies amount is within allowed bounds
+   - Confirms QC status is `Active`
+   - Checks available minting capacity against reserves
 
-3. **Direct Bank Integration and Auto-Minting**
-   - Convert tBTC amount to satoshis (`amount / SATOSHI_MULTIPLIER`)
-   - Create Bank balance: `bank.increaseBalanceAndCall(tbtcVault, [user], [satoshis])`
-   - Auto-triggers TBTCVault minting of tBTC tokens to user
-   - Update QC's minted amount in QCData
-   - Events: `QCBankBalanceCreated`, `QCBackedDepositCredited`, `MintCompleted`
+3. **Token Minting**
+   - System processes the minting request
+   - tBTC tokens are minted to the user's address
+   - QC's minted amount is updated
+   - Events: `MintCompleted`
 
 **Script Requirements**:
 
 - Set up user accounts with appropriate permissions
 - Test capacity calculations and limits
-- Validate policy checks (status, freshness, capacity)
+- Validate system checks (status, freshness, capacity)
 - Verify token minting and balance updates
 
 #### 3.3.2 Error Scenarios
@@ -210,43 +227,42 @@ UnderReview → Active/Revoked (Council decision)
 - **Inactive QC**: Attempt minting with UnderReview/Revoked QC
 - **Stale Reserves**: Minting blocked due to old attestation
 - **Insufficient Capacity**: Amount exceeds available minting capacity
-- **Policy Failure**: Various policy validation failures
+- **Validation Failure**: System rejects request due to failed checks
 
 ### 3.4 User Redemption Flow
 
 **Flow ID**: `USER-REDEEM-001`  
 **Priority**: Critical  
-**Participants**: End User, QC, Watchdog, BasicRedemptionPolicy
+**Participants**: End User, QC, Watchdog
 
 #### 3.4.1 Happy Path
 
 1. **User Initiates Redemption**
 
-   - User calls `QCRedeemer.initiateRedemption(qc, amount, userBtcAddress)`
-   - QCRedeemer burns user's tBTC tokens immediately
+   - User calls `initiateRedemption(qc, amount, userBtcAddress)`
+   - System burns user's tBTC tokens immediately
    - Creates redemption record with `Pending` status
-   - Generates unique collision-resistant redemption ID
+   - Generates unique redemption ID
    - Event: `RedemptionRequested`
 
 2. **QC Fulfillment Process**
 
-   - QC monitors for redemption requests (via events or API notifications)
-   - QC sends Bitcoin to user's specified Bitcoin address within `redemptionTimeout` (7 days)
-   - QC notifies watchdog of fulfillment transaction details
+   - QC monitors for redemption requests
+   - QC sends Bitcoin to user's specified address within timeout period (7 days)
+   - QC notifies watchdog of fulfillment
 
 3. **Watchdog Verification and Completion**
-   - Watchdog monitors Bitcoin network for fulfillment transaction
-   - On successful payment: calls `BasicRedemptionPolicy.recordFulfillment(redemptionId, userBtcAddress, expectedAmount, txInfo, spvProof)` with `ARBITER_ROLE`
-   - SPV proof validates Bitcoin transaction inclusion
+   - Watchdog monitors Bitcoin network for fulfillment
+   - Records successful payment in the system
    - Redemption status changes to `Fulfilled`
-   - Event: `RedemptionFulfilledByPolicy`
+   - Event: `RedemptionFulfilled`
 
 **Script Requirements**:
 
 - Mock Bitcoin network transactions
-- Generate SPV proofs for fulfillment verification
-- Test redemption ID generation and collision resistance
+- Test redemption ID generation and uniqueness
 - Validate token burning and state transitions
+- Test fulfillment recording process
 
 #### 3.4.2 Timeout Scenarios
 
@@ -266,7 +282,7 @@ UnderReview → Active/Revoked (Council decision)
 - Validate graduated consequence logic (1st, 2nd, 3rd defaults)
 - Test QC recovery paths (backlog clearance)
 - Test 90-day penalty window expiration
-- Validate network continuity (60% states allow fulfillment)
+- **⚠️ CRITICAL BUG**: Flow states MintingPaused can fulfill, but code only allows Active+UnderReview (line 439-441)
 
 ### 3.5 Wallet Management Flow
 
@@ -294,36 +310,92 @@ UnderReview → Active/Revoked (Council decision)
 - Validate solvency checks during deregistration
 - Test race condition prevention
 
-### 3.6 QC Self-Pause Flow (5-State Model)
+### 3.6 QC Information and Status Queries
+
+**Flow ID**: `QC-INFO-001`  
+**Priority**: High  
+**Participants**: QC, Users, System Monitors
+
+#### 3.6.1 QC Status Queries
+
+1. **Check QC Status**
+
+   - Anyone can call `getQCStatus(qc)` to get current status
+   - Returns: Active, MintingPaused, Paused, UnderReview, or Revoked
+   - Used for operational decisions and monitoring
+
+2. **Check QC Capabilities**
+
+   - `canQCMint(qc)` - Returns if QC can currently mint tokens
+   - `canQCFulfill(qc)` - Returns if QC can fulfill redemptions
+   - Used to determine available operations
+
+3. **Get Complete QC Information**
+
+   - `getQCInfo(qc)` returns comprehensive QC data:
+     - Current status and capabilities
+     - Minting limits and current usage
+     - Registration timestamp
+     - Associated Bitcoin wallets
+
+#### 3.6.2 Redemption Status Queries
+
+**⚠️ Implementation Status**: The following IQCRedeemer interface methods are currently implemented with placeholder stubs for development purposes:
+
+1. **Check Unfulfilled Redemptions**
+
+   - `hasUnfulfilledRedemptions(qc)` - Currently returns `false` (safe default)
+   - **TODO**: Requires QC-to-redemptions mapping for production
+   - Used for operational planning and status assessment
+
+2. **Get Redemption Deadlines**
+
+   - `getEarliestRedemptionDeadline(qc)` - Currently returns `0` (no deadlines)
+   - **TODO**: Requires deadline field in Redemption struct
+   - Used for prioritizing fulfillment operations
+
+3. **Count Pending Redemptions**
+
+   - `getPendingRedemptionCount(qc)` - Currently returns `0` (no pending)
+   - **TODO**: Requires QC redemption counters for production
+   - Used for workload assessment
+
+**Script Requirements**:
+
+- Test all query functions return expected data (noting current stub implementations)
+- Validate QC status and capability queries work across all QC states  
+- Test actual query functions: `getQCStatus()`, `canQCMint()`, `canQCFulfill()`, `getQCInfo()`
+- **Note**: Redemption query functions currently return static values per TODOs
+
+### 3.7 QC Self-Pause Flow (5-State Model)
 
 **Flow ID**: `QC-PAUSE-001`  
 **Priority**: Critical  
 **Participants**: QC, QCStateManager, WatchdogEnforcer
 
-#### 3.6.1 Routine Maintenance (MintingPaused)
+#### 3.7.1 Routine Maintenance (MintingPaused)
 
 1. **QC Self-Initiates Pause**
-   - QC calls `QCStateManager.selfPause(PauseLevel.MintingOnly, "ROUTINE_MAINTENANCE")`
+   - QC calls `selfPause(PauseLevel.MintingOnly)`
    - Consumes 1 renewable pause credit
    - QC status changes to `MintingPaused`
    - Can still fulfill redemptions (network continuity)
    - 48h timer starts
 
 2. **Early Resume**
-   - QC can call `QCStateManager.resumeSelfPause()` anytime before 48h
+   - QC can call `resumeSelfPause()` anytime before 48h
    - QC status returns to `Active`
    - 48h timer cleared
 
 3. **Auto-Escalation**
    - If not resumed within 48h
-   - Watchdog calls `WatchdogEnforcer.checkQCEscalations([qc])`
-   - QC status auto-escalates to `UnderReview`
+   - System auto-escalates to `UnderReview`
    - Council intervention required
 
-#### 3.6.2 Critical Maintenance (Full Pause)
+#### 3.7.2 Critical Maintenance (Full Pause)
 
 1. **QC Escalates to Full Pause**
-   - QC calls `QCStateManager.selfPause(PauseLevel.Full, "CRITICAL_MAINTENANCE")`
+   - QC calls `selfPause(PauseLevel.Complete)`
    - QC status changes to `Paused`
    - Cannot mint OR fulfill redemptions
    - 48h timer starts
@@ -338,9 +410,84 @@ UnderReview → Active/Revoked (Council decision)
 - Validate 48h auto-escalation timers
 - Test early resume capabilities
 - Validate network continuity (MintingPaused can fulfill)
-- Test watchdog escalation monitoring
+- Test escalation monitoring
 
-### 3.7 Policy Upgrade Flow
+### 3.8 QC Renewable Pause Credits
+
+**Flow ID**: `QC-CREDITS-001`  
+**Priority**: High  
+**Participants**: QC, System
+
+#### 3.8.1 Pause Credit Management
+
+1. **Credit Check**
+
+   - QC calls `canSelfPause(qc)` to check available credits
+   - Returns true if QC has unused pause credits
+   - Each QC gets 1 credit per 90-day period
+
+2. **Credit Consumption**
+
+   - Self-pause consumes 1 credit
+   - Credit is used regardless of pause duration
+   - Early resume doesn't restore the credit
+
+3. **Credit Renewal**
+
+   - Credits automatically renew every 90 days
+   - Renewal based on original registration timestamp
+   - `getPauseInfo(qc)` returns credit status and renewal date
+
+**Script Requirements**:
+
+- Test 90-day renewal cycles
+- Validate credit consumption and tracking
+- Test edge cases around renewal timing
+
+### 3.9 QC Auto-Escalation and Recovery
+
+**Flow ID**: `QC-ESCALATION-001`  
+**Priority**: Critical  
+**Participants**: QC, Watchdog, Council
+
+#### 3.9.1 Auto-Escalation Monitoring
+
+1. **Escalation Eligibility Check**
+
+   - Anyone can call `isEligibleForEscalation(qc)` to check
+   - Returns true if QC has been paused beyond timeout (48h)
+   - Used by watchdogs to identify escalation candidates
+
+2. **Escalation Execution**
+
+   - Watchdog calls escalation function for eligible QCs
+   - QC status transitions from MintingPaused/Paused to UnderReview
+   - QC loses ability to self-resume
+   - Council intervention now required
+
+#### 3.9.2 Recovery from UnderReview
+
+1. **Backlog Assessment**
+
+   - Council reviews QC's operational status
+   - Checks if redemption backlogs are resolved
+   - Verifies QC operational readiness
+
+2. **Status Restoration**
+
+   - Council calls `clearBacklog(qc)` if QC is ready
+   - QC status returns to `Active`
+   - QC can resume normal operations
+   - Pause timeout tracking is cleared
+
+**Script Requirements**:
+
+- Test escalation eligibility detection
+- Validate automatic status transitions
+- Test council restoration process
+- Verify timeout clearing
+
+### 3.10 Policy Upgrade Flow
 
 **Flow ID**: `POLICY-UPGRADE-001`  
 **Priority**: High  
@@ -473,6 +620,116 @@ UnderReview → Active/Revoked (Council decision)
 - Validate no service interruption
 - Test role management
 
+### 5.3 Zero Balance Attestation Lifecycle
+
+**Flow ID**: `ZERO-BALANCE-001`  
+**Priority**: High  
+**Participants**: Attesters, New QCs, Retiring QCs
+
+#### 5.3.1 New QC Monitoring
+
+1. **Initial Zero Balance**
+
+   - Newly registered QC has no Bitcoin funds yet
+   - Attesters can submit zero balance attestations
+   - Enables monitoring from day one of registration
+   - Prevents monitoring blind spots during onboarding
+
+2. **First Funding Detection**
+
+   - Attesters monitor for initial Bitcoin deposits
+   - Normal attestation process begins once funds received
+   - Seamless transition from zero to positive balance tracking
+
+#### 5.3.2 QC Wind-Down Process
+
+1. **Balance Reduction Monitoring**
+
+   - QC reduces Bitcoin holdings during wind-down
+   - Attesters continue monitoring as balance approaches zero
+   - Maintains visibility through complete lifecycle
+
+2. **Final Zero Balance**
+
+   - QC completes operations and reaches zero balance
+   - Attesters can confirm zero balance state
+   - Enables clean operational closure without monitoring gaps
+
+**Script Requirements**:
+
+- Test zero balance attestation acceptance
+- Validate transition from zero to positive balances
+- Test complete lifecycle monitoring
+- Ensure no monitoring blind spots
+
+### 5.4 Emergency Consensus Flow
+
+**Flow ID**: `EMERGENCY-CONSENSUS-001`  
+**Priority**: Critical  
+**Participants**: Arbiter, QCReserveLedger
+
+#### 5.4.1 Force Consensus Mechanism
+
+1. **Consensus Failure Detection**
+
+   - Normal attestation process fails to reach consensus threshold
+   - Attesters unavailable or disputed attestations prevent agreement
+   - System requires reserve update for critical operations
+
+2. **Arbiter Intervention**
+
+   - ARBITER role holder identifies consensus failure
+   - Calls `forceConsensus(qc)` 
+   - Requires at least one valid attestation to prevent arbitrary updates
+
+3. **Emergency Consensus Applied**
+
+   - Uses available attestations (even if below normal threshold)
+   - Updates reserve balance with forced consensus
+   - Events: `ForcedConsensusReached`, `ReserveUpdated`
+
+**Script Requirements**:
+
+- Test with partial attester availability
+- Validate minimum attestation requirement
+- Ensure ARBITER role authorization
+- Test prevention of arbitrary reserve updates
+
+### 5.5 QC Backlog Clearance Flow
+
+**Flow ID**: `QC-BACKLOG-001`  
+**Priority**: High  
+**Participants**: Council, QC
+
+#### 5.5.1 Council Review and Restoration
+
+1. **Review Process**
+
+   - Council reviews QC in UnderReview status
+   - Assesses redemption backlog resolution
+   - Verifies operational readiness
+   - Confirms reserve adequacy
+
+2. **Status Restoration**
+
+   - Council calls `clearBacklog(qc)` for eligible QCs
+   - QC status returns from UnderReview to Active
+   - QC regains full operational capabilities
+   - All timeout tracking is cleared
+
+3. **Monitoring Resumption**
+
+   - QC can resume normal minting operations
+   - Reserve monitoring continues normally
+   - Self-pause capabilities restored
+
+**Script Requirements**:
+
+- Test council review process
+- Validate status restoration
+- Test operational capability restoration
+- Verify timeout clearing
+
 ---
 
 ## 6. Implementation Requirements
@@ -536,122 +793,37 @@ export default config
 ```typescript
 // scripts/deploy-account-control.ts
 import { ethers } from "hardhat"
-import {
-  ProtocolRegistry,
-  QCManager,
-  QCData,
-  SystemState,
-  QCMinter,
-  QCRedeemer,
-  BasicMintingPolicy,
-  BasicRedemptionPolicy,
-  QCReserveLedger,
-  SingleWatchdog,
-} from "../typechain"
 
 export async function deployAccountControlSystem() {
   console.log("Deploying Account Control System...")
 
-  // Phase 1: Core Infrastructure
-  const ProtocolRegistry = await ethers.getContractFactory("ProtocolRegistry")
-  const protocolRegistry = await ProtocolRegistry.deploy()
-  await protocolRegistry.deployed()
-  console.log("ProtocolRegistry deployed to:", protocolRegistry.address)
+  // Deploy core components
+  const qcData = await deployContract("QCData")
+  const systemState = await deployContract("SystemState")
+  const qcReserveLedger = await deployContract("QCReserveLedger")
+  const qcManager = await deployContract("QCManager")
+  const qcMinter = await deployContract("QCMinter")
+  const qcRedeemer = await deployContract("QCRedeemer")
+  const watchdogEnforcer = await deployContract("WatchdogEnforcer")
 
-  // Phase 2: State Management
-  const QCData = await ethers.getContractFactory("QCData")
-  const qcData = await QCData.deploy()
-  await qcData.deployed()
+  // Configure roles and permissions
+  await configureSystemRoles()
 
-  const SystemState = await ethers.getContractFactory("SystemState")
-  const systemState = await SystemState.deploy()
-  await systemState.deployed()
-
-  const QCManager = await ethers.getContractFactory("QCManager")
-  const qcManager = await QCManager.deploy(protocolRegistry.address)
-  await qcManager.deployed()
-
-  // Phase 3: Entry Points
-  const QCMinter = await ethers.getContractFactory("QCMinter")
-  const qcMinter = await QCMinter.deploy(protocolRegistry.address)
-  await qcMinter.deployed()
-
-  const QCRedeemer = await ethers.getContractFactory("QCRedeemer")
-  const qcRedeemer = await QCRedeemer.deploy(protocolRegistry.address)
-  await qcRedeemer.deployed()
-
-  // Phase 4: Policy Layer
-  const BasicMintingPolicy = await ethers.getContractFactory(
-    "BasicMintingPolicy"
-  )
-  const basicMintingPolicy = await BasicMintingPolicy.deploy(
-    protocolRegistry.address
-  )
-  await basicMintingPolicy.deployed()
-
-  const BasicRedemptionPolicy = await ethers.getContractFactory(
-    "BasicRedemptionPolicy"
-  )
-  const basicRedemptionPolicy = await BasicRedemptionPolicy.deploy(
-    protocolRegistry.address
-  )
-  await basicRedemptionPolicy.deployed()
-
-  const QCReserveLedger = await ethers.getContractFactory("QCReserveLedger")
-  const qcReserveLedger = await QCReserveLedger.deploy(protocolRegistry.address)
-  await qcReserveLedger.deployed()
-
-  // Phase 5: Watchdog
-  const SingleWatchdog = await ethers.getContractFactory("SingleWatchdog")
-  const singleWatchdog = await SingleWatchdog.deploy(protocolRegistry.address)
-  await singleWatchdog.deployed()
-
-  // Phase 6: Service Registration
-  await configureServices(protocolRegistry, {
-    qcData,
-    systemState,
-    qcManager,
-    qcMinter,
-    qcRedeemer,
-    basicMintingPolicy,
-    basicRedemptionPolicy,
-    qcReserveLedger,
-    singleWatchdog,
-  })
+  console.log("Account Control System deployed successfully")
 
   return {
-    protocolRegistry,
     qcData,
     systemState,
     qcManager,
     qcMinter,
     qcRedeemer,
-    basicMintingPolicy,
-    basicRedemptionPolicy,
     qcReserveLedger,
-    singleWatchdog,
+    watchdogEnforcer,
   }
 }
-
-async function configureServices(registry: ProtocolRegistry, contracts: any) {
-  // Register all services
-  await registry.setService(
-    ethers.utils.id("QC_DATA"),
-    contracts.qcData.address
-  )
-  await registry.setService(
-    ethers.utils.id("SYSTEM_STATE"),
-    contracts.systemState.address
-  )
-  await registry.setService(
-    ethers.utils.id("QC_MANAGER"),
-    contracts.qcManager.address
-  )
-  // ... register all other services
-
-  console.log("All services registered in ProtocolRegistry")
-}
 ```
+
+**Note**: The actual deployment is split across multiple scripts (95-99) in the `deploy/` directory.
 
 ### 6.3 Test Data Generation
 
@@ -833,36 +1005,36 @@ export class MintingFlow extends BaseFlowTest {
   async executeFlow() {
     console.log("🚀 Starting QC Minting Flow")
 
-    const { qcMinter, qcReserveLedger, tbtc } = this.contracts
-    const { qc, user, watchdog } = this.signers
+    const { qcMinter, tbtc } = this.contracts
+    const { qc, user } = this.signers
 
     // Prerequisites: QC must be onboarded and have reserves
     await this.setupQCWithReserves()
 
-    // Step 1: User requests minting
-    console.log("Step 1: User requesting mint...")
+    // Step 1: QC requests minting on behalf of user
+    console.log("Step 1: QC requesting mint for user...")
     const mintAmount = ethers.utils.parseEther("10")
 
     const initialBalance = await tbtc.balanceOf(user.address)
 
-    await qcMinter.connect(user).requestQCMint(qc.address, mintAmount)
+    await qcMinter.connect(qc).requestQCMint(qc.address, mintAmount)
     console.log("✅ Mint request submitted")
 
-    // Step 2: Verify minting completed
+    // Step 2: Verify user received tokens
     const finalBalance = await tbtc.balanceOf(user.address)
     const mintedAmount = finalBalance.sub(initialBalance)
 
     expect(mintedAmount).to.equal(mintAmount)
     console.log(
-      `✅ Successfully minted ${ethers.utils.formatEther(mintedAmount)} tBTC`
+      `✅ User received ${ethers.utils.formatEther(mintedAmount)} tBTC`
     )
 
     console.log("🎉 Minting Flow completed successfully")
   }
 
   async setupQCWithReserves() {
-    // This would be implemented to:
-    // 1. Register QC
+    // Setup steps:
+    // 1. Register QC in the system
     // 2. Register Bitcoin wallet
     // 3. Submit reserve attestation
     // ... setup code
@@ -876,20 +1048,19 @@ export class MintingFlow extends BaseFlowTest {
 // scripts/flows/redemption-flow.ts
 import { BaseFlowTest } from "./base-flow-test"
 import { ethers } from "hardhat"
-import { time } from "@nomicfoundation/hardhat-network-helpers"
 
 export class RedemptionFlow extends BaseFlowTest {
   async executeFlow() {
     console.log("🚀 Starting Redemption Flow")
 
-    const { qcRedeemer, basicRedemptionPolicy, tbtc } = this.contracts
+    const { qcRedeemer } = this.contracts
     const { qc, user, watchdog } = this.signers
 
     // Prerequisites: User must have tBTC tokens
     await this.setupUserWithTokens()
 
     // Step 1: User initiates redemption
-    console.log("Step 1: User initiating redemption...")
+    console.log("Step 1: User requesting redemption...")
     const redeemAmount = ethers.utils.parseEther("5")
     const btcReceiveAddress = "tb1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
@@ -901,50 +1072,145 @@ export class RedemptionFlow extends BaseFlowTest {
     const event = receipt.events?.find((e) => e.event === "RedemptionRequested")
     const redemptionId = event?.args?.redemptionId
 
-    console.log(`✅ Redemption initiated with ID: ${redemptionId}`)
+    console.log(`✅ Redemption requested with ID: ${redemptionId}`)
 
-    // Step 2: Verify redemption state
+    // Step 2: Verify redemption is pending
     const redemption = await qcRedeemer.getRedemption(redemptionId)
     expect(redemption.status).to.equal(1) // Pending
-    expect(redemption.amount).to.equal(redeemAmount)
-    console.log("✅ Redemption record created with Pending status")
+    console.log("✅ Redemption is pending QC fulfillment")
 
-    // Step 3: Simulate QC fulfillment
-    console.log("Step 3: Simulating QC fulfillment...")
-    const fulfillmentProof = this.generateFulfillmentProof(
-      redemptionId,
-      btcReceiveAddress,
-      redeemAmount
-    )
-
-    await basicRedemptionPolicy
+    // Step 3: Simulate QC fulfillment on Bitcoin network
+    console.log("Step 3: QC fulfills redemption on Bitcoin...")
+    
+    // Watchdog records the fulfillment with SPV proof
+    const mockTxInfo = this.generateMockBitcoinTx()
+    const mockProof = this.generateMockSPVProof()
+    
+    await qcRedeemer
       .connect(watchdog)
-      .recordFulfillment(redemptionId, fulfillmentProof)
+      .recordRedemptionFulfillment(
+        redemptionId,
+        btcReceiveAddress,
+        redeemAmount,
+        mockTxInfo,
+        mockProof
+      )
 
-    // Step 4: Verify fulfillment
+    // Step 4: Verify redemption completed
     const updatedRedemption = await qcRedeemer.getRedemption(redemptionId)
     expect(updatedRedemption.status).to.equal(2) // Fulfilled
-    console.log("✅ Redemption fulfilled successfully")
+    console.log("✅ Redemption fulfilled - user received Bitcoin")
 
     console.log("🎉 Redemption Flow completed successfully")
   }
 
   async setupUserWithTokens() {
-    // Mint tokens for user via QC
+    // Give user tBTC tokens for redemption
     // ... setup code
   }
 
-  generateFulfillmentProof(
-    redemptionId: string,
-    btcAddress: string,
-    amount: any
-  ) {
-    // Generate mock SPV proof for Bitcoin transaction
+  generateMockBitcoinTx() {
+    // Return mock BitcoinTx.Info structure
     return {
-      txHash: "0x" + "1".repeat(64),
-      merkleProof: ["0x" + "a".repeat(64)],
-      blockHeader: "0x" + "0".repeat(160),
+      version: "0x01000000",
+      inputVector: "0x...", // Mock input data
+      outputVector: "0x...", // Mock output data
+      locktime: "0x00000000"
     }
+  }
+
+  generateMockSPVProof() {
+    // Return mock BitcoinTx.Proof structure
+    return {
+      merkleProof: "0x...", // Mock merkle proof
+      txIndexInBlock: 0,
+      bitcoinHeaders: "0x..." // Mock block headers
+    }
+  }
+}
+```
+
+### 7.5 QC Status Monitoring Script
+
+```typescript
+// scripts/flows/qc-status-monitoring.ts
+import { BaseFlowTest } from "./base-flow-test"
+import { ethers } from "hardhat"
+
+export class QCStatusMonitoring extends BaseFlowTest {
+  async executeFlow() {
+    console.log("🚀 Starting QC Status Monitoring Flow")
+
+    const { qcData, qcRedeemer } = this.contracts
+    const { qc } = this.signers
+
+    // Step 1: Query QC status
+    console.log("Step 1: Checking QC status...")
+    const status = await qcData.getQCStatus(qc.address)
+    console.log(`QC Status: ${status}`) // 0=Active, 1=MintingPaused, etc.
+
+    // Step 2: Check QC capabilities
+    console.log("Step 2: Checking QC capabilities...")
+    const canMint = await qcData.canQCMint(qc.address)
+    const canFulfill = await qcData.canQCFulfill(qc.address)
+    console.log(`Can mint: ${canMint}, Can fulfill: ${canFulfill}`)
+
+    // Step 3: Get complete QC information
+    console.log("Step 3: Getting complete QC info...")
+    const qcInfo = await qcData.getQCInfo(qc.address)
+    console.log(`QC Info - Status: ${qcInfo.status}, Minted: ${qcInfo.mintedAmount}`)
+
+    // Step 4: Check redemption status (Note: Currently stubbed implementations)
+    console.log("Step 4: Checking redemption status...")
+    const hasUnfulfilled = await qcRedeemer.hasUnfulfilledRedemptions(qc.address)
+    const pendingCount = await qcRedeemer.getPendingRedemptionCount(qc.address)
+    console.log(`Has unfulfilled: ${hasUnfulfilled}, Pending count: ${pendingCount}`)
+    console.log("⚠️ Note: Redemption status functions currently return static values per TODOs")
+
+    console.log("🎉 QC Status Monitoring completed successfully")
+  }
+}
+```
+
+### 7.6 Self-Pause and Recovery Script
+
+```typescript
+// scripts/flows/qc-self-pause.ts
+import { BaseFlowTest } from "./base-flow-test"
+import { time } from "@nomicfoundation/hardhat-network-helpers"
+
+export class QCSelfPauseFlow extends BaseFlowTest {
+  async executeFlow() {
+    console.log("🚀 Starting QC Self-Pause Flow")
+
+    const { qcRenewablePause, qcStateManager } = this.contracts
+    const { qc } = this.signers
+
+    // Step 1: Check pause credits
+    console.log("Step 1: Checking pause credits...")
+    const canPause = await qcRenewablePause.canSelfPause(qc.address)
+    console.log(`QC can self-pause: ${canPause}`)
+
+    if (!canPause) {
+      console.log("❌ No pause credits available")
+      return
+    }
+
+    // Step 2: Initiate self-pause
+    console.log("Step 2: Initiating self-pause...")
+    await qcStateManager.connect(qc).selfPause(0) // MintingOnly level
+    console.log("✅ QC paused for maintenance")
+
+    // Step 3: Check pause info
+    const pauseInfo = await qcStateManager.getQCPauseInfo(qc.address)
+    console.log(`Pause started at: ${pauseInfo.pauseTimestamp}`)
+
+    // Step 4: Early resume
+    console.log("Step 4: Resuming early...")
+    await qcStateManager.connect(qc).resumeSelfPause()
+    console.log("✅ QC resumed operations")
+
+    console.log("🎉 Self-Pause Flow completed successfully")
   }
 }
 ```
@@ -1035,9 +1301,78 @@ runAllFlows().catch(console.error)
 
 ---
 
-## 9. Implementation Checklist
+## 9. System Status
 
-### 9.1 Development Phases
+### 9.1 Current Deployment
+
+The Account Control system is deployed with the following components:
+
+**Active Components**:
+- QC registration and management
+- Minting operations for qualified custodians
+- User redemption processing
+- Reserve attestation and monitoring
+- Watchdog enforcement for collateralization
+
+### 9.2 Known Limitations and Implementation Status
+
+#### 9.2.1 Fully Implemented Features ✅
+
+- **QC Status Management**: Complete 5-state model (Active, MintingPaused, Paused, UnderReview, Revoked)
+- **QC Capability Queries**: `canQCMint()` and `canQCFulfill()` functions working correctly
+- **Self-Pause System**: Complete with renewable credits (90-day cycles) and auto-escalation
+- **Reserve Attestation**: Multi-attester consensus with zero balance support
+- **Minting Operations**: Direct Bank integration with full validation
+- **Redemption Core**: Token burning and redemption request creation
+
+#### 9.2.2 CRITICAL IMPLEMENTATION BUGS 🚨
+
+**URGENT**: The following critical discrepancies between documentation and code implementation were discovered during deep scrutiny:
+
+**Bug #1 - Flow 3.1 QC Onboarding**: 
+- **Documentation Claims**: "Pause Credit Initialization - QC receives initial renewable pause credit - Credit available immediately after registration"
+- **Actual Implementation**: `QCRenewablePause.grantInitialCredit(qc)` must be called manually by admin (DEFAULT_ADMIN_ROLE)
+- **Impact**: QCs cannot self-pause after registration without manual admin action
+- **Location**: QCRenewablePause.sol line 271-280
+
+**Bug #2 - Flow 3.3 QC Minting**: 
+- **Documentation Claims**: "QC calls requestQCMint with appropriate permissions" 
+- **Actual Implementation**: QCs must be manually granted MINTER_ROLE after registration
+- **Impact**: Registered QCs cannot mint without separate role granting step
+- **Location**: QCMinter.sol line 148-155, deploy script line 158-159
+
+**Bug #3 - Flow 3.4 User Redemption (MOST CRITICAL)**:
+- **Documentation Claims**: "MintingPaused QCs can fulfill redemptions (network continuity)"
+- **Actual Implementation**: Only Active OR UnderReview QCs can redeem (line 439-441)
+- **Impact**: BREAKS NETWORK CONTINUITY - MintingPaused QCs cannot fulfill redemptions
+- **Location**: QCRedeemer.sol _validateRedemptionRequest() function
+- **Contradiction**: canQCFulfill() allows MintingPaused but redemption validation rejects it
+
+#### 9.2.3 Stubbed/Pending Implementation ⚠️
+
+**SPV Proof Verification**: Currently stubbed in multiple contracts
+- `QCManager.registerWallet()` - SPV validation returns true (line 184)
+- `QCRedeemer._verifySPVProof()` - Always returns true (line 582-585)
+- **Impact**: Bitcoin transaction validation not enforced
+- **Status**: TODO for production implementation
+
+**IQCRedeemer Interface Methods**: Placeholder implementations in QCRedeemer
+- `hasUnfulfilledRedemptions(qc)` - Always returns false (line 625)
+- `getEarliestRedemptionDeadline(qc)` - Always returns 0 (line 640)
+- `getPendingRedemptionCount(qc)` - Always returns 0 (line 653)
+- **Impact**: QC workload assessment and deadline tracking unavailable
+- **Status**: Requires additional data structures for production
+
+#### 9.2.3 Testing Considerations
+
+- **Script Development**: Use actual contract functions as documented
+- **Redemption Monitoring**: Expect static values from IQCRedeemer interface methods
+- **SPV Testing**: All SPV-related functions will pass validation (stubbed)
+- **Production Readiness**: Core functionality complete, monitoring features require implementation
+
+## 10. Implementation Checklist
+
+### 10.1 Development Phases
 
 **Phase 1: Infrastructure Setup** (Week 1)
 
@@ -1074,7 +1409,7 @@ runAllFlows().catch(console.error)
 - [ ] Report generation
 - [ ] Documentation completion
 
-### 9.2 Success Metrics
+### 10.2 Success Metrics
 
 - **Functional Coverage**: 100% of critical user flows tested
 - **Error Coverage**: All identified error scenarios validated

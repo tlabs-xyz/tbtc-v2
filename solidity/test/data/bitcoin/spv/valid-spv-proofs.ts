@@ -126,11 +126,11 @@ export const P2PKHWalletControlProof: SPVProofTestData = {
   },
   proof: {
     // Simplified proof data for testing - in production these would be real values
-    merkleProof: "0x" + "a".repeat(640), // 320 bytes of mock merkle proof
+    merkleProof: `0x${"a".repeat(640)}`, // 320 bytes of mock merkle proof
     txIndexInBlock: 42,
-    bitcoinHeaders: "0x" + "b".repeat(1280), // 640 bytes of headers (8 headers)
-    coinbasePreimage: "0x" + "c".repeat(64),
-    coinbaseProof: "0x" + "d".repeat(640),
+    bitcoinHeaders: `0x${"b".repeat(1280)}`, // 640 bytes of headers (8 headers)
+    coinbasePreimage: `0x${"c".repeat(64)}`,
+    coinbaseProof: `0x${"d".repeat(640)}`,
   },
   expectedTxHash:
     "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
@@ -188,11 +188,11 @@ export const ComplexMultiInputTx: SPVProofTestData = {
     locktime: "0x00000000",
   },
   proof: {
-    merkleProof: "0x" + "e".repeat(800), // 400 bytes
+    merkleProof: `0x${"e".repeat(800)}`, // 400 bytes
     txIndexInBlock: 123,
-    bitcoinHeaders: "0x" + "f".repeat(1920), // 960 bytes (12 headers)
-    coinbasePreimage: "0x" + "1".repeat(64),
-    coinbaseProof: "0x" + "2".repeat(800),
+    bitcoinHeaders: `0x${"f".repeat(1920)}`, // 960 bytes (12 headers)
+    coinbasePreimage: `0x${"1".repeat(64)}`,
+    coinbaseProof: `0x${"2".repeat(800)}`,
   },
   expectedTxHash:
     "0xfedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",

@@ -85,11 +85,18 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
       to: bank.address,
       data: ethers.utils.defaultAbiCoder.encode(
         ["bytes4", "address"],
-        [ethers.utils.id("authorizedBalanceIncreasers(address)").slice(0, 10), qcMinter.address]
-      )
+        [
+          ethers.utils.id("authorizedBalanceIncreasers(address)").slice(0, 10),
+          qcMinter.address,
+        ]
+      ),
     })
-    
-    if (!isAuthorized || isAuthorized === "0x0000000000000000000000000000000000000000000000000000000000000000") {
+
+    if (
+      !isAuthorized ||
+      isAuthorized ===
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+    ) {
       log("QCMinter not yet authorized in Bank, requires governance action")
       log("TODO: Submit governance proposal to authorize QCMinter in Bank")
     } else {
@@ -148,7 +155,7 @@ export default func
 func.tags = ["ConfigureAccountControl"]
 func.dependencies = [
   "AccountControlCore",
-  "AccountControlState", 
+  "AccountControlState",
   "QCReserveLedger",
-  "WatchdogEnforcer"
+  "WatchdogEnforcer",
 ]

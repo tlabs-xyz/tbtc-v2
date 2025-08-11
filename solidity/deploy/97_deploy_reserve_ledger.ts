@@ -16,7 +16,7 @@ const func: DeployFunction = async function DeployQCReserveLedger(
     args: [],
     log: true,
   })
-  
+
   log(`✅ QCReserveLedger deployed at ${reserveLedger.address}`)
 }
 

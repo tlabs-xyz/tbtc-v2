@@ -30,8 +30,12 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   const QC_GOVERNANCE_ROLE = ethers.utils.id("QC_GOVERNANCE_ROLE")
 
   // First check if governance already has the role
-  const qcManager = await ethers.getContract("QCManager")
-  const governanceHasRole = await qcManager.hasRole(
+  const qcManager = await get("QCManager")
+  const qcManagerContract = await ethers.getContractAt(
+    "QCManager",
+    qcManager.address
+  )
+  const governanceHasRole = await qcManagerContract.hasRole(
     QC_GOVERNANCE_ROLE,
     governance
   )
@@ -50,7 +54,10 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   }
 
   // Optionally revoke from deployer
-  const deployerHasRole = await qcManager.hasRole(QC_GOVERNANCE_ROLE, deployer)
+  const deployerHasRole = await qcManagerContract.hasRole(
+    QC_GOVERNANCE_ROLE,
+    deployer
+  )
   if (deployerHasRole && deployer !== governance) {
     log("Revoking QC_GOVERNANCE_ROLE from deployer...")
     await execute(
@@ -74,7 +81,6 @@ const func: DeployFunction = async function TransferRolesToGovernance(
     "QCRedeemer",
     "SystemState",
     "WatchdogEnforcer",
-    "ProtocolRegistry",
     "QCMinter",
   ]
 
@@ -83,7 +89,11 @@ const func: DeployFunction = async function TransferRolesToGovernance(
 
   for (const contractName of contracts) {
     try {
-      const contract = await ethers.getContract(contractName)
+      const contractDeployment = await get(contractName)
+      const contract = await ethers.getContractAt(
+        contractName,
+        contractDeployment.address
+      )
       const governanceIsAdmin = await contract.hasRole(
         DEFAULT_ADMIN_ROLE,
         governance
@@ -111,7 +121,11 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   log("")
   log("Step 3: Transferring PAUSER_ROLE in SystemState...")
   const PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")
-  const systemState = await ethers.getContract("SystemState")
+  const systemStateDeployment = await get("SystemState")
+  const systemState = await ethers.getContractAt(
+    "SystemState",
+    systemStateDeployment.address
+  )
   const governanceHasPauserRole = await systemState.hasRole(
     PAUSER_ROLE,
     governance

@@ -4,10 +4,9 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "./interfaces/IQCData.sol";
-import "./interfaces/IQCRenewablePause.sol";
-import "./interfaces/IQCRedeemer.sol";
-import "./interfaces/IProtocolRegistry.sol";
+import "./QCData.sol";
+import "./QCRenewablePause.sol";
+import "./QCRedeemer.sol";
 
 /// @title QCStateManager
 /// @notice Manages the 5-state QC operational model with self-pause capability and auto-escalation
@@ -52,14 +51,14 @@ contract QCStateManager is
         Complete        // Pause all operations
     }
     
-    /// @dev QCStatus enum from IQCData interface
+    // QCStatus enum is defined in QCData contract
     // enum QCStatus { Active, MintingPaused, Paused, UnderReview, Revoked }
     
     // =================== STATE VARIABLES ===================
     
-    IQCData public qcData;
-    IQCRenewablePause public renewablePause;
-    IProtocolRegistry public protocolRegistry;
+    QCData public qcData;
+    QCRenewablePause public renewablePause;
+    QCRedeemer public qcRedeemer;
     
     /// @dev Track QC self-pause timeouts for auto-escalation
     mapping(address => uint256) public qcPauseTimestamp;
@@ -75,7 +74,7 @@ contract QCStateManager is
     event QCSelfPaused(
         address indexed qc,
         PauseLevel level,
-        IQCData.QCStatus newStatus,
+        QCData.QCStatus newStatus,
         uint256 timeout
     );
     
@@ -91,20 +90,20 @@ contract QCStateManager is
     
     event AutoEscalated(
         address indexed qc,
-        IQCData.QCStatus fromStatus,
-        IQCData.QCStatus toStatus
+        QCData.QCStatus fromStatus,
+        QCData.QCStatus toStatus
     );
     
     event DefaultProcessed(
         address indexed qc,
         bytes32 redemptionId,
-        IQCData.QCStatus oldStatus,
-        IQCData.QCStatus newStatus
+        QCData.QCStatus oldStatus,
+        QCData.QCStatus newStatus
     );
     
     event BacklogCleared(
         address indexed qc,
-        IQCData.QCStatus newStatus
+        QCData.QCStatus newStatus
     );
     
     // =================== INITIALIZATION ===================
@@ -117,14 +116,14 @@ contract QCStateManager is
     function initialize(
         address _qcData,
         address _renewablePause,
-        address _protocolRegistry
+        address _qcRedeemer
     ) external initializer {
         __AccessControl_init();
         __ReentrancyGuard_init();
         
-        qcData = IQCData(_qcData);
-        renewablePause = IQCRenewablePause(_renewablePause);
-        protocolRegistry = IProtocolRegistry(_protocolRegistry);
+        qcData = QCData(_qcData);
+        renewablePause = QCRenewablePause(_renewablePause);
+        qcRedeemer = QCRedeemer(_qcRedeemer);
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
@@ -137,8 +136,8 @@ contract QCStateManager is
         address qc = msg.sender;
         
         // Validate QC status
-        IQCData.QCStatus currentStatus = qcData.getQCStatus(qc);
-        if (currentStatus != IQCData.QCStatus.Active) {
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+        if (currentStatus != QCData.QCStatus.Active) {
             revert QCNotActive();
         }
         
@@ -151,9 +150,9 @@ contract QCStateManager is
         renewablePause.useEmergencyPause(qc, "SELF_MAINTENANCE");
         
         // Set appropriate state based on pause level
-        IQCData.QCStatus newStatus = (level == PauseLevel.MintingOnly) ? 
-            IQCData.QCStatus.MintingPaused : 
-            IQCData.QCStatus.Paused;
+        QCData.QCStatus newStatus = (level == PauseLevel.MintingOnly) ? 
+            QCData.QCStatus.MintingPaused : 
+            QCData.QCStatus.Paused;
         
         // Update QC status
         qcData.setQCStatus(qc, newStatus, SELF_PAUSE);
@@ -175,9 +174,9 @@ contract QCStateManager is
             revert CannotEarlyResume();
         }
         
-        IQCData.QCStatus currentStatus = qcData.getQCStatus(qc);
-        if (currentStatus != IQCData.QCStatus.MintingPaused && 
-            currentStatus != IQCData.QCStatus.Paused) {
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+        if (currentStatus != QCData.QCStatus.MintingPaused && 
+            currentStatus != QCData.QCStatus.Paused) {
             revert NotSelfPaused();
         }
         
@@ -187,7 +186,7 @@ contract QCStateManager is
         delete escalationWarningEmitted[qc];
         
         // Return to Active status
-        qcData.setQCStatus(qc, IQCData.QCStatus.Active, EARLY_RESUME);
+        qcData.setQCStatus(qc, QCData.QCStatus.Active, EARLY_RESUME);
         qcData.setQCSelfPaused(qc, false);
         
         // Notify renewable pause system
@@ -230,21 +229,21 @@ contract QCStateManager is
     
     /// @dev Internal function to perform auto-escalation
     function _performAutoEscalation(address qc) private {
-        IQCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
         
         // Auto-escalate based on current state
-        if (currentStatus == IQCData.QCStatus.MintingPaused || 
-            currentStatus == IQCData.QCStatus.Paused) {
+        if (currentStatus == QCData.QCStatus.MintingPaused || 
+            currentStatus == QCData.QCStatus.Paused) {
             
             // Escalate to UnderReview
-            qcData.setQCStatus(qc, IQCData.QCStatus.UnderReview, AUTO_ESCALATION);
+            qcData.setQCStatus(qc, QCData.QCStatus.UnderReview, AUTO_ESCALATION);
             
             // Clear early resume capability
             delete qcCanEarlyResume[qc];
             delete qcPauseTimestamp[qc];
             qcData.setQCSelfPaused(qc, false);
             
-            emit AutoEscalated(qc, currentStatus, IQCData.QCStatus.UnderReview);
+            emit AutoEscalated(qc, currentStatus, QCData.QCStatus.UnderReview);
         }
     }
     
@@ -258,18 +257,18 @@ contract QCStateManager is
         onlyRole(ARBITER_ROLE)
         nonReentrant
     {
-        IQCData.QCStatus currentStatus = qcData.getQCStatus(qc);
-        IQCData.QCStatus newStatus = currentStatus;
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+        QCData.QCStatus newStatus = currentStatus;
         
         // Progressive escalation logic
-        if (currentStatus == IQCData.QCStatus.Active || 
-            currentStatus == IQCData.QCStatus.MintingPaused) {
+        if (currentStatus == QCData.QCStatus.Active || 
+            currentStatus == QCData.QCStatus.MintingPaused) {
             // First default → UnderReview
-            newStatus = IQCData.QCStatus.UnderReview;
-        } else if (currentStatus == IQCData.QCStatus.UnderReview || 
-                   currentStatus == IQCData.QCStatus.Paused) {
+            newStatus = QCData.QCStatus.UnderReview;
+        } else if (currentStatus == QCData.QCStatus.UnderReview || 
+                   currentStatus == QCData.QCStatus.Paused) {
             // Second default → Revoked
-            newStatus = IQCData.QCStatus.Revoked;
+            newStatus = QCData.QCStatus.Revoked;
         }
         // Revoked QCs remain revoked
         
@@ -301,11 +300,11 @@ contract QCStateManager is
             revert HasPendingRedemptions();
         }
         
-        IQCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
         
         // Only UnderReview QCs can be cleared back to Active
-        if (currentStatus == IQCData.QCStatus.UnderReview) {
-            qcData.setQCStatus(qc, IQCData.QCStatus.Active, BACKLOG_CLEARED);
+        if (currentStatus == QCData.QCStatus.UnderReview) {
+            qcData.setQCStatus(qc, QCData.QCStatus.Active, BACKLOG_CLEARED);
             
             // Clear any remaining timeout tracking
             delete qcPauseTimestamp[qc];
@@ -313,7 +312,7 @@ contract QCStateManager is
             delete escalationWarningEmitted[qc];
             qcData.setQCSelfPaused(qc, false);
             
-            emit BacklogCleared(qc, IQCData.QCStatus.Active);
+            emit BacklogCleared(qc, QCData.QCStatus.Active);
         } else {
             revert InvalidStatus();
         }
@@ -341,10 +340,7 @@ contract QCStateManager is
     /// @param qc QC address
     /// @return hasUnfulfilled Whether QC has pending redemptions
     function hasUnfulfilledRedemptions(address qc) public view returns (bool) {
-        IQCRedeemer redeemer = IQCRedeemer(
-            protocolRegistry.getService("QC_REDEEMER")
-        );
-        return redeemer.hasUnfulfilledRedemptions(qc);
+        return qcRedeemer.hasUnfulfilledRedemptions(qc);
     }
     
     /// @notice Check if QC is eligible for escalation
