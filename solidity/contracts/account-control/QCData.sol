@@ -24,11 +24,13 @@ contract QCData is AccessControl {
     error WalletNotPendingDeregistration();
     error InvalidCapacity();
 
-    /// @dev QC status enumeration - simple 3-state model
+    /// @dev QC status enumeration - enhanced 5-state model
     enum QCStatus {
-        Active, // QC is fully operational with minting/redemption rights
-        UnderReview, // QC's minting rights are paused pending review
-        Revoked // QC's rights are permanently terminated
+        Active,         // 0 - Full operations (mint + fulfill)
+        MintingPaused,  // 1 - Can fulfill only (no new minting)
+        Paused,         // 2 - Complete halt (no operations)
+        UnderReview,    // 3 - Under governance review (no operations)
+        Revoked         // 4 - Terminal state (no operations)
     }
 
     /// @dev Wallet status enumeration - comprehensive 4-state model
@@ -44,7 +46,8 @@ contract QCData is AccessControl {
         uint256 totalMintedAmount; // Total tBTC minted by this QC
         uint256 maxMintingCapacity; // Maximum tBTC this QC can mint
         uint256 registeredAt; // Timestamp when QC was registered
-        QCStatus status; // Pack enum with next field
+        QCStatus status; // Current operational status
+        bool selfPaused; // True if QC initiated the pause
         string[] walletAddresses; // Array of registered wallet addresses
         mapping(string => WalletStatus) walletStatuses;
         mapping(string => uint256) walletRegistrationTimes;
@@ -454,5 +457,59 @@ contract QCData is AccessControl {
         return
             wallets[btcAddress].status == WalletStatus.Inactive &&
             wallets[btcAddress].registeredAt != 0;
+    }
+
+    // =================== 5-STATE MODEL FUNCTIONS ===================
+
+    /// @notice Set QC self-paused status
+    /// @param qc QC address
+    /// @param selfPaused True if QC initiated the pause
+    function setQCSelfPaused(address qc, bool selfPaused) external onlyRole(QC_MANAGER_ROLE) {
+        if (!isQCRegistered(qc)) {
+            revert QCNotRegistered();
+        }
+        custodians[qc].selfPaused = selfPaused;
+    }
+
+    /// @notice Check if QC can mint (Active or MintingPaused states with minting allowed)
+    /// @param qc QC address
+    /// @return canMint True if QC can mint new tokens
+    function canQCMint(address qc) external view returns (bool canMint) {
+        QCStatus status = custodians[qc].status;
+        return status == QCStatus.Active;
+    }
+
+    /// @notice Check if QC can fulfill redemptions 
+    /// @param qc QC address  
+    /// @return canFulfill True if QC can fulfill redemptions
+    function canQCFulfill(address qc) external view returns (bool canFulfill) {
+        QCStatus status = custodians[qc].status;
+        return status == QCStatus.Active || 
+               status == QCStatus.MintingPaused || 
+               status == QCStatus.UnderReview;
+    }
+
+    /// @notice Get comprehensive QC information for 5-state model
+    /// @param qc QC address
+    /// @return status Current QC status
+    /// @return selfPaused True if QC initiated current pause
+    /// @return mintedAmount Total amount minted by QC
+    /// @return maxCapacity Maximum minting capacity
+    /// @return registeredAt Registration timestamp
+    function getQCInfo(address qc) external view returns (
+        QCStatus status,
+        bool selfPaused,
+        uint256 mintedAmount,
+        uint256 maxCapacity,
+        uint256 registeredAt
+    ) {
+        Custodian storage custodian = custodians[qc];
+        return (
+            custodian.status,
+            custodian.selfPaused,
+            custodian.totalMintedAmount,
+            custodian.maxMintingCapacity,
+            custodian.registeredAt
+        );
     }
 }

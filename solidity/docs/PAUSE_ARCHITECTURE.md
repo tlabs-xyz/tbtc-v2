@@ -49,20 +49,20 @@ The tBTC v2 Account Control system implements a sophisticated **two-tier pause a
 
 ## Architecture Overview
 
-The pause architecture is implemented in `SystemState.sol` and provides granular control over system operations:
+The pause architecture combines the 5-state QC model with emergency response mechanisms:
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Pause Architecture                            │
-├─────────────────────────┬───────────────────────────────────────────┤
-│   Global Pauses         │        QC-Specific Pauses                 │
-│   (System-Wide)         │        (Individual Targets)               │
-├─────────────────────────┼───────────────────────────────────────────┤
-│ • pauseMinting()        │ • emergencyPauseQC(qc, reason)          │
-│ • pauseRedemption()     │ • emergencyUnpauseQC(qc)                 │
-│ • pauseRegistry()       │ • Modifier: qcNotEmergencyPaused(qc)     │
-│ • pauseWalletReg()      │ • Auto-expiry after 7 days               │
-└─────────────────────────┴───────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Multi-Layered Pause Architecture                         │
+├─────────────────────────┬─────────────────────────┬─────────────────────────┤
+│  5-State QC Model       │   Emergency Pauses      │   Global Pauses         │
+│  (Self-Managed)         │   (Council Override)    │   (System-Wide)         │
+├─────────────────────────┼─────────────────────────┼─────────────────────────┤
+│ • MintingPaused         │ • emergencyPauseQC()    │ • pauseMinting()        │
+│ • Paused (full)         │ • 7-day auto-expiry     │ • pauseRedemption()     │
+│ • 48h auto-escalation   │ • Council authority     │ • pauseRegistry()       │
+│ • Renewable credits     │ • Immediate effect      │ • Manual unpause        │
+└─────────────────────────┴─────────────────────────┴─────────────────────────┘
 ```
 
 ### Key Design Principles
@@ -72,6 +72,84 @@ The pause architecture is implemented in `SystemState.sol` and provides granular
 3. **Time-Limited**: All pauses auto-expire to prevent permanent lockdown
 4. **Role-Based**: Only PAUSER_ROLE (emergency council) can pause/unpause
 5. **Audit Trail**: Comprehensive event logging for all pause actions
+
+---
+
+## 5-State QC Model Integration
+
+### Overview
+
+The 5-state model provides QC-managed pause capabilities that complement the emergency pause system:
+
+### Self-Initiated Pause States
+
+#### MintingPaused State
+```solidity
+function selfPause(PauseLevel.MintingOnly) external
+// Effects:
+// - Cannot mint new tBTC
+// - CAN still fulfill redemptions (network continuity)
+// - Uses renewable pause credit
+// - 48h maximum duration before auto-escalation
+```
+
+**Purpose**: Routine maintenance without disrupting redemptions
+**When to Use**:
+- Wallet rotation or security updates
+- Reserve rebalancing operations
+- Technical maintenance on minting infrastructure
+- Compliance reviews that don't affect redemptions
+
+#### Paused State (Full Pause)
+```solidity
+function selfPause(PauseLevel.Full) external
+// Effects:
+// - Cannot mint OR fulfill redemptions
+// - Complete operational halt
+// - 48h timer starts for auto-escalation
+// - Can resume early via resumeSelfPause()
+```
+
+**Purpose**: Critical maintenance requiring full halt
+**When to Use**:
+- Major security incident response
+- Complete system migration
+- Critical infrastructure failure
+- Legal or regulatory freeze
+
+### Renewable Pause Credits
+
+```solidity
+struct PauseCredit {
+    uint256 availableCredits;     // Current available credits
+    uint256 lastCreditUsed;       // Timestamp of last use
+    uint256 lastCreditRenewal;    // Last renewal timestamp
+}
+```
+
+- **Initial Grant**: 1 credit on QC registration
+- **Renewal**: 1 new credit every 90 days
+- **Maximum**: 1 credit (no accumulation)
+- **Usage**: Consumed when self-pausing
+- **Recovery**: Must wait 90 days for renewal
+
+### Auto-Escalation Mechanism
+
+```
+Self-Pause Initiated
+        ↓
+48-Hour Timer Starts
+        ↓
+QC Can Resume Anytime (resumeSelfPause)
+        ↓
+If Not Resumed After 48h:
+        ↓
+Watchdog Calls checkQCEscalations()
+        ↓
+Auto-Escalate to UnderReview
+        ↓
+Council Intervention Required
+```
 
 ---
 
@@ -303,37 +381,47 @@ The two-tier design addresses fundamentally different threat models:
 - Timer cleanup and management functions
 - Integration documentation and examples
 
-### Coordinated Dual System Architecture
+### Coordinated Multi-Layer System Architecture
 
-The system now implements **coordinated dual QC disable mechanisms**:
+The system implements **three coordinated pause mechanisms** integrated with the 5-state model:
 
-1. **Status-Based System** (Active → UnderReview → Revoked)
+1. **5-State QC Model** (Active → MintingPaused → Paused/UnderReview → Revoked)
+   - Self-managed pauses with renewable credits
+   - 48-hour auto-escalation for unresolved issues
+   - Network continuity focus (60% of states allow fulfillment)
+   - Graduated consequences for defaults
 
-   - Used for policy violations and graduated enforcement
-   - Provides human oversight and nuanced state transitions
-   - Integrated with QCManager and watchdog enforcement
+2. **Emergency Pause System** (Council Override)
+   - Manual emergency pauses for security incidents
+   - 7-day auto-expiry to prevent permanent lockdown
+   - Immediate effect overriding QC state
+   - Reserved for critical interventions
 
-2. **Emergency Pause System** (Manual + Automated Escalation)
-   - Manual emergency pauses for security incidents (Emergency Council)
-   - Automated escalation for sustained critical violations (45-min delay)
-   - Immediate operational halt with auto-expiry safety net
+3. **Global Function Pauses** (System-Wide)
+   - Circuit breakers for protocol-level threats
+   - Affects all QCs simultaneously
+   - Manual unpause required
+   - Last resort for systemic issues
 
-**Graduated Response Flow**:
-
+**Integrated Response Flow**:
 ```
-INSUFFICIENT_RESERVES Detected
+QC Operational Issue
          ↓
-QC → UnderReview Status (45-minute grace period)
-         ↓ (if violation persists)
-Automatic Emergency Pause (blocks all operations)
+QC Self-Pause (MintingPaused/Paused)
+         ↓ (48h timer)
+Auto-Escalate to UnderReview (if not resolved)
+         ↓
+Council Can Emergency Pause (if critical)
+         ↓
+Global Pause (if systemic threat)
 ```
 
-This coordinated approach provides:
-
-- **Legal compliance** through human oversight windows
-- **Automated safety** for sustained critical violations
-- **Proportional response** matching intervention to threat severity
-- **Multiple independent safety mechanisms** for defense in depth
+This multi-layer approach provides:
+- **Self-Management** through renewable pause credits
+- **Network Continuity** via graduated state transitions
+- **Automated Safety** through 48h escalation timers
+- **Emergency Override** for critical interventions
+- **Defense in Depth** with multiple independent mechanisms
 
 ---
 
