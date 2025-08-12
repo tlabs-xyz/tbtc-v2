@@ -71,80 +71,7 @@ User → QCMinter → Bank → TBTCVault → tBTC Tokens
 
 ---
 
-## Slide 3: 5-State Operational Model
-### "QC Lifecycle for Network Continuity"
-
-#### State Overview
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    QC Operational States                        │
-├─────────────┬─────────────┬─────────────┬─────────────┬─────────┤
-│   Active    │ MintingPau  │   Paused    │UnderReview  │ Revoked │
-│             │    sed      │             │             │         │
-│ ✅ Mint     │ ❌ Mint     │ ❌ Mint     │ ❌ Mint     │ ❌ All  │
-│ ✅ Fulfill  │ ✅ Fulfill  │ ❌ Fulfill  │ ✅ Fulfill  │ ❌ All  │
-│             │             │             │             │         │
-│ Full Ops    │ Degraded    │ Maintenance │ Review      │Terminal │
-└─────────────┴─────────────┴─────────────┴─────────────┴─────────┘
-```
-
-- What is the difference between Active and MintingPaused? - MintingPaused is a self-initiated pause for routine maintenance.
-- What is the difference between Paused and UnderReview? - UnderReview is an auto-escalation after 48-hour timer expires.
-- What is the difference between Paused and Revoked? - Revoked is a manual termination by the Emergency Council (QC offboarding).
-
-#### State Transition Paths
-```
-Active ←→ MintingPaused (Self-pause for routine maintenance)
-   │
-   └→ MintingPaused → Paused (QC escalates for full maintenance)
-                        │
-                        └→ UnderReview (Auto-escalation after 48h)
-                              │
-                              ├→ Active (Council restores)
-                              └→ Revoked (Council terminates)
-```
-
-#### QC Self-Paused
-- QC can self-pause for operational flexibility.
-- Renewable Pause Credits: 1 credit per 90 days.
-- Auto-Escalation Timer: 48-hour maximum for self-initiated pauses.
-- Network Protection: Prevents indefinite service disruption.
-
----
-
-## Slide 4: State Transition Logic & Edge Cases
-### "Automated Escalation and Recovery Mechanisms"
-
-#### Transition Conditions & Timers
-
-**Automated Transitions:**
-- `Active → MintingPaused`: Reserve violation detected by WatchdogEnforcer
-- `Paused → UnderReview`: 48-hour auto-escalation timer expires
-- `MintingPaused → Active`: Reserve violation resolved + QC action
-
-**Manual Transitions:**
-- `Active → MintingPaused`: QC self-pause (uses renewable credit)
-- `MintingPaused → Paused`: QC requests full maintenance pause
-- `UnderReview → Active/Revoked`: Emergency Council decision
-
-#### Auto-Escalation Workflow
-```
-1. QC enters Paused state (self-initiated)
-2. 48-hour timer starts automatically
-3. Watchdog monitors: checkEscalation(qc)
-4. If unresolved → enforceObjectiveViolation(qc, AUTO_ESCALATION)
-5. QC transitions to UnderReview
-6. Emergency Council intervention required
-```
-
-#### Recovery Mechanisms
-- **Early Resume**: QCs can exit pause states before timer expiry
-- **Emergency Consensus**: ARBITER can force reserve consensus with available attestations
-- **Council Override**: Emergency Council can restore QCs after investigation
-
----
-
-## Slide 5: Actor Roles & Workflows
+## Slide 3: Actor Roles & Workflows
 ### "Who Does What in the System"
 
 #### Core Actors & Responsibilities
@@ -193,7 +120,7 @@ Active ←→ MintingPaused (Self-pause for routine maintenance)
 
 ---
 
-## Slide 6: Reserve Attestation
+## Slide 4: Reserve Attestation
 ### "Consensus, Enforcement, and Integration Mechanics"
 
 #### Multi-Attester Consensus
@@ -268,6 +195,79 @@ Bank.increaseBalanceAndCall(vault, [user], [satoshis]);
 - **Idempotent Operations**: Prevent front-running and replay attacks
 - **Event-Based Monitoring**: Complete audit trail for compliance
 - **Parameter Bounds**: Hard-coded limits prevent malicious configurations
+
+---
+
+## Slide 5: 5-State Operational Model
+### "QC Lifecycle for Network Continuity"
+
+#### State Overview
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    QC Operational States                        │
+├─────────────┬─────────────┬─────────────┬─────────────┬─────────┤
+│   Active    │ MintingPau  │   Paused    │UnderReview  │ Revoked │
+│             │    sed      │             │             │         │
+│ ✅ Mint     │ ❌ Mint     │ ❌ Mint     │ ❌ Mint     │ ❌ All  │
+│ ✅ Fulfill  │ ✅ Fulfill  │ ❌ Fulfill  │ ✅ Fulfill  │ ❌ All  │
+│             │             │             │             │         │
+│ Full Ops    │ Degraded    │ Maintenance │ Review      │Terminal │
+└─────────────┴─────────────┴─────────────┴─────────────┴─────────┘
+```
+
+- What is the difference between Active and MintingPaused? - MintingPaused is a self-initiated pause for routine maintenance.
+- What is the difference between Paused and UnderReview? - UnderReview is an auto-escalation after 48-hour timer expires.
+- What is the difference between Paused and Revoked? - Revoked is a manual termination by the Emergency Council (QC offboarding).
+
+#### State Transition Paths
+```
+Active ←→ MintingPaused (Self-pause for routine maintenance)
+   │
+   └→ MintingPaused → Paused (QC escalates for full maintenance)
+                        │
+                        └→ UnderReview (Auto-escalation after 48h)
+                              │
+                              ├→ Active (Council restores)
+                              └→ Revoked (Council terminates)
+```
+
+#### QC Self-Paused
+- QC can self-pause for operational flexibility.
+- Renewable Pause Credits: 1 credit per 90 days.
+- Auto-Escalation Timer: 48-hour maximum for self-initiated pauses.
+- Network Protection: Prevents indefinite service disruption.
+
+---
+
+## Slide 6: State Transition Logic & Edge Cases
+### "Automated Escalation and Recovery Mechanisms"
+
+#### Transition Conditions & Timers
+
+**Automated Transitions:**
+- `Active → MintingPaused`: Reserve violation detected by WatchdogEnforcer
+- `Paused → UnderReview`: 48-hour auto-escalation timer expires
+- `MintingPaused → Active`: Reserve violation resolved + QC action
+
+**Manual Transitions:**
+- `Active → MintingPaused`: QC self-pause (uses renewable credit)
+- `MintingPaused → Paused`: QC requests full maintenance pause
+- `UnderReview → Active/Revoked`: Emergency Council decision
+
+#### Auto-Escalation Workflow
+```
+1. QC enters Paused state (self-initiated)
+2. 48-hour timer starts automatically
+3. Watchdog monitors: checkEscalation(qc)
+4. If unresolved → enforceObjectiveViolation(qc, AUTO_ESCALATION)
+5. QC transitions to UnderReview
+6. Emergency Council intervention required
+```
+
+#### Recovery Mechanisms
+- **Early Resume**: QCs can exit pause states before timer expiry
+- **Emergency Consensus**: ARBITER can force reserve consensus with available attestations
+- **Council Override**: Emergency Council can restore QCs after investigation
 
 ---
 
