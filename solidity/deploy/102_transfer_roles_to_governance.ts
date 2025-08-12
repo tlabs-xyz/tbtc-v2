@@ -77,7 +77,7 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   const contracts = [
     "QCManager",
     "QCData",
-    "QCReserveLedger",
+    "ReserveOracle",
     "QCRedeemer",
     "SystemState",
     "WatchdogEnforcer",

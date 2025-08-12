@@ -178,7 +178,6 @@ describe("SystemState", () => {
         })
       })
 
-
       describe("pauseWalletRegistration", () => {
         it("should pause wallet registration successfully", async () => {
           const tx = await systemState
@@ -244,7 +243,6 @@ describe("SystemState", () => {
           `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
         )
       })
-
 
       it("should revert for pauseWalletRegistration", async () => {
         await expect(
@@ -612,7 +610,6 @@ describe("SystemState", () => {
         expect(await systemState.isFunctionPaused("redemption")).to.be.false
       })
 
-
       it("should return correct status for wallet registration", async () => {
         expect(await systemState.isFunctionPaused("wallet_registration")).to.be
           .false
@@ -761,7 +758,6 @@ describe("SystemState", () => {
           systemState.connect(pauserAccount).pauseRedemption()
         ).to.emit(systemState, "RedemptionPaused")
 
-
         // Unpause events
         await expect(
           systemState.connect(pauserAccount).unpauseMinting()
@@ -770,7 +766,6 @@ describe("SystemState", () => {
         await expect(
           systemState.connect(pauserAccount).unpauseRedemption()
         ).to.emit(systemState, "RedemptionUnpaused")
-
 
         // Wallet registration pause/unpause events
         await expect(

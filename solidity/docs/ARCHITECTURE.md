@@ -24,7 +24,7 @@ This system enables **Qualified Custodians** (regulated institutional entities) 
 ### Core Architectural Principles
 
 1. **Two-Problem Framework**: 
-   - **Oracle Problem**: Multi-attester consensus for objective facts (solved by QCReserveLedger)
+   - **Oracle Problem**: Multi-attester consensus for objective facts (solved by ReserveOracle)
    - **Enforcement Problem**: Permissionless enforcement of objective violations (solved by WatchdogEnforcer with embedded reason codes)
 
 2. **Direct Integration**: Leverage existing Bank/Vault infrastructure without abstraction layers (~50% gas savings vs proxy approaches)
@@ -64,7 +64,7 @@ This system enables **Qualified Custodians** (regulated institutional entities) 
 │                     │                     │                         │
 ├─────────────────────┼─────────────────────┼─────────────────────────┤
 │                     │                     │                         │
-│ QCManager           │ QCReserveLedger     │ BasicMintingPolicy      │
+│ QCManager           │ ReserveOracle       │ BasicMintingPolicy      │
 │ QCData              │ • Multi-attestation │                         │
 │ QCMinter            │ • Reserve consensus │ • Direct Integration    │
 │ QCRedeemer          │                     │ • 50% Gas Savings       │
@@ -116,7 +116,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
     └─────────┬───────┘ └─────────────────┘ └─────────────────┘│
               │                                                │
               │         ┌─────────────────┐                   │
-              │         │QCReserveLedger  │                   │
+              │         │ReserveOracle    │                   │
               │         │ (Oracle+Storage)│                   │
               │         └─────────┬───────┘                   │
               │                   │                           │
@@ -203,7 +203,7 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 - Emergency pause capabilities
 - Role-based access control
 
-#### QCReserveLedger.sol (Reserve Tracking)
+#### ReserveOracle.sol (Reserve Tracking)
 
 - Bitcoin reserve attestation storage
 - Staleness detection and validation
@@ -355,7 +355,7 @@ The system separates concerns into:
           └──────────────────────┼──────────────────────┘
                                  │
                     ┌────────────▼────────────┐
-                    │   QCReserveLedger       │
+                    │   ReserveOracle         │
                     │ • Multi-attester oracle │
                     │ • Reserve data storage  │
                     │ • Consensus calculation │
@@ -370,16 +370,16 @@ The system separates concerns into:
                     └──────────────────┘
 ```
 
-### 1. QCReserveLedger.sol
+### 1. ReserveOracle.sol
 
 **Purpose**: Unified multi-attester oracle and reserve data storage
 
 **Architecture Design**: Oracle + Slim Ledger Architecture
 
-The QCReserveLedger implements a two-component architecture:
+The ReserveOracle implements a unified architecture combining:
 
-1. **ReserveOracle**: Handles multi-attester consensus (internal logic)
-2. **QCReserveLedger**: Stores consensus results and maintains history (external interface)
+1. **Oracle Logic**: Handles multi-attester consensus (internal logic)
+2. **Storage Layer**: Stores consensus results and maintains history (external interface)
 
 ```
 ┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
@@ -389,19 +389,11 @@ The QCReserveLedger implements a two-component architecture:
            │ submitAttestation()       │                           │
            ▼                           ▼                           ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                            ReserveOracle (Internal)                          │
+│                             ReserveOracle (Unified)                        │
 │  - Receives multiple attestations                                           │
 │  - Calculates consensus (median)                                            │
 │  - Validates freshness                                                      │
-│  - No permanent storage                                                     │
-└─────────────────────────────────────┬───────────────────────────────────────┘
-                                      │
-                                      │ pushConsensusAttestation()
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          QCReserveLedger (External)                         │
-│  - Stores consensus values only                                             │
-│  - Maintains attestation history                                            │
+│  - Stores consensus values and maintains history                            │
 │  - Provides staleness checking                                              │
 │  - Handles invalidations                                                    │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -475,7 +467,7 @@ function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) // Emergency
 - **Limited Authority**: Can only set QCs to UnderReview status (human oversight for final decisions)
 - **Objective Only**: Monitors only machine-verifiable conditions
 - **Time-Based Escalation**: 45-minute delay for critical violations before emergency pause
-- **Byzantine Fault Tolerance**: Works with QCReserveLedger consensus data
+- **Byzantine Fault Tolerance**: Works with ReserveOracle consensus data
 
 **Core Functions**:
 
@@ -516,8 +508,8 @@ The watchdog system implements a clear role hierarchy for security and operation
 
 | Role                   | Purpose                           | Contracts                         | Authority                          |
 | ---------------------- | --------------------------------- | --------------------------------- | ---------------------------------- |
-| **ATTESTER_ROLE**      | Submit reserve attestations       | QCReserveLedger                   | Submit balance observations        |
-| **ARBITER_ROLE**       | Emergency consensus & enforcement | QCReserveLedger, WatchdogEnforcer | Force consensus, QC status changes |
+| **ATTESTER_ROLE**      | Submit reserve attestations       | ReserveOracle                     | Submit balance observations        |
+| **ARBITER_ROLE**       | Emergency consensus & enforcement | ReserveOracle, WatchdogEnforcer   | Force consensus, QC status changes |
 | **PAUSER_ROLE**        | Emergency pause controls          | SystemState                       | Emergency pause/unpause QCs        |
 | **DEFAULT_ADMIN_ROLE** | System administration             | All contracts                     | Grant/revoke roles                 |
 
@@ -561,7 +553,7 @@ User → QCMinter → Bank → TBTCVault → TBTC Tokens
          ↓
     QCManager → QCData (direct reference)
                            ↓
-                    QCReserveLedger ← ReserveOracle ← Attesters
+                    ReserveOracle ← Attesters
 ```
 - **Proven Infrastructure**: Leverages battle-tested Bank/Vault architecture
 - **Perfect Fungibility**: QC tBTC identical to Bridge tBTC
@@ -574,8 +566,8 @@ User → QCMinter → Bank → TBTCVault → TBTC Tokens
 ```
 ReserveOracle:
 ├── Multiple ATTESTER_ROLE holders submit attestations
-├── Oracle has ATTESTER_ROLE in QCReserveLedger
-└── Pushes consensus automatically
+├── Internal consensus calculation and storage
+└── Provides consensus data automatically
 
 WatchdogEnforcer:
 ├── ARBITER_ROLE in QCManager (for status changes)
@@ -663,7 +655,7 @@ The system deploys through numbered scripts ensuring proper dependency resolutio
 1. `95_deploy_account_control_core.ts` - Core entry points (QCMinter, QCRedeemer with direct dependencies)
 2. `96_deploy_account_control_state.ts` - State management (QCData, SystemState, QCManager)
 3. `97_deploy_account_control_policies.ts` - Policy contracts (BasicMintingPolicy, BasicRedemptionPolicy)
-4. `98_deploy_reserve_ledger.ts` - Reserve tracking and watchdog system (QCReserveLedger, WatchdogEnforcer)
+4. `98_deploy_reserve_oracle.ts` - Reserve tracking and watchdog system (ReserveOracle, WatchdogEnforcer)
 5. `99_configure_account_control_system.ts` - Role assignments and final configuration
 
 **Supporting Infrastructure**: 6. `30_deploy_spv_validator.ts` - Bitcoin transaction validation (SPVValidator)
@@ -672,7 +664,7 @@ The system deploys through numbered scripts ensuring proper dependency resolutio
 
 **Multi-Environment Approach**:
 
-1. **Development**: Single attester for QCReserveLedger, fast parameters for testing
+1. **Development**: Single attester for ReserveOracle, fast parameters for testing
 2. **Staging**: Multiple attesters, realistic timing parameters for validation
 3. **Production**: Minimum 3 attesters for Byzantine fault tolerance, secure parameters
 
@@ -847,7 +839,7 @@ The Account Control system consists of:
 - Direct integration with immutable contract references
 - SPVValidator.sol - Bitcoin SPV proof validation
 - BitcoinAddressUtils.sol - Bitcoin address utilities
-- QCReserveLedger.sol - Multi-attester consensus and storage
+- ReserveOracle.sol - Multi-attester consensus and storage
 - WatchdogEnforcer.sol - Permissionless objective enforcement
 - WatchdogReasonCodes.sol - Machine-readable violation codes
 
@@ -897,7 +889,7 @@ Critical issue identified: **Machines cannot interpret human-readable strings** 
 
 **Decision**: Migrate to a simplified 3-contract architecture focused on objective enforcement:
 
-1. **Oracle Problem** → `QCReserveLedger` (multi-attester consensus)
+1. **Oracle Problem** → `ReserveOracle` (multi-attester consensus)
 2. **Enforcement** → `WatchdogEnforcer` (permissionless with reason codes)
 3. **Validation** → `WatchdogReasonCodes` (machine-readable violation codes)
 

@@ -208,7 +208,6 @@ const EXPECTED_ROLES: RoleAssignment[] = [
     critical: false,
   }, // Added by operators
 
-
   // WatchdogAutomatedEnforcement
   {
     contract: "WatchdogAutomatedEnforcement",

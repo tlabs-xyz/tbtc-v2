@@ -5,7 +5,7 @@ import { FakeContract, smock } from "@defi-wonderland/smock"
 
 import {
   WatchdogEnforcer,
-  QCReserveLedger,
+  ReserveOracle,
   QCManager,
   QCData,
   SystemState,
@@ -22,7 +22,7 @@ describe("WatchdogEnforcer", () => {
   let randomUser: SignerWithAddress
 
   let watchdogEnforcer: WatchdogEnforcer
-  let mockQcReserveLedger: FakeContract<QCReserveLedger>
+  let mockReserveOracle: FakeContract<ReserveOracle>
   let mockQcManager: FakeContract<QCManager>
   let mockQcData: FakeContract<QCData>
   let mockSystemState: FakeContract<SystemState>
@@ -60,7 +60,7 @@ describe("WatchdogEnforcer", () => {
     await createSnapshot()
 
     // Create mock contracts
-    mockQcReserveLedger = await smock.fake<QCReserveLedger>("QCReserveLedger")
+    mockReserveOracle = await smock.fake<ReserveOracle>("ReserveOracle")
     mockQcManager = await smock.fake<QCManager>("QCManager")
     mockQcData = await smock.fake<QCData>("QCData")
     mockSystemState = await smock.fake<SystemState>("SystemState")
@@ -70,7 +70,7 @@ describe("WatchdogEnforcer", () => {
       "WatchdogEnforcer"
     )
     watchdogEnforcer = await WatchdogEnforcerFactory.deploy(
-      mockQcReserveLedger.address,
+      mockReserveOracle.address,
       mockQcManager.address,
       mockQcData.address,
       mockSystemState.address
@@ -80,7 +80,7 @@ describe("WatchdogEnforcer", () => {
     // Set up default mock behaviors
     mockSystemState.minCollateralRatio.returns(minCollateralRatio)
     mockQcData.getQCMintedAmount.returns(mintedAmount)
-    mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+    mockReserveOracle.getReserveBalanceAndStaleness.returns([
       reserveBalance,
       false,
     ])
@@ -92,8 +92,8 @@ describe("WatchdogEnforcer", () => {
 
   describe("Deployment", () => {
     it("should set correct addresses", async () => {
-      expect(await watchdogEnforcer.reserveLedger()).to.equal(
-        mockQcReserveLedger.address
+      expect(await watchdogEnforcer.reserveOracle()).to.equal(
+        mockReserveOracle.address
       )
       expect(await watchdogEnforcer.qcManager()).to.equal(mockQcManager.address)
       expect(await watchdogEnforcer.qcData()).to.equal(mockQcData.address)
@@ -128,7 +128,7 @@ describe("WatchdogEnforcer", () => {
 
         beforeEach(async () => {
           // Setup: reserves < minted amount
-          mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+          mockReserveOracle.getReserveBalanceAndStaleness.returns([
             reserveBalance,
             false,
           ])
@@ -178,7 +178,7 @@ describe("WatchdogEnforcer", () => {
       context("when QC has sufficient reserves", () => {
         beforeEach(async () => {
           // Setup: reserves >= minted amount
-          mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+          mockReserveOracle.getReserveBalanceAndStaleness.returns([
             reserveBalance,
             false,
           ])
@@ -203,7 +203,7 @@ describe("WatchdogEnforcer", () => {
       context("when reserves are stale", () => {
         beforeEach(async () => {
           // Setup: stale reserves
-          mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+          mockReserveOracle.getReserveBalanceAndStaleness.returns([
             reserveBalance,
             true, // Stale
           ])
@@ -231,7 +231,7 @@ describe("WatchdogEnforcer", () => {
 
         beforeEach(async () => {
           // Setup: stale attestations
-          mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+          mockReserveOracle.getReserveBalanceAndStaleness.returns([
             reserveBalance,
             true, // Stale
           ])
@@ -266,7 +266,7 @@ describe("WatchdogEnforcer", () => {
       context("when attestations are fresh", () => {
         beforeEach(async () => {
           // Setup: fresh attestations
-          mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+          mockReserveOracle.getReserveBalanceAndStaleness.returns([
             reserveBalance,
             false, // Fresh
           ])
@@ -298,7 +298,7 @@ describe("WatchdogEnforcer", () => {
     context("when called by anyone (permissionless)", () => {
       it("should allow watchdog to enforce", async () => {
         // Setup violation
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockReserveOracle.getReserveBalanceAndStaleness.returns([
           reserveBalance,
           true, // Stale
         ])
@@ -312,7 +312,7 @@ describe("WatchdogEnforcer", () => {
 
       it("should allow random user to enforce", async () => {
         // Setup violation
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockReserveOracle.getReserveBalanceAndStaleness.returns([
           reserveBalance,
           true, // Stale
         ])
@@ -332,7 +332,7 @@ describe("WatchdogEnforcer", () => {
         // the function executes successfully when called normally
 
         // Setup violation
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockReserveOracle.getReserveBalanceAndStaleness.returns([
           reserveBalance,
           true, // Stale
         ])
@@ -354,7 +354,7 @@ describe("WatchdogEnforcer", () => {
   describe("checkViolation", () => {
     context("when checking insufficient reserves", () => {
       it("should return true when reserves are insufficient", async () => {
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockReserveOracle.getReserveBalanceAndStaleness.returns([
           ethers.utils.parseEther("9"),
           false,
         ])
@@ -370,7 +370,7 @@ describe("WatchdogEnforcer", () => {
       })
 
       it("should return false when reserves are sufficient", async () => {
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockReserveOracle.getReserveBalanceAndStaleness.returns([
           ethers.utils.parseEther("10"),
           false,
         ])
@@ -386,7 +386,7 @@ describe("WatchdogEnforcer", () => {
       })
 
       it("should return false when reserves are stale", async () => {
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockReserveOracle.getReserveBalanceAndStaleness.returns([
           ethers.utils.parseEther("9"),
           true, // Stale
         ])
@@ -405,7 +405,7 @@ describe("WatchdogEnforcer", () => {
 
     context("when checking stale attestations", () => {
       it("should return true when attestations are stale", async () => {
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockReserveOracle.getReserveBalanceAndStaleness.returns([
           reserveBalance,
           true, // Stale
         ])
@@ -420,7 +420,7 @@ describe("WatchdogEnforcer", () => {
       })
 
       it("should return false when attestations are fresh", async () => {
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockReserveOracle.getReserveBalanceAndStaleness.returns([
           reserveBalance,
           false, // Fresh
         ])
@@ -457,7 +457,7 @@ describe("WatchdogEnforcer", () => {
     context("when checking for insufficient reserves", () => {
       it("should return QCs with violations", async () => {
         // QC1: insufficient
-        mockQcReserveLedger.getReserveBalanceAndStaleness
+        mockReserveOracle.getReserveBalanceAndStaleness
           .whenCalledWith(qc1)
           .returns([ethers.utils.parseEther("9"), false])
         mockQcData.getQCMintedAmount
@@ -465,7 +465,7 @@ describe("WatchdogEnforcer", () => {
           .returns(ethers.utils.parseEther("10"))
 
         // QC2: sufficient
-        mockQcReserveLedger.getReserveBalanceAndStaleness
+        mockReserveOracle.getReserveBalanceAndStaleness
           .whenCalledWith(qc2)
           .returns([ethers.utils.parseEther("10"), false])
         mockQcData.getQCMintedAmount
@@ -473,7 +473,7 @@ describe("WatchdogEnforcer", () => {
           .returns(ethers.utils.parseEther("10"))
 
         // QC3: insufficient
-        mockQcReserveLedger.getReserveBalanceAndStaleness
+        mockReserveOracle.getReserveBalanceAndStaleness
           .whenCalledWith(qc3)
           .returns([ethers.utils.parseEther("5"), false])
         mockQcData.getQCMintedAmount
@@ -494,17 +494,17 @@ describe("WatchdogEnforcer", () => {
     context("when checking for stale attestations", () => {
       it("should return QCs with stale attestations", async () => {
         // QC1: stale
-        mockQcReserveLedger.getReserveBalanceAndStaleness
+        mockReserveOracle.getReserveBalanceAndStaleness
           .whenCalledWith(qc1)
           .returns([reserveBalance, true])
 
         // QC2: fresh
-        mockQcReserveLedger.getReserveBalanceAndStaleness
+        mockReserveOracle.getReserveBalanceAndStaleness
           .whenCalledWith(qc2)
           .returns([reserveBalance, false])
 
         // QC3: stale
-        mockQcReserveLedger.getReserveBalanceAndStaleness
+        mockReserveOracle.getReserveBalanceAndStaleness
           .whenCalledWith(qc3)
           .returns([reserveBalance, true])
 
@@ -548,7 +548,7 @@ describe("WatchdogEnforcer", () => {
       it("should adapt to new collateral ratio", async () => {
         // Initial: 100% ratio, QC is sufficiently collateralized
         mockSystemState.minCollateralRatio.returns(100)
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockReserveOracle.getReserveBalanceAndStaleness.returns([
           ethers.utils.parseEther("10"),
           false,
         ])
@@ -575,7 +575,7 @@ describe("WatchdogEnforcer", () => {
     context("when multiple violations exist", () => {
       it("should allow enforcing each violation separately", async () => {
         // Setup: both stale and insufficient
-        mockQcReserveLedger.getReserveBalanceAndStaleness.returns([
+        mockReserveOracle.getReserveBalanceAndStaleness.returns([
           ethers.utils.parseEther("9"),
           true, // Stale
         ])

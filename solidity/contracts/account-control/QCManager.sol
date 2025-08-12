@@ -5,28 +5,77 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
-import "./QCReserveLedger.sol";
+import "./ReserveOracle.sol";
 import "../bridge/BitcoinTx.sol";
 // SPV validation is now handled directly in this contract and QCRedeemer
 
+// =================== CONSOLIDATED INTERFACES ===================
+// Interfaces for contracts that will be removed in consolidation
+interface IQCRedeemer {
+    function hasUnfulfilledRedemptions(address qc) external view returns (bool);
+    function getEarliestRedemptionDeadline(address qc) external view returns (uint256);
+}
+
 /// @title QCManager
-/// @dev Stateless business logic controller for QC management.
+/// @dev Unified controller for QC management, consolidating business logic, state management, and pause credits.
 /// Contains all business logic for managing QCs, reading from and writing to
-/// QCData and SystemState. Manages QC status
-/// changes, wallet registration flows, and integrates with role-based access control.
+/// QCData and SystemState. Manages QC status changes, wallet registration flows,
+/// self-pause capabilities, renewable pause credits, and integrates with role-based access control.
+///
+/// ## Consolidated Functionality
+/// This contract combines functionality from:
+/// - QCManager: Core business logic and QC lifecycle management
+/// - QCStateManager: 5-state machine with self-pause and auto-escalation
+/// - QCRenewablePause: 90-day renewable pause credit system
+///
+/// ## 5-State QC Model
+/// - Active: Full operations (mint + fulfill)
+/// - MintingPaused: Can fulfill only (no new minting)
+/// - Paused: Complete halt (no operations)
+/// - UnderReview: Under governance review (no operations)
+/// - Revoked: Terminal state (no operations)
+///
+/// ## Self-Pause System
+/// - QCs can self-pause using renewable 90-day credits
+/// - 48-hour pause duration with auto-escalation to UnderReview
+/// - Redemption deadline protection prevents breaking user commitments
+/// - Emergency council can override and restore credits
 ///
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update system configurations
 /// - QC_ADMIN_ROLE: Can update minting amounts, request wallet deregistration
 /// - REGISTRAR_ROLE: Can register/deregister wallets with SPV verification
-/// - ARBITER_ROLE: Can pause QCs, change status, verify solvency (emergency response)
+/// - ARBITER_ROLE: Can pause QCs, change status, verify solvency, handle defaults (emergency response)
+/// - WATCHDOG_ENFORCER_ROLE: Can request status changes to UnderReview (limited authority)
 /// - QC_GOVERNANCE_ROLE: Can register QCs and manage minting capacity (instant actions)
+/// - WATCHDOG_ROLE: Can check QC escalations and trigger auto-escalation
+/// - PAUSER_ROLE: Can clear emergency pauses and restore credits
 contract QCManager is AccessControl, ReentrancyGuard {
     bytes32 public constant QC_ADMIN_ROLE = keccak256("QC_ADMIN_ROLE");
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
     bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
     bytes32 public constant WATCHDOG_ENFORCER_ROLE =
         keccak256("WATCHDOG_ENFORCER_ROLE");
+    bytes32 public constant WATCHDOG_ROLE = keccak256("WATCHDOG_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
+    // =================== STATE MANAGEMENT CONSTANTS ===================
+    
+    uint256 public constant SELF_PAUSE_TIMEOUT = 48 hours;
+    uint256 public constant ESCALATION_WARNING_PERIOD = 1 hours;
+    
+    // Reason codes for state changes
+    bytes32 public constant SELF_PAUSE = keccak256("SELF_PAUSE");
+    bytes32 public constant EARLY_RESUME = keccak256("EARLY_RESUME");
+    bytes32 public constant AUTO_ESCALATION = keccak256("AUTO_ESCALATION");
+    bytes32 public constant DEFAULT_ESCALATION = keccak256("DEFAULT_ESCALATION");
+    bytes32 public constant BACKLOG_CLEARED = keccak256("BACKLOG_CLEARED");
+    
+    // =================== PAUSE CREDIT CONSTANTS ===================
+    
+    uint256 public constant PAUSE_DURATION = 48 hours;
+    uint256 public constant RENEWAL_PERIOD = 90 days;
+    uint256 public constant MIN_REDEMPTION_BUFFER = 8 hours;
 
     // Custom errors for gas-efficient reverts
     error InvalidQCAddress();
@@ -52,13 +101,73 @@ contract QCManager is AccessControl, ReentrancyGuard {
     error QCReserveLedgerNotAvailable();
     error SPVValidatorNotAvailable();
     error ServiceNotAvailable(string service);
+    
+    // =================== STATE MANAGEMENT ERRORS ===================
+    
+    error NoPauseCredit();
+    error AlreadyPaused();
+    error NotSelfPaused();
+    error CannotEarlyResume();
+    error InvalidPauseLevel();
+    error HasPendingRedemptions();
+    error InvalidStatus();
+    error NotEligibleForEscalation();
+    
+    // =================== PAUSE CREDIT ERRORS ===================
+    
+    error NoPauseCreditAvailable();
+    error PauseReasonRequired();
+    error WouldBreachRedemptionDeadline();
+    error NotPaused();
+    error PauseNotExpired();
+    error CreditAlreadyAvailable();
+    error NeverUsedCredit();
+    error RenewalPeriodNotMet();
+    error QCAlreadyInitialized();
+    error OnlyStateManager();
+    
     bytes32 public constant QC_GOVERNANCE_ROLE =
         keccak256("QC_GOVERNANCE_ROLE");
 
+    // =================== ENUMS AND STRUCTS ===================
+    
+    /// @dev Pause level selection for QC self-pause
+    enum PauseLevel {
+        MintingOnly,    // Pause minting but allow fulfillment
+        Complete        // Pause all operations
+    }
+    
+    /// @dev Pause credit information for each QC
+    struct PauseCredit {
+        bool hasCredit;              // Can QC pause themselves?
+        uint256 lastUsed;            // When last used (0 = never)
+        uint256 creditRenewTime;     // When credit can be renewed
+        bool isPaused;               // Currently paused?
+        uint256 pauseEndTime;        // When pause expires
+        bytes32 pauseReason;         // Why paused
+    }
 
     QCData public immutable qcData;
     SystemState public immutable systemState;
-    QCReserveLedger public immutable qcReserveLedger;
+    ReserveOracle public immutable reserveOracle;
+    
+    // =================== STATE MANAGEMENT STORAGE ===================
+    
+    /// @dev Track QC self-pause timeouts for auto-escalation
+    mapping(address => uint256) public qcPauseTimestamp;
+    
+    /// @dev Track if QC can early resume (only for self-initiated pauses)
+    mapping(address => bool) public qcCanEarlyResume;
+    
+    /// @dev Track if escalation warning has been emitted
+    mapping(address => bool) public escalationWarningEmitted;
+    
+    // =================== PAUSE CREDIT STORAGE ===================
+    
+    mapping(address => PauseCredit) public pauseCredits;
+    
+    // Temporary reference for QCRedeemer until full consolidation
+    IQCRedeemer public qcRedeemer;
 
     // =================== STANDARDIZED EVENTS ===================
 
@@ -163,6 +272,75 @@ contract QCManager is AccessControl, ReentrancyGuard {
         string reason,
         address attemptedBy
     );
+    
+    // =================== STATE MANAGEMENT EVENTS ===================
+    
+    event QCSelfPaused(
+        address indexed qc,
+        PauseLevel level,
+        QCData.QCStatus newStatus,
+        uint256 timeout
+    );
+    
+    event QCEarlyResumed(
+        address indexed qc,
+        address indexed resumedBy
+    );
+    
+    event ApproachingEscalation(
+        address indexed qc,
+        uint256 timeRemaining
+    );
+    
+    event AutoEscalated(
+        address indexed qc,
+        QCData.QCStatus fromStatus,
+        QCData.QCStatus toStatus
+    );
+    
+    event DefaultProcessed(
+        address indexed qc,
+        bytes32 redemptionId,
+        QCData.QCStatus oldStatus,
+        QCData.QCStatus newStatus
+    );
+    
+    event BacklogCleared(
+        address indexed qc,
+        QCData.QCStatus newStatus
+    );
+    
+    // =================== PAUSE CREDIT EVENTS ===================
+    
+    event PauseCreditUsed(
+        address indexed qc,
+        bytes32 reason,
+        uint256 duration
+    );
+    
+    event PauseCreditRenewed(
+        address indexed qc,
+        uint256 nextRenewalTime
+    );
+    
+    event PauseExpired(
+        address indexed qc
+    );
+    
+    event EmergencyCleared(
+        address indexed qc,
+        address indexed clearedBy,
+        bytes32 reason
+    );
+    
+    event EarlyResumed(
+        address indexed qc
+    );
+    
+    event InitialCreditGranted(
+        address indexed qc,
+        address indexed grantedBy
+    );
 
     modifier onlyWhenNotPaused(string memory functionName) {
         require(
@@ -175,16 +353,27 @@ contract QCManager is AccessControl, ReentrancyGuard {
     constructor(
         address _qcData,
         address _systemState,
-        address _qcReserveLedger
+        address _reserveOracle
     ) {
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
-        qcReserveLedger = QCReserveLedger(_qcReserveLedger);
+        reserveOracle = ReserveOracle(_reserveOracle);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(QC_ADMIN_ROLE, msg.sender);
         _grantRole(REGISTRAR_ROLE, msg.sender);
         _grantRole(ARBITER_ROLE, msg.sender);
         _grantRole(QC_GOVERNANCE_ROLE, msg.sender);
+        _grantRole(WATCHDOG_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+    }
+    
+    /// @notice Set QCRedeemer contract reference (temporary until full consolidation)
+    /// @param _qcRedeemer Address of the QCRedeemer contract
+    function setQCRedeemer(address _qcRedeemer) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
+        qcRedeemer = IQCRedeemer(_qcRedeemer);
     }
 
     // =================== INSTANT GOVERNANCE FUNCTIONS ===================
@@ -658,7 +847,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         view
         returns (uint256 balance, bool isStale)
     {
-        return qcReserveLedger.getReserveBalanceAndStaleness(qc);
+        return reserveOracle.getReserveBalanceAndStaleness(qc);
     }
 
     /// @dev Update reserve balance and check solvency
@@ -690,5 +879,454 @@ contract QCManager is AccessControl, ReentrancyGuard {
             msg.sender,
             block.timestamp
         );
+    }
+    
+    // =================== QC SELF-PAUSE FUNCTIONS ===================
+    
+    /// @notice QC initiates self-pause with chosen level
+    /// @param level PauseLevel.MintingOnly or PauseLevel.Complete
+    function selfPause(PauseLevel level) external nonReentrant {
+        address qc = msg.sender;
+        
+        // Validate QC status
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+        if (currentStatus != QCData.QCStatus.Active) {
+            revert QCNotActive(qc);
+        }
+        
+        // Check pause credit availability
+        if (!canSelfPause(qc)) {
+            revert NoPauseCredit();
+        }
+        
+        // Use renewable pause credit
+        _useEmergencyPause(qc, "SELF_MAINTENANCE");
+        
+        // Set appropriate state based on pause level
+        QCData.QCStatus newStatus = (level == PauseLevel.MintingOnly) ? 
+            QCData.QCStatus.MintingPaused : 
+            QCData.QCStatus.Paused;
+        
+        // Update QC status
+        qcData.setQCStatus(qc, newStatus, SELF_PAUSE);
+        qcData.setQCSelfPaused(qc, true);
+        
+        // Track timeout for auto-escalation
+        qcPauseTimestamp[qc] = block.timestamp;
+        qcCanEarlyResume[qc] = true;
+        escalationWarningEmitted[qc] = false;
+        
+        emit QCSelfPaused(qc, level, newStatus, block.timestamp + SELF_PAUSE_TIMEOUT);
+    }
+    
+    /// @notice QC resumes from self-initiated pause before timeout
+    function resumeSelfPause() external nonReentrant {
+        address qc = msg.sender;
+        
+        if (!qcCanEarlyResume[qc]) {
+            revert CannotEarlyResume();
+        }
+        
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+        if (currentStatus != QCData.QCStatus.MintingPaused && 
+            currentStatus != QCData.QCStatus.Paused) {
+            revert NotSelfPaused();
+        }
+        
+        // Clear pause tracking
+        delete qcPauseTimestamp[qc];
+        delete qcCanEarlyResume[qc];
+        delete escalationWarningEmitted[qc];
+        
+        // Return to Active status
+        qcData.setQCStatus(qc, QCData.QCStatus.Active, EARLY_RESUME);
+        qcData.setQCSelfPaused(qc, false);
+        
+        // Notify pause credit system
+        _resumeEarly(qc);
+        
+        emit QCEarlyResumed(qc, qc);
+    }
+    
+    // =================== WATCHDOG INTEGRATION ===================
+    
+    /// @notice Watchdog checks for QCs requiring auto-escalation
+    /// @param qcAddresses Array of QC addresses to check
+    function checkQCEscalations(address[] calldata qcAddresses) 
+        external 
+        onlyRole(WATCHDOG_ROLE) 
+        nonReentrant 
+    {
+        for (uint256 i = 0; i < qcAddresses.length; i++) {
+            address qc = qcAddresses[i];
+            
+            // Skip if no pause timestamp
+            if (qcPauseTimestamp[qc] == 0) continue;
+            
+            uint256 timeElapsed = block.timestamp - qcPauseTimestamp[qc];
+            
+            // Check for warning period (1 hour before escalation)
+            if (timeElapsed >= SELF_PAUSE_TIMEOUT - ESCALATION_WARNING_PERIOD && 
+                !escalationWarningEmitted[qc]) {
+                uint256 timeRemaining = SELF_PAUSE_TIMEOUT - timeElapsed;
+                emit ApproachingEscalation(qc, timeRemaining);
+                escalationWarningEmitted[qc] = true;
+            }
+            
+            // Check for auto-escalation after 48h
+            if (timeElapsed >= SELF_PAUSE_TIMEOUT) {
+                _performAutoEscalation(qc);
+            }
+        }
+    }
+    
+    /// @notice Handle redemption default with graduated consequences
+    /// @param qc QC that defaulted
+    /// @param redemptionId ID of the defaulted redemption
+    function handleRedemptionDefault(address qc, bytes32 redemptionId)
+        external
+        onlyRole(ARBITER_ROLE)
+        nonReentrant
+    {
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+        QCData.QCStatus newStatus = currentStatus;
+        
+        // Progressive escalation logic
+        if (currentStatus == QCData.QCStatus.Active || 
+            currentStatus == QCData.QCStatus.MintingPaused) {
+            // First default → UnderReview
+            newStatus = QCData.QCStatus.UnderReview;
+        } else if (currentStatus == QCData.QCStatus.UnderReview || 
+                   currentStatus == QCData.QCStatus.Paused) {
+            // Second default → Revoked
+            newStatus = QCData.QCStatus.Revoked;
+        }
+        // Revoked QCs remain revoked
+        
+        if (newStatus != currentStatus) {
+            qcData.setQCStatus(qc, newStatus, DEFAULT_ESCALATION);
+            
+            // Clear any self-pause tracking if escalating
+            if (qcCanEarlyResume[qc]) {
+                delete qcCanEarlyResume[qc];
+                delete qcPauseTimestamp[qc];
+                qcData.setQCSelfPaused(qc, false);
+            }
+        }
+        
+        emit DefaultProcessed(qc, redemptionId, currentStatus, newStatus);
+    }
+    
+    /// @notice Clear QC backlog and potentially restore to Active
+    /// @param qc QC address to clear
+    function clearQCBacklog(address qc) 
+        external 
+        onlyRole(ARBITER_ROLE) 
+        nonReentrant 
+    {
+        // Check for pending redemptions
+        if (hasUnfulfilledRedemptions(qc)) {
+            revert HasPendingRedemptions();
+        }
+        
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+        
+        // Only UnderReview QCs can be cleared back to Active
+        if (currentStatus == QCData.QCStatus.UnderReview) {
+            qcData.setQCStatus(qc, QCData.QCStatus.Active, BACKLOG_CLEARED);
+            
+            // Clear any remaining timeout tracking
+            delete qcPauseTimestamp[qc];
+            delete qcCanEarlyResume[qc];
+            delete escalationWarningEmitted[qc];
+            qcData.setQCSelfPaused(qc, false);
+            
+            emit BacklogCleared(qc, QCData.QCStatus.Active);
+        } else {
+            revert InvalidStatus();
+        }
+    }
+    
+    // =================== PAUSE CREDIT MANAGEMENT ===================
+    
+    /// @notice Check if QC can use pause credit
+    /// @param qc QC address
+    /// @return canPause Whether QC can self-pause
+    function canSelfPause(address qc) public view returns (bool canPause) {
+        PauseCredit memory credit = pauseCredits[qc];
+        
+        // Must have credit and not be currently paused
+        if (!credit.hasCredit || credit.isPaused) {
+            return false;
+        }
+        
+        // Check QC is active
+        try qcData.getQCStatus(qc) returns (QCData.QCStatus status) {
+            if (status != QCData.QCStatus.Active) {
+                return false;
+            }
+        } catch {
+            return false;
+        }
+        
+        // Check redemption deadline protection
+        uint256 earliestDeadline = getEarliestRedemptionDeadline(qc);
+        if (earliestDeadline > 0 && 
+            earliestDeadline < block.timestamp + PAUSE_DURATION + MIN_REDEMPTION_BUFFER) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /// @notice Renew pause credit after 90 days
+    function renewPauseCredit() external {
+        address qc = msg.sender;
+        PauseCredit storage credit = pauseCredits[qc];
+        
+        // Validate conditions
+        QCData.QCStatus status = qcData.getQCStatus(qc);
+        if (status != QCData.QCStatus.Active) revert QCNotActive(qc);
+        if (credit.hasCredit) revert CreditAlreadyAvailable();
+        if (credit.lastUsed == 0) revert NeverUsedCredit();
+        if (block.timestamp < credit.creditRenewTime) revert RenewalPeriodNotMet();
+        
+        // Renew credit
+        credit.hasCredit = true;
+        credit.creditRenewTime = 0;
+        
+        emit PauseCreditRenewed(qc, block.timestamp + RENEWAL_PERIOD);
+    }
+    
+    /// @notice Check and auto-resume if pause expired
+    /// @param qc QC address
+    function resumeIfExpired(address qc) external {
+        PauseCredit storage credit = pauseCredits[qc];
+        
+        if (!credit.isPaused) revert NotPaused();
+        if (block.timestamp < credit.pauseEndTime) revert PauseNotExpired();
+        
+        // Clear pause state
+        credit.isPaused = false;
+        credit.pauseEndTime = 0;
+        credit.pauseReason = bytes32(0);
+        
+        emit PauseExpired(qc);
+    }
+    
+    /// @notice Emergency council can clear pause and restore credit
+    /// @param qc QC address
+    /// @param reason Reason for clearing
+    function emergencyClearPause(address qc, string calldata reason) 
+        external 
+        onlyRole(PAUSER_ROLE) 
+    {
+        PauseCredit storage credit = pauseCredits[qc];
+        
+        // Clear pause state
+        credit.isPaused = false;
+        credit.pauseEndTime = 0;
+        credit.pauseReason = bytes32(0);
+        
+        // Optionally restore credit if it was consumed
+        if (!credit.hasCredit && credit.lastUsed > 0) {
+            credit.hasCredit = true;
+            credit.creditRenewTime = 0;
+        }
+        
+        emit EmergencyCleared(qc, msg.sender, keccak256(bytes(reason)));
+    }
+    
+    /// @notice Grant initial credit to new QC
+    /// @param qc QC address
+    function grantInitialCredit(address qc) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
+        if (pauseCredits[qc].lastUsed != 0) revert QCAlreadyInitialized();
+        
+        pauseCredits[qc].hasCredit = true;
+        
+        emit InitialCreditGranted(qc, msg.sender);
+    }
+    
+    // =================== VIEW FUNCTIONS FOR CONSOLIDATED STATE ===================
+    
+    /// @notice Get QC pause information
+    /// @param qc QC address
+    /// @return pauseTimestamp When the pause started (0 if not paused)
+    /// @return canEarlyResume Whether QC can resume early
+    /// @return escalationDeadline When auto-escalation will occur
+    function getQCPauseInfo(address qc) external view returns (
+        uint256 pauseTimestamp,
+        bool canEarlyResume,
+        uint256 escalationDeadline
+    ) {
+        pauseTimestamp = qcPauseTimestamp[qc];
+        canEarlyResume = qcCanEarlyResume[qc];
+        escalationDeadline = pauseTimestamp > 0 ? 
+            pauseTimestamp + SELF_PAUSE_TIMEOUT : 0;
+    }
+    
+    /// @notice Check if QC has unfulfilled redemptions
+    /// @param qc QC address
+    /// @return hasUnfulfilled Whether QC has pending redemptions
+    function hasUnfulfilledRedemptions(address qc) public view returns (bool) {
+        if (address(qcRedeemer) == address(0)) return false;
+        return qcRedeemer.hasUnfulfilledRedemptions(qc);
+    }
+    
+    /// @notice Check if QC is eligible for escalation
+    /// @param qc QC address
+    /// @return eligible Whether QC can be escalated
+    /// @return timeUntilEscalation Seconds until escalation (0 if ready)
+    function isEligibleForEscalation(address qc) external view returns (
+        bool eligible,
+        uint256 timeUntilEscalation
+    ) {
+        if (qcPauseTimestamp[qc] == 0) {
+            return (false, 0);
+        }
+        
+        uint256 timeElapsed = block.timestamp - qcPauseTimestamp[qc];
+        
+        if (timeElapsed >= SELF_PAUSE_TIMEOUT) {
+            return (true, 0);
+        } else {
+            return (false, SELF_PAUSE_TIMEOUT - timeElapsed);
+        }
+    }
+    
+    /// @notice Get earliest redemption deadline for a QC
+    /// @param qc QC address
+    /// @return deadline Earliest redemption deadline (0 if none)
+    function getEarliestRedemptionDeadline(address qc) 
+        public 
+        view 
+        returns (uint256 deadline) 
+    {
+        if (address(qcRedeemer) == address(0)) return 0;
+        try qcRedeemer.getEarliestRedemptionDeadline(qc) returns (uint256 deadline) {
+            return deadline;
+        } catch {
+            return 0;
+        }
+    }
+    
+    /// @notice Check if QC is currently self-paused
+    /// @param qc QC address
+    /// @return isPaused Whether QC is paused
+    function isSelfPaused(address qc) external view returns (bool isPaused) {
+        return pauseCredits[qc].isPaused;
+    }
+    
+    /// @notice Get comprehensive pause credit information for a QC
+    /// @param qc QC address
+    /// @return isPaused Whether currently paused
+    /// @return pauseEndTime When pause expires
+    /// @return pauseReason Reason for pause
+    /// @return hasCredit Whether credit is available
+    /// @return creditRenewTime When credit can be renewed
+    function getPauseInfo(address qc) external view returns (
+        bool isPaused,
+        uint256 pauseEndTime,
+        bytes32 pauseReason,
+        bool hasCredit,
+        uint256 creditRenewTime
+    ) {
+        PauseCredit memory credit = pauseCredits[qc];
+        return (
+            credit.isPaused,
+            credit.pauseEndTime,
+            credit.pauseReason,
+            credit.hasCredit,
+            credit.creditRenewTime
+        );
+    }
+    
+    /// @notice Get time until credit renewal is available
+    /// @param qc QC address
+    /// @return timeUntilRenewal Seconds until renewal (0 if available now)
+    function getTimeUntilRenewal(address qc) 
+        external 
+        view 
+        returns (uint256 timeUntilRenewal) 
+    {
+        PauseCredit memory credit = pauseCredits[qc];
+        
+        if (credit.hasCredit || credit.lastUsed == 0) {
+            return 0;
+        }
+        
+        if (block.timestamp >= credit.creditRenewTime) {
+            return 0;
+        }
+        
+        return credit.creditRenewTime - block.timestamp;
+    }
+    
+    // =================== INTERNAL HELPER FUNCTIONS ===================
+    
+    /// @dev Internal function to perform auto-escalation
+    function _performAutoEscalation(address qc) private {
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+        
+        // Auto-escalate based on current state
+        if (currentStatus == QCData.QCStatus.MintingPaused || 
+            currentStatus == QCData.QCStatus.Paused) {
+            
+            // Escalate to UnderReview
+            qcData.setQCStatus(qc, QCData.QCStatus.UnderReview, AUTO_ESCALATION);
+            
+            // Clear early resume capability
+            delete qcCanEarlyResume[qc];
+            delete qcPauseTimestamp[qc];
+            qcData.setQCSelfPaused(qc, false);
+            
+            emit AutoEscalated(qc, currentStatus, QCData.QCStatus.UnderReview);
+        }
+    }
+    
+    /// @dev Internal function to use emergency pause credit
+    function _useEmergencyPause(address qc, string memory reason) private {
+        PauseCredit storage credit = pauseCredits[qc];
+        
+        // Validate conditions
+        if (!credit.hasCredit) revert NoPauseCreditAvailable();
+        if (credit.isPaused) revert AlreadyPaused();
+        if (bytes(reason).length == 0) revert ReasonRequired();
+        
+        // Check QC status
+        QCData.QCStatus status = qcData.getQCStatus(qc);
+        if (status != QCData.QCStatus.Active) revert QCNotActive(qc);
+        
+        // Deadline protection
+        uint256 earliestDeadline = getEarliestRedemptionDeadline(qc);
+        if (earliestDeadline > 0 && 
+            earliestDeadline < block.timestamp + PAUSE_DURATION + MIN_REDEMPTION_BUFFER) {
+            revert WouldBreachRedemptionDeadline();
+        }
+        
+        // Consume credit and set pause
+        credit.hasCredit = false;
+        credit.lastUsed = block.timestamp;
+        credit.creditRenewTime = block.timestamp + RENEWAL_PERIOD;
+        credit.isPaused = true;
+        credit.pauseEndTime = block.timestamp + PAUSE_DURATION;
+        credit.pauseReason = keccak256(bytes(reason));
+        
+        emit PauseCreditUsed(qc, credit.pauseReason, PAUSE_DURATION);
+    }
+    
+    /// @dev Internal function for early resume from pause credit system
+    function _resumeEarly(address qc) private {
+        PauseCredit storage credit = pauseCredits[qc];
+        
+        // Clear pause state
+        credit.isPaused = false;
+        credit.pauseEndTime = 0;
+        credit.pauseReason = bytes32(0);
+        
+        emit EarlyResumed(qc);
     }
 }

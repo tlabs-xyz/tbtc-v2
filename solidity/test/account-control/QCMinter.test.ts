@@ -30,7 +30,6 @@ describe("QCMinter", () => {
   let mockQCData: FakeContract<QCData>
   let mockQCManager: FakeContract<QCManager>
 
-
   // Test data
   const mintAmount = ethers.utils.parseEther("5")
   const satoshis = mintAmount.div(ethers.BigNumber.from("10000000000")) // 1e10
@@ -42,12 +41,10 @@ describe("QCMinter", () => {
     user = signers[1]
     qcAddress = signers[2]
     thirdParty = signers[3]
-
   })
 
   beforeEach(async () => {
     await createSnapshot()
-
 
     // Create mocks
     mockBank = await smock.fake<Bank>("Bank")
@@ -94,7 +91,6 @@ describe("QCMinter", () => {
   })
 
   describe("Deployment", () => {
-
     it("should set correct bank", async () => {
       expect(await qcMinter.bank()).to.equal(mockBank.address)
     })
