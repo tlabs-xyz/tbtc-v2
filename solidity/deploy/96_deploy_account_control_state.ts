@@ -29,11 +29,26 @@ const func: DeployFunction = async function DeployAccountControlState(
 
   // Get dependencies for QCManager direct injection
   const reserveOracle = await get("ReserveOracle")
+  const lightRelay = await get("LightRelay")
+  
+  // Configure SPV parameters based on network
+  const txProofDifficultyFactor = 
+    network.name === "hardhat" ||
+    network.name === "development" ||
+    network.name === "system_tests"
+      ? 1  // Lower requirement for testing
+      : 6  // Production requirement (6 confirmations)
 
-  // Deploy QCManager - Unified business logic with state management and pause credits
+  // Deploy QCManager - Unified business logic with state management and pause credits, SPV support
   const qcManager = await deploy("QCManager", {
     from: deployer,
-    args: [qcData.address, systemState.address, reserveOracle.address],
+    args: [
+      qcData.address, 
+      systemState.address, 
+      reserveOracle.address,
+      lightRelay.address,
+      txProofDifficultyFactor
+    ],
     log: true,
     waitConfirmations: network.live ? 5 : 1,
   })
@@ -46,4 +61,4 @@ const func: DeployFunction = async function DeployAccountControlState(
 
 export default func
 func.tags = ["AccountControlState", "QCData", "SystemState", "QCManager"]
-func.dependencies = ["ReserveOracle"]
+func.dependencies = ["ReserveOracle", "LightRelay"]
