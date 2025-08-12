@@ -38,7 +38,7 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
   uint256 public constant SATOSHI_MULTIPLIER = 1e10;
 
-  ProtocolRegistry public immutable protocolRegistry;
+  // Direct integration - no registry needed
 
   /// @notice Request minting with direct Bank integration
   /// @param qc The address of the Qualified Custodian
@@ -57,10 +57,9 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     uint256 satoshis = amount / SATOSHI_MULTIPLIER;
 
     // Direct Bank interaction with auto-minting
-    Bank bank = Bank(protocolRegistry.getService(BANK_KEY));
-    TBTCVault tbtcVault = TBTCVault(
-      protocolRegistry.getService(TBTC_VAULT_KEY)
-    );
+    // Direct integration - contracts passed via constructor
+    Bank bank = bank; // immutable reference
+    TBTCVault tbtcVault = tbtcVault; // immutable reference
 
     address[] memory depositors = new address[](1);
     uint256[] memory amounts = new uint256[](1);
@@ -82,7 +81,7 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     returns (uint256)
   {
     QCManager qcManager = QCManager(
-      protocolRegistry.getService(QC_MANAGER_KEY)
+      qcManager // direct reference from constructor
     );
     return qcManager.getAvailableMintingCapacity(qc);
   }
@@ -93,10 +92,10 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
     uint256 amount
   ) internal view {
     QCManager qcManager = QCManager(
-      protocolRegistry.getService(QC_MANAGER_KEY)
+      qcManager // direct reference from constructor
     );
     SystemState systemState = SystemState(
-      protocolRegistry.getService(SYSTEM_STATE_KEY)
+      systemState // direct reference from constructor
     );
 
     // Check system not paused
@@ -709,11 +708,11 @@ async function verifyDeployment() {
   console.log("Contract Addresses:")
   console.log("QCManager:", contracts.qcManager.address)
   console.log("BasicMintingPolicy:", contracts.basicMintingPolicy.address)
-  console.log("ProtocolRegistry:", contracts.protocolRegistry.address)
+  // Direct integration - no registry address to log
 
   // 2. Verify service registration
   const bankKey = ethers.utils.id("BANK")
-  const registeredBank = await contracts.protocolRegistry.getService(bankKey)
+  // Direct integration - no registry lookup needed
   console.log("Registered Bank:", registeredBank)
 
   // 3. Verify role assignments
@@ -1141,7 +1140,7 @@ contract BasicMintingPolicy is ReentrancyGuard {
     // External calls protected against reentrancy
     _validateRequest(qc, user, amount);
 
-    Bank bank = Bank(protocolRegistry.getService(BANK_KEY));
+    Bank bank = bank; // direct reference from constructor
     bank.increaseBalanceAndCall(); /* parameters */
 
     return _completeMint(qc, amount);
