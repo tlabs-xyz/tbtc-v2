@@ -12,7 +12,7 @@ import "../bridge/BitcoinTx.sol";
 /// @title QCManager
 /// @dev Stateless business logic controller for QC management.
 /// Contains all business logic for managing QCs, reading from and writing to
-/// QCData and SystemState via direct integration. Manages QC status
+/// QCData and SystemState. Manages QC status
 /// changes, wallet registration flows, and integrates with role-based access control.
 ///
 /// Role definitions:
@@ -270,7 +270,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
     )
         external
         onlyRole(ARBITER_ROLE)
-        onlyWhenNotPaused("registry")
         nonReentrant
     {
         _executeStatusChange(qc, newStatus, reason, "ARBITER");
@@ -294,7 +293,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
     )
         external
         onlyRole(WATCHDOG_ENFORCER_ROLE)
-        onlyWhenNotPaused("registry")
         nonReentrant
     {
         // AUTHORITY VALIDATION: WatchdogEnforcer can only set QCs to UnderReview

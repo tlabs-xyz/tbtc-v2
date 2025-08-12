@@ -94,11 +94,6 @@ describe("QCMinter", () => {
   })
 
   describe("Deployment", () => {
-    it("should set correct protocol registry", async () => {
-      expect(await qcMinter.protocolRegistry()).to.equal(
-        protocolRegistry.address
-      )
-    })
 
     it("should set correct bank", async () => {
       expect(await qcMinter.bank()).to.equal(mockBank.address)
