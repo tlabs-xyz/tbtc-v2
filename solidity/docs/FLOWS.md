@@ -42,7 +42,7 @@ This document provides a complete inventory of user flows in the tBTC v2 Account
 - **QCRedeemer**: Processes redemption requests from users
 - **QCData**: Stores QC information and status
 - **SystemState**: Manages system-wide parameters and emergency controls
-- **QCReserveLedger**: Tracks Bitcoin reserves via multi-attester consensus
+- **ReserveOracle**: Tracks Bitcoin reserves via multi-attester consensus
 - **WatchdogEnforcer**: Monitors and enforces collateralization requirements
 
 ---
@@ -54,7 +54,7 @@ This document provides a complete inventory of user flows in the tBTC v2 Account
 ```
 User Request → QCMinter/QCRedeemer → Bank → TBTC Token
                          ↓
-            QCManager ← QCData (State) → QCReserveLedger (Attestations)
+            QCManager ← QCData (State) → ReserveOracle (Attestations)
 ```
 
 ### 2.2 Key States and Transitions
@@ -165,7 +165,7 @@ The onboarding flow now supports the complete QC lifecycle from registration thr
    - Zero balance attestations are now accepted
    - System collects attestations until `consensusThreshold` met (default 3)
    - Median consensus calculated automatically when threshold reached
-   - Reserve balance updated in QCReserveLedger
+   - Reserve balance updated in ReserveOracle
    - Events: `AttestationSubmitted`, `ConsensusReached`, `ReserveUpdated`
 
 3. **Automated Status Management**
@@ -268,7 +268,7 @@ The onboarding flow now supports the complete QC lifecycle from registration thr
 
 1. **Redemption Timeout with Graduated Consequences**
    - Watchdog monitors for timeout expiration
-   - Calls `QCStateManager.handleRedemptionDefault(qc, redemptionId)`
+   - Calls `QCManager.handleRedemptionDefault(qc, redemptionId)`
    - Redemption status changes to `Defaulted`
    - QC status transitions based on graduated consequences:
      - 1st default: Active → MintingPaused
@@ -371,7 +371,7 @@ The onboarding flow now supports the complete QC lifecycle from registration thr
 
 **Flow ID**: `QC-PAUSE-001`  
 **Priority**: Critical  
-**Participants**: QC, QCStateManager, WatchdogEnforcer
+**Participants**: QC, QCManager, WatchdogEnforcer
 
 #### 3.7.1 Routine Maintenance (MintingPaused)
 
@@ -606,7 +606,7 @@ The onboarding flow now supports the complete QC lifecycle from registration thr
 
 1. **Add Attester**
 
-   - DAO grants ATTESTER_ROLE to entity via `QCReserveLedger.grantRole()`
+   - DAO grants ATTESTER_ROLE to entity via `ReserveOracle.grantRole()`
    - Minimum 3 attesters maintained at all times
 
 2. **Remove Attester**
@@ -666,7 +666,7 @@ The onboarding flow now supports the complete QC lifecycle from registration thr
 
 **Flow ID**: `EMERGENCY-CONSENSUS-001`  
 **Priority**: Critical  
-**Participants**: Arbiter, QCReserveLedger
+**Participants**: Arbiter, ReserveOracle
 
 #### 5.4.1 Force Consensus Mechanism
 
@@ -800,7 +800,7 @@ export async function deployAccountControlSystem() {
   // Deploy core components
   const qcData = await deployContract("QCData")
   const systemState = await deployContract("SystemState")
-  const qcReserveLedger = await deployContract("QCReserveLedger")
+  const reserveOracle = await deployContract("ReserveOracle")
   const qcManager = await deployContract("QCManager")
   const qcMinter = await deployContract("QCMinter")
   const qcRedeemer = await deployContract("QCRedeemer")
@@ -817,7 +817,7 @@ export async function deployAccountControlSystem() {
     qcManager,
     qcMinter,
     qcRedeemer,
-    qcReserveLedger,
+    reserveOracle,
     watchdogEnforcer,
   }
 }
@@ -903,7 +903,7 @@ export abstract class BaseFlowTest {
   }
 
   async configureRoles() {
-    const { qcManager, qcReserveLedger, singleWatchdog } = this.contracts
+    const { qcManager, reserveOracle, singleWatchdog } = this.contracts
     const { watchdog } = this.signers
 
     // Grant watchdog roles
@@ -911,7 +911,7 @@ export abstract class BaseFlowTest {
     const REGISTRAR_ROLE = ethers.utils.id("REGISTRAR_ROLE")
     const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
 
-    await qcReserveLedger.grantRole(ATTESTER_ROLE, watchdog.address)
+    await reserveOracle.grantRole(ATTESTER_ROLE, watchdog.address)
     await qcManager.grantRole(REGISTRAR_ROLE, watchdog.address)
     await qcManager.grantRole(ARBITER_ROLE, watchdog.address)
   }
@@ -1183,12 +1183,12 @@ export class QCSelfPauseFlow extends BaseFlowTest {
   async executeFlow() {
     console.log("🚀 Starting QC Self-Pause Flow")
 
-    const { qcRenewablePause, qcStateManager } = this.contracts
+    const { qcManager } = this.contracts
     const { qc } = this.signers
 
     // Step 1: Check pause credits
     console.log("Step 1: Checking pause credits...")
-    const canPause = await qcRenewablePause.canSelfPause(qc.address)
+    const canPause = await qcManager.canSelfPause(qc.address)
     console.log(`QC can self-pause: ${canPause}`)
 
     if (!canPause) {
@@ -1198,16 +1198,16 @@ export class QCSelfPauseFlow extends BaseFlowTest {
 
     // Step 2: Initiate self-pause
     console.log("Step 2: Initiating self-pause...")
-    await qcStateManager.connect(qc).selfPause(0) // MintingOnly level
+    await qcManager.connect(qc).selfPause(0) // MintingOnly level
     console.log("✅ QC paused for maintenance")
 
     // Step 3: Check pause info
-    const pauseInfo = await qcStateManager.getQCPauseInfo(qc.address)
+    const pauseInfo = await qcManager.getQCPauseInfo(qc.address)
     console.log(`Pause started at: ${pauseInfo.pauseTimestamp}`)
 
     // Step 4: Early resume
     console.log("Step 4: Resuming early...")
-    await qcStateManager.connect(qc).resumeSelfPause()
+    await qcManager.connect(qc).resumeSelfPause()
     console.log("✅ QC resumed operations")
 
     console.log("🎉 Self-Pause Flow completed successfully")
@@ -1331,9 +1331,9 @@ The Account Control system is deployed with the following components:
 
 **Bug #1 - Flow 3.1 QC Onboarding**: 
 - **Documentation Claims**: "Pause Credit Initialization - QC receives initial renewable pause credit - Credit available immediately after registration"
-- **Actual Implementation**: `QCRenewablePause.grantInitialCredit(qc)` must be called manually by admin (DEFAULT_ADMIN_ROLE)
+- **Actual Implementation**: `QCManager.grantInitialCredit(qc)` must be called manually by admin (DEFAULT_ADMIN_ROLE)
 - **Impact**: QCs cannot self-pause after registration without manual admin action
-- **Location**: QCRenewablePause.sol line 271-280
+- **Location**: QCManager.sol (consolidated pause credit functionality)
 
 **Bug #2 - Flow 3.3 QC Minting**: 
 - **Documentation Claims**: "QC calls requestQCMint with appropriate permissions" 

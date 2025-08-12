@@ -29,7 +29,6 @@ describe("QCRedeemer", () => {
   let mockQCData: FakeContract<QCData>
   let mockSystemState: FakeContract<SystemState>
 
-
   // Roles
   let REDEEMER_ROLE: string
   let ARBITER_ROLE: string
@@ -46,7 +45,6 @@ describe("QCRedeemer", () => {
     watchdog = signers[4]
     thirdParty = signers[5]
 
-
     // Generate role hashes
     REDEEMER_ROLE = ethers.utils.id("REDEEMER_ROLE")
     ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
@@ -54,7 +52,6 @@ describe("QCRedeemer", () => {
 
   beforeEach(async () => {
     await createSnapshot()
-
 
     // Create mock contracts
     mockRedemptionPolicy = await smock.fake<IRedemptionPolicy>(
@@ -737,7 +734,6 @@ describe("QCRedeemer", () => {
   })
 
   describe("Edge Cases", () => {
-
     context("when policy contracts change behavior", () => {
       let redemptionId: string
 

@@ -14,13 +14,13 @@ const func: DeployFunction = async function DeployWatchdogEnforcer(
   const qcManager = await get("QCManager")
   const qcData = await get("QCData")
   const systemState = await get("SystemState")
-  const reserveLedger = await get("QCReserveLedger")
+  const reserveOracle = await get("ReserveOracle")
 
   // Deploy WatchdogEnforcer
   const watchdogEnforcer = await deploy("WatchdogEnforcer", {
     from: deployer,
     args: [
-      reserveLedger.address,
+      reserveOracle.address,
       qcManager.address,
       qcData.address,
       systemState.address,
@@ -37,6 +37,6 @@ const func: DeployFunction = async function DeployWatchdogEnforcer(
 }
 
 func.tags = ["WatchdogEnforcer", "Watchdog"]
-func.dependencies = ["QCManager", "QCReserveLedger"]
+func.dependencies = ["QCManager", "ReserveOracle"]
 
 export default func

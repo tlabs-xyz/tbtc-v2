@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// 3-state models as specified in the architecture.
 contract QCData is AccessControl {
     bytes32 public constant QC_MANAGER_ROLE = keccak256("QC_MANAGER_ROLE");
-    bytes32 public constant STATE_MANAGER_ROLE = keccak256("STATE_MANAGER_ROLE");
 
     // Custom errors for gas-efficient reverts
     error InvalidManagerAddress();
@@ -174,28 +173,6 @@ contract QCData is AccessControl {
         emit QCManagerRoleRevoked(manager, msg.sender, block.timestamp);
     }
 
-    /// @notice Grant STATE_MANAGER_ROLE to an address (typically QCStateManager contract)
-    /// @param stateManager The address to grant the role to
-    /// @dev Only callable by DEFAULT_ADMIN_ROLE
-    function grantStateManagerRole(address stateManager)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        if (stateManager == address(0)) revert InvalidManagerAddress();
-        _grantRole(STATE_MANAGER_ROLE, stateManager);
-        emit QCManagerRoleGranted(stateManager, msg.sender, block.timestamp);
-    }
-
-    /// @notice Revoke STATE_MANAGER_ROLE from an address
-    /// @param stateManager The address to revoke the role from
-    /// @dev Only callable by DEFAULT_ADMIN_ROLE
-    function revokeStateManagerRole(address stateManager)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        _revokeRole(STATE_MANAGER_ROLE, stateManager);
-        emit QCManagerRoleRevoked(stateManager, msg.sender, block.timestamp);
-    }
 
     /// @notice Register a new Qualified Custodian
     /// @param qc The address of the QC to register
@@ -224,11 +201,7 @@ contract QCData is AccessControl {
         address qc,
         QCStatus newStatus,
         bytes32 reason
-    ) external {
-        require(
-            hasRole(QC_MANAGER_ROLE, msg.sender) || hasRole(STATE_MANAGER_ROLE, msg.sender),
-            "Caller must have QC_MANAGER_ROLE or STATE_MANAGER_ROLE"
-        );
+    ) external onlyRole(QC_MANAGER_ROLE) {
         if (!isQCRegistered(qc)) revert QCNotRegistered();
 
         QCStatus oldStatus = custodians[qc].status;
@@ -492,11 +465,7 @@ contract QCData is AccessControl {
     /// @notice Set QC self-paused status
     /// @param qc QC address
     /// @param selfPaused True if QC initiated the pause
-    function setQCSelfPaused(address qc, bool selfPaused) external {
-        require(
-            hasRole(QC_MANAGER_ROLE, msg.sender) || hasRole(STATE_MANAGER_ROLE, msg.sender),
-            "Caller must have QC_MANAGER_ROLE or STATE_MANAGER_ROLE"
-        );
+    function setQCSelfPaused(address qc, bool selfPaused) external onlyRole(QC_MANAGER_ROLE) {
         if (!isQCRegistered(qc)) {
             revert QCNotRegistered();
         }

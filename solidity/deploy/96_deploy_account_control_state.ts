@@ -28,12 +28,12 @@ const func: DeployFunction = async function DeployAccountControlState(
   })
 
   // Get dependencies for QCManager direct injection
-  const qcReserveLedger = await get("QCReserveLedger")
+  const reserveOracle = await get("ReserveOracle")
 
-  // Deploy QCManager - Business logic with direct dependencies
+  // Deploy QCManager - Unified business logic with state management and pause credits
   const qcManager = await deploy("QCManager", {
     from: deployer,
-    args: [qcData.address, systemState.address, qcReserveLedger.address],
+    args: [qcData.address, systemState.address, reserveOracle.address],
     log: true,
     waitConfirmations: network.live ? 5 : 1,
   })
@@ -46,4 +46,4 @@ const func: DeployFunction = async function DeployAccountControlState(
 
 export default func
 func.tags = ["AccountControlState", "QCData", "SystemState", "QCManager"]
-func.dependencies = ["QCReserveLedger"]
+func.dependencies = ["ReserveOracle"]

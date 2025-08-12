@@ -3,7 +3,7 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "./QCReserveLedger.sol";
+import "./ReserveOracle.sol";
 import "./QCManager.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
@@ -48,7 +48,7 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
     mapping(address => uint256) public criticalViolationTimestamps;
 
     // External contracts
-    QCReserveLedger public immutable reserveLedger;
+    ReserveOracle public immutable reserveOracle;
     QCManager public immutable qcManager;
     QCData public immutable qcData;
     SystemState public immutable systemState;
@@ -101,7 +101,7 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         address _qcData,
         address _systemState
     ) {
-        reserveLedger = QCReserveLedger(_reserveLedger);
+        reserveOracle = ReserveOracle(_reserveLedger);
         qcManager = QCManager(_qcManager);
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
@@ -170,7 +170,7 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         view
         returns (bool violated, string memory reason)
     {
-        (uint256 reserves, bool isStale) = reserveLedger
+        (uint256 reserves, bool isStale) = reserveOracle
             .getReserveBalanceAndStaleness(qc);
 
         if (isStale) {
@@ -194,7 +194,7 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         view
         returns (bool violated, string memory reason)
     {
-        (, bool isStale) = reserveLedger.getReserveBalanceAndStaleness(qc);
+        (, bool isStale) = reserveOracle.getReserveBalanceAndStaleness(qc);
 
         if (isStale) {
             return (true, "");

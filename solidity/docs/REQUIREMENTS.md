@@ -96,15 +96,15 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 - Direct integration pattern for gas optimization
 - Data/logic separation (QCData.sol storage, QCManager.sol logic)
-- 5-state management contracts (QCStateManager.sol, QCRenewablePause.sol)
+- 5-state management unified in QCManager.sol
 - Direct integration with embedded policy logic (YAGNI principle)
 - Independent component upgradeability
 
 **Acceptance Criteria**:
 
 - All contracts use direct integration with immutable references
-- QCStateManager handles 5-state transitions and auto-escalation
-- QCRenewablePause manages pause credits and renewal logic
+- QCManager handles unified 5-state transitions, auto-escalation, and pause credits
+- Enhanced QCManager consolidates state management functionality
 - QCData updated with 5-state enum and STATE_MANAGER_ROLE
 - Policy contracts support 5-state validation (Active only mints, 60% can fulfill)
 - Policy contracts upgradeable via registry updates
@@ -191,14 +191,14 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Current Design (v2.0)**:
 
-- **Oracle Problem**: QCReserveLedger provides multi-attester consensus for reserve balances
+- **Oracle Problem**: ReserveOracle provides multi-attester consensus for reserve balances
 - **Enforcement**: WatchdogEnforcer allows permissionless triggering of objective violations
 - **Decision Problem**: Direct DAO action for any governance decisions
 
 **Key Components**:
 
 - **WatchdogReasonCodes**: Machine-readable violation codes for automated validation
-- **QCReserveLedger**: Median consensus from 3+ attesters, eliminates single trust point
+- **ReserveOracle**: Median consensus from 3+ attesters, eliminates single trust point
 - **WatchdogEnforcer**: Anyone can trigger enforcement with valid reason codes
 
 **Acceptance Criteria**:
@@ -259,7 +259,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - Graduated consequence progression: 1st default → MintingPaused, 2nd → UnderReview, 3rd → Revoked
 - Recovery paths: QCs can return to Active by clearing backlogs within time windows
 - RedemptionDefaulted events with full audit trail and consequence level
-- Integration with QCStateManager for automated consequence application
+- Integration with QCManager for automated consequence application
 - Integration with off-chain legal enforcement for terminal revocations
 
 ### 3.6 Emergency Controls
@@ -355,7 +355,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 - **DEFAULT_ADMIN_ROLE**: DAO governance (grant/revoke roles)
 - **MINTER_ROLE**: QCMinter contract (request minting operations)
-- **ATTESTER_ROLE**: ReserveOracle and individual attesters (submit reserve attestations)
+- **ATTESTER_ROLE**: ReserveOracle attesters (submit reserve attestations)
 - **REGISTRAR_ROLE**: Authorized entities (finalize wallet registrations)
 - **ARBITER_ROLE**: WatchdogEnforcer (objective violation enforcement)
 - **WATCHDOG_ROLE**: Subjective reporters (submit observations)

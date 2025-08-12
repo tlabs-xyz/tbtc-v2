@@ -53,7 +53,7 @@ describe("v1 System Deployment Tests", () => {
       // v1 should include these core contracts (direct integration architecture)
       const expectedV1Contracts = [
         "QCMinter", // Direct integration entry point for minting
-        "QCRedeemer", // Direct integration entry point for redemption  
+        "QCRedeemer", // Direct integration entry point for redemption
         "QCData", // Storage layer with 5-state models
         "SystemState", // Global configuration and emergency controls
         "QCManager", // Business logic controller with direct dependencies
@@ -77,7 +77,7 @@ describe("v1 System Deployment Tests", () => {
       // Test that we can get factories for the actual implemented contracts
       const contractsToTest = [
         "QCMinter",
-        "QCRedeemer", 
+        "QCRedeemer",
         "QCData",
         "SystemState",
         "QCManager",
@@ -163,11 +163,7 @@ describe("v1 System Deployment Tests", () => {
     it("should verify deployment tags are properly structured", () => {
       // Document the available tags for fixture deployment
       const deploymentTags = {
-        core: [
-          "AccountControlCore",
-          "QCMinter",
-          "QCRedeemer",
-        ],
+        core: ["AccountControlCore", "QCMinter", "QCRedeemer"],
         state: ["AccountControlState", "QCData", "SystemState", "QCManager"],
         policies: [
           "AccountControlPolicies",
@@ -210,27 +206,15 @@ describe("v1 System Deployment Tests", () => {
       const contractRelationships = {
         QCManager: {
           role: "Stateless business logic controller",
-          dependencies: [
-              "QCData",
-            "SystemState",
-            "QCReserveLedger",
-          ],
+          dependencies: ["QCData", "SystemState", "QCReserveLedger"],
         },
         QCMinter: {
           role: "Stable entry point for minting",
-          dependencies: [
-              "QCManager",
-            "BasicMintingPolicy",
-            "SystemState",
-          ],
+          dependencies: ["QCManager", "BasicMintingPolicy", "SystemState"],
         },
         QCRedeemer: {
           role: "Stable entry point for redemption",
-          dependencies: [
-              "QCManager",
-            "BasicRedemptionPolicy",
-            "SystemState",
-          ],
+          dependencies: ["QCManager", "BasicRedemptionPolicy", "SystemState"],
         },
         WatchdogEnforcer: {
           role: "Automated enforcement",
