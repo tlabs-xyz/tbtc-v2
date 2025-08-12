@@ -39,7 +39,6 @@ The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tB
 
 | Component | Purpose | Status |
 |-----------|---------|--------|
-| **ProtocolRegistry** | Service discovery and upgrades | ✅ Deployed |
 | **QCManager** | QC lifecycle and business logic | ✅ Deployed |
 | **QCData** | Isolated storage layer (5-state enum) | 🔄 Update Required |
 | **QCStateManager** | 5-state transition logic with auto-escalation | 🆕 New Contract |
@@ -180,7 +179,7 @@ redemptionGracePeriod: 8 hours  // Protection before deadline
 ```
 User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → TBTC Tokens
          ↓
-    ProtocolRegistry ← QCManager ← QCData
+    QCManager → QCData (direct reference)
                            ↓
                     QCReserveLedger ← ReserveOracle ← Attesters
 ```

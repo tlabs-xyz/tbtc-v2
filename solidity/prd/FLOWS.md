@@ -502,7 +502,7 @@ The onboarding flow now supports the complete QC lifecycle from registration thr
 
 2. **Update Registry**
 
-   - DAO calls `ProtocolRegistry.setService("MINTING_POLICY", newPolicyAddress)`
+   - DAO would need to redeploy contracts (direct integration model)
    - All subsequent mints use new policy
    - Event: `ServiceUpdated`
 
@@ -1378,7 +1378,7 @@ The Account Control system is deployed with the following components:
 
 - [ ] Set up testnet accounts and funding
 - [ ] Deploy base contract suite
-- [ ] Configure ProtocolRegistry
+- [ ] Deploy contracts with direct dependencies
 - [ ] Implement basic test utilities
 
 **Phase 2: Core Flow Scripts** (Week 2)

@@ -57,7 +57,7 @@ Now accurately describes the 11 implemented contracts:
 - WatchdogEnforcer.sol - Simplified Enforcement
 - QCReserveLedger.sol - Reserve Attestation
 - SystemState.sol - Global Configuration
-- ProtocolRegistry.sol - Service Discovery
+- Direct Integration Pattern (no registry needed)
 - QCStateManager.sol - State Management
 - QCRenewablePause.sol - Pause System
 - BitcoinAddressUtils.sol - Address Validation

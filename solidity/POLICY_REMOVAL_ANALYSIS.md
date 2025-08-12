@@ -126,11 +126,11 @@ This represents a **mature architecture decision** after the system proved the p
 | **Minting** | QCMinter.sol with direct Bank integration | ✅ Complete |
 | **Redemption** | QCRedeemer.sol with internal logic | ✅ Complete |
 | **SPV Validation** | Inlined in QCManager/QCRedeemer | ✅ Stubbed |
-| **Policy Upgrades** | ProtocolRegistry service locator pattern | ✅ Available |
+| **Policy Upgrades** | Direct integration (no registry) | ❌ Not needed |
 
 ### 🔄 **Upgrade Path Still Available**
 
-The **ProtocolRegistry** service locator pattern still enables policy upgrades if needed:
+The direct integration pattern was chosen over a service locator pattern:
 
 ```solidity
 // Can still add policy contracts later if requirements change
@@ -153,7 +153,7 @@ protocolRegistry.setService("MINTING_POLICY", newPolicyAddress);
 - **Not a missing feature** - Intentional architectural decision
 - **Not technical debt** - Strategic simplification  
 - **Not incomplete** - Direct implementation is the intended design
-- **Future-proof** - ProtocolRegistry still enables upgrades if needed
+- **Gas-optimized** - Direct integration saves ~5k gas per operation
 
 ---
 

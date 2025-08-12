@@ -71,7 +71,6 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 | ------------------------------- | ---------------------------- | ------------------------------------------------- |
 | **BasicMintingPolicy**          | Direct Bank integration      | Auto-minting, capacity validation, 5-state checks |
 | **BasicRedemptionPolicy**       | Redemption logic             | Network continuity (60% states allow fulfillment) |
-| **ProtocolRegistry**            | Central service registry     | Component upgrades, dependency management         |
 | **QCManager**                   | Business logic               | Stateless QC management, capacity calculations    |
 | **QCData**                      | Storage layer                | 5-state enum, gas-optimized, audit-friendly      |
 | **QCStateManager**              | State transition logic       | 5-state management, auto-escalation, graduated consequences |

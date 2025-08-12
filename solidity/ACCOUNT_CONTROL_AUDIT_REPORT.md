@@ -2,7 +2,8 @@
 
 **Date**: 2025-08-11  
 **Scope**: Complete analysis of account control system implementation vs. documentation  
-**Status**: CRITICAL FINDINGS - Major discrepancies identified
+**Status**: CRITICAL FINDINGS - Major discrepancies identified  
+**Note**: This audit was conducted before the removal of ProtocolRegistry. The system now uses direct integration pattern.
 
 ---
 
