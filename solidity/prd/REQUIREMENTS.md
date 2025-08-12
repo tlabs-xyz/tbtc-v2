@@ -76,7 +76,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 #### 3.1.1 Direct Bank Integration (REQ-FUNC-BANK-001)
 
-**Requirement**: The BasicMintingPolicy MUST directly integrate with the existing Bank/Vault architecture
+**Requirement**: The QCMinter MUST directly integrate with the existing Bank/Vault architecture
 
 - Direct calls to `Bank.increaseBalanceAndCall()` for seamless minting
 - Authorization through `authorizedBalanceIncreasers` mapping
@@ -85,7 +85,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Acceptance Criteria**:
 
-- BasicMintingPolicy authorized as balance increaser in Bank contract
+- QCMinter authorized as balance increaser in Bank contract
 - Auto-minting triggers TBTCVault.receiveBalanceIncrease() automatically
 - Manual minting creates Bank balance for user discretionary minting
 - No interference with existing Bridge → Bank → Vault flows
@@ -97,7 +97,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - Direct integration pattern for gas optimization
 - Data/logic separation (QCData.sol storage, QCManager.sol logic)
 - 5-state management contracts (QCStateManager.sol, QCRenewablePause.sol)
-- Policy-driven operations through IMintingPolicy and IRedemptionPolicy
+- Direct integration with embedded policy logic (YAGNI principle)
 - Independent component upgradeability
 
 **Acceptance Criteria**:
@@ -153,7 +153,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Requirement**: The system MUST implement seamless minting through direct Bank integration
 
-- BasicMintingPolicy validates QC status, capacity, and system state
+- QCMinter validates QC status, capacity, and system state (embedded logic)
 - Direct Bank balance creation with optional auto-minting
 - Comprehensive input validation and error handling
 - Unique mint ID generation and tracking
@@ -495,7 +495,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 **Technical Implementation**:
 
 - Deploy QCManager, QCData, SystemState with direct dependencies
-- BasicMintingPolicy authorized in Bank's authorizedBalanceIncreasers
+- QCMinter authorized in Bank's authorizedBalanceIncreasers
 - Use existing TBTC token interface for minting/burning
 - No shared state with existing tBTC v2 contracts
 
@@ -503,7 +503,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Requirement**: Seamless integration with existing Bank contract
 
-- BasicMintingPolicy authorized as balance increaser
+- QCMinter authorized as balance increaser
 - Support for both increaseBalanceAndCall (auto-mint) and increaseBalance (manual)
 - Maintain compatibility with existing Bridge operations
 - Shared infrastructure for optimal efficiency
@@ -881,7 +881,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 | Risk                               | Probability | Impact   | Mitigation Strategy                                    |
 | ---------------------------------- | ----------- | -------- | ------------------------------------------------------ |
-| Critical bug in BasicMintingPolicy | Medium      | High     | Comprehensive testing, security audits, bug bounty     |
+| Critical bug in QCMinter           | Medium      | High     | Comprehensive testing, security audits, bug bounty     |
 | Bank integration issues            | Low         | High     | Extensive integration testing, staged deployment       |
 | SPV verification vulnerabilities   | Low         | Critical | Leverage proven SPV infrastructure, additional testing |
 | Gas limit exceeded                 | Low         | Medium   | Gas optimization, transaction batching                 |

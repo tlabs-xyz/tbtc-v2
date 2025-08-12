@@ -230,6 +230,82 @@ UnderReview → Active/Revoked (Council decision)
 
 ---
 
+## Operational Details
+
+### Renewable Pause Credit Mechanism
+
+QCs receive renewable pause credits for operational flexibility:
+
+- **Initial Grant**: 1 credit upon QC registration
+- **Renewal Period**: 1 new credit every 90 days
+- **Maximum Credits**: 1 (no accumulation)
+- **Usage**: Consumed when self-pausing (MintingPaused or Paused)
+- **Recovery**: Must wait 90 days for renewal after use
+
+### Auto-Escalation Timer
+
+Self-initiated pauses have automatic escalation to prevent indefinite disruption:
+
+```
+Self-Pause Initiated (MintingPaused/Paused)
+        ↓
+48-Hour Timer Starts
+        ↓
+QC Can Resume Anytime (resumeSelfPause)
+        ↓
+If Not Resumed After 48h:
+        ↓
+Watchdog Calls checkEscalation()
+        ↓
+Auto-Escalate to UnderReview
+        ↓
+Emergency Council Intervention Required
+```
+
+### Default Tracking & Progressive Consequences
+
+The system tracks redemption defaults with graduated consequences:
+
+**Timing Parameters:**
+- **Consecutive Default Window**: 30 days (resets if no defaults)
+- **Recovery Period**: 90 days between penalty tiers
+- **First Default**: Active → MintingPaused (can still fulfill)
+- **Second Default**: MintingPaused → UnderReview (council review)
+- **Third Default**: UnderReview → Revoked (permanent termination)
+
+**Default Recovery Path:**
+- Clear redemption backlog
+- Maintain good standing for recovery period
+- Council approval for UnderReview → Active transition
+
+### Role Distribution Across Contracts
+
+| Contract | Roles | Purpose |
+|----------|-------|---------|
+| **QCManager** | QC_ADMIN_ROLE, REGISTRAR_ROLE, ARBITER_ROLE, QC_GOVERNANCE_ROLE, WATCHDOG_ENFORCER_ROLE | Business logic and coordination |
+| **QCMinter** | MINTER_ROLE | Minting authorization |
+| **QCRedeemer** | REDEEMER_ROLE, ARBITER_ROLE | Redemption and arbitration |
+| **SystemState** | PARAMETER_ADMIN_ROLE, PAUSER_ROLE | System parameters and pausing |
+| **QCData** | QC_MANAGER_ROLE, STATE_MANAGER_ROLE | State storage management |
+| **QCReserveLedger** | ATTESTER_ROLE | Reserve attestation |
+| **WatchdogEnforcer** | Permissionless | Anyone can trigger violations |
+
+### Emergency Response Quick Reference
+
+**Key Emergency Functions:**
+- `emergencyPauseQC(address qc, bytes32 reason)` - QC-specific pause (7-day auto-expire)
+- `forceConsensus()` - Override attestation deadlocks (requires ≥1 valid attestation)
+- `pauseMinting()` / `pauseRedemption()` - Global function pauses
+- `checkEscalation(address qc)` - Trigger escalation after 45-minute timer
+- `enforceObjectiveViolation(qc, reasonCode)` - Permissionless violation enforcement
+
+**Emergency Authority:**
+- **PAUSER_ROLE**: Execute pauses (Emergency Council)
+- **ARBITER_ROLE**: Force consensus, resolve disputes
+- **Anyone**: Trigger objective violations via WatchdogEnforcer
+
+---
+
 ## Documentation References
 
 ### Technical Documentation
