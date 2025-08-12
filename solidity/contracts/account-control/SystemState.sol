@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// ## Emergency Control Architecture
 ///
 /// ### Global Pause Mechanisms
-/// - **Function-Specific Pauses**: Can pause minting, redemption, registry, wallet registration independently
+/// - **Function-Specific Pauses**: Can pause minting, redemption, wallet registration independently
 /// - **Time-Limited Duration**: All pauses expire automatically after emergencyPauseDuration (default 7 days)
 /// - **No Global Kill Switch**: Intentional design to prevent single points of failure
 ///
@@ -48,8 +48,6 @@ contract SystemState is AccessControl {
     error MintingNotPaused();
     error RedemptionAlreadyPaused();
     error RedemptionNotPaused();
-    error RegistryAlreadyPaused();
-    error RegistryNotPaused();
     error WalletRegistrationAlreadyPaused();
     error WalletRegistrationNotPaused();
     error InvalidAmount();
@@ -65,7 +63,6 @@ contract SystemState is AccessControl {
     error InvalidCouncilAddress();
     error MintingIsPaused();
     error RedemptionIsPaused();
-    error RegistryOperationsArePaused();
     error WalletRegistrationIsPaused();
     error QCIsEmergencyPaused(address qc);
     error QCNotEmergencyPaused(address qc);
@@ -74,7 +71,6 @@ contract SystemState is AccessControl {
     /// @dev Global pause flags for granular emergency controls
     bool public isMintingPaused;
     bool public isRedemptionPaused;
-    bool public isRegistryPaused;
     bool public isWalletRegistrationPaused;
 
     /// @dev Global system parameters
@@ -153,15 +149,6 @@ contract SystemState is AccessControl {
         uint256 indexed timestamp
     );
 
-    event RegistryPaused(
-        address indexed triggeredBy,
-        uint256 indexed timestamp
-    );
-
-    event RegistryUnpaused(
-        address indexed triggeredBy,
-        uint256 indexed timestamp
-    );
 
     event WalletRegistrationPaused(
         address indexed triggeredBy,
@@ -209,8 +196,6 @@ contract SystemState is AccessControl {
             if (isMintingPaused) revert MintingIsPaused();
         } else if (pauseKey == keccak256("redemption")) {
             if (isRedemptionPaused) revert RedemptionIsPaused();
-        } else if (pauseKey == keccak256("registry")) {
-            if (isRegistryPaused) revert RegistryOperationsArePaused();
         } else if (pauseKey == keccak256("wallet_registration")) {
             if (isWalletRegistrationPaused) revert WalletRegistrationIsPaused();
         }
@@ -270,21 +255,6 @@ contract SystemState is AccessControl {
         emit RedemptionUnpaused(msg.sender, block.timestamp);
     }
 
-    /// @notice Pause registry operations
-    function pauseRegistry() external onlyRole(PAUSER_ROLE) {
-        if (isRegistryPaused) revert RegistryAlreadyPaused();
-        isRegistryPaused = true;
-        pauseTimestamps[keccak256("registry")] = block.timestamp;
-        emit RegistryPaused(msg.sender, block.timestamp);
-    }
-
-    /// @notice Unpause registry operations
-    function unpauseRegistry() external onlyRole(PAUSER_ROLE) {
-        if (!isRegistryPaused) revert RegistryNotPaused();
-        isRegistryPaused = false;
-        delete pauseTimestamps[keccak256("registry")];
-        emit RegistryUnpaused(msg.sender, block.timestamp);
-    }
 
     /// @notice Pause wallet registration operations
     function pauseWalletRegistration() external onlyRole(PAUSER_ROLE) {
@@ -580,8 +550,6 @@ contract SystemState is AccessControl {
             return isMintingPaused;
         } else if (pauseKey == keccak256("redemption")) {
             return isRedemptionPaused;
-        } else if (pauseKey == keccak256("registry")) {
-            return isRegistryPaused;
         } else if (pauseKey == keccak256("wallet_registration")) {
             return isWalletRegistrationPaused;
         }

@@ -400,7 +400,6 @@ describe("SystemState Security Tests", () => {
 
       expect(await freshSystemState.isMintingPaused()).to.be.false
       expect(await freshSystemState.isRedemptionPaused()).to.be.false
-      expect(await freshSystemState.isRegistryPaused()).to.be.false
       expect(await freshSystemState.isWalletRegistrationPaused()).to.be.false
     })
   })

@@ -70,7 +70,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         string userBtcAddress;
     }
 
-    // Direct dependencies for efficient access
+    // Contract dependencies
     TBTC public immutable tbtcToken;
     QCData public immutable qcData;
     SystemState public immutable systemState;
