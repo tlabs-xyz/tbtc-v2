@@ -17,7 +17,10 @@
 - **CURRENT_SYSTEM_STATE.md** - Single source of truth for system state
 - **ARCHITECTURE.md** - Technical architecture and design
 - **IMPLEMENTATION.md** - Code patterns and implementation guide
-- **ARCHITECTURE_DECISIONS.md** - Key design decisions (ADRs)
+- **REQUIREMENTS.md** - Complete requirements specification
+- **FLOWS.md** - User journeys and operational sequences
+- **SECURITY_ARCHITECTURE.md** - Role-based access control and security
+- **ACCOUNT_CONTROL_AUDIT_TRAIL.md** - Event tracking and compliance
 
 ### Watchdog System
 
@@ -40,7 +43,6 @@
 
 ## 🔗 Related Documentation
 
-- **Business/Product**: [`../prd/`](../prd/) - Requirements, flows, research
 - **Smart Contracts**: [`../contracts/`](../contracts/) - Source code
 - **Deployment**: [`../deploy/`](../deploy/) - Deployment scripts
 - **Tests**: [`../test/`](../test/) - Test suites
@@ -73,5 +75,4 @@ All documents in this directory reflect the **current system state** (v2.0). His
 
 ---
 
-_For business/product documentation, see [`../prd/README.md`](../prd/README.md)_  
 _For complete navigation, see [`../DOCUMENTATION_MAP.md`](../DOCUMENTATION_MAP.md)_
