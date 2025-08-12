@@ -4,7 +4,7 @@
 **Date**: 2025-08-11  
 **Architecture**: Simplified Account Control System  
 **Purpose**: User journeys and sequence diagrams for Account Control system  
-**Related Documents**: [README.md](README.md), [REQUIREMENTS.md](REQUIREMENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION.md](IMPLEMENTATION.md)
+**Related Documents**: [README.md](README.md), [REQUIREMENTS.md](REQUIREMENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ## Table of Contents
 
