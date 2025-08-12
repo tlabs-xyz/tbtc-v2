@@ -9,7 +9,6 @@ import {
   QCManager,
   QCData,
   SystemState,
-  ProtocolRegistry,
 } from "../../typechain"
 
 chai.use(smock.matchers)
