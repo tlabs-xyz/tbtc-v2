@@ -166,23 +166,6 @@ function enforceObjectiveViolation(address qc, bytes32 reasonCode) external {
 - `STALE_ATTESTATIONS`: No fresh attestations in 24 hours  
 - `SUSTAINED_RESERVE_VIOLATION`: Persistent undercollateralization
 
-#### Direct Bank Integration Benefits
-**Gas Efficiency Through Simplification:**
-```
-Traditional: User → Proxy → Abstraction → Policy → Bank (4 hops)
-Our Approach: User → QCMinter (embedded logic) → Bank (1 hop)
-Result: ~5k gas savings per operation
-```
-
-**Integration Flow:**
-```solidity
-// Direct integration pattern with embedded policy logic
-// QCMinter has all validation logic embedded (YAGNI principle)
-Bank.increaseBalanceAndCall(vault, [user], [satoshis]);
-// Triggers automatic minting in TBTCVault
-// Perfect fungibility with Bridge-minted tBTC
-```
-
 #### Key Technical Parameters
 - **Consensus Threshold**: 3 attestations required (Byzantine fault tolerant)
 - **Attestation Window**: 6 hours for fresh submissions
