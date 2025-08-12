@@ -130,12 +130,13 @@ contract BasicMintingPolicy is IMintingPolicy, AccessControl {
 - **Emergency Controls**: System-wide pause mechanisms
 - **Gas Optimization**: Efficient batched operations for multiple users
 
-### 2. ProtocolRegistry.sol - Service Locator Pattern
+### 2. Direct Integration Pattern
 
-**Purpose**: Central registry enabling modular architecture and seamless upgrades.
+**Purpose**: Simplified architecture with direct contract dependencies for gas optimization.
 
 ```solidity
-contract ProtocolRegistry is AccessControl {
+// Example: QCMinter with direct integration
+contract QCMinter {
   bytes32 public constant SERVICE_ADMIN_ROLE = keccak256("SERVICE_ADMIN_ROLE");
 
   mapping(bytes32 => address) private services;

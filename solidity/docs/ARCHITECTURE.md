@@ -87,7 +87,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 └─────────┬───────┘    └──────────────────┘    └─────────────────┘
           │                        │                        │
           │              ┌─────────────────┐               │
-          └──────────────│ ProtocolRegistry│               │
+          └──────────────│ Direct Integration│              │
                          │ (Service Locator)│               │
                          └─────────┬───────┘               │
                                    │                        │
@@ -124,7 +124,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 - Auto-minting capability through TBTCVault integration
 - Capacity validation and authorization checks
 - Emergency pause mechanisms
-- Policy-driven evolution (upgradeable via ProtocolRegistry)
+- Direct integration pattern (following YAGNI principle)
 
 **Critical Methods**:
 
@@ -139,7 +139,7 @@ function creditQCBackedDeposit(
 
 ```
 
-### 2. ProtocolRegistry.sol (Service Locator)
+### 2. Direct Integration Architecture
 
 **Purpose**: Central registry enabling modular architecture and seamless upgrades.
 
@@ -552,7 +552,7 @@ WatchdogEnforcer:
 └── Uses machine-readable reason codes
 ```
 
-### ProtocolRegistry Usage
+### Direct Integration Pattern
 
 **Direct Integration**:
 
@@ -629,7 +629,7 @@ The system deploys through numbered scripts ensuring proper dependency resolutio
 
 **Core Infrastructure (Scripts 95-99)**:
 
-1. `95_deploy_account_control_core.ts` - Core entry points (QCMinter, QCRedeemer, ProtocolRegistry)
+1. `95_deploy_account_control_core.ts` - Core entry points (QCMinter, QCRedeemer with direct dependencies)
 2. `96_deploy_account_control_state.ts` - State management (QCData, SystemState, QCManager)
 3. `97_deploy_account_control_policies.ts` - Policy contracts (BasicMintingPolicy, BasicRedemptionPolicy)
 4. `98_deploy_reserve_ledger.ts` - Reserve tracking and watchdog system (QCReserveLedger, WatchdogEnforcer)
@@ -779,7 +779,7 @@ The Account Control system consists of:
 - QCMinter.sol - User-facing minting interface
 - QCRedeemer.sol - User-facing redemption interface
 - SystemState.sol - Global system parameters and emergency controls
-- ProtocolRegistry.sol - Service discovery and upgrades
+- Direct integration with immutable contract references
 - SPVValidator.sol - Bitcoin SPV proof validation
 - BitcoinAddressUtils.sol - Bitcoin address utilities
 - QCReserveLedger.sol - Multi-attester consensus and storage

@@ -94,7 +94,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Requirement**: The system MUST implement a modular, upgradeable contract architecture with 5-state management
 
-- ProtocolRegistry as central service registry
+- Direct integration pattern for gas optimization
 - Data/logic separation (QCData.sol storage, QCManager.sol logic)
 - 5-state management contracts (QCStateManager.sol, QCRenewablePause.sol)
 - Policy-driven operations through IMintingPolicy and IRedemptionPolicy
@@ -102,7 +102,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Acceptance Criteria**:
 
-- All contracts reference services through ProtocolRegistry
+- All contracts use direct integration with immutable references
 - QCStateManager handles 5-state transitions and auto-escalation
 - QCRenewablePause manages pause credits and renewal logic
 - QCData updated with 5-state enum and STATE_MANAGER_ROLE
@@ -494,7 +494,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Technical Implementation**:
 
-- Deploy ProtocolRegistry, QCManager, QCData, SystemState independently
+- Deploy QCManager, QCData, SystemState with direct dependencies
 - BasicMintingPolicy authorized in Bank's authorizedBalanceIncreasers
 - Use existing TBTC token interface for minting/burning
 - No shared state with existing tBTC v2 contracts
