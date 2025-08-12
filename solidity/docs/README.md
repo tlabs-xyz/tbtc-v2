@@ -6,7 +6,7 @@
 ## 📍 Quick Start
 
 **Architecture**: [`ARCHITECTURE.md`](ARCHITECTURE.md) - Start here!  
-**Implementation Guide**: [`IMPLEMENTATION.md`](IMPLEMENTATION.md)  
+
 **Full Navigation**: [`../DOCUMENTATION_MAP.md`](../DOCUMENTATION_MAP.md)
 
 ## 📁 Directory Contents
@@ -15,7 +15,7 @@
 
 
 - **ARCHITECTURE.md** - Technical architecture and design
-- **IMPLEMENTATION.md** - Code patterns and implementation guide
+
 - **REQUIREMENTS.md** - Complete requirements specification
 - **FLOWS.md** - User journeys and operational sequences
 - **SECURITY_ARCHITECTURE.md** - Role-based access control and security
@@ -50,8 +50,7 @@
 
 ### Understanding the System
 
-1. Read [`ARCHITECTURE.md`](ARCHITECTURE.md) for technical design
-2. Review [`IMPLEMENTATION.md`](IMPLEMENTATION.md) for code patterns
+1. Read [`ARCHITECTURE.md`](ARCHITECTURE.md) for technical design and implementation
 
 ### Key Concepts
 

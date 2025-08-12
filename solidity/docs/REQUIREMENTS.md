@@ -4,7 +4,7 @@
 **Date**: 2025-08-06  
 **Architecture**: Simplified Watchdog System  
 **Purpose**: Complete requirements specification (source of truth)  
-**Related Documents**: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [IMPLEMENTATION.md](IMPLEMENTATION.md), [FLOWS.md](FLOWS.md)
+**Related Documents**: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [FLOWS.md](FLOWS.md)
 
 ## Table of Contents
 
