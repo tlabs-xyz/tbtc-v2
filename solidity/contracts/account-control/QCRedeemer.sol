@@ -66,6 +66,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         address qc;
         uint256 amount;
         uint256 requestedAt;
+        uint256 deadline;           // Added: Deadline for fulfillment
         RedemptionStatus status;
         string userBtcAddress;
     }
@@ -89,6 +90,12 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
 
     /// @dev Counter for generating unique redemption IDs
     uint256 private redemptionCounter;
+
+    /// @dev Track redemptions by QC for efficient lookup
+    mapping(address => bytes32[]) public qcRedemptions;
+    
+    /// @dev Track number of active redemptions per QC
+    mapping(address => uint256) public qcActiveRedemptionCount;
 
     // =================== EVENTS ===================
 
@@ -228,15 +235,24 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Burn the tBTC tokens
         tbtcToken.burnFrom(msg.sender, amount);
 
+        // Calculate deadline
+        uint256 redemptionTimeout = systemState.redemptionTimeout();
+        uint256 deadline = block.timestamp + redemptionTimeout;
+
         // Store redemption data
         redemptions[redemptionId] = Redemption({
             user: msg.sender,
             qc: qc,
             amount: amount,
             requestedAt: block.timestamp,
+            deadline: deadline,
             status: RedemptionStatus.Pending,
             userBtcAddress: userBtcAddress
         });
+        
+        // Track redemption for QC
+        qcRedemptions[qc].push(redemptionId);
+        qcActiveRedemptionCount[qc]++;
 
         emit RedemptionRequested(
             redemptionId,
@@ -284,6 +300,12 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
 
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Fulfilled;
+        
+        // Update tracking
+        address qc = redemptions[redemptionId].qc;
+        if (qcActiveRedemptionCount[qc] > 0) {
+            qcActiveRedemptionCount[qc]--;
+        }
 
         Redemption memory redemption = redemptions[redemptionId];
         emit RedemptionFulfilled(
@@ -316,6 +338,12 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
 
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Defaulted;
+        
+        // Update tracking
+        address qc = redemptions[redemptionId].qc;
+        if (qcActiveRedemptionCount[qc] > 0) {
+            qcActiveRedemptionCount[qc]--;
+        }
 
         Redemption memory redemption = redemptions[redemptionId];
         emit RedemptionDefaulted(
@@ -612,46 +640,33 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
 
     // =================== IQCRedeemer Interface Implementation ===================
 
-    /// @notice Check if QC has any unfulfilled (pending) redemptions
-    /// @return hasUnfulfilled True if QC has pending redemptions
-    function hasUnfulfilledRedemptions(address /* qc */) external view returns (bool hasUnfulfilled) {
-        // Note: This is a simplified implementation that would need optimization for production
-        // In a full implementation, we would maintain separate mappings for efficient querying
-        // For now, this function assumes QCs don't have many redemptions to check
-        
-        // Implementation note: In production, this would require additional data structures
-        // to efficiently track redemptions by QC without iterating through all redemptions.
-        // Current implementation returns false as a safe default.
-        
-        // TODO: Add efficient QC-to-redemptions mapping for production implementation
-        return false;
-    }
-
-    /// @notice Get earliest redemption deadline for a QC
-    /// @return deadline Earliest deadline timestamp (0 if no pending redemptions)
-    function getEarliestRedemptionDeadline(address /* qc */) external view returns (uint256 deadline) {
-        // Note: This is a simplified implementation that would need optimization for production
-        // In a full implementation, we would maintain deadline tracking per redemption
-        // and efficient querying structures
-        
-        // Implementation note: Current redemption structure doesn't include deadlines.
-        // In production, this would require adding deadline field to Redemption struct
-        // and maintaining efficient QC-to-deadline mappings.
-        
-        // TODO: Add deadline tracking to Redemption struct and implement deadline querying
-        return 0;
-    }
-
     /// @notice Get count of pending redemptions for a QC
     /// @return count Number of pending redemptions
-    function getPendingRedemptionCount(address /* qc */) external view returns (uint256 count) {
-        // Note: This is a simplified implementation that would need optimization for production
-        // In a full implementation, we would maintain counters per QC for efficient access
+    function getPendingRedemptionCount(address qc) external view returns (uint256 count) {
+        return qcActiveRedemptionCount[qc];
+    }
+
+    /// @notice Check if QC has unfulfilled redemptions
+    /// @param qc The QC address to check
+    /// @return hasUnfulfilled True if QC has pending redemptions
+    function hasUnfulfilledRedemptions(address qc) external view returns (bool hasUnfulfilled) {
+        return qcActiveRedemptionCount[qc] > 0;
+    }
+    
+    /// @notice Get earliest redemption deadline for a QC
+    /// @param qc The QC address to check
+    /// @return deadline Earliest deadline timestamp, or type(uint256).max if no pending redemptions
+    function getEarliestRedemptionDeadline(address qc) external view returns (uint256 deadline) {
+        bytes32[] memory redemptionIds = qcRedemptions[qc];
+        uint256 earliest = type(uint256).max;
         
-        // Implementation note: Requires additional data structures to efficiently count
-        // redemptions by QC and status without full enumeration.
+        for (uint256 i = 0; i < redemptionIds.length; i++) {
+            Redemption memory redemption = redemptions[redemptionIds[i]];
+            if (redemption.status == RedemptionStatus.Pending && redemption.deadline < earliest) {
+                earliest = redemption.deadline;
+            }
+        }
         
-        // TODO: Add QC redemption counters for production implementation
-        return 0;
+        return earliest;
     }
 }
