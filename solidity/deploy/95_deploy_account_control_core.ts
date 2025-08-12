@@ -22,6 +22,15 @@ const func: DeployFunction = async function DeployAccountControlCore(
   const bank = await deployments.get("Bank")
   const tbtcVault = await deployments.get("TBTCVault")
   const tbtc = await deployments.get("TBTC")
+  const lightRelay = await deployments.get("LightRelay")
+  
+  // Configure SPV parameters based on network
+  const txProofDifficultyFactor = 
+    network.name === "hardhat" ||
+    network.name === "development" ||
+    network.name === "system_tests"
+      ? 1  // Lower requirement for testing
+      : 6  // Production requirement (6 confirmations)
 
   // Deploy QCMinter - Direct injection pattern
   const qcMinter = await deploy("QCMinter", {
@@ -38,10 +47,16 @@ const func: DeployFunction = async function DeployAccountControlCore(
     waitConfirmations: network.live ? 5 : 1,
   })
 
-  // Deploy QCRedeemer - Direct injection pattern
+  // Deploy QCRedeemer - Direct injection pattern with SPV support
   const qcRedeemer = await deploy("QCRedeemer", {
     from: deployer,
-    args: [tbtc.address, qcData.address, systemState.address],
+    args: [
+      tbtc.address, 
+      qcData.address, 
+      systemState.address,
+      lightRelay.address,
+      txProofDifficultyFactor
+    ],
     log: true,
     waitConfirmations: network.live ? 5 : 1,
   })
@@ -53,4 +68,4 @@ const func: DeployFunction = async function DeployAccountControlCore(
 
 export default func
 func.tags = ["AccountControlCore", "QCMinter", "QCRedeemer"]
-func.dependencies = ["Bank", "TBTCVault", "TBTC", "AccountControlState"] // Depends on existing tBTC infrastructure and state contracts
+func.dependencies = ["Bank", "TBTCVault", "TBTC", "LightRelay", "AccountControlState"] // Depends on existing tBTC infrastructure, light relay, and state contracts

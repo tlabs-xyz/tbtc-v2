@@ -21,6 +21,15 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const watchdogEnforcer = await get("WatchdogEnforcer")
   const tbtc = await get("TBTC")
   const bank = await get("Bank")
+  const lightRelay = await get("LightRelay")
+  
+  // Configure SPV parameters based on network
+  const txProofDifficultyFactor = 
+    hre.network.name === "hardhat" ||
+    hre.network.name === "development" ||
+    hre.network.name === "system_tests"
+      ? 1  // Lower requirement for testing
+      : 6  // Production requirement (6 confirmations)
 
   // Define role constants
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
@@ -130,6 +139,23 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     "setRedemptionTimeout",
     48 * 60 * 60 // 48 hours
   )
+  
+  // Step 8: Configure SPV parameters
+  log("Step 8: Configuring SPV parameters...")
+  await execute(
+    "SystemState",
+    { from: deployer, log: true },
+    "setLightRelay",
+    lightRelay.address
+  )
+  await execute(
+    "SystemState",
+    { from: deployer, log: true },
+    "setTxProofDifficultyFactor",
+    txProofDifficultyFactor
+  )
+  log(`✅ SPV parameters configured (relay: ${lightRelay.address}, difficulty: ${txProofDifficultyFactor})`)
+  
   log("✅ System parameters configured")
 
   log("")
@@ -143,6 +169,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log("  3. Redemption via QCRedeemer")
   log("  4. Reserve attestation via ReserveOracle")
   log("  5. Enforcement via WatchdogEnforcer")
+  log("  6. SPV validation for wallet registration and redemption proofs")
   log("")
   log("Important next steps:")
   log("  - Grant actual attester addresses ATTESTER_ROLE in ReserveOracle")

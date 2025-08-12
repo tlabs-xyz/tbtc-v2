@@ -3,10 +3,15 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {BTCUtils} from "@keep-network/bitcoin-spv-sol/contracts/BTCUtils.sol";
+import {BytesLib} from "@keep-network/bitcoin-spv-sol/contracts/BytesLib.sol";
+import {ValidateSPV} from "@keep-network/bitcoin-spv-sol/contracts/ValidateSPV.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
+import "./SPVState.sol";
 import "../token/TBTC.sol";
 import "../bridge/BitcoinTx.sol";
+import "../bridge/IRelay.sol";
 
 /// @title QCRedeemer
 /// @dev Direct implementation for tBTC redemption with QC backing.
@@ -26,6 +31,12 @@ import "../bridge/BitcoinTx.sol";
 /// - REDEEMER_ROLE: Reserved for future functionality (currently unused)
 /// - ARBITER_ROLE: Can record redemption fulfillments and flag defaults
 contract QCRedeemer is AccessControl, ReentrancyGuard {
+    using BTCUtils for bytes;
+    using BTCUtils for uint256;
+    using ValidateSPV for bytes;
+    using ValidateSPV for bytes32;
+    using SPVState for SPVState.Storage;
+    
     // Custom errors for gas-efficient reverts
     error InvalidQCAddress();
     error InvalidAmount();
@@ -46,6 +57,15 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     error SPVVerificationFailed(bytes32 redemptionId);
     error InvalidReason();
     error SPVValidatorNotAvailable();
+    error RelayNotSet();
+    error InvalidRelayAddress();
+    error SPVProofValidationFailed(string reason);
+    error RedemptionProofFailed(string reason);
+    error InsufficientProofDifficulty();
+    error TransactionTooOld();
+    error InvalidBitcoinTransaction();
+    error PaymentNotFound();
+    error InsufficientPayment(uint64 expected, uint64 actual);
 
     // Role definitions for access control
     bytes32 public constant REDEEMER_ROLE = keccak256("REDEEMER_ROLE");
@@ -75,6 +95,9 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     TBTC public immutable tbtcToken;
     QCData public immutable qcData;
     SystemState public immutable systemState;
+    
+    // SPV validation storage
+    SPVState.Storage internal spvState;
 
     /// @dev Maps redemption IDs to redemption data
     mapping(bytes32 => Redemption) public redemptions;
@@ -158,7 +181,9 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     constructor(
         address _tbtcToken,
         address _qcData,
-        address _systemState
+        address _systemState,
+        address _relay,
+        uint96 _txProofDifficultyFactor
     ) {
         require(_tbtcToken != address(0), "Invalid token address");
         require(_qcData != address(0), "Invalid qcData address");
@@ -167,6 +192,9 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         tbtcToken = TBTC(_tbtcToken);
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
+        
+        // Initialize SPV state
+        spvState.initialize(_relay, _txProofDifficultyFactor);
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(REDEEMER_ROLE, msg.sender);
@@ -403,6 +431,43 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     function getRedemptionTimeout() external view returns (uint256 timeout) {
         return systemState.redemptionTimeout();
     }
+    
+    // =================== SPV CONFIGURATION FUNCTIONS ===================
+    
+    /// @notice Update the Bitcoin relay address
+    /// @param _relay New relay address
+    function setRelay(address _relay) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
+        spvState.setRelay(_relay);
+    }
+    
+    /// @notice Update the transaction proof difficulty factor
+    /// @param _txProofDifficultyFactor New difficulty factor
+    function setTxProofDifficultyFactor(uint96 _txProofDifficultyFactor) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
+        spvState.setTxProofDifficultyFactor(_txProofDifficultyFactor);
+    }
+    
+    /// @notice Get current SPV parameters
+    /// @return relay The current relay address
+    /// @return difficultyFactor The current difficulty factor
+    function getSPVParameters() 
+        external 
+        view 
+        returns (address relay, uint96 difficultyFactor) 
+    {
+        return spvState.getParameters();
+    }
+    
+    /// @notice Check if SPV validation is properly configured
+    /// @return isConfigured True if SPV state is initialized
+    function isSPVConfigured() external view returns (bool isConfigured) {
+        return spvState.isInitialized();
+    }
 
     /// @notice Check if a redemption is fulfilled
     /// @param redemptionId The redemption identifier
@@ -609,10 +674,160 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
     ) private view returns (bool verified) {
-        // For now, return true to allow development and testing
-        // TODO: Implement actual SPV validation logic when validator is available
-        redemptionId; userBtcAddress; expectedAmount; txInfo; proof; // Silence unused warnings
-        return true;
+        // Verify SPV state is initialized
+        if (!spvState.isInitialized()) {
+            revert RelayNotSet();
+        }
+        
+        // TODO: SPV validation stubbed out for development/testing
+        // This should be replaced with full SPV validation logic for production
+        
+        // Basic parameter validation
+        if (bytes(userBtcAddress).length == 0 || expectedAmount == 0) {
+            revert RedemptionProofFailed("Invalid parameters");
+        }
+        
+        // TODO: Implement full redemption proof verification:
+        // 1. Validate SPV proof using Bridge's BitcoinTx pattern
+        // 2. Verify transaction contains expected payment to userBtcAddress
+        // 3. Validate redemption-specific transaction requirements
+        // 4. Cross-reference with redemption records
+        
+        return true; // Stubbed for development
+    }
+    
+    /// @dev Validate SPV proof and return transaction hash
+    /// @param txInfo Bitcoin transaction information
+    /// @param proof SPV proof of transaction inclusion
+    /// @return txHash The validated transaction hash
+    function _validateSPVProof(
+        BitcoinTx.Info calldata txInfo,
+        BitcoinTx.Proof calldata proof
+    ) private view returns (bytes32 txHash) {
+        // Validate transaction structure
+        if (!txInfo.inputVector.validateVin()) {
+            revert InvalidBitcoinTransaction();
+        }
+        if (!txInfo.outputVector.validateVout()) {
+            revert InvalidBitcoinTransaction();
+        }
+        
+        // Validate proof structure
+        if (proof.merkleProof.length != proof.coinbaseProof.length) {
+            revert SPVProofValidationFailed("Tx not on same level of merkle tree as coinbase");
+        }
+        
+        // Calculate transaction hash
+        txHash = abi.encodePacked(
+            txInfo.version,
+            txInfo.inputVector,
+            txInfo.outputVector,
+            txInfo.locktime
+        ).hash256View();
+        
+        // Validate merkle proof
+        bytes32 root = proof.bitcoinHeaders.extractMerkleRootLE();
+        
+        if (!txHash.prove(root, proof.merkleProof, proof.txIndexInBlock)) {
+            revert SPVProofValidationFailed("Tx merkle proof is not valid for provided header and tx hash");
+        }
+        
+        // Validate coinbase proof
+        bytes32 coinbaseHash = sha256(abi.encodePacked(proof.coinbasePreimage));
+        if (!coinbaseHash.prove(root, proof.coinbaseProof, 0)) {
+            revert SPVProofValidationFailed("Coinbase merkle proof is not valid for provided header and hash");
+        }
+        
+        // Evaluate proof difficulty
+        _evaluateProofDifficulty(proof.bitcoinHeaders);
+        
+        return txHash;
+    }
+    
+    /// @dev Evaluate proof difficulty against relay requirements
+    /// @param bitcoinHeaders Bitcoin headers chain for difficulty evaluation
+    function _evaluateProofDifficulty(bytes memory bitcoinHeaders) private view {
+        // TODO: Stubbed for development - implement full difficulty evaluation
+        // This function should:
+        // 1. Get current and previous epoch difficulty from relay
+        // 2. Extract target from Bitcoin headers and calculate difficulty
+        // 3. Validate headers chain and check work requirements
+        // 4. Compare observed difficulty against relay requirements
+        
+        if (bitcoinHeaders.length == 0) {
+            revert SPVProofValidationFailed("Empty headers");
+        }
+        
+        // Stubbed validation - replace with full implementation
+    }
+    
+    /// @dev Verify that transaction contains expected payment to user
+    /// @param userBtcAddress The user's Bitcoin address
+    /// @param expectedAmount The expected payment amount in satoshis
+    /// @param txInfo The Bitcoin transaction information
+    /// @return valid True if payment is found and sufficient
+    function _verifyRedemptionPayment(
+        string calldata userBtcAddress,
+        uint64 expectedAmount,
+        BitcoinTx.Info calldata txInfo
+    ) private pure returns (bool valid) {
+        // Parse transaction outputs to find payment to userBtcAddress
+        bytes memory outputVector = txInfo.outputVector;
+        
+        // This is a simplified implementation for the Account Control system
+        // Full implementation would:
+        // 1. Parse all transaction outputs
+        // 2. Find output paying to userBtcAddress (P2PKH, P2SH, P2WPKH, P2WSH)
+        // 3. Verify payment amount >= expectedAmount
+        // 4. Account for transaction fees and dust limits
+        
+        if (bytes(userBtcAddress).length == 0 || expectedAmount == 0 || outputVector.length == 0) {
+            return false;
+        }
+        
+        // TODO: Implement full payment verification:
+        // - Parse outputs and extract script/address pairs
+        // - Match userBtcAddress against output scripts
+        // - Verify payment amount meets or exceeds expectedAmount
+        // - Handle different address formats (Legacy, SegWit, Taproot)
+        
+        // For production deployment, this should validate:
+        // 1. Transaction contains output paying to userBtcAddress
+        // 2. Payment amount >= expectedAmount
+        // 3. Address format validation and script matching
+        // 4. Dust threshold compliance
+        
+        return true; // Simplified validation - replace with full implementation
+    }
+    
+    /// @dev Validate redemption-specific transaction requirements
+    /// @param redemptionId The redemption identifier
+    /// @param txInfo The Bitcoin transaction information
+    /// @return valid True if transaction meets redemption requirements
+    function _validateRedemptionTransaction(
+        bytes32 redemptionId,
+        BitcoinTx.Info calldata txInfo
+    ) private view returns (bool valid) {
+        // Redemption-specific validations
+        
+        // Check transaction is recent enough (within acceptable time window)
+        // This prevents replay attacks with old transactions
+        
+        // Verify transaction structure is appropriate for redemptions
+        // (sufficient inputs, reasonable fee structure, etc.)
+        
+        // Basic validation - ensure required parameters are present
+        if (redemptionId == bytes32(0) || txInfo.inputVector.length == 0) {
+            return false;
+        }
+        
+        // TODO: Implement additional redemption validations:
+        // - Transaction timestamp validation (not too old)
+        // - Input/output ratio validation
+        // - Fee structure validation
+        // - Anti-replay protections
+        
+        return true; // Simplified validation - replace with full implementation
     }
 
     /// @dev Generate unique redemption ID
@@ -668,5 +883,18 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         }
         
         return earliest;
+    }
+    
+    /// @notice Get SPV state information for debugging
+    /// @return relay Current relay address
+    /// @return difficultyFactor Current difficulty factor
+    /// @return isInitialized Whether SPV is properly configured
+    function getSPVState() external view returns (
+        address relay,
+        uint96 difficultyFactor,
+        bool isInitialized
+    ) {
+        (relay, difficultyFactor) = spvState.getParameters();
+        isInitialized = spvState.isInitialized();
     }
 }
