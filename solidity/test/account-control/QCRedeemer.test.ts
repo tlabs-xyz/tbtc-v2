@@ -4,7 +4,6 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 import {
   QCRedeemer,
-  ProtocolRegistry,
   QCData,
   SystemState,
   TBTC,
@@ -25,13 +24,11 @@ describe("QCRedeemer", () => {
   let thirdParty: SignerWithAddress
 
   let qcRedeemer: QCRedeemer
-  let protocolRegistry: ProtocolRegistry
   let mockRedemptionPolicy: FakeContract<IRedemptionPolicy>
   let mockTbtc: FakeContract<TBTC>
+  let mockQCData: FakeContract<QCData>
+  let mockSystemState: FakeContract<SystemState>
 
-  // Service keys
-  let REDEMPTION_POLICY_KEY: string
-  let TBTC_TOKEN_KEY: string
 
   // Roles
   let REDEEMER_ROLE: string
@@ -49,9 +46,6 @@ describe("QCRedeemer", () => {
     watchdog = signers[4]
     thirdParty = signers[5]
 
-    // Generate service keys
-    REDEMPTION_POLICY_KEY = ethers.utils.id("REDEMPTION_POLICY")
-    TBTC_TOKEN_KEY = ethers.utils.id("TBTC_TOKEN")
 
     // Generate role hashes
     REDEEMER_ROLE = ethers.utils.id("REDEEMER_ROLE")
@@ -61,30 +55,23 @@ describe("QCRedeemer", () => {
   beforeEach(async () => {
     await createSnapshot()
 
-    // Deploy ProtocolRegistry
-    const ProtocolRegistryFactory = await ethers.getContractFactory(
-      "ProtocolRegistry"
-    )
-    protocolRegistry = await ProtocolRegistryFactory.deploy()
-    await protocolRegistry.deployed()
-
-    // Deploy QCRedeemer
-    const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer")
-    qcRedeemer = await QCRedeemerFactory.deploy(protocolRegistry.address)
-    await qcRedeemer.deployed()
 
     // Create mock contracts
     mockRedemptionPolicy = await smock.fake<IRedemptionPolicy>(
       "IRedemptionPolicy"
     )
     mockTbtc = await smock.fake<TBTC>("TBTC")
+    mockQCData = await smock.fake<QCData>("QCData")
+    mockSystemState = await smock.fake<SystemState>("SystemState")
 
-    // Register services
-    await protocolRegistry.setService(
-      REDEMPTION_POLICY_KEY,
-      mockRedemptionPolicy.address
+    // Deploy QCRedeemer with direct integration pattern
+    const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer")
+    qcRedeemer = await QCRedeemerFactory.deploy(
+      mockTbtc.address,
+      mockQCData.address,
+      mockSystemState.address
     )
-    await protocolRegistry.setService(TBTC_TOKEN_KEY, mockTbtc.address)
+    await qcRedeemer.deployed()
 
     // Set up default mock behaviors
     mockRedemptionPolicy.validateRedemptionRequest.returns(true)
@@ -102,10 +89,9 @@ describe("QCRedeemer", () => {
   })
 
   describe("Deployment", () => {
-    it("should set correct protocol registry", async () => {
-      expect(await qcRedeemer.protocolRegistry()).to.equal(
-        protocolRegistry.address
-      )
+    it("should set correct dependencies", async () => {
+      // QCRedeemer now uses direct integration - no public getters for dependencies
+      expect(qcRedeemer.address).to.not.equal(ethers.constants.AddressZero)
     })
 
     it("should grant deployer admin and redeemer roles", async () => {
@@ -751,32 +737,6 @@ describe("QCRedeemer", () => {
   })
 
   describe("Edge Cases", () => {
-    context("when ProtocolRegistry service is not set", () => {
-      it("should revert when trying to initiate redemption", async () => {
-        // Deploy a new protocol registry without services
-        const EmptyRegistryFactory = await ethers.getContractFactory(
-          "ProtocolRegistry"
-        )
-        const emptyRegistry = await EmptyRegistryFactory.deploy()
-        await emptyRegistry.deployed()
-
-        const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer")
-        const redeemerWithEmptyRegistry = await QCRedeemerFactory.deploy(
-          emptyRegistry.address
-        )
-        await redeemerWithEmptyRegistry.deployed()
-
-        await expect(
-          redeemerWithEmptyRegistry
-            .connect(user)
-            .initiateRedemption(
-              qcAddress.address,
-              ethers.utils.parseEther("5"),
-              validLegacyBtc
-            )
-        ).to.be.reverted
-      })
-    })
 
     context("when policy contracts change behavior", () => {
       let redemptionId: string

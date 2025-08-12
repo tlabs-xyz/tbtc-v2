@@ -208,13 +208,6 @@ const EXPECTED_ROLES: RoleAssignment[] = [
     critical: false,
   }, // Added by operators
 
-  // ProtocolRegistry
-  {
-    contract: "ProtocolRegistry",
-    role: "DEFAULT_ADMIN_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
 
   // WatchdogAutomatedEnforcement
   {

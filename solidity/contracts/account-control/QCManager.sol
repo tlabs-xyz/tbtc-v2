@@ -12,7 +12,7 @@ import "../bridge/BitcoinTx.sol";
 /// @title QCManager
 /// @dev Stateless business logic controller for QC management.
 /// Contains all business logic for managing QCs, reading from and writing to
-/// QCData and SystemState via the central ProtocolRegistry. Manages QC status
+/// QCData and SystemState via direct integration. Manages QC status
 /// changes, wallet registration flows, and integrates with role-based access control.
 ///
 /// Role definitions:

@@ -4,7 +4,6 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 import {
   QCMinter,
-  ProtocolRegistry,
   Bank,
   TBTCVault,
   TBTC,
@@ -24,7 +23,6 @@ describe("QCMinter", () => {
   let thirdParty: SignerWithAddress
 
   let qcMinter: QCMinter
-  let protocolRegistry: ProtocolRegistry
   let mockBank: FakeContract<Bank>
   let mockTBTCVault: FakeContract<TBTCVault>
   let mockTBTC: FakeContract<TBTC>
@@ -32,10 +30,6 @@ describe("QCMinter", () => {
   let mockQCData: FakeContract<QCData>
   let mockQCManager: FakeContract<QCManager>
 
-  // Service keys
-  let SYSTEM_STATE_KEY: string
-  let QC_DATA_KEY: string
-  let QC_MANAGER_KEY: string
 
   // Test data
   const mintAmount = ethers.utils.parseEther("5")
@@ -49,21 +43,11 @@ describe("QCMinter", () => {
     qcAddress = signers[2]
     thirdParty = signers[3]
 
-    // Generate service keys
-    SYSTEM_STATE_KEY = ethers.utils.id("SYSTEM_STATE")
-    QC_DATA_KEY = ethers.utils.id("QC_DATA")
-    QC_MANAGER_KEY = ethers.utils.id("QC_MANAGER")
   })
 
   beforeEach(async () => {
     await createSnapshot()
 
-    // Deploy ProtocolRegistry
-    const ProtocolRegistryFactory = await ethers.getContractFactory(
-      "ProtocolRegistry"
-    )
-    protocolRegistry = await ProtocolRegistryFactory.deploy()
-    await protocolRegistry.deployed()
 
     // Create mocks
     mockBank = await smock.fake<Bank>("Bank")
@@ -73,18 +57,15 @@ describe("QCMinter", () => {
     mockQCData = await smock.fake<QCData>("QCData")
     mockQCManager = await smock.fake<QCManager>("QCManager")
 
-    // Register services
-    await protocolRegistry.setService(SYSTEM_STATE_KEY, mockSystemState.address)
-    await protocolRegistry.setService(QC_DATA_KEY, mockQCData.address)
-    await protocolRegistry.setService(QC_MANAGER_KEY, mockQCManager.address)
-
-    // Deploy QCMinter with direct dependencies
+    // Deploy QCMinter with direct integration pattern
     const QCMinterFactory = await ethers.getContractFactory("QCMinter")
     qcMinter = await QCMinterFactory.deploy(
       mockBank.address,
       mockTBTCVault.address,
       mockTBTC.address,
-      protocolRegistry.address
+      mockQCData.address,
+      mockSystemState.address,
+      mockQCManager.address
     )
     await qcMinter.deployed()
 
