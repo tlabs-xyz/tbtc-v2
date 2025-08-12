@@ -50,22 +50,19 @@ describe("v1 System Deployment Tests", () => {
     })
 
     it("should verify v1 core contracts structure", async () => {
-      // v1 should include these core contracts
+      // v1 should include these core contracts (direct integration architecture)
       const expectedV1Contracts = [
-        "ProtocolRegistry", // Central dynamic address book
-        "QCMinter", // Stable entry point for minting
-        "QCRedeemer", // Stable entry point for redemption
-        "QCData", // Storage layer with 3-state models
+        "QCMinter", // Direct integration entry point for minting
+        "QCRedeemer", // Direct integration entry point for redemption  
+        "QCData", // Storage layer with 5-state models
         "SystemState", // Global configuration and emergency controls
-        "QCManager", // Stateless business logic controller
+        "QCManager", // Business logic controller with direct dependencies
         "QCReserveLedger", // Reserve attestation system
-        "BasicMintingPolicy", // Upgradeable minting policy
-        "BasicRedemptionPolicy", // Upgradeable redemption policy
         "WatchdogEnforcer", // Simplified watchdog enforcement
       ]
 
-      // Verify the expected contract count
-      expect(expectedV1Contracts.length).to.equal(10)
+      // Verify the expected contract count for simplified architecture
+      expect(expectedV1Contracts.length).to.equal(7)
 
       // Verify WatchdogEnforcer is the only watchdog contract
       const watchdogContracts = expectedV1Contracts.filter((name) =>
@@ -79,15 +76,12 @@ describe("v1 System Deployment Tests", () => {
     it("should be able to get contract factories for v1 contracts", async () => {
       // Test that we can get factories for the actual implemented contracts
       const contractsToTest = [
-        "ProtocolRegistry",
         "QCMinter",
-        "QCRedeemer",
+        "QCRedeemer", 
         "QCData",
         "SystemState",
         "QCManager",
         "QCReserveLedger",
-        "BasicMintingPolicy",
-        "BasicRedemptionPolicy",
         "WatchdogEnforcer",
       ]
 
@@ -151,7 +145,6 @@ describe("v1 System Deployment Tests", () => {
           "QCMinter",
           "QCRedeemer",
           "SystemState",
-          "ProtocolRegistry",
         ],
       }
 
@@ -172,7 +165,6 @@ describe("v1 System Deployment Tests", () => {
       const deploymentTags = {
         core: [
           "AccountControlCore",
-          "ProtocolRegistry",
           "QCMinter",
           "QCRedeemer",
         ],
@@ -216,15 +208,10 @@ describe("v1 System Deployment Tests", () => {
     it("should validate v1 contract relationships", () => {
       // Document the v1 contract relationships
       const contractRelationships = {
-        ProtocolRegistry: {
-          role: "Central dynamic address book",
-          registeredServices: ["QCManager", "QCMinter", "QCRedeemer"],
-        },
         QCManager: {
           role: "Stateless business logic controller",
           dependencies: [
-            "ProtocolRegistry",
-            "QCData",
+              "QCData",
             "SystemState",
             "QCReserveLedger",
           ],
@@ -232,8 +219,7 @@ describe("v1 System Deployment Tests", () => {
         QCMinter: {
           role: "Stable entry point for minting",
           dependencies: [
-            "ProtocolRegistry",
-            "QCManager",
+              "QCManager",
             "BasicMintingPolicy",
             "SystemState",
           ],
@@ -241,8 +227,7 @@ describe("v1 System Deployment Tests", () => {
         QCRedeemer: {
           role: "Stable entry point for redemption",
           dependencies: [
-            "ProtocolRegistry",
-            "QCManager",
+              "QCManager",
             "BasicRedemptionPolicy",
             "SystemState",
           ],
