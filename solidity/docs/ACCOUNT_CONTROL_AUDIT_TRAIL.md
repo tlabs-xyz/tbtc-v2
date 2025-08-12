@@ -593,6 +593,58 @@ event QCStatusChanged(
 );
 ```
 
+### 6.4 Default Tracking Data Structures
+
+**Purpose**: Track redemption defaults for graduated consequences
+
+**Data Structures**:
+
+```solidity
+// QCData.sol - Default tracking per QC
+struct DefaultHistory {
+    uint256 totalDefaults;           // Total lifetime defaults
+    uint256 lastDefaultTimestamp;    // Timestamp of most recent default
+    uint256 consecutiveDefaults;     // Defaults within 30-day window
+    uint256 defaultsWhileUnderReview; // Defaults during UnderReview state
+}
+
+// Mapping for default history
+mapping(address => DefaultHistory) private defaultHistories;
+
+// Global tracking of defaults per redemption
+mapping(bytes32 => address) private defaultedRedemptionQCs;
+```
+
+**Default Recording Logic**:
+
+```solidity
+function recordDefault(address qc, bytes32 redemptionId) external {
+    DefaultHistory storage history = defaultHistories[qc];
+    history.totalDefaults++;
+    history.lastDefaultTimestamp = block.timestamp;
+    
+    // Track consecutive defaults (reset if > 30 days since last)
+    if (block.timestamp - history.lastDefaultTimestamp > 30 days) {
+        history.consecutiveDefaults = 1;
+    } else {
+        history.consecutiveDefaults++;
+    }
+    
+    // Track defaults while under review
+    if (custodians[qc].status == QCStatus.UnderReview) {
+        history.defaultsWhileUnderReview++;
+    }
+    
+    defaultedRedemptionQCs[redemptionId] = qc;
+}
+```
+
+**Progressive Consequences Based on Defaults**:
+
+- **First Default**: Active → MintingPaused (90-day recovery window)
+- **Second Default**: MintingPaused → UnderReview (requires council)
+- **Third Default**: UnderReview → Revoked (permanent termination)
+
 ---
 
 ## 7. Watchdog Operations Flows

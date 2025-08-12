@@ -18,7 +18,7 @@ Welcome to the Account Control system documentation. This feature extends tBTC v
 | **[REQUIREMENTS.md](REQUIREMENTS.md)**                     | Complete requirements specification | All stakeholders         |
 | **[../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)**     | Detailed technical architecture     | Architects, developers   |
 | **[../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md)** | Code patterns and deployment        | Developers, DevOps       |
-| **[FLOWS.md](FLOWS.md)**                                   | User journeys and sequences         | Product, QA, integrators |
+| **[../docs/FLOWS.md](../docs/FLOWS.md)**                   | User journeys and sequences         | Product, QA, integrators |
 
 ### 📚 Reference Documents
 
@@ -42,7 +42,7 @@ Account Control enables **Qualified Custodians** (regulated institutional entiti
 Account Control integrates directly with the existing tBTC Bank/Vault architecture:
 
 ```
-User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
+User → QCMinter (with embedded policy) → Bank → TBTCVault → tBTC Tokens
 ```
 
 ### Core Features
@@ -69,14 +69,13 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 #### Core Account Control
 | Component                       | Purpose                      | Key Features                                      |
 | ------------------------------- | ---------------------------- | ------------------------------------------------- |
-| **BasicMintingPolicy**          | Direct Bank integration      | Auto-minting, capacity validation, 5-state checks |
-| **BasicRedemptionPolicy**       | Redemption logic             | Network continuity (60% states allow fulfillment) |
-| **QCManager**                   | Business logic               | Stateless QC management, capacity calculations    |
+| **QCMinter**                    | Minting operations           | Direct Bank integration, embedded policy logic    |
+| **QCRedeemer**                  | Redemption operations        | Embedded redemption logic, default handling       |
+| **QCManager**                   | Business logic               | QC management, capacity calculations, SPV verification |
 | **QCData**                      | Storage layer                | 5-state enum, gas-optimized, audit-friendly      |
 | **QCStateManager**              | State transition logic       | 5-state management, auto-escalation, graduated consequences |
 | **QCRenewablePause**            | Pause credit system          | 90-day renewable credits, self-pause capabilities |
-| **QCMinter**                    | Stable entry point           | Policy delegation, emergency pause                |
-| **QCRedeemer**                  | Redemption engine            | Lifecycle management, default handling            |
+| **SystemState**                 | Global configuration         | System parameters, emergency pause                |
 
 #### Simplified Watchdog System (v2.0)
 | Component                       | Purpose                      | Key Features                                      |
@@ -89,7 +88,7 @@ User → QCMinter → BasicMintingPolicy → Bank → TBTCVault → tBTC Tokens
 
 The system deploys as an **independent contract suite** without modifying existing contracts:
 
-- **Bank Authorization**: BasicMintingPolicy authorized via `authorizedBalanceIncreasers`
+- **Bank Authorization**: QCMinter authorized directly via `authorizedBalanceIncreasers`
 - **Shared Infrastructure**: Uses same Bank/Vault/Token contracts as regular Bridge
 - **Perfect Fungibility**: QC-minted tBTC indistinguishable from Bridge-minted tBTC
 - **Coexistence**: Regular Bridge operations continue unchanged
@@ -98,56 +97,17 @@ The system deploys as an **independent contract suite** without modifying existi
 
 ## Getting Started
 
-### For Developers
+### Documentation Overview
 
-1. **Start with**: [REQUIREMENTS.md](REQUIREMENTS.md) - Understand what we're building
-2. **Technical spec**: [../V1.1_ACCOUNT_CONTROL_SPECIFICATION.md](../V1.1_ACCOUNT_CONTROL_SPECIFICATION.md) - Complete technical reference
-3. **Architecture**: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) - System architecture details
-4. **Implementation**: [../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md) - Deploy and configure
-5. **User flows**: [FLOWS.md](FLOWS.md) - Understand user journeys
+The following documents provide comprehensive coverage of the Account Control system:
 
-### For Product Managers
-
-1. **Business case**: [REQUIREMENTS.md](REQUIREMENTS.md) - Section 2 (Business Requirements)
-2. **User experience**: [FLOWS.md](FLOWS.md) - Complete user journey documentation
-3. **Future roadmap**: [../docs/future-enhancements/FUTURE_ENHANCEMENTS.md](../docs/future-enhancements/FUTURE_ENHANCEMENTS.md) - V2 evolution path
-
-### For Security Reviewers
-
-1. **Security requirements**: [REQUIREMENTS.md](REQUIREMENTS.md) - Section 5 (Security Requirements)
-2. **Architecture security**: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) - Complete security model
-3. **Implementation security**: [../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md) - Security patterns and access control
-
-### For QCs (Qualified Custodians)
-
-1. **Onboarding process**: [FLOWS.md](FLOWS.md) - Section 4.2 (QC Registration Flow)
-2. **Minting operations**: [FLOWS.md](FLOWS.md) - Section 4.1 (QC Minting Flow)
-3. **Wallet management**: [FLOWS.md](FLOWS.md) - Section 4.2 (Wallet Registration)
-
----
-
-## Current Status
-
-### ✅ Completed
-
-- **Requirements Analysis**: Complete requirements specification
-- **Architecture Design**: Direct Bank integration architecture
-- **Smart Contract Implementation**: BasicMintingPolicy and supporting contracts
-- **Testing Framework**: Comprehensive unit and integration tests
-- **Documentation**: Complete technical and user documentation
-
-### 🔄 In Progress
-
-- **Security Audit**: Professional security review
-- **Testnet Deployment**: Goerli testnet validation
-- **Integration Testing**: End-to-end system validation
-
-### 📋 Next Steps
-
-1. **Security Audit**: Complete independent security review
-2. **Testnet Validation**: Deploy and test on Goerli
-3. **QC Onboarding**: Partner with initial qualified custodians
-4. **Mainnet Deployment**: Production deployment with governance approval
+1. **[REQUIREMENTS.md](REQUIREMENTS.md)** - Complete requirements specification including business, functional, technical, and security requirements
+2. **[../docs/FLOWS.md](../docs/FLOWS.md)** - Detailed user journeys, QC operations, minting/redemption flows, and state transitions
+3. **[../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)** - Technical architecture, design decisions, and security model
+4. **[../docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md)** - Deployment guide, configuration, and development patterns
+5. **[../docs/CURRENT_SYSTEM_STATE.md](../docs/CURRENT_SYSTEM_STATE.md)** - Current deployment status and operational details
+6. **[../docs/SECURITY_ARCHITECTURE.md](../docs/SECURITY_ARCHITECTURE.md)** - Role-based access control and security implementation
+7. **[../docs/ACCOUNT_CONTROL_AUDIT_TRAIL.md](../docs/ACCOUNT_CONTROL_AUDIT_TRAIL.md)** - Event tracking and compliance monitoring
 
 ---
 
