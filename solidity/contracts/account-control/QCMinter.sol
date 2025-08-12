@@ -11,11 +11,9 @@ import "../vault/TBTCVault.sol";
 import "../token/TBTC.sol";
 
 /// @title QCMinter
-/// @notice Direct implementation for tBTC minting with QC backing
+/// @notice QC-backed tBTC minting implementation
 /// @dev This contract validates QC status, reserve freshness, and capacity
-///      before directly creating Bank balances and auto-minting tBTC tokens.
-///      Implements direct Bank integration following the project's preference
-///      for simple, direct patterns.
+///      before creating Bank balances and minting tBTC tokens.
 ///
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
@@ -33,19 +31,12 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     uint256 public constant SATOSHI_MULTIPLIER = 1e10;
 
-    // Service keys for remaining registry-based lookups
-    // Registry keys removed - using direct references instead
+    // Core protocol contracts
+    Bank public immutable bank;
+    TBTCVault public immutable tbtcVault;
+    TBTC public immutable tbtc;
 
-    // =================== DIRECT INTEGRATION ===================
-    // Core protocol contracts - immutable, high-frequency access, no registry overhead
-
-    Bank public immutable bank; // Direct Bank integration saves ~5k gas per mint
-    TBTCVault public immutable tbtcVault; // Direct Vault integration for minting
-    TBTC public immutable tbtc; // Direct token contract access
-
-    // =================== REGISTRY INTEGRATION ===================
-    // Business logic contracts - direct references replacing registry
-
+    // Business logic contracts
     QCData public immutable qcData;
     SystemState public immutable systemState;
     QCManager public immutable qcManager;
@@ -139,8 +130,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         _grantRole(MINTER_ROLE, msg.sender);
     }
 
-    /// @notice Request minting with direct Bank integration for seamless user experience
-    /// @dev Validates QC capacity, directly creates Bank balance, and triggers TBTCVault minting
+    /// @notice Request minting of tBTC tokens
+    /// @dev Validates QC capacity, creates Bank balance, and triggers TBTCVault minting
     ///      SECURITY: nonReentrant protects against reentrancy via Bank.increaseBalanceAndCall
     /// @param qc The address of the Qualified Custodian
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
@@ -154,7 +145,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         return _requestMint(qc, msg.sender, amount);
     }
 
-    /// @notice Internal minting logic with direct Bank integration
+    /// @notice Internal minting logic
     /// @param qc The address of the Qualified Custodian
     /// @param user The address receiving the tBTC tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
@@ -170,7 +161,6 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         if (amount == 0) revert InvalidAmount();
 
         // Check system state
-        // Use direct reference to systemState
         if (systemState.isMintingPaused()) {
             emit MintRejected(
                 qc,
@@ -209,7 +199,6 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         }
 
         // Check QC status
-        // Use direct reference to qcData
         if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
             emit MintRejected(
                 qc,
@@ -248,7 +237,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             completed: false
         });
 
-        // Verify this contract is authorized in Bank - direct integration
+        // Verify this contract is authorized in Bank
         if (!bank.authorizedBalanceIncreasers(address(this))) {
             revert NotAuthorizedInBank();
         }
@@ -257,7 +246,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // 1 tBTC = 1e18 wei, 1 BTC = 1e8 satoshis
         uint256 satoshis = amount / SATOSHI_MULTIPLIER;
 
-        // Direct Bank interaction with auto-minting
+        // Bank interaction with auto-minting
         address[] memory depositors = new address[](1);
         uint256[] memory amounts = new uint256[](1);
         depositors[0] = user;
@@ -305,7 +294,6 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         view
         returns (uint256 availableCapacity)
     {
-        // Use direct reference to qcManager
         return qcManager.getAvailableMintingCapacity(qc);
     }
 
@@ -319,7 +307,6 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         returns (bool eligible)
     {
         // Check system state
-        // Use direct reference to systemState
         if (systemState.isMintingPaused()) {
             return false;
         }
@@ -332,7 +319,6 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         }
 
         // Check QC status
-        // Use direct reference to qcData
         if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
             return false;
         }
@@ -361,7 +347,6 @@ contract QCMinter is AccessControl, ReentrancyGuard {
 
     /// @dev Helper to update QC minted amount to avoid stack too deep errors
     function _updateQCMintedAmount(address qc, uint256 amount) private {
-        // Use direct reference to qcData
         uint256 currentMinted = qcData.getQCMintedAmount(qc);
         qcManager.updateQCMintedAmount(qc, currentMinted + amount);
     }

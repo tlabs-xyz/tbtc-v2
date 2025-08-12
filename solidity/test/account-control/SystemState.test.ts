@@ -75,7 +75,6 @@ describe("SystemState", () => {
     it("should initialize with default values", async () => {
       expect(await systemState.isMintingPaused()).to.be.false
       expect(await systemState.isRedemptionPaused()).to.be.false
-      expect(await systemState.isRegistryPaused()).to.be.false
       expect(await systemState.minMintAmount()).to.equal(
         ethers.utils.parseEther("0.01")
       ) // Default 0.01 tBTC
@@ -179,49 +178,6 @@ describe("SystemState", () => {
         })
       })
 
-      describe("pauseRegistry", () => {
-        it("should pause registry successfully", async () => {
-          const tx = await systemState.connect(pauserAccount).pauseRegistry()
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-
-          expect(await systemState.isRegistryPaused()).to.be.true
-          await expect(tx)
-            .to.emit(systemState, "RegistryPaused")
-            .withArgs(pauserAccount.address, currentBlock.timestamp)
-        })
-
-        it("should revert when already paused", async () => {
-          await systemState.connect(pauserAccount).pauseRegistry()
-
-          await expect(
-            systemState.connect(pauserAccount).pauseRegistry()
-          ).to.be.revertedWith("RegistryAlreadyPaused")
-        })
-      })
-
-      describe("unpauseRegistry", () => {
-        beforeEach(async () => {
-          await systemState.connect(pauserAccount).pauseRegistry()
-        })
-
-        it("should unpause registry successfully", async () => {
-          const tx = await systemState.connect(pauserAccount).unpauseRegistry()
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-
-          expect(await systemState.isRegistryPaused()).to.be.false
-          await expect(tx)
-            .to.emit(systemState, "RegistryUnpaused")
-            .withArgs(pauserAccount.address, currentBlock.timestamp)
-        })
-
-        it("should revert when not paused", async () => {
-          await systemState.connect(pauserAccount).unpauseRegistry()
-
-          await expect(
-            systemState.connect(pauserAccount).unpauseRegistry()
-          ).to.be.revertedWith("RegistryNotPaused")
-        })
-      })
 
       describe("pauseWalletRegistration", () => {
         it("should pause wallet registration successfully", async () => {
@@ -289,13 +245,6 @@ describe("SystemState", () => {
         )
       })
 
-      it("should revert for pauseRegistry", async () => {
-        await expect(
-          systemState.connect(thirdParty).pauseRegistry()
-        ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
-        )
-      })
 
       it("should revert for pauseWalletRegistration", async () => {
         await expect(
@@ -663,15 +612,6 @@ describe("SystemState", () => {
         expect(await systemState.isFunctionPaused("redemption")).to.be.false
       })
 
-      it("should return correct status for registry", async () => {
-        expect(await systemState.isFunctionPaused("registry")).to.be.false
-
-        await systemState.connect(pauserAccount).pauseRegistry()
-        expect(await systemState.isFunctionPaused("registry")).to.be.true
-
-        await systemState.connect(pauserAccount).unpauseRegistry()
-        expect(await systemState.isFunctionPaused("registry")).to.be.false
-      })
 
       it("should return correct status for wallet registration", async () => {
         expect(await systemState.isFunctionPaused("wallet_registration")).to.be
@@ -743,25 +683,21 @@ describe("SystemState", () => {
         await systemState.connect(pauserAccount).pauseMinting()
         expect(await systemState.isMintingPaused()).to.be.true
         expect(await systemState.isRedemptionPaused()).to.be.false
-        expect(await systemState.isRegistryPaused()).to.be.false
         expect(await systemState.isWalletRegistrationPaused()).to.be.false
 
         await systemState.connect(pauserAccount).pauseRedemption()
         expect(await systemState.isMintingPaused()).to.be.true
         expect(await systemState.isRedemptionPaused()).to.be.true
-        expect(await systemState.isRegistryPaused()).to.be.false
         expect(await systemState.isWalletRegistrationPaused()).to.be.false
 
         await systemState.connect(pauserAccount).pauseWalletRegistration()
         expect(await systemState.isMintingPaused()).to.be.true
         expect(await systemState.isRedemptionPaused()).to.be.true
-        expect(await systemState.isRegistryPaused()).to.be.false
         expect(await systemState.isWalletRegistrationPaused()).to.be.true
 
         await systemState.connect(pauserAccount).unpauseMinting()
         expect(await systemState.isMintingPaused()).to.be.false
         expect(await systemState.isRedemptionPaused()).to.be.true
-        expect(await systemState.isRegistryPaused()).to.be.false
         expect(await systemState.isWalletRegistrationPaused()).to.be.true
       })
 
@@ -825,9 +761,6 @@ describe("SystemState", () => {
           systemState.connect(pauserAccount).pauseRedemption()
         ).to.emit(systemState, "RedemptionPaused")
 
-        await expect(
-          systemState.connect(pauserAccount).pauseRegistry()
-        ).to.emit(systemState, "RegistryPaused")
 
         // Unpause events
         await expect(
@@ -838,9 +771,6 @@ describe("SystemState", () => {
           systemState.connect(pauserAccount).unpauseRedemption()
         ).to.emit(systemState, "RedemptionUnpaused")
 
-        await expect(
-          systemState.connect(pauserAccount).unpauseRegistry()
-        ).to.emit(systemState, "RegistryUnpaused")
 
         // Wallet registration pause/unpause events
         await expect(
