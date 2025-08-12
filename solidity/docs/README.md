@@ -5,8 +5,7 @@
 
 ## 📍 Quick Start
 
-**Current System State**: [`CURRENT_SYSTEM_STATE.md`](CURRENT_SYSTEM_STATE.md) - Start here!  
-**Architecture**: [`ARCHITECTURE.md`](ARCHITECTURE.md)  
+**Architecture**: [`ARCHITECTURE.md`](ARCHITECTURE.md) - Start here!  
 **Implementation Guide**: [`IMPLEMENTATION.md`](IMPLEMENTATION.md)  
 **Full Navigation**: [`../DOCUMENTATION_MAP.md`](../DOCUMENTATION_MAP.md)
 
@@ -14,7 +13,7 @@
 
 ### Core Documentation
 
-- **CURRENT_SYSTEM_STATE.md** - Single source of truth for system state
+
 - **ARCHITECTURE.md** - Technical architecture and design
 - **IMPLEMENTATION.md** - Code patterns and implementation guide
 - **REQUIREMENTS.md** - Complete requirements specification
@@ -51,9 +50,8 @@
 
 ### Understanding the System
 
-1. Read [`CURRENT_SYSTEM_STATE.md`](CURRENT_SYSTEM_STATE.md) for overview
-2. Study [`ARCHITECTURE.md`](ARCHITECTURE.md) for technical design
-3. Review [`IMPLEMENTATION.md`](IMPLEMENTATION.md) for code patterns
+1. Read [`ARCHITECTURE.md`](ARCHITECTURE.md) for technical design
+2. Review [`IMPLEMENTATION.md`](IMPLEMENTATION.md) for code patterns
 
 ### Key Concepts
 
