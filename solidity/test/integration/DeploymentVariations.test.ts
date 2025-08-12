@@ -57,7 +57,7 @@ describe("v1 System Deployment Tests", () => {
         "QCData", // Storage layer with 5-state models
         "SystemState", // Global configuration and emergency controls
         "QCManager", // Business logic controller with direct dependencies
-        "QCReserveLedger", // Reserve attestation system
+        "ReserveOracle", // Reserve attestation system
         "WatchdogEnforcer", // Simplified watchdog enforcement
       ]
 
@@ -81,7 +81,7 @@ describe("v1 System Deployment Tests", () => {
         "QCData",
         "SystemState",
         "QCManager",
-        "QCReserveLedger",
+        "ReserveOracle",
         "WatchdogEnforcer",
       ]
 
@@ -167,11 +167,11 @@ describe("v1 System Deployment Tests", () => {
         state: ["AccountControlState", "QCData", "SystemState", "QCManager"],
         policies: [
           "AccountControlPolicies",
-          "QCReserveLedger",
+          "ReserveOracle",
           "BasicMintingPolicy",
           "BasicRedemptionPolicy",
         ],
-        watchdog: ["QCReserveLedger", "Watchdog"],
+        watchdog: ["ReserveOracle", "Watchdog"],
         config: ["ConfigureSystem", "Configuration"],
         integrated: ["DirectQCIntegration", "AccountControl"], // This one has Bank/TBTC dependencies
       }
@@ -206,7 +206,7 @@ describe("v1 System Deployment Tests", () => {
       const contractRelationships = {
         QCManager: {
           role: "Stateless business logic controller",
-          dependencies: ["QCData", "SystemState", "QCReserveLedger"],
+          dependencies: ["QCData", "SystemState", "ReserveOracle"],
         },
         QCMinter: {
           role: "Stable entry point for minting",
@@ -223,7 +223,7 @@ describe("v1 System Deployment Tests", () => {
       }
 
       // Verify all contracts have defined relationships
-      expect(Object.keys(contractRelationships)).to.have.lengthOf(5)
+      expect(Object.keys(contractRelationships)).to.have.lengthOf(4)
     })
   })
 })
