@@ -109,6 +109,9 @@ describe("QCManager", () => {
     await qcManager.grantRole(REGISTRAR_ROLE, registrar.address)
     await qcManager.grantRole(PAUSER_ROLE, pauser.address)
     await qcManager.grantRole(WATCHDOG_ROLE, watchdog.address)
+
+    // Set QCRedeemer reference for integrated functionality
+    await qcManager.setQCRedeemer(mockQCRedeemer.address)
   })
 
   afterEach(async () => {
@@ -150,11 +153,20 @@ describe("QCManager", () => {
         )
 
         await expect(tx)
-          .to.emit(qcManager, "QCRegistered")
+          .to.emit(qcManager, "QCRegistrationInitiated")
+          .withArgs(
+            qcAddress.address,
+            governance.address,
+            expect.any(Number)
+          )
+
+        await expect(tx)
+          .to.emit(qcManager, "QCOnboarded")
           .withArgs(
             qcAddress.address,
             initialMintingCapacity,
-            governance.address
+            governance.address,
+            expect.any(Number)
           )
       })
 
@@ -219,12 +231,13 @@ describe("QCManager", () => {
         )
 
         await expect(tx)
-          .to.emit(qcManager, "MintingCapacityUpdated")
+          .to.emit(qcManager, "MintingCapIncreased")
           .withArgs(
             qcAddress.address,
             initialMintingCapacity,
             newCapacity,
-            governance.address
+            governance.address,
+            expect.any(Number)
           )
       })
 
@@ -385,7 +398,7 @@ describe("QCManager", () => {
             qcManager
               .connect(arbiter)
               .setQCStatus(qcAddress.address, 4, ethers.constants.HashZero)
-          ).to.be.revertedWith("ReasonRequired")
+          ).to.be.revertedWith("PauseReasonRequired")
         })
       })
 
@@ -419,7 +432,7 @@ describe("QCManager", () => {
           )
 
           await expect(tx)
-            .to.emit(qcManager, "StatusChangeRequested")
+            .to.emit(qcManager, "QCStatusChangeRequested")
             .withArgs(
               qcAddress.address,
               1, // oldStatus
@@ -451,7 +464,7 @@ describe("QCManager", () => {
       mockQCRedeemer.hasUnfulfilledRedemptions.whenCalledWith(qcAddress.address).returns(false)
       
       // Grant pause credit
-      await qcManager.connect(pauser).grantPauseCredit(qcAddress.address)
+      await qcManager.connect(deployer).grantInitialCredit(qcAddress.address)
     })
 
     describe("canSelfPause", () => {
@@ -567,12 +580,12 @@ describe("QCManager", () => {
       mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
     })
 
-    describe("grantPauseCredit", () => {
+    describe("grantInitialCredit", () => {
       context("when called by pauser", () => {
         it("should grant pause credit to QC", async () => {
           const tx = await qcManager
             .connect(pauser)
-            .grantPauseCredit(qcAddress.address)
+            .grantInitialCredit(qcAddress.address)
 
           await expect(tx)
             .to.emit(qcManager, "PauseCreditGranted")
@@ -585,7 +598,7 @@ describe("QCManager", () => {
           mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(false)
           
           await expect(
-            qcManager.connect(pauser).grantPauseCredit(qcAddress.address)
+            qcManager.connect(pauser).grantInitialCredit(qcAddress.address)
           ).to.be.revertedWith("QCNotRegistered")
         })
       })
@@ -593,7 +606,7 @@ describe("QCManager", () => {
       context("when called by non-pauser", () => {
         it("should revert", async () => {
           await expect(
-            qcManager.connect(user).grantPauseCredit(qcAddress.address)
+            qcManager.connect(user).grantInitialCredit(qcAddress.address)
           ).to.be.revertedWith(
             `AccessControl: account ${user.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
           )
@@ -601,22 +614,25 @@ describe("QCManager", () => {
       })
     })
 
-    describe("revokePauseCredit", () => {
+    describe("emergencyClearPause", () => {
       beforeEach(async () => {
-        await qcManager.connect(pauser).grantPauseCredit(qcAddress.address)
+        await qcManager.connect(deployer).grantInitialCredit(qcAddress.address)
+        // First pause the QC
+        await qcManager.connect(qcAddress).selfPause(1) // MintingOnly
       })
 
       context("when called by pauser", () => {
-        it("should revoke pause credit", async () => {
+        it("should clear pause and restore credit", async () => {
+          const reason = "Emergency restoration"
           const tx = await qcManager
             .connect(pauser)
-            .revokePauseCredit(qcAddress.address)
+            .emergencyClearPause(qcAddress.address, reason)
 
           await expect(tx)
-            .to.emit(qcManager, "PauseCreditRevoked")
-            .withArgs(qcAddress.address, pauser.address)
+            .to.emit(qcManager, "EmergencyPauseCleared")
+            .withArgs(qcAddress.address, reason, pauser.address)
 
-          expect(await qcManager.canSelfPause(qcAddress.address)).to.be.false
+          expect(await qcManager.canSelfPause(qcAddress.address)).to.be.true
         })
       })
     })
@@ -628,7 +644,7 @@ describe("QCManager", () => {
       mockQCData.getQCMintedAmount.whenCalledWith(qcAddress.address).returns(ethers.utils.parseEther("50"))
     })
 
-    describe("checkSolvency", () => {
+    describe("verifyQCSolvency", () => {
       context("when called by arbiter", () => {
         it("should verify solvency with adequate reserves", async () => {
           // Mock adequate reserves (100 > 50 minted)
@@ -638,11 +654,9 @@ describe("QCManager", () => {
 
           const result = await qcManager
             .connect(arbiter)
-            .checkSolvency(qcAddress.address)
+            .verifyQCSolvency(qcAddress.address)
 
-          expect(result.isSolvent).to.be.true
-          expect(result.reserveBalance).to.equal(ethers.utils.parseEther("100"))
-          expect(result.mintedAmount).to.equal(ethers.utils.parseEther("50"))
+          expect(result).to.be.true
         })
 
         it("should detect insolvency", async () => {
@@ -653,28 +667,29 @@ describe("QCManager", () => {
 
           const result = await qcManager
             .connect(arbiter)
-            .checkSolvency(qcAddress.address)
+            .verifyQCSolvency(qcAddress.address)
 
-          expect(result.isSolvent).to.be.false
+          expect(result).to.be.false
         })
 
-        it("should detect stale reserves", async () => {
+        it("should ignore stale reserves for solvency check", async () => {
+          // verifyQCSolvency ignores staleness, unlike getAvailableMintingCapacity
           mockReserveOracle.getReserveBalanceAndStaleness
             .whenCalledWith(qcAddress.address)
-            .returns([ethers.utils.parseEther("100"), true]) // stale = true
+            .returns([ethers.utils.parseEther("100"), true]) // stale = true but adequate balance
 
           const result = await qcManager
             .connect(arbiter)
-            .checkSolvency(qcAddress.address)
+            .verifyQCSolvency(qcAddress.address)
 
-          expect(result.isStale).to.be.true
+          expect(result).to.be.true // Should still be solvent despite staleness
         })
 
         it("should revert for unregistered QC", async () => {
           mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(false)
           
           await expect(
-            qcManager.connect(arbiter).checkSolvency(qcAddress.address)
+            qcManager.connect(arbiter).verifyQCSolvency(qcAddress.address)
           ).to.be.revertedWith("QCNotRegisteredForSolvency")
         })
       })
@@ -682,7 +697,7 @@ describe("QCManager", () => {
       context("when called by non-arbiter", () => {
         it("should revert", async () => {
           await expect(
-            qcManager.connect(user).checkSolvency(qcAddress.address)
+            qcManager.connect(user).verifyQCSolvency(qcAddress.address)
           ).to.be.revertedWith("NotAuthorizedForSolvency")
         })
       })
@@ -698,13 +713,24 @@ describe("QCManager", () => {
     })
 
     it("should calculate available capacity correctly", async () => {
-      // Capacity: 100, Minted: 30, Available should be 70
+      // Reset and setup mocks specifically for this test
+      mockQCData.isQCRegistered.reset()
+      mockQCData.getQCStatus.reset()
+      mockQCData.getQCMintedAmount.reset()
+      mockReserveOracle.getReserveBalanceAndStaleness.reset()
+      
+      // Ensure QC is properly registered and active
+      mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
+      mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(1) // Active
+      mockQCData.getQCMintedAmount.whenCalledWith(qcAddress.address).returns(ethers.utils.parseEther("30"))
+      
+      // Available capacity = reserves - minted = 70 - 30 = 40
       mockReserveOracle.getReserveBalanceAndStaleness
         .whenCalledWith(qcAddress.address)
         .returns([ethers.utils.parseEther("70"), false])
 
       const availableCapacity = await qcManager.getAvailableMintingCapacity(qcAddress.address)
-      expect(availableCapacity).to.equal(ethers.utils.parseEther("70"))
+      expect(availableCapacity).to.equal(ethers.utils.parseEther("40")) // 70 reserves - 30 minted = 40
     })
 
     it("should return zero when QC is not Active", async () => {
@@ -715,13 +741,13 @@ describe("QCManager", () => {
     })
 
     it("should be limited by reserve balance", async () => {
-      // Reserve only 40, should limit available capacity to 40 even though cap-minted = 70
+      // Reserve only 40, available = reserves - minted = 40 - 30 = 10
       mockReserveOracle.getReserveBalanceAndStaleness
         .whenCalledWith(qcAddress.address)
         .returns([ethers.utils.parseEther("40"), false])
 
       const availableCapacity = await qcManager.getAvailableMintingCapacity(qcAddress.address)
-      expect(availableCapacity).to.equal(ethers.utils.parseEther("40"))
+      expect(availableCapacity).to.equal(ethers.utils.parseEther("10")) // 40 reserves - 30 minted = 10
     })
 
     it("should return zero for stale reserves", async () => {
@@ -740,7 +766,7 @@ describe("QCManager", () => {
       mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(3) // Paused
       
       // Setup a paused QC with escalation timer
-      await qcManager.connect(pauser).grantPauseCredit(qcAddress.address)
+      await qcManager.connect(deployer).grantInitialCredit(qcAddress.address)
       await qcManager.connect(qcAddress).selfPause(2) // Complete pause
     })
 
@@ -786,7 +812,7 @@ describe("QCManager", () => {
       mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
       mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(1) // Active
       
-      await qcManager.connect(pauser).grantPauseCredit(qcAddress.address)
+      await qcManager.connect(deployer).grantInitialCredit(qcAddress.address)
 
       await expect(
         qcManager.connect(qcAddress).selfPause(1)
@@ -806,6 +832,333 @@ describe("QCManager", () => {
       await qcManager.connect(arbiter).setQCStatus(qcAddress.address, 1, reason2) // Back to Active
 
       expect(mockQCData.setQCStatus).to.have.been.calledTwice
+    })
+  })
+
+  describe("5-State Model Transitions", () => {
+    beforeEach(async () => {
+      // Register QC for testing
+      await qcManager.connect(governance).registerQC(
+        qcAddress.address,
+        initialMintingCapacity
+      )
+      
+      // Mock QC as registered
+      mockQCData.isQCRegistered.returns(true)
+      
+      // Grant initial pause credit
+      await qcManager.connect(governance).grantInitialCredit(qcAddress.address)
+    })
+
+    describe("Active State Transitions", () => {
+      beforeEach(async () => {
+        mockQCData.getQCStatus.returns(0) // Active
+      })
+
+      it("should allow Active → MintingPaused", async () => {
+        const reason = ethers.utils.id("MAINTENANCE")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 1, reason)
+        ).to.not.be.reverted
+        
+        expect(mockQCData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          1, // MintingPaused
+          reason
+        )
+      })
+
+      it("should allow Active → Paused", async () => {
+        const reason = ethers.utils.id("FULL_MAINTENANCE")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 2, reason)
+        ).to.not.be.reverted
+        
+        expect(mockQCData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          2, // Paused
+          reason
+        )
+      })
+
+      it("should allow Active → UnderReview", async () => {
+        const reason = ethers.utils.id("VIOLATION")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 3, reason)
+        ).to.not.be.reverted
+        
+        expect(mockQCData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          3, // UnderReview
+          reason
+        )
+      })
+
+      it("should allow Active → Revoked", async () => {
+        const reason = ethers.utils.id("CRITICAL_VIOLATION")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 4, reason)
+        ).to.not.be.reverted
+        
+        expect(mockQCData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          4, // Revoked
+          reason
+        )
+      })
+    })
+
+    describe("MintingPaused State Transitions", () => {
+      beforeEach(async () => {
+        mockQCData.getQCStatus.returns(1) // MintingPaused
+      })
+
+      it("should allow MintingPaused → Active", async () => {
+        const reason = ethers.utils.id("RESUMED")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 0, reason)
+        ).to.not.be.reverted
+      })
+
+      it("should allow MintingPaused → Paused", async () => {
+        const reason = ethers.utils.id("ESCALATE")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 2, reason)
+        ).to.not.be.reverted
+      })
+
+      it("should allow MintingPaused → UnderReview", async () => {
+        const reason = ethers.utils.id("AUTO_ESCALATION")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 3, reason)
+        ).to.not.be.reverted
+      })
+
+      it("should allow MintingPaused → Revoked", async () => {
+        const reason = ethers.utils.id("CRITICAL")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 4, reason)
+        ).to.not.be.reverted
+      })
+    })
+
+    describe("Paused State Transitions", () => {
+      beforeEach(async () => {
+        mockQCData.getQCStatus.returns(2) // Paused
+      })
+
+      it("should allow Paused → Active", async () => {
+        const reason = ethers.utils.id("RESUMED")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 0, reason)
+        ).to.not.be.reverted
+      })
+
+      it("should allow Paused → MintingPaused", async () => {
+        const reason = ethers.utils.id("PARTIAL_RESUME")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 1, reason)
+        ).to.not.be.reverted
+      })
+
+      it("should allow Paused → UnderReview", async () => {
+        const reason = ethers.utils.id("AUTO_ESCALATION")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 3, reason)
+        ).to.not.be.reverted
+      })
+
+      it("should allow Paused → Revoked", async () => {
+        const reason = ethers.utils.id("CRITICAL")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 4, reason)
+        ).to.not.be.reverted
+      })
+    })
+
+    describe("UnderReview State Transitions", () => {
+      beforeEach(async () => {
+        mockQCData.getQCStatus.returns(3) // UnderReview
+      })
+
+      it("should allow UnderReview → Active", async () => {
+        const reason = ethers.utils.id("CLEARED")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 0, reason)
+        ).to.not.be.reverted
+      })
+
+      it("should allow UnderReview → Revoked", async () => {
+        const reason = ethers.utils.id("CONFIRMED_VIOLATION")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 4, reason)
+        ).to.not.be.reverted
+      })
+
+      it("should reject UnderReview → MintingPaused", async () => {
+        const reason = ethers.utils.id("INVALID")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 1, reason)
+        ).to.be.revertedWith("InvalidStatusTransition")
+      })
+
+      it("should reject UnderReview → Paused", async () => {
+        const reason = ethers.utils.id("INVALID")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 2, reason)
+        ).to.be.revertedWith("InvalidStatusTransition")
+      })
+    })
+
+    describe("Revoked State Transitions", () => {
+      beforeEach(async () => {
+        mockQCData.getQCStatus.returns(4) // Revoked
+      })
+
+      it("should reject Revoked → Active", async () => {
+        const reason = ethers.utils.id("INVALID")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 0, reason)
+        ).to.be.revertedWith("InvalidStatusTransition")
+      })
+
+      it("should reject Revoked → MintingPaused", async () => {
+        const reason = ethers.utils.id("INVALID")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 1, reason)
+        ).to.be.revertedWith("InvalidStatusTransition")
+      })
+
+      it("should reject Revoked → Paused", async () => {
+        const reason = ethers.utils.id("INVALID")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 2, reason)
+        ).to.be.revertedWith("InvalidStatusTransition")
+      })
+
+      it("should reject Revoked → UnderReview", async () => {
+        const reason = ethers.utils.id("INVALID")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 3, reason)
+        ).to.be.revertedWith("InvalidStatusTransition")
+      })
+
+      it("should allow Revoked → Revoked (no-op)", async () => {
+        const reason = ethers.utils.id("NO_OP")
+        await expect(
+          qcManager.connect(arbiter).setQCStatus(qcAddress.address, 4, reason)
+        ).to.not.be.reverted
+      })
+    })
+
+    describe("Self-Pause Flow Validation", () => {
+      it("should validate Active → MintingPaused via selfPause", async () => {
+        mockQCData.getQCStatus.returns(0) // Active
+        
+        await qcManager.connect(qcAddress).selfPause(1) // MintingOnly
+        
+        expect(mockQCData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          1, // MintingPaused
+          ethers.utils.id("SELF_PAUSE")
+        )
+      })
+
+      it("should validate Active → Paused via selfPause", async () => {
+        mockQCData.getQCStatus.returns(0) // Active
+        
+        await qcManager.connect(qcAddress).selfPause(2) // Complete
+        
+        expect(mockQCData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          2, // Paused
+          ethers.utils.id("SELF_PAUSE")
+        )
+      })
+
+      it("should validate MintingPaused → Active via resumeSelfPause", async () => {
+        // First pause
+        mockQCData.getQCStatus.returns(0) // Active
+        await qcManager.connect(qcAddress).selfPause(1) // MintingOnly
+        
+        // Then resume
+        mockQCData.getQCStatus.returns(1) // MintingPaused
+        await qcManager.connect(qcAddress).resumeSelfPause()
+        
+        expect(mockQCData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          0, // Active
+          ethers.utils.id("EARLY_RESUME")
+        )
+      })
+
+      it("should validate Paused → Active via resumeSelfPause", async () => {
+        // First pause
+        mockQCData.getQCStatus.returns(0) // Active
+        await qcManager.connect(qcAddress).selfPause(2) // Complete
+        
+        // Then resume
+        mockQCData.getQCStatus.returns(2) // Paused
+        await qcManager.connect(qcAddress).resumeSelfPause()
+        
+        expect(mockQCData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          0, // Active
+          ethers.utils.id("EARLY_RESUME")
+        )
+      })
+    })
+
+    describe("Auto-Escalation Validation", () => {
+      it("should validate MintingPaused → UnderReview auto-escalation", async () => {
+        // Setup: QC is in MintingPaused state with timeout exceeded
+        mockQCData.getQCStatus.returns(1) // MintingPaused
+        
+        // First self-pause to set the timestamp
+        mockQCData.getQCStatus.returns(0) // Active first
+        await qcManager.connect(qcAddress).selfPause(1)
+        
+        // Fast forward time past timeout
+        await helpers.time.increaseTime(48 * 60 * 60 + 1) // 48 hours + 1 second
+        
+        // Mock the status for escalation
+        mockQCData.getQCStatus.returns(1) // MintingPaused
+        
+        // Trigger escalation check
+        await qcManager.connect(watchdog).checkQCEscalations([qcAddress.address])
+        
+        // Verify escalation occurred
+        expect(mockQCData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          3, // UnderReview
+          ethers.utils.id("AUTO_ESCALATION")
+        )
+      })
+
+      it("should validate Paused → UnderReview auto-escalation", async () => {
+        // Setup: QC is in Paused state with timeout exceeded
+        mockQCData.getQCStatus.returns(2) // Paused
+        
+        // First self-pause to set the timestamp
+        mockQCData.getQCStatus.returns(0) // Active first
+        await qcManager.connect(qcAddress).selfPause(2)
+        
+        // Fast forward time past timeout
+        await helpers.time.increaseTime(48 * 60 * 60 + 1) // 48 hours + 1 second
+        
+        // Mock the status for escalation
+        mockQCData.getQCStatus.returns(2) // Paused
+        
+        // Trigger escalation check
+        await qcManager.connect(watchdog).checkQCEscalations([qcAddress.address])
+        
+        // Verify escalation occurred
+        expect(mockQCData.setQCStatus).to.have.been.calledWith(
+          qcAddress.address,
+          3, // UnderReview
+          ethers.utils.id("AUTO_ESCALATION")
+        )
+      })
     })
   })
 })

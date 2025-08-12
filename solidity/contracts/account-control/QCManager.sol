@@ -800,8 +800,32 @@ contract QCManager is AccessControl, ReentrancyGuard {
 
         // Define valid transitions based on current state
         if (oldStatus == QCData.QCStatus.Active) {
-            // Active can go to UnderReview (temporary) or Revoked (permanent)
+            // Active can transition to any other state
             return
+                newStatus == QCData.QCStatus.MintingPaused ||
+                newStatus == QCData.QCStatus.Paused ||
+                newStatus == QCData.QCStatus.UnderReview ||
+                newStatus == QCData.QCStatus.Revoked;
+        } else if (oldStatus == QCData.QCStatus.MintingPaused) {
+            // MintingPaused can go to:
+            // - Active (resume operations)
+            // - Paused (escalate to full pause)
+            // - UnderReview (watchdog/auto-escalation)
+            // - Revoked (governance decision)
+            return
+                newStatus == QCData.QCStatus.Active ||
+                newStatus == QCData.QCStatus.Paused ||
+                newStatus == QCData.QCStatus.UnderReview ||
+                newStatus == QCData.QCStatus.Revoked;
+        } else if (oldStatus == QCData.QCStatus.Paused) {
+            // Paused can go to:
+            // - Active (resume operations)
+            // - MintingPaused (partial resume)
+            // - UnderReview (watchdog/auto-escalation)
+            // - Revoked (governance decision)
+            return
+                newStatus == QCData.QCStatus.Active ||
+                newStatus == QCData.QCStatus.MintingPaused ||
                 newStatus == QCData.QCStatus.UnderReview ||
                 newStatus == QCData.QCStatus.Revoked;
         } else if (oldStatus == QCData.QCStatus.UnderReview) {
