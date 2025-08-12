@@ -17,7 +17,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const qcData = await get("QCData")
   const systemState = await get("SystemState")
   const qcManager = await get("QCManager")
-  const reserveLedger = await get("QCReserveLedger")
+  const reserveOracle = await get("ReserveOracle")
   const watchdogEnforcer = await get("WatchdogEnforcer")
   const tbtc = await get("TBTC")
   const bank = await get("Bank")
@@ -66,16 +66,16 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   )
   log("✅ WatchdogEnforcer granted ARBITER_ROLE in QCManager")
 
-  // Step 4: Configure QCReserveLedger permissions
-  log("Step 4: Configuring QCReserveLedger permissions...")
+  // Step 4: Configure ReserveOracle permissions
+  log("Step 4: Configuring ReserveOracle permissions...")
   await execute(
-    "QCReserveLedger",
+    "ReserveOracle",
     { from: deployer, log: true },
     "grantRole",
     ATTESTER_ROLE,
     deployer // Initial attester, should be replaced with actual attesters
   )
-  log("✅ Deployer granted initial ATTESTER_ROLE in QCReserveLedger")
+  log("✅ Deployer granted initial ATTESTER_ROLE in ReserveOracle")
 
   // Step 5: Configure Bank authorization for QCMinter
   log("Step 5: Configuring Bank authorization...")
@@ -141,11 +141,11 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log("  1. QC registration via QCManager")
   log("  2. Minting via QCMinter")
   log("  3. Redemption via QCRedeemer")
-  log("  4. Reserve attestation via QCReserveLedger")
+  log("  4. Reserve attestation via ReserveOracle")
   log("  5. Enforcement via WatchdogEnforcer")
   log("")
   log("Important next steps:")
-  log("  - Grant actual attester addresses ATTESTER_ROLE in QCReserveLedger")
+  log("  - Grant actual attester addresses ATTESTER_ROLE in ReserveOracle")
   log("  - Submit governance proposal to authorize QCMinter in Bank")
   log("  - Configure actual watchdog operators")
   log("")
@@ -156,6 +156,6 @@ func.tags = ["ConfigureAccountControl"]
 func.dependencies = [
   "AccountControlCore",
   "AccountControlState",
-  "QCReserveLedger",
+  "ReserveOracle",
   "WatchdogEnforcer",
 ]
