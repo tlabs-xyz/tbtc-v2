@@ -9,18 +9,35 @@
 
 ## Executive Summary
 
-The tBTC v2 Account Control system enables **Qualified Custodians** (regulated institutional entities) to mint tBTC tokens against their Bitcoin reserves through **direct Bank integration**. The system implements a simplified watchdog architecture focusing on objective enforcement:
+The tBTC v2 Account Control system enables Qualified Custodians (QCs) to mint tBTC against their Bitcoin reserves through direct Bank integration. The system implements a 5-state QC management model with renewable pause credits and automated escalation, providing network continuity during operational issues.
 
-- **Oracle Problem**: Multi-attester consensus for objective facts (reserve balances) - solved by QCReserveLedger
-- **Enforcement Problem**: Permissionless enforcement of objective violations - solved by WatchdogEnforcer
+**Key Statistics**:
+- **Core Contracts**: 12 (QC management + state control) + 3 (watchdog)
+- **QC States**: 5-state linear model (Active → MintingPaused → Paused/UnderReview → Revoked)
+- **Network Continuity**: 60% of states preserve redemption fulfillment
+- **Trust Model**: Multi-attester consensus with watchdog auto-escalation
+- **Architecture**: Direct Bank integration with modular policies
+- **Gas Savings**: ~50% vs abstraction layer approach
+
+This system enables **Qualified Custodians** (regulated institutional entities) to mint tBTC tokens against their Bitcoin reserves through **direct Bank integration**. The system implements a simplified watchdog architecture focusing on objective enforcement.
 
 ### Core Architectural Principles
 
-1. **Direct Integration**: Leverage existing Bank/Vault infrastructure without abstraction layers
-2. **Modular Design**: Policy-driven contracts enable evolution without breaking core interfaces
-3. **Data/Logic Separation**: Clear separation between storage (QCData) and business logic (QCManager)
-4. **Simplified Watchdog**: Machine-readable codes, distributed trust, permissionless enforcement
-5. **Future-Proof Interfaces**: Stable core contracts with upgradeable policy implementations
+1. **Two-Problem Framework**: 
+   - **Oracle Problem**: Multi-attester consensus for objective facts (solved by QCReserveLedger)
+   - **Enforcement Problem**: Permissionless enforcement of objective violations (solved by WatchdogEnforcer with embedded reason codes)
+
+2. **Direct Integration**: Leverage existing Bank/Vault infrastructure without abstraction layers (~50% gas savings vs proxy approaches)
+
+3. **Trust Distribution**: No single points of failure, minimum 3 attesters for reserve consensus, permissionless enforcement of violations
+
+4. **Machine Readability**: Standardized bytes32 reason codes (INSUFFICIENT_RESERVES, STALE_ATTESTATIONS, SUSTAINED_RESERVE_VIOLATION) for automated validation without human interpretation
+
+5. **Modular Design**: Policy-driven contracts enable evolution without breaking core interfaces
+
+6. **Data/Logic Separation**: Clear separation between storage (QCData) and business logic (QCManager)
+
+7. **Future-Proof Interfaces**: Stable core contracts with upgradeable policy implementations
 
 ---
 
@@ -522,16 +539,30 @@ The system achieves efficiency through direct integration with existing tBTC con
 **Integration Flow**:
 
 ```
-QC Request → QCMinter → BasicMintingPolicy
-    ↓
-Bank.increaseBalanceAndCall()
-    ↓
-TBTCVault.receiveBalanceIncrease() → Auto-mint tBTC
+QC Request → QCMinter → Bank.increaseBalanceAndCall() → TBTCVault → Auto-mint tBTC
 ```
 
 **Benefits**:
 
 - **50% Gas Reduction**: Direct calls eliminate intermediate contracts
+
+### Integration Points
+
+**With tBTC Core**:
+
+- **Bank Contract**: QCMinter authorized as balance increaser
+- **TBTCVault**: Receives balance increases for auto-minting
+- **TBTC Token**: QCMinter has MINTER_ROLE, QCRedeemer has BURNER_ROLE
+
+**Data Flow**:
+
+```
+User → QCMinter → Bank → TBTCVault → TBTC Tokens
+         ↓
+    QCManager → QCData (direct reference)
+                           ↓
+                    QCReserveLedger ← ReserveOracle ← Attesters
+```
 - **Proven Infrastructure**: Leverages battle-tested Bank/Vault architecture
 - **Perfect Fungibility**: QC tBTC identical to Bridge tBTC
 - **Operational Efficiency**: ~$375,000 annual operational savings
@@ -665,40 +696,74 @@ Production     3+              Byzantine tolerant   Secure (hours)
 
 ---
 
-## Configuration Parameters
+## Current System Configuration
 
-### System-Wide Defaults
+### System Parameters
 
-**Simplified Watchdog System**:
+**Core Parameters**:
 
 ```solidity
-// ReserveOracle
-uint256 public constant MIN_ATTESTERS = 3;     // Minimum for consensus
-uint256 public attestationWindow = 1 hours;    // Collection window
+// Collateral Management
+minCollateralRatio: 100%        // 100% reserve requirement
+collateralBuffer: 10%            // Grace margin for volatility
+staleThreshold: 24 hours        // Attestation freshness requirement
 
-// SystemState (used by WatchdogEnforcer)
-uint256 public minCollateralRatio = 100;       // 100% minimum
-uint256 public staleThreshold = 7 days;        // Attestation staleness
-uint256 public redemptionTimeout = 48 hours;   // Redemption deadline
+// Operations
+redemptionTimeout: 7 days       // QC must fulfill within
+minMintAmount: 0.01 tBTC        // Minimum minting amount
+maxMintAmount: 1000 tBTC        // Maximum per transaction
+
+// 5-State Model Parameters
+pauseExpiryTime: 48 hours       // Self-pause auto-escalation timer
+pauseCreditInterval: 90 days    // Renewable pause credit period
+defaultPenaltyWindow: 90 days   // Window for graduated consequences
+redemptionGracePeriod: 8 hours  // Protection before deadline
+
+// Watchdog System
+MIN_ATTESTERS: 3                // Minimum for consensus
+attestationWindow: 6 hours      // Collection window for attestations
 ```
 
-### Environment-Specific Tuning
+### Role Structure
+
+| Role | Purpose | Assigned To |
+|------|---------|-------------|
+| **DEFAULT_ADMIN_ROLE** | Ultimate authority | DAO governance |
+| **ATTESTER_ROLE** | Submit reserve attestations | Multiple oracle operators |
+| **ARBITER_ROLE** | Handle disputes and defaults | Emergency Council |
+| **WATCHDOG_ENFORCER_ROLE** | Trigger objective violations | WatchdogEnforcer contract |
+| **MINTER_ROLE** | Authorize minting operations | QCMinter contract |
+| **PAUSER_ROLE** | Emergency pause capabilities | Emergency Council |
+| **QC_ADMIN_ROLE** | QC administration | QC operators |
+| **QC_GOVERNANCE_ROLE** | Register QCs, set capacity | DAO governance |
+
+### Operational Expectations
+
+**WatchdogEnforcer Usage Pattern**:
+- Primary monitoring by designated watchdogs
+- Permissionless fallback allows anyone to enforce
+- Continuous monitoring via `batchCheckViolations()`
+- All enforcement attempts logged via events
+
+**Expected Actors**:
+- **Primary**: Watchdogs with monitoring infrastructure
+- **Secondary**: Community members, automated systems
+- **Resilience**: System maintains integrity without primary actors
+
+### Environment-Specific Configuration
 
 **Development**:
-
-- Single approval for testing
-- Faster iteration cycles
+- Single attester for testing
+- Fast timers (minutes instead of hours)
 - Relaxed validation rules
 
 **Staging**:
-
-- Majority consensus validation
+- 2-3 attesters for validation
 - Realistic timing parameters
 - Full feature testing
 
 **Production**:
-
-- Secure majority requirements
+- 3+ attesters for Byzantine fault tolerance
 - Conservative timing windows
 - Maximum security validation
 
@@ -1034,6 +1099,93 @@ This demonstrates mature engineering: willingness to remove complexity that does
 | **Gas Optimization** | Excellent | Direct references, immutable contracts |
 | **Testing Integration** | Good | Event emissions for monitoring |
 | **Upgrade Patterns** | Good | Direct integration pattern |
+
+## Operational Model
+
+### 5-State Model Features
+
+**Network Continuity Focus**:
+- **60% State Availability**: 3 out of 5 states allow redemption fulfillment
+- **Graduated Response**: Issues handled proportionally to severity  
+- **Self-Recovery**: QCs can resume from self-initiated pauses
+
+**State Definitions**:
+- **Active**: Full operations - can mint and fulfill redemptions
+- **MintingPaused**: Can fulfill redemptions but cannot mint new tBTC (self-initiated or watchdog)
+- **Paused**: Self-initiated maintenance pause, cannot mint or fulfill (48h max)
+- **UnderReview**: Council review state, can fulfill but cannot mint
+- **Revoked**: Permanently disabled, no operations allowed
+
+**State Transition Rules**:
+```
+Active ↔ MintingPaused (QC self-pause for routine maintenance)
+MintingPaused → Paused (QC escalates for full maintenance)
+Paused → UnderReview (Auto-escalation after 48h if not resumed)
+MintingPaused/Paused → Active (QC resumes early)
+UnderReview → Active/Revoked (Council decision)
+```
+
+### Renewable Pause Credit Mechanism
+
+QCs receive renewable pause credits for operational flexibility:
+
+- **Initial Grant**: 1 credit upon QC registration
+- **Renewal Period**: 1 new credit every 90 days
+- **Maximum Credits**: 1 (no accumulation)
+- **Usage**: Consumed when self-pausing (MintingPaused or Paused)
+- **Recovery**: Must wait 90 days for renewal after use
+
+### Auto-Escalation Timer
+
+Self-initiated pauses have automatic escalation to prevent indefinite disruption:
+
+```
+Self-Pause Initiated (MintingPaused/Paused)
+        ↓
+48-Hour Timer Starts
+        ↓
+QC Can Resume Anytime (resumeSelfPause)
+        ↓
+If Not Resumed After 48h:
+        ↓
+Watchdog Calls checkEscalation()
+        ↓
+Auto-Escalate to UnderReview
+        ↓
+Emergency Council Intervention Required
+```
+
+### Default Tracking & Progressive Consequences
+
+The system tracks redemption defaults with graduated consequences:
+
+**Timing Parameters**:
+- **Consecutive Default Window**: 30 days (resets if no defaults)
+- **Recovery Period**: 90 days between penalty tiers
+- **First Default**: Active → MintingPaused (can still fulfill)
+- **Second Default**: MintingPaused → UnderReview (council review)
+- **Third Default**: UnderReview → Revoked (permanent termination)
+
+**Default Recovery Path**:
+- Clear redemption backlog
+- Maintain good standing for recovery period
+- Council approval for UnderReview → Active transition
+
+### Emergency Response Quick Reference
+
+**Key Emergency Functions**:
+- `emergencyPauseQC(address qc, bytes32 reason)` - QC-specific pause (7-day auto-expire)
+- `forceConsensus()` - Override attestation deadlocks (requires ≥1 valid attestation)
+- `pauseMinting()` / `pauseRedemption()` - Global function pauses
+- `checkEscalation(address qc)` - Trigger escalation after 45-minute timer
+- `enforceObjectiveViolation(qc, reasonCode)` - Permissionless violation enforcement
+
+**Emergency Authority**:
+- **PAUSER_ROLE**: Execute pauses (Emergency Council)
+- **ARBITER_ROLE**: Force consensus, resolve disputes
+- **Anyone**: Trigger objective violations via WatchdogEnforcer
+
+---
 
 ### Final Architecture Benefits
 
