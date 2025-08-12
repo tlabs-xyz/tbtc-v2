@@ -18,7 +18,7 @@
 │ QCManager           │ QCReserveLedger     │ QCMinter                │
 │ QCData              │ • Multi-attestation │ • Embedded minting logic│
 │ SystemState         │ • Reserve consensus │ • Direct Bank access    │
-│                     │                     │ • ~5k gas saved/op      │
+│                     │                     │                         │
 │                     │ WatchdogEnforcer    │                         │
 │                     │ • Permissionless    │ QCRedeemer              │
 │ • 5-State Model     │ • Objective only    │ • Embedded redemption   │
@@ -29,31 +29,25 @@
 
 #### Integration Flow
 ```
-User → QCMinter (with embedded policy) → Bank → TBTCVault → tBTC Tokens
+User → QCMinter → Bank → TBTCVault → tBTC Tokens
 ```
 
 #### Key Integration Points
 - **Direct Bank Integration**: QCMinter authorized directly via `authorizedBalanceIncreasers`
 - **Embedded Policy Logic**: Minting/redemption rules embedded in QCMinter/QCRedeemer (YAGNI principle)
 - **Perfect Fungibility**: QC-minted tBTC identical to Bridge-minted tBTC
-- **Simplified Watchdog**: 2 contracts (down from 6) with machine-readable enforcement
+- **Simplified Watchdog**: 2 contracts with automated enforcement
 
 ---
 
 ## Slide 2: Architectural Evolution
-### "From 6 Contracts to 2: The Simplification Story"
+### "Oracle Problem in Reserve Attestation"
 
 #### The Original Challenge
-**Complex 6-Contract Watchdog System:**
-- WatchdogAutomatedEnforcement
-- WatchdogConsensusManager  
-- WatchdogDAOEscalation
-- WatchdogThresholdActions
-- WatchdogMonitor
-- QCWatchdog
-
-**Critical Issue Identified:**
-> "Machines cannot interpret human-readable strings" - the OptimisticWatchdogConsensus expected automated systems to understand strings like "excessive_slippage_observed"
+- QCReserveLedger is a smart contract that stores the reserve balance of a QC.
+- Watchdogs are responsible for submitting attestations to the QCReserveLedger.
+- We need to dissolve the single-attester problem.
+- And we need to automate the enforcement protocol rules.
 
 #### The Breakthrough Solution
 **2-Problem Framework:**
@@ -64,20 +58,16 @@ User → QCMinter (with embedded policy) → Bank → TBTCVault → tBTC Tokens
 │ QCReserveLedger     │    │ WatchdogEnforcer    │
 │ • 3+ attesters      │    │ • Permissionless    │
 │ • Median consensus  │    │ • Machine-readable  │
-│ • Byzantine fault   │    │ • Objective only    │
-│   tolerance         │    │                     │
+│ • Honest-majority   │    │ • Objective only    │
+│   assumption        │    │                     │
 └─────────────────────┘    └─────────────────────┘
 ```
 
-#### Machine-Readable Innovation
-**Before:** `"excessive_slippage_observed"` (string - requires human interpretation)  
-**After:** `keccak256("INSUFFICIENT_RESERVES")` (bytes32 - machine processable)
+#### Automation
 
-#### Results Achieved
-- **50% contract reduction** (6 → 2 core watchdog contracts)
-- **Machine-readable reason codes** enable full automation
-- **No single points of trust** through distributed attestation
-- **Gas optimization** through minimal state management
+- Example of automation: `enforceObjectiveViolation(qc, "INSUFFICIENT_RESERVES")` - Reserve violation detected by WatchdogEnforcer
+- Example of automation: `checkEscalation(qc)` - 48-hour auto-escalation timer expires
+- Example of automation: `batchCheckViolations(qcs[], reasonCode)` - Batch check for violations
 
 ---
 
@@ -98,10 +88,9 @@ User → QCMinter (with embedded policy) → Bank → TBTCVault → tBTC Tokens
 └─────────────┴─────────────┴─────────────┴─────────────┴─────────┘
 ```
 
-#### Network Continuity Analysis
-- **60% State Availability**: 3 out of 5 states allow redemption fulfillment
-- **Graduated Response**: Issues handled proportionally to severity
-- **Self-Recovery**: QCs can resume from self-initiated pauses
+- What is the difference between Active and MintingPaused? - MintingPaused is a self-initiated pause for routine maintenance.
+- What is the difference between Paused and UnderReview? - UnderReview is an auto-escalation after 48-hour timer expires.
+- What is the difference between Paused and Revoked? - Revoked is a manual termination by the Emergency Council (QC offboarding).
 
 #### State Transition Paths
 ```
@@ -115,10 +104,11 @@ Active ←→ MintingPaused (Self-pause for routine maintenance)
                               └→ Revoked (Council terminates)
 ```
 
-#### Innovative Features
-- **Renewable Pause Credits**: 1 credit per 90 days for operational flexibility
-- **Auto-Escalation Timer**: 48-hour maximum for self-initiated pauses
-- **Network Protection**: Prevents indefinite service disruption
+#### QC Self-Paused
+- QC can self-pause for operational flexibility.
+- Renewable Pause Credits: 1 credit per 90 days.
+- Auto-Escalation Timer: 48-hour maximum for self-initiated pauses.
+- Network Protection: Prevents indefinite service disruption.
 
 ---
 
@@ -151,12 +141,6 @@ Active ←→ MintingPaused (Self-pause for routine maintenance)
 - **Early Resume**: QCs can exit pause states before timer expiry
 - **Emergency Consensus**: ARBITER can force reserve consensus with available attestations
 - **Council Override**: Emergency Council can restore QCs after investigation
-
-#### Edge Cases Handled
-- **Stale Attestations**: Auto-transition to UnderReview after 24 hours
-- **Redemption Defaults**: Graduated consequences (1st→MintingPaused, 2nd→Paused)
-- **Reserve Violations**: Immediate pause with 45-minute escalation to emergency halt
-- **Consensus Failures**: Emergency consensus mechanism prevents deadlocks
 
 ---
 
@@ -209,10 +193,10 @@ Active ←→ MintingPaused (Self-pause for routine maintenance)
 
 ---
 
-## Slide 6: Technical Innovations in Detail
+## Slide 6: Reserve Attestation
 ### "Consensus, Enforcement, and Integration Mechanics"
 
-#### Multi-Attester Consensus Algorithm
+#### Multi-Attester Consensus
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Attester #1   │    │   Attester #2   │    │   Attester #3   │
