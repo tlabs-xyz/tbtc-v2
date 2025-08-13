@@ -3,16 +3,12 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {BTCUtils} from "@keep-network/bitcoin-spv-sol/contracts/BTCUtils.sol";
-import {BytesLib} from "@keep-network/bitcoin-spv-sol/contracts/BytesLib.sol";
-import {ValidateSPV} from "@keep-network/bitcoin-spv-sol/contracts/ValidateSPV.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
 import "./SPVState.sol";
-import "./BitcoinAddressUtils.sol";
 import "../token/TBTC.sol";
 import "../bridge/BitcoinTx.sol";
-import "../bridge/IRelay.sol";
+import {QCRedeemerSPV} from "./libraries/QCRedeemerSPV.sol";
 
 /// @title QCRedeemer
 /// @dev Direct implementation for tBTC redemption with QC backing.
@@ -32,10 +28,6 @@ import "../bridge/IRelay.sol";
 /// - REDEEMER_ROLE: Reserved for future functionality (currently unused)
 /// - ARBITER_ROLE: Can record redemption fulfillments and flag defaults
 contract QCRedeemer is AccessControl, ReentrancyGuard {
-    using BTCUtils for bytes;
-    using BTCUtils for uint256;
-    using ValidateSPV for bytes;
-    using ValidateSPV for bytes32;
     using SPVState for SPVState.Storage;
     
     // Custom errors for gas-efficient reverts
@@ -680,280 +672,27 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             revert RelayNotSet();
         }
         
-        // Complete SPV validation following Bridge patterns
+        // Complete SPV validation using library
         
-        // 1. Validate SPV proof using Bridge's BitcoinTx pattern
-        bytes32 txHash = _validateSPVProof(txInfo, proof);
+        // 1. Validate SPV proof using library
+        QCRedeemerSPV.validateSPVProof(spvState, txInfo, proof);
         
         // 2. Verify transaction contains expected payment to userBtcAddress
-        if (!_verifyRedemptionPayment(userBtcAddress, expectedAmount, txInfo)) {
+        if (!QCRedeemerSPV.verifyRedemptionPayment(userBtcAddress, expectedAmount, txInfo)) {
             revert RedemptionProofFailed("Payment verification failed");
         }
         
         // 3. Validate redemption-specific transaction requirements
-        if (!_validateRedemptionTransaction(redemptionId, txInfo)) {
+        Redemption memory redemption = redemptions[redemptionId];
+        if (!QCRedeemerSPV.validateRedemptionTransaction(uint8(redemption.status), txInfo)) {
             revert RedemptionProofFailed("Transaction validation failed");
         }
         
         return true;
     }
     
-    /// @dev Validate SPV proof and return transaction hash
-    /// @param txInfo Bitcoin transaction information
-    /// @param proof SPV proof of transaction inclusion
-    /// @return txHash The validated transaction hash
-    function _validateSPVProof(
-        BitcoinTx.Info calldata txInfo,
-        BitcoinTx.Proof calldata proof
-    ) private view returns (bytes32 txHash) {
-        // Validate transaction structure
-        if (!txInfo.inputVector.validateVin()) {
-            revert InvalidBitcoinTransaction();
-        }
-        if (!txInfo.outputVector.validateVout()) {
-            revert InvalidBitcoinTransaction();
-        }
-        
-        // Validate proof structure
-        if (proof.merkleProof.length != proof.coinbaseProof.length) {
-            revert SPVProofValidationFailed("Tx not on same level of merkle tree as coinbase");
-        }
-        
-        // Calculate transaction hash
-        txHash = abi.encodePacked(
-            txInfo.version,
-            txInfo.inputVector,
-            txInfo.outputVector,
-            txInfo.locktime
-        ).hash256View();
-        
-        // Validate merkle proof
-        bytes32 root = proof.bitcoinHeaders.extractMerkleRootLE();
-        
-        if (!txHash.prove(root, proof.merkleProof, proof.txIndexInBlock)) {
-            revert SPVProofValidationFailed("Tx merkle proof is not valid for provided header and tx hash");
-        }
-        
-        // Validate coinbase proof
-        bytes32 coinbaseHash = sha256(abi.encodePacked(proof.coinbasePreimage));
-        if (!coinbaseHash.prove(root, proof.coinbaseProof, 0)) {
-            revert SPVProofValidationFailed("Coinbase merkle proof is not valid for provided header and hash");
-        }
-        
-        // Evaluate proof difficulty
-        _evaluateProofDifficulty(proof.bitcoinHeaders);
-        
-        return txHash;
-    }
     
-    /// @dev Evaluate proof difficulty against relay requirements
-    /// @param bitcoinHeaders Bitcoin headers chain for difficulty evaluation
-    function _evaluateProofDifficulty(bytes memory bitcoinHeaders) private view {
-        // TODO: Stubbed for development - implement full difficulty evaluation
-        // This function should:
-        // 1. Get current and previous epoch difficulty from relay
-        // 2. Extract target from Bitcoin headers and calculate difficulty
-        // 3. Validate headers chain and check work requirements
-        // 4. Compare observed difficulty against relay requirements
-        
-        if (bitcoinHeaders.length == 0) {
-            revert SPVProofValidationFailed("Empty headers");
-        }
-        
-        // Stubbed validation - replace with full implementation
-    }
     
-    /// @dev Verify that transaction contains expected payment to user
-    /// @param userBtcAddress The user's Bitcoin address
-    /// @param expectedAmount The expected payment amount in satoshis
-    /// @param txInfo The Bitcoin transaction information
-    /// @return valid True if payment is found and sufficient
-    function _verifyRedemptionPayment(
-        string calldata userBtcAddress,
-        uint64 expectedAmount,
-        BitcoinTx.Info calldata txInfo
-    ) private pure returns (bool valid) {
-        // Basic parameter validation
-        if (bytes(userBtcAddress).length == 0 || expectedAmount == 0 || txInfo.outputVector.length == 0) {
-            return false;
-        }
-        
-        // Validate Bitcoin address format
-        if (!_isValidBitcoinAddress(userBtcAddress)) {
-            return false;
-        }
-        
-        // Find payment to user address and verify amount
-        uint64 totalPayment = _calculatePaymentToAddress(txInfo.outputVector, userBtcAddress);
-        
-        // Verify payment meets expected amount (accounting for dust threshold)
-        return totalPayment >= expectedAmount && totalPayment >= 546; // Bitcoin dust threshold
-    }
-    
-    /// @dev Validate and decode Bitcoin address using production-ready BitcoinAddressUtils
-    /// @param btcAddress The Bitcoin address to validate and decode
-    /// @return valid True if address is valid
-    /// @return scriptType The decoded script type (0=P2PKH, 1=P2SH, 2=P2WPKH, 3=P2WSH)
-    /// @return scriptHash The decoded script hash (20 or 32 bytes)
-    function _decodeAndValidateBitcoinAddress(
-        string calldata btcAddress
-    ) private pure returns (bool valid, uint8 scriptType, bytes memory scriptHash) {
-        // Check basic length requirements before attempting decode
-        bytes memory addr = bytes(btcAddress);
-        if (addr.length == 0 || addr.length < 14 || addr.length > 74) {
-            return (false, 0, new bytes(0));
-        }
-        
-        // The BitcoinAddressUtils library will revert on invalid addresses
-        // Since we can't try-catch a library call, we'll validate the format first
-        // and let successful decode indicate validity
-        (uint8 decodedScriptType, bytes memory decodedScriptHash) = BitcoinAddressUtils.decodeAddress(btcAddress);
-        
-        // If we reach here, decode was successful
-        return (true, decodedScriptType, decodedScriptHash);
-    }
-
-    /// @dev Legacy validation function - now uses real address decoding  
-    /// @param btcAddress The Bitcoin address to validate
-    /// @return valid True if address format is valid
-    function _isValidBitcoinAddress(string calldata btcAddress) private pure returns (bool valid) {
-        (bool isValid, , ) = _decodeAndValidateBitcoinAddress(btcAddress);
-        return isValid;
-    }
-    
-    /// @dev Calculate total payment amount to a specific Bitcoin address using Bridge patterns
-    /// @param outputVector The transaction output vector
-    /// @param targetAddress The Bitcoin address to find payments to
-    /// @return totalAmount Total satoshis paid to the address
-    function _calculatePaymentToAddress(
-        bytes memory outputVector, 
-        string calldata targetAddress
-    ) private pure returns (uint64 totalAmount) {
-        // Use Bridge pattern for parsing output vector (following Redemption.sol)
-        (, uint256 outputsCount) = outputVector.parseVarInt();
-        
-        for (uint256 i = 0; i < outputsCount; i++) {
-            // Use Bridge's proven method for extracting outputs
-            bytes memory output = outputVector.extractOutputAtIndex(i);
-            
-            if (output.length < 8) continue;
-            
-            // Use Bridge's proven method for value extraction
-            uint64 outputValue = output.extractValue();
-            
-            // Use Bridge's proven method for hash extraction  
-            bytes memory outputHash = output.extractHash();
-            
-            // Check if this output pays to target address using Bridge patterns
-            if (_addressMatchesOutputHash(targetAddress, outputHash)) {
-                totalAmount += outputValue;
-            }
-        }
-        
-        return totalAmount;
-    }
-    
-    // NOTE: _extractScript and _scriptPaysToAddress functions removed
-    // Replaced with Bridge-proven methods: extractHash() + _addressMatchesOutputHash()
-    
-    /// @dev Check if Bitcoin address matches output hash using real address decoding
-    /// @param targetAddress The Bitcoin address  
-    /// @param outputHash The extracted output hash from Bridge's extractHash()
-    /// @return matches True if address matches the output hash
-    function _addressMatchesOutputHash(
-        string calldata targetAddress,
-        bytes memory outputHash
-    ) private pure returns (bool matches) {
-        if (outputHash.length == 0) {
-            return false;
-        }
-        
-        // Decode the Bitcoin address to get real script hash
-        (bool isValid, uint8 scriptType, bytes memory addressHash) = _decodeAndValidateBitcoinAddress(targetAddress);
-        
-        if (!isValid || addressHash.length == 0) {
-            return false;
-        }
-        
-        // Verify hash lengths match expected for script type
-        if (scriptType <= 2) {
-            // P2PKH, P2SH, P2WPKH use 20-byte hashes
-            if (outputHash.length != 20 || addressHash.length != 20) {
-                return false;
-            }
-        } else if (scriptType == 3) {
-            // P2WSH uses 32-byte hashes  
-            if (outputHash.length != 32 || addressHash.length != 32) {
-                return false;
-            }
-        } else {
-            return false; // Unsupported script type
-        }
-        
-        // Compare the actual decoded address hash with the output hash
-        // Using Bridge's proven hash comparison pattern
-        if (outputHash.length == 20) {
-            // 20-byte comparison using Bridge's slice20 pattern
-            bytes20 outputHash20;
-            bytes20 addressHash20;
-            
-            assembly {
-                outputHash20 := mload(add(outputHash, 32))
-                addressHash20 := mload(add(addressHash, 32))
-            }
-            
-            return outputHash20 == addressHash20;
-        } else if (outputHash.length == 32) {
-            // 32-byte comparison for P2WSH
-            bytes32 outputHash32;
-            bytes32 addressHash32;
-            
-            assembly {
-                outputHash32 := mload(add(outputHash, 32))
-                addressHash32 := mload(add(addressHash, 32))
-            }
-            
-            return outputHash32 == addressHash32;
-        }
-        
-        return false;
-    }
-    
-    // NOTE: _validateAddressFormat function removed
-    // Replaced with real Bitcoin address decoding using BitcoinAddressUtils
-    
-    // NOTE: _bech32AddressMatches function removed
-    // Replaced with Bridge-proven _validateAddressFormat() method
-    
-    /// @dev Validate redemption-specific transaction requirements
-    /// @param redemptionId The redemption identifier
-    /// @param txInfo The Bitcoin transaction information
-    /// @return valid True if transaction meets redemption requirements
-    function _validateRedemptionTransaction(
-        bytes32 redemptionId,
-        BitcoinTx.Info calldata txInfo
-    ) private view returns (bool valid) {
-        // Redemption-specific validations
-        
-        // Check transaction is recent enough (within acceptable time window)
-        // This prevents replay attacks with old transactions
-        
-        // Verify transaction structure is appropriate for redemptions
-        // (sufficient inputs, reasonable fee structure, etc.)
-        
-        // Basic validation - ensure required parameters are present
-        if (redemptionId == bytes32(0) || txInfo.inputVector.length == 0) {
-            return false;
-        }
-        
-        // TODO: Implement additional redemption validations:
-        // - Transaction timestamp validation (not too old)
-        // - Input/output ratio validation
-        // - Fee structure validation
-        // - Anti-replay protections
-        
-        return true; // Simplified validation - replace with full implementation
-    }
 
     /// @dev Generate unique redemption ID
     /// @param user The user requesting redemption
