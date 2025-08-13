@@ -4,10 +4,10 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /// @title ReserveOracle
-/// @notice Multi-attester consensus oracle with Byzantine fault tolerance for QC reserve attestation
+/// @notice Multi-attester consensus oracle with honest-majority assumption for QC reserve attestation
 /// @dev This oracle system provides secure, decentralized reserve balance attestation for Qualified Custodians.
 ///
-/// ## Byzantine Fault Tolerance Design
+/// ## Honest-Majority Oracle Design
 /// The system protects against malicious attesters through:
 /// - **Consensus Requirement**: Minimum 3 attesters required for balance updates
 /// - **Median Calculation**: Uses statistical median to resist outlier manipulation
@@ -307,7 +307,7 @@ contract ReserveOracle is AccessControl {
             revert InsufficientAttestations();
         }
 
-        // Calculate median balance for Byzantine fault tolerance
+        // Calculate median balance for honest-majority consensus
         uint256 consensusBalance = _calculateMedian(balances, validCount);
         uint256 oldBalance = reserves[qc].balance;
 
@@ -337,7 +337,7 @@ contract ReserveOracle is AccessControl {
         _clearPendingAttestations(qc);
     }
 
-    /// @dev Calculate median of array (Byzantine fault tolerance)
+    /// @dev Calculate median of array (honest-majority consensus)
     function _calculateMedian(uint256[] memory values, uint256 length)
         private
         pure

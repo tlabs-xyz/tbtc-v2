@@ -43,9 +43,15 @@ const func: DeployFunction = async function DeployAccountControlState(
       ? 1 // Lower requirement for testing
       : 6 // Production requirement (6 confirmations)
 
-  // Deploy QCManagerSPV library first
+  // Get SharedSPVCore from previous deployment
+  const sharedSPVCore = await get("SharedSPVCore")
+  
+  // Deploy QCManagerSPV library with SharedSPVCore dependency
   const qcManagerSPV = await deploy("QCManagerSPV", {
     from: deployer,
+    libraries: {
+      SharedSPVCore: sharedSPVCore.address,
+    },
     log: true,
     waitConfirmations: network.live ? 5 : 1,
   })
@@ -75,4 +81,4 @@ const func: DeployFunction = async function DeployAccountControlState(
 
 export default func
 func.tags = ["AccountControlState", "QCData", "SystemState", "QCManager"]
-func.dependencies = ["ReserveOracle", "LightRelay"]
+func.dependencies = ["ReserveOracle", "LightRelay", "AccountControlCore"]
