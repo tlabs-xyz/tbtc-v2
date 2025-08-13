@@ -45,15 +45,25 @@ describe("QCManager", () => {
   const validBtcAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
-    governance = signers[1]
-    qcAddress = signers[2]
-    arbiter = signers[3]
-    watchdog = signers[4]
-    registrar = signers[5]
-    pauser = signers[6]
-    user = signers[7]
+    const [
+      deployerSigner,
+      governanceSigner,
+      qcAddressSigner,
+      arbiterSigner,
+      watchdogSigner,
+      registrarSigner,
+      pauserSigner,
+      userSigner,
+    ] = await ethers.getSigners()
+
+    deployer = deployerSigner
+    governance = governanceSigner
+    qcAddress = qcAddressSigner
+    arbiter = arbiterSigner
+    watchdog = watchdogSigner
+    registrar = registrarSigner
+    pauser = pauserSigner
+    user = userSigner
 
     // Generate role hashes
     DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
@@ -75,8 +85,17 @@ describe("QCManager", () => {
     mockReserveOracle = await smock.fake<ReserveOracle>("ReserveOracle")
     mockQCRedeemer = await smock.fake<IQCRedeemer>("IQCRedeemer")
 
-    // Deploy QCManagerSPV library first
-    const QCManagerSPVFactory = await ethers.getContractFactory("QCManagerSPV")
+    // Deploy SharedSPVCore library first
+    const SharedSPVCoreFactory = await ethers.getContractFactory("SharedSPVCore")
+    const sharedSPVCore = await SharedSPVCoreFactory.deploy()
+    await sharedSPVCore.deployed()
+    
+    // Deploy QCManagerSPV library with SharedSPVCore dependency
+    const QCManagerSPVFactory = await ethers.getContractFactory("QCManagerSPV", {
+      libraries: {
+        SharedSPVCore: sharedSPVCore.address,
+      },
+    })
     const qcManagerSPV = await QCManagerSPVFactory.deploy()
     await qcManagerSPV.deployed()
 
@@ -873,6 +892,9 @@ describe("QCManager", () => {
 
       // Setup a paused QC with escalation timer
       await qcManager.connect(deployer).grantRole(PAUSER_ROLE, deployer.address)
+      await qcManager
+        .connect(deployer)
+        .grantRole(WATCHDOG_ROLE, watchdog.address)
       await qcManager.connect(deployer).grantInitialCredit(qcAddress.address)
 
       // Call selfPause
@@ -896,7 +918,7 @@ describe("QCManager", () => {
           expect(mockQCData.setQCStatus).to.have.been.calledTwice
           expect(mockQCData.setQCStatus).to.have.been.calledWith(
             qcAddress.address,
-            3, // UnderReview  
+            3, // UnderReview
             ethers.utils.id("AUTO_ESCALATION")
           )
 

@@ -139,6 +139,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
     error NeverUsedCredit();
     error RenewalPeriodNotMet();
     error QCAlreadyInitialized();
+    error QCNotEligibleForEscalation();
+    error EscalationPeriodNotReached();
     error OnlyStateManager();
     
     bytes32 public constant QC_GOVERNANCE_ROLE =
@@ -1034,10 +1036,21 @@ contract QCManager is AccessControl, ReentrancyGuard {
         for (uint256 i = 0; i < qcAddresses.length; i++) {
             address qc = qcAddresses[i];
             
+            // Check if QC is eligible for escalation
+            QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+            if (currentStatus != QCData.QCStatus.Paused && currentStatus != QCData.QCStatus.MintingPaused) {
+                revert QCNotEligibleForEscalation();
+            }
+            
             // Skip if no pause timestamp
             if (qcPauseTimestamp[qc] == 0) continue;
             
             uint256 timeElapsed = block.timestamp - qcPauseTimestamp[qc];
+            
+            // Check if escalation period has been reached
+            if (timeElapsed < SELF_PAUSE_TIMEOUT) {
+                revert EscalationPeriodNotReached();
+            }
             
             // Check for warning period (1 hour before escalation) but only if not yet escalated
             if (timeElapsed >= SELF_PAUSE_TIMEOUT - ESCALATION_WARNING_PERIOD && 
@@ -1048,10 +1061,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
                 escalationWarningEmitted[qc] = true;
             }
             
-            // Check for auto-escalation after 48h
-            if (timeElapsed >= SELF_PAUSE_TIMEOUT) {
-                _performAutoEscalation(qc);
-            }
+            // Perform auto-escalation after 48h
+            _performAutoEscalation(qc);
         }
     }
     

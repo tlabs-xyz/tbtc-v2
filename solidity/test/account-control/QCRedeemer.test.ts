@@ -51,16 +51,28 @@ describe("QCRedeemer", () => {
     mockQCData = await smock.fake<QCData>("QCData")
     mockSystemState = await smock.fake<SystemState>("SystemState")
 
-    // Deploy QCRedeemerSPV library first
-    const QCRedeemerSPVFactory = await ethers.getContractFactory("QCRedeemerSPV")
+    // Deploy SharedSPVCore library first
+    const SharedSPVCoreFactory = await ethers.getContractFactory("SharedSPVCore")
+    const sharedSPVCore = await SharedSPVCoreFactory.deploy()
+    await sharedSPVCore.deployed()
+    
+    // Deploy QCRedeemerSPV library with SharedSPVCore dependency
+    const QCRedeemerSPVFactory = await ethers.getContractFactory(
+      "QCRedeemerSPV",
+      {
+        libraries: {
+          SharedSPVCore: sharedSPVCore.address,
+        },
+      }
+    )
     const qcRedeemerSPVLib = await QCRedeemerSPVFactory.deploy()
     await qcRedeemerSPVLib.deployed()
 
     // Deploy QCRedeemer with SPV support and link the library
     const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer", {
       libraries: {
-        QCRedeemerSPV: qcRedeemerSPVLib.address
-      }
+        QCRedeemerSPV: qcRedeemerSPVLib.address,
+      },
     })
     qcRedeemer = await QCRedeemerFactory.deploy(
       mockTbtc.address,
@@ -185,7 +197,6 @@ describe("QCRedeemer", () => {
       })
     })
 
-
     context("when all validations pass", () => {
       let tx: any
       let redemptionId: string
@@ -202,7 +213,6 @@ describe("QCRedeemer", () => {
         )
         redemptionId = event?.args?.redemptionId
       })
-
 
       it("should burn user tokens", async () => {
         expect(mockTbtc.burnFrom).to.have.been.calledWith(
@@ -353,7 +363,6 @@ describe("QCRedeemer", () => {
       })
     })
 
-
     context("when called by arbiter with valid redemption", () => {
       let tx: any
 
@@ -369,7 +378,6 @@ describe("QCRedeemer", () => {
             mockSpvData.proof
           )
       })
-
 
       it("should update redemption status to Fulfilled", async () => {
         const redemption = await qcRedeemer.getRedemption(redemptionId)
@@ -449,7 +457,6 @@ describe("QCRedeemer", () => {
       })
     })
 
-
     context("when called by arbiter with valid redemption", () => {
       let tx: any
 
@@ -458,7 +465,6 @@ describe("QCRedeemer", () => {
           .connect(watchdog)
           .flagDefaultedRedemption(redemptionId, defaultReason)
       })
-
 
       it("should update redemption status to Defaulted", async () => {
         const redemption = await qcRedeemer.getRedemption(redemptionId)
@@ -568,7 +574,6 @@ describe("QCRedeemer", () => {
       expect(redemption.status).to.equal(0) // NeverInitiated
     })
   })
-
 
   describe("Access Control", () => {
     context("ARBITER_ROLE functions", () => {
