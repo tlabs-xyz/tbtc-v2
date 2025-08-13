@@ -13,6 +13,33 @@ const func: DeployFunction = async function DeployAccountControlCore(
   // Phase 1: Core Contract Layer with Direct Injection
   log("Phase 1: Deploying Core Contract Layer")
 
+  // Deploy SPV libraries first
+  log("Deploying SPV libraries...")
+  
+  const sharedSPVCore = await deploy("SharedSPVCore", {
+    from: deployer,
+    log: true,
+    waitConfirmations: network.live ? 5 : 1,
+  })
+  
+  const qcManagerSPV = await deploy("QCManagerSPV", {
+    from: deployer,
+    libraries: {
+      SharedSPVCore: sharedSPVCore.address,
+    },
+    log: true,
+    waitConfirmations: network.live ? 5 : 1,
+  })
+  
+  const qcRedeemerSPV = await deploy("QCRedeemerSPV", {
+    from: deployer,
+    libraries: {
+      SharedSPVCore: sharedSPVCore.address,
+    },
+    log: true,
+    waitConfirmations: network.live ? 5 : 1,
+  })
+
   // Get dependencies from previously deployed state contracts
   const qcData = await deployments.get("QCData")
   const systemState = await deployments.get("SystemState")
@@ -50,6 +77,9 @@ const func: DeployFunction = async function DeployAccountControlCore(
   // Deploy QCRedeemer - Direct injection pattern with SPV support
   const qcRedeemer = await deploy("QCRedeemer", {
     from: deployer,
+    libraries: {
+      QCRedeemerSPV: qcRedeemerSPV.address,
+    },
     args: [
       tbtc.address,
       qcData.address,

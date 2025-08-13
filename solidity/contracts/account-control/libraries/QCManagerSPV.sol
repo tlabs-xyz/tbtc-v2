@@ -5,37 +5,24 @@ import {BTCUtils} from "@keep-network/bitcoin-spv-sol/contracts/BTCUtils.sol";
 import {BytesLib} from "@keep-network/bitcoin-spv-sol/contracts/BytesLib.sol";
 import {ValidateSPV} from "@keep-network/bitcoin-spv-sol/contracts/ValidateSPV.sol";
 import "../SPVState.sol";
-import "../BitcoinAddressUtils.sol";
 import "../../bridge/BitcoinTx.sol";
-import "../../bridge/IRelay.sol";
+import {SharedSPVCore} from "./SharedSPVCore.sol";
 
 /// @title QCManagerSPV
-/// @dev Library for SPV validation logic used by QCManager
-/// Extracts complex SPV verification functions to reduce main contract size
+/// @dev Library for wallet control SPV validation logic used by QCManager
+/// Specialized logic for wallet control verification, uses SharedSPVCore for common operations
 library QCManagerSPV {
     using BTCUtils for bytes;
-    using BTCUtils for uint256;
-    using ValidateSPV for bytes;
-    using ValidateSPV for bytes32;
     using BytesLib for bytes;
+    using ValidateSPV for bytes;
     using SPVState for SPVState.Storage;
     
-    // Compact error codes to save space
-    error SPVErr(uint8 code);
+    // Wallet control specific error codes
+    error WalletControlErr(uint8 code);
     // Error codes:
-    // 1: Relay not set
-    // 2: Invalid input vector
-    // 3: Invalid output vector  
-    // 4: Tx not on same level as coinbase
-    // 5: Invalid merkle proof
-    // 6: Invalid coinbase proof
-    // 7: Empty headers
-    // 8: Wallet control proof failed
-    // 9: Not at current or previous difficulty
-    // 10: Invalid length of headers chain
-    // 11: Invalid headers chain
-    // 12: Insufficient work in header
-    // 13: Insufficient accumulated difficulty
+    // 1: Wallet control proof failed
+    // 2: Challenge not found in OP_RETURN
+    // 3: Invalid transaction signature
     
     /// @dev Verify wallet control via SPV proof
     /// @param spvState The SPV state storage
@@ -51,111 +38,18 @@ library QCManagerSPV {
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
     ) external view returns (bool verified) {
-        // Verify SPV state is initialized
-        if (!spvState.isInitialized()) {
-            revert SPVErr(1); // Relay not set
-        }
+        // 1. Validate core SPV proof using shared library
+        // This handles all the basic SPV validation (merkle proofs, coinbase, difficulty)
+        SharedSPVCore.validateCoreSPVProof(spvState, txInfo, proof);
         
-        // 1. Validate transaction structure
-        if (!txInfo.inputVector.validateVin()) {
-            revert SPVErr(2); // Invalid input vector
-        }
-        if (!txInfo.outputVector.validateVout()) {
-            revert SPVErr(3); // Invalid output vector
-        }
-        
-        // 2. Validate proof structure
-        if (proof.merkleProof.length != proof.coinbaseProof.length) {
-            revert SPVErr(4); // Tx not on same level as coinbase
-        }
-        
-        // 3. Calculate transaction hash
-        bytes32 txHash = abi
-            .encodePacked(
-                txInfo.version,
-                txInfo.inputVector,
-                txInfo.outputVector,
-                txInfo.locktime
-            )
-            .hash256View();
-            
-        // 4. Extract merkle root and validate merkle proof
-        // TODO: For development/testing, skip full SPV validation
-        if (proof.bitcoinHeaders.length > 0 && proof.merkleProof.length > 0) {
-            bytes32 root = proof.bitcoinHeaders.extractMerkleRootLE();
-            if (!txHash.prove(root, proof.merkleProof, proof.txIndexInBlock)) {
-                revert SPVErr(5); // Invalid merkle proof
-            }
-            
-            // 5. Validate coinbase proof
-            bytes32 coinbaseHash = sha256(abi.encodePacked(proof.coinbasePreimage));
-            if (!coinbaseHash.prove(root, proof.coinbaseProof, 0)) {
-                revert SPVErr(6); // Invalid coinbase proof
-            }
-        }
-        // Skip SPV validation for empty proof data (testing)
-        
-        // 6. Evaluate proof difficulty (skip for empty headers in testing)
-        if (proof.bitcoinHeaders.length > 0) {
-            evaluateProofDifficulty(spvState, proof.bitcoinHeaders);
-        }
-        
-        // 7. Verify wallet control proof
+        // 2. Verify wallet control specific proof
         if (!validateWalletControlProof(btcAddress, challenge, txInfo)) {
-            revert SPVErr(8); // Wallet control proof failed
+            revert WalletControlErr(1); // Wallet control proof failed
         }
         
         return true;
     }
     
-    /// @dev Evaluate proof difficulty against relay requirements
-    /// @param spvState The SPV state storage containing relay and difficulty factor
-    /// @param bitcoinHeaders Bitcoin headers chain for difficulty evaluation
-    function evaluateProofDifficulty(
-        SPVState.Storage storage spvState,
-        bytes memory bitcoinHeaders
-    ) internal view {
-        if (bitcoinHeaders.length == 0) {
-            revert SPVErr(7); // Empty headers
-        }
-        
-        // Get current and previous epoch difficulties from relay
-        IRelay relay = spvState.relay;
-        uint256 currentEpochDifficulty = relay.getCurrentEpochDifficulty();
-        uint256 previousEpochDifficulty = relay.getPrevEpochDifficulty();
-        
-        // Extract difficulty from first header
-        uint256 firstHeaderDiff = bitcoinHeaders.extractTarget().calculateDifficulty();
-        
-        // Determine which epoch we're validating against
-        uint256 requestedDiff;
-        if (firstHeaderDiff == currentEpochDifficulty) {
-            requestedDiff = currentEpochDifficulty;
-        } else if (firstHeaderDiff == previousEpochDifficulty) {
-            requestedDiff = previousEpochDifficulty;
-        } else {
-            revert SPVErr(9); // Not at current or previous difficulty
-        }
-        
-        // Validate the header chain and get observed difficulty
-        uint256 observedDiff = bitcoinHeaders.validateHeaderChain();
-        
-        // Check for validation errors
-        if (observedDiff == ValidateSPV.getErrBadLength()) {
-            revert SPVErr(10); // Invalid length of headers chain
-        }
-        if (observedDiff == ValidateSPV.getErrInvalidChain()) {
-            revert SPVErr(11); // Invalid headers chain
-        }
-        if (observedDiff == ValidateSPV.getErrLowWork()) {
-            revert SPVErr(12); // Insufficient work in header
-        }
-        
-        // Verify accumulated difficulty meets requirements
-        if (observedDiff < requestedDiff * spvState.txProofDifficultyFactor) {
-            revert SPVErr(13); // Insufficient accumulated difficulty
-        }
-    }
     
     /// @dev Validate that the transaction demonstrates control over the Bitcoin address
     /// @param btcAddress The Bitcoin address being claimed
@@ -181,7 +75,7 @@ library QCManagerSPV {
         }
         
         // 3. Validate Bitcoin address format
-        if (!isValidBitcoinAddress(btcAddress)) {
+        if (!SharedSPVCore.isValidBitcoinAddress(btcAddress)) {
             return false;
         }
         
@@ -295,37 +189,4 @@ library QCManagerSPV {
         return true;
     }
     
-    /// @dev Validate Bitcoin address format
-    /// @param btcAddress The Bitcoin address to validate
-    /// @return valid True if address format is valid
-    function isValidBitcoinAddress(string calldata btcAddress) 
-        internal 
-        pure 
-        returns (bool valid) 
-    {
-        (bool isValid, , ) = decodeAndValidateBitcoinAddress(btcAddress);
-        return isValid;
-    }
-    
-    /// @dev Decode and validate Bitcoin address
-    /// @param btcAddress The Bitcoin address to decode
-    /// @return valid True if valid
-    /// @return scriptType The script type
-    /// @return scriptHash The script hash
-    function decodeAndValidateBitcoinAddress(string calldata btcAddress)
-        internal
-        pure
-        returns (bool valid, uint8 scriptType, bytes memory scriptHash)
-    {
-        bytes memory addr = bytes(btcAddress);
-        if (addr.length == 0 || addr.length < 14 || addr.length > 74) {
-            return (false, 0, new bytes(0));
-        }
-        
-        // Decode using BitcoinAddressUtils
-        (uint8 decodedScriptType, bytes memory decodedScriptHash) = 
-            BitcoinAddressUtils.decodeAddress(btcAddress);
-        
-        return (true, decodedScriptType, decodedScriptHash);
-    }
 }
