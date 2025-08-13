@@ -22,14 +22,14 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const tbtc = await get("TBTC")
   const bank = await get("Bank")
   const lightRelay = await get("LightRelay")
-  
+
   // Configure SPV parameters based on network
-  const txProofDifficultyFactor = 
+  const txProofDifficultyFactor =
     hre.network.name === "hardhat" ||
     hre.network.name === "development" ||
     hre.network.name === "system_tests"
-      ? 1  // Lower requirement for testing
-      : 6  // Production requirement (6 confirmations)
+      ? 1 // Lower requirement for testing
+      : 6 // Production requirement (6 confirmations)
 
   // Define role constants
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
@@ -139,7 +139,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     "setRedemptionTimeout",
     48 * 60 * 60 // 48 hours
   )
-  
+
   // Step 8: Configure SPV parameters
   log("Step 8: Configuring SPV parameters...")
   await execute(
@@ -154,8 +154,10 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     "setTxProofDifficultyFactor",
     txProofDifficultyFactor
   )
-  log(`✅ SPV parameters configured (relay: ${lightRelay.address}, difficulty: ${txProofDifficultyFactor})`)
-  
+  log(
+    `✅ SPV parameters configured (relay: ${lightRelay.address}, difficulty: ${txProofDifficultyFactor})`
+  )
+
   log("✅ System parameters configured")
 
   log("")

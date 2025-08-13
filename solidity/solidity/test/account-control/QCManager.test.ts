@@ -86,7 +86,7 @@ describe("QCManager", () => {
     mockSystemState.isFunctionPaused.returns(false) // Functions not paused
     mockSystemState.isMintingPaused.returns(false)
     mockSystemState.isQCEmergencyPaused.returns(false)
-    
+
     mockQCData.isQCRegistered.returns(false) // QC not registered by default
     mockQCData.getQCStatus.returns(0) // NeverRegistered status
     mockQCData.getMaxMintingCapacity.returns(0)
@@ -96,7 +96,7 @@ describe("QCManager", () => {
     mockQCData.setQCStatus.returns()
     mockQCData.registerWallet.returns()
     mockQCData.setQCSelfPaused.returns()
-    
+
     mockReserveOracle.getReserveBalanceAndStaleness.returns([0, false])
     mockQCRedeemer.hasUnfulfilledRedemptions.returns(false)
     mockQCRedeemer.getEarliestRedemptionDeadline.returns(0)
@@ -122,14 +122,17 @@ describe("QCManager", () => {
     })
 
     it("should grant deployer admin role", async () => {
-      expect(await qcManager.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true
+      expect(await qcManager.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to
+        .be.true
     })
 
     it("should have correct role constants", async () => {
       expect(await qcManager.QC_ADMIN_ROLE()).to.equal(QC_ADMIN_ROLE)
       expect(await qcManager.REGISTRAR_ROLE()).to.equal(REGISTRAR_ROLE)
       expect(await qcManager.ARBITER_ROLE()).to.equal(ARBITER_ROLE)
-      expect(await qcManager.WATCHDOG_ENFORCER_ROLE()).to.equal(WATCHDOG_ENFORCER_ROLE)
+      expect(await qcManager.WATCHDOG_ENFORCER_ROLE()).to.equal(
+        WATCHDOG_ENFORCER_ROLE
+      )
       expect(await qcManager.WATCHDOG_ROLE()).to.equal(WATCHDOG_ROLE)
       expect(await qcManager.PAUSER_ROLE()).to.equal(PAUSER_ROLE)
     })
@@ -138,8 +141,10 @@ describe("QCManager", () => {
   describe("QC Registration", () => {
     context("when called by governance", () => {
       it("should register QC successfully", async () => {
-        mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(false)
-        
+        mockQCData.isQCRegistered
+          .whenCalledWith(qcAddress.address)
+          .returns(false)
+
         const tx = await qcManager
           .connect(governance)
           .registerQC(qcAddress.address, initialMintingCapacity)
@@ -151,11 +156,7 @@ describe("QCManager", () => {
 
         await expect(tx)
           .to.emit(qcManager, "QCRegistrationInitiated")
-          .withArgs(
-            qcAddress.address,
-            governance.address,
-            expect.any(Number)
-          )
+          .withArgs(qcAddress.address, governance.address, expect.any(Number))
 
         await expect(tx)
           .to.emit(qcManager, "QCOnboarded")
@@ -168,7 +169,9 @@ describe("QCManager", () => {
       })
 
       it("should revert if QC already registered", async () => {
-        mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
+        mockQCData.isQCRegistered
+          .whenCalledWith(qcAddress.address)
+          .returns(true)
 
         await expect(
           qcManager
@@ -187,9 +190,7 @@ describe("QCManager", () => {
 
       it("should revert with zero capacity", async () => {
         await expect(
-          qcManager
-            .connect(governance)
-            .registerQC(qcAddress.address, 0)
+          qcManager.connect(governance).registerQC(qcAddress.address, 0)
         ).to.be.revertedWith("InvalidMintingCapacity")
       })
     })
@@ -211,13 +212,15 @@ describe("QCManager", () => {
     beforeEach(async () => {
       // Setup registered QC
       mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
-      mockQCData.getMaxMintingCapacity.whenCalledWith(qcAddress.address).returns(initialMintingCapacity)
+      mockQCData.getMaxMintingCapacity
+        .whenCalledWith(qcAddress.address)
+        .returns(initialMintingCapacity)
     })
 
     context("when called by governance", () => {
       it("should increase minting capacity", async () => {
         const newCapacity = initialMintingCapacity.mul(2)
-        
+
         const tx = await qcManager
           .connect(governance)
           .increaseMintingCapacity(qcAddress.address, newCapacity)
@@ -240,7 +243,7 @@ describe("QCManager", () => {
 
       it("should revert when decreasing capacity", async () => {
         const lowerCapacity = initialMintingCapacity.div(2)
-        
+
         await expect(
           qcManager
             .connect(governance)
@@ -249,12 +252,17 @@ describe("QCManager", () => {
       })
 
       it("should revert for unregistered QC", async () => {
-        mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(false)
-        
+        mockQCData.isQCRegistered
+          .whenCalledWith(qcAddress.address)
+          .returns(false)
+
         await expect(
           qcManager
             .connect(governance)
-            .increaseMintingCapacity(qcAddress.address, initialMintingCapacity.mul(2))
+            .increaseMintingCapacity(
+              qcAddress.address,
+              initialMintingCapacity.mul(2)
+            )
         ).to.be.revertedWith("QCNotRegistered")
       })
     })
@@ -271,7 +279,7 @@ describe("QCManager", () => {
       context("when called by arbiter", () => {
         it("should change status to UnderReview", async () => {
           const reason = ethers.utils.id("COMPLIANCE_REVIEW")
-          
+
           const tx = await qcManager
             .connect(arbiter)
             .setQCStatus(qcAddress.address, 4, reason) // UnderReview
@@ -282,17 +290,15 @@ describe("QCManager", () => {
             reason
           )
 
-          await expect(tx)
-            .to.emit(qcManager, "QCStatusChanged")
-            .withArgs(
-              qcAddress.address,
-              1, // oldStatus (Active)
-              4, // newStatus (UnderReview)
-              reason,
-              arbiter.address,
-              "AUTHORITY",
-              expect.any(Number)
-            )
+          await expect(tx).to.emit(qcManager, "QCStatusChanged").withArgs(
+            qcAddress.address,
+            1, // oldStatus (Active)
+            4, // newStatus (UnderReview)
+            reason,
+            arbiter.address,
+            "AUTHORITY",
+            expect.any(Number)
+          )
         })
 
         it("should revert with empty reason", async () => {
@@ -307,11 +313,9 @@ describe("QCManager", () => {
       context("when called by non-arbiter", () => {
         it("should revert", async () => {
           const reason = ethers.utils.id("UNAUTHORIZED")
-          
+
           await expect(
-            qcManager
-              .connect(user)
-              .setQCStatus(qcAddress.address, 4, reason)
+            qcManager.connect(user).setQCStatus(qcAddress.address, 4, reason)
           ).to.be.revertedWith(
             `AccessControl: account ${user.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
           )
@@ -323,7 +327,7 @@ describe("QCManager", () => {
       context("when called by watchdog enforcer", () => {
         it("should request status change to UnderReview", async () => {
           const reason = ethers.utils.id("INSUFFICIENT_RESERVES")
-          
+
           const tx = await qcManager
             .connect(watchdog)
             .requestStatusChange(qcAddress.address, 4, reason) // UnderReview
@@ -347,13 +351,15 @@ describe("QCManager", () => {
 
         it("should revert when requesting invalid status", async () => {
           const reason = ethers.utils.id("INVALID_REQUEST")
-          
+
           // WatchdogEnforcer can only request UnderReview status
           await expect(
             qcManager
               .connect(watchdog)
               .requestStatusChange(qcAddress.address, 5, reason) // Revoked
-          ).to.be.revertedWith("WatchdogEnforcer can only set UnderReview status")
+          ).to.be.revertedWith(
+            "WatchdogEnforcer can only set UnderReview status"
+          )
         })
       })
     })
@@ -364,8 +370,10 @@ describe("QCManager", () => {
       // Setup QC with pause credit
       mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
       mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(1) // Active
-      mockQCRedeemer.hasUnfulfilledRedemptions.whenCalledWith(qcAddress.address).returns(false)
-      
+      mockQCRedeemer.hasUnfulfilledRedemptions
+        .whenCalledWith(qcAddress.address)
+        .returns(false)
+
       // Grant pause credit using correct function name
       await qcManager.connect(deployer).grantInitialCredit(qcAddress.address)
     })
@@ -376,14 +384,16 @@ describe("QCManager", () => {
       })
 
       it("should return false when QC has unfulfilled redemptions", async () => {
-        mockQCRedeemer.hasUnfulfilledRedemptions.whenCalledWith(qcAddress.address).returns(true)
-        
+        mockQCRedeemer.hasUnfulfilledRedemptions
+          .whenCalledWith(qcAddress.address)
+          .returns(true)
+
         expect(await qcManager.canSelfPause(qcAddress.address)).to.be.false
       })
 
       it("should return false when QC is not Active", async () => {
         mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(2) // MintingPaused
-        
+
         expect(await qcManager.canSelfPause(qcAddress.address)).to.be.false
       })
     })
@@ -413,7 +423,7 @@ describe("QCManager", () => {
 
       it("should consume pause credit", async () => {
         await qcManager.connect(qcAddress).selfPause(0)
-        
+
         // Should not be able to pause again immediately
         expect(await qcManager.canSelfPause(qcAddress.address)).to.be.false
       })
@@ -424,7 +434,9 @@ describe("QCManager", () => {
     beforeEach(async () => {
       mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
       mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(1) // Active
-      mockQCData.getQCMintedAmount.whenCalledWith(qcAddress.address).returns(ethers.utils.parseEther("30"))
+      mockQCData.getQCMintedAmount
+        .whenCalledWith(qcAddress.address)
+        .returns(ethers.utils.parseEther("30"))
     })
 
     it("should calculate available capacity correctly", async () => {
@@ -433,14 +445,18 @@ describe("QCManager", () => {
         .whenCalledWith(qcAddress.address)
         .returns([ethers.utils.parseEther("70"), false])
 
-      const availableCapacity = await qcManager.getAvailableMintingCapacity(qcAddress.address)
+      const availableCapacity = await qcManager.getAvailableMintingCapacity(
+        qcAddress.address
+      )
       expect(availableCapacity).to.equal(ethers.utils.parseEther("40")) // 70 reserves - 30 minted = 40
     })
 
     it("should return zero when QC is not Active", async () => {
       mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(2) // MintingPaused
-      
-      const availableCapacity = await qcManager.getAvailableMintingCapacity(qcAddress.address)
+
+      const availableCapacity = await qcManager.getAvailableMintingCapacity(
+        qcAddress.address
+      )
       expect(availableCapacity).to.equal(0)
     })
 
@@ -449,7 +465,9 @@ describe("QCManager", () => {
         .whenCalledWith(qcAddress.address)
         .returns([ethers.utils.parseEther("70"), true]) // stale = true
 
-      const availableCapacity = await qcManager.getAvailableMintingCapacity(qcAddress.address)
+      const availableCapacity = await qcManager.getAvailableMintingCapacity(
+        qcAddress.address
+      )
       expect(availableCapacity).to.equal(0)
     })
 
@@ -459,7 +477,9 @@ describe("QCManager", () => {
         .whenCalledWith(qcAddress.address)
         .returns([ethers.utils.parseEther("20"), false])
 
-      const availableCapacity = await qcManager.getAvailableMintingCapacity(qcAddress.address)
+      const availableCapacity = await qcManager.getAvailableMintingCapacity(
+        qcAddress.address
+      )
       expect(availableCapacity).to.equal(0)
     })
   })
@@ -467,7 +487,9 @@ describe("QCManager", () => {
   describe("Solvency Checking", () => {
     beforeEach(async () => {
       mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
-      mockQCData.getQCMintedAmount.whenCalledWith(qcAddress.address).returns(ethers.utils.parseEther("50"))
+      mockQCData.getQCMintedAmount
+        .whenCalledWith(qcAddress.address)
+        .returns(ethers.utils.parseEther("50"))
     })
 
     describe("verifyQCSolvency", () => {
@@ -508,8 +530,10 @@ describe("QCManager", () => {
         })
 
         it("should revert for unregistered QC", async () => {
-          mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(false)
-          
+          mockQCData.isQCRegistered
+            .whenCalledWith(qcAddress.address)
+            .returns(false)
+
           await expect(
             qcManager.connect(arbiter).verifyQCSolvency(qcAddress.address)
           ).to.be.revertedWith("QCNotRegisteredForSolvency")

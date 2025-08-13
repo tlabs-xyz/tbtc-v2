@@ -6,26 +6,27 @@ import { ethers } from "hardhat"
 
 /**
  * Creates mock SPV data for testing redemption fulfillment
- * Returns mock BitcoinTx.Info and BitcoinTx.Proof structures
+ * Returns mock BitcoinTx.Info and BitcoinTx.Proof structures matching the contract types
  */
 export function createMockSpvData(): {
   txInfo: any
   proof: any
 } {
-  // Mock BitcoinTx.Info structure
+  // Mock BitcoinTx.Info structure - matches struct in BitcoinTx.sol with valid Bitcoin format
   const txInfo = {
-    version: "0x02000000", // Version 2
-    inputVector: `0x01${"a".repeat(72)}ffffffff`, // 1 input with mock data
-    outputVector: `0x01${"00e1f50500000000"}${"1976a914"}${"b".repeat(40)}88ac`, // 1 output with mock P2PKH script
-    locktime: "0x00000000", // No locktime
+    version: "0x01000000", // bytes4 - Version 1 (little endian)
+    inputVector: `0x01${"00".repeat(36)}00${"00".repeat(4)}`, // bytes - 1 input: 36 byte outpoint + 0 script length + 4 byte sequence
+    outputVector: `0x01${"00".repeat(8)}00`, // bytes - 1 output: 8 byte value + 0 script length
+    locktime: "0x00000000", // bytes4 - No locktime
   }
 
-  // Mock BitcoinTx.Proof structure
+  // Mock BitcoinTx.Proof structure - matches struct in BitcoinTx.sol
   const proof = {
-    merkleProof: `0x${"c".repeat(128)}`, // Mock 64-byte merkle proof
-    txIndexInBlock: 0,
-    bitcoinHeaders: `0x${"d".repeat(160)}`, // Mock 80-byte header
-    coinbasePreimage: ethers.utils.id("mock_coinbase"), // Mock coinbase preimage
+    merkleProof: ethers.utils.hexlify(new Uint8Array(32).fill(0xcc)), // bytes - Mock 32-byte merkle proof
+    txIndexInBlock: 0, // uint256 - Transaction index
+    bitcoinHeaders: ethers.utils.hexlify(new Uint8Array(80).fill(0xdd)), // bytes - Mock 80-byte header
+    coinbasePreimage: ethers.utils.hexZeroPad("0xaabbcc", 32), // bytes32 - Mock coinbase preimage
+    coinbaseProof: ethers.utils.hexlify(new Uint8Array(32).fill(0xee)), // bytes - Mock coinbase proof
   }
 
   return { txInfo, proof }
