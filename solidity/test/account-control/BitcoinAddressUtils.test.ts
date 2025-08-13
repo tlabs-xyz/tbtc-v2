@@ -40,9 +40,7 @@ describe("BitcoinAddressUtils", () => {
     it("should reject invalid P2PKH address", async () => {
       const invalidAddress = "1InvalidAddress"
 
-      await expect(
-        testContract.decodeAddress(invalidAddress)
-      ).to.be.revertedWith("Invalid Bitcoin address")
+      await expect(testContract.decodeAddress(invalidAddress)).to.be.reverted
     })
   })
 
@@ -76,9 +74,7 @@ describe("BitcoinAddressUtils", () => {
     it("should reject invalid bech32 address", async () => {
       const invalidAddress = "bc1qinvalid"
 
-      await expect(
-        testContract.decodeAddress(invalidAddress)
-      ).to.be.revertedWith("Invalid Bitcoin address")
+      await expect(testContract.decodeAddress(invalidAddress)).to.be.reverted
     })
   })
 

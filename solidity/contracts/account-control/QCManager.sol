@@ -13,7 +13,7 @@ import "./SPVState.sol";
 import "./BitcoinAddressUtils.sol";
 import "../bridge/BitcoinTx.sol";
 import "../bridge/IRelay.sol";
-// SPV validation is now handled directly in this contract and QCRedeemer
+import {QCManagerSPV} from "./libraries/QCManagerSPV.sol";
 
 // =================== CONSOLIDATED INTERFACES ===================
 // Interfaces for contracts that will be removed in consolidation
@@ -114,13 +114,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
     error QCReserveLedgerNotAvailable();
     error SPVValidatorNotAvailable();
     error ServiceNotAvailable(string service);
-    error RelayNotSet();
     error InvalidRelayAddress();
-    error SPVProofValidationFailed(string reason);
-    error WalletControlProofFailed(string reason);
-    error InsufficientProofDifficulty();
-    error TransactionTooOld();
-    error InvalidBitcoinTransaction();
+    // SPV-related errors moved to QCManagerSPV library (including RelayNotSet)
     
     // =================== STATE MANAGEMENT ERRORS ===================
     
@@ -305,10 +300,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         uint256 timeout
     );
     
-    event QCEarlyResumed(
-        address indexed qc,
-        address indexed resumedBy
-    );
+    // QCEarlyResumed consolidated with EarlyResumed to reduce contract size
     
     event ApproachingEscalation(
         address indexed qc,
@@ -357,7 +349,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
     );
     
     event EarlyResumed(
-        address indexed qc
+        address indexed qc,
+        address indexed resumedBy  // Added for consolidation
     );
     
     event InitialCreditGranted(
@@ -648,8 +641,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
             revert QCNotActive(qc);
         }
 
-        // Verify wallet control using SPV client
-        if (!_verifyWalletControl(qc, btcAddress, challenge, txInfo, proof)) {
+        // Verify wallet control using SPV client library
+        if (!QCManagerSPV.verifyWalletControl(spvState, btcAddress, challenge, txInfo, proof)) {
             emit WalletRegistrationFailed(
                 qc,
                 btcAddress,
@@ -903,261 +896,15 @@ contract QCManager is AccessControl, ReentrancyGuard {
         return false;
     }
 
-    /// @dev Verify wallet control via SPV proof
-    /// @dev SPV validation using Bridge's BitcoinTx infrastructure
-    /// @param qc The QC address claiming wallet control
-    /// @param btcAddress The Bitcoin address being claimed
-    /// @param challenge The expected challenge string
-    /// @param txInfo Bitcoin transaction information
-    /// @param proof SPV proof of transaction inclusion
-    /// @return verified True if verification successful
-    function _verifyWalletControl(
-        address qc,
-        string calldata btcAddress,
-        bytes32 challenge,
-        BitcoinTx.Info calldata txInfo,
-        BitcoinTx.Proof calldata proof
-    ) private view returns (bool verified) {
-        // Verify SPV state is initialized
-        if (!spvState.isInitialized()) {
-            revert RelayNotSet();
-        }
-        
-        // Complete SPV validation following Bridge patterns
-        
-        // 1. Validate transaction structure (Bridge pattern)
-        if (!txInfo.inputVector.validateVin()) {
-            revert SPVProofValidationFailed("Invalid input vector");
-        }
-        if (!txInfo.outputVector.validateVout()) {
-            revert SPVProofValidationFailed("Invalid output vector");
-        }
-        
-        // 2. Validate proof structure (Bridge pattern)  
-        if (proof.merkleProof.length != proof.coinbaseProof.length) {
-            revert SPVProofValidationFailed("Tx not on same level as coinbase");
-        }
-        
-        // 3. Calculate and verify transaction hash (Bridge pattern)
-        bytes32 txHash = abi
-            .encodePacked(
-                txInfo.version,
-                txInfo.inputVector,
-                txInfo.outputVector,
-                txInfo.locktime
-            )
-            .hash256View();
-            
-        // 4. Extract merkle root and validate merkle proof (Bridge pattern)
-        bytes32 root = proof.bitcoinHeaders.extractMerkleRootLE();
-        if (!txHash.prove(root, proof.merkleProof, proof.txIndexInBlock)) {
-            revert SPVProofValidationFailed("Invalid merkle proof");
-        }
-        
-        // 5. Validate coinbase proof (Bridge pattern)
-        bytes32 coinbaseHash = abi
-            .encodePacked(proof.coinbasePreimage, proof.coinbaseProof)
-            .hash256View();
-        if (!coinbaseHash.prove(root, proof.coinbaseProof, 0)) {
-            revert SPVProofValidationFailed("Invalid coinbase proof");
-        }
-        
-        // 6. Evaluate proof difficulty against relay requirements
-        _evaluateProofDifficulty(proof.bitcoinHeaders);
-        
-        // 7. Verify wallet control proof (challenge response in OP_RETURN)
-        if (!_validateWalletControlProof(btcAddress, challenge, txInfo)) {
-            revert SPVProofValidationFailed("Wallet control proof failed");
-        }
-        
-        return true;
-    }
-    
-    /// @dev Evaluate proof difficulty against relay requirements
-    /// @param bitcoinHeaders Bitcoin headers chain for difficulty evaluation
-    function _evaluateProofDifficulty(bytes memory bitcoinHeaders) private view {
-        // TODO: Stubbed for development - implement full difficulty evaluation
-        // This function should:
-        // 1. Get current and previous epoch difficulty from relay
-        // 2. Extract target from Bitcoin headers and calculate difficulty
-        // 3. Validate headers chain and check work requirements
-        // 4. Compare observed difficulty against relay requirements
-        
-        if (bitcoinHeaders.length == 0) {
-            revert SPVProofValidationFailed("Empty headers");
-        }
-        
-        // Stubbed validation - replace with full implementation
-    }
-    
-    /// @dev Validate that the transaction demonstrates control over the Bitcoin address
-    /// @param btcAddress The Bitcoin address being claimed
-    /// @param challenge The challenge that should be included in the transaction
-    /// @param txInfo The Bitcoin transaction information
-    /// @return valid True if wallet control is demonstrated
-    function _validateWalletControlProof(
-        string calldata btcAddress,
-        bytes32 challenge,
-        BitcoinTx.Info calldata txInfo
-    ) private pure returns (bool valid) {
-        // Complete SPV validation following Bridge patterns
-        
-        // 1. Validate transaction vectors (Bridge pattern)
-        if (!txInfo.inputVector.validateVin()) {
-            return false;
-        }
-        if (!txInfo.outputVector.validateVout()) {
-            return false;
-        }
-        
-        // 2. Basic parameter validation
-        if (bytes(btcAddress).length == 0 || challenge == bytes32(0)) {
-            return false;
-        }
-        
-        // 3. Validate Bitcoin address format
-        if (!_isValidBitcoinAddress(btcAddress)) {
-            return false;
-        }
-        
-        // 4. Find OP_RETURN output containing the challenge using Bridge methods
-        if (!_findChallengeInOpReturn(txInfo.outputVector, challenge)) {
-            return false;
-        }
-        
-        // 5. Verify transaction signature matches the Bitcoin address
-        // For wallet control proof, we verify that at least one input
-        // is signed by the private key controlling the btcAddress
-        return _verifyTransactionSignature(btcAddress, txInfo);
-    }
-    
-    /// @dev Validate and decode Bitcoin address using production-ready BitcoinAddressUtils
-    /// @param btcAddress The Bitcoin address to validate and decode
-    /// @return valid True if address is valid
-    /// @return scriptType The decoded script type (0=P2PKH, 1=P2SH, 2=P2WPKH, 3=P2WSH)  
-    /// @return scriptHash The decoded script hash (20 or 32 bytes)
-    function _decodeAndValidateBitcoinAddress(
-        string calldata btcAddress
-    ) private pure returns (bool valid, uint8 scriptType, bytes memory scriptHash) {
-        // Check basic length requirements before attempting decode
-        bytes memory addr = bytes(btcAddress);
-        if (addr.length == 0 || addr.length < 14 || addr.length > 74) {
-            return (false, 0, new bytes(0));
-        }
-        
-        // The BitcoinAddressUtils library will revert on invalid addresses
-        // Since we can't try-catch a library call, we'll validate the format first
-        // and let successful decode indicate validity
-        (uint8 decodedScriptType, bytes memory decodedScriptHash) = BitcoinAddressUtils.decodeAddress(btcAddress);
-        
-        // If we reach here, decode was successful
-        return (true, decodedScriptType, decodedScriptHash);
-    }
-    
-    /// @dev Legacy validation function - now uses real address decoding
-    /// @param btcAddress The Bitcoin address to validate
-    /// @return valid True if address format is valid
-    function _isValidBitcoinAddress(string calldata btcAddress) private pure returns (bool valid) {
-        (bool isValid, , ) = _decodeAndValidateBitcoinAddress(btcAddress);
-        return isValid;
-    }
-    
-    /// @dev Find challenge bytes in OP_RETURN output using Bridge patterns
-    /// @param outputVector The transaction output vector
-    /// @param challenge The challenge bytes to find
-    /// @return found True if challenge found in OP_RETURN
-    function _findChallengeInOpReturn(bytes memory outputVector, bytes32 challenge) private pure returns (bool found) {
-        // Use Bridge pattern for parsing output vector (following Redemption.sol pattern)
-        (, uint256 outputsCount) = outputVector.parseVarInt();
-        
-        // Skip the varInt prefix to get to outputs data
-        uint256 outputsPrefix = outputVector.length - outputsCount;
-        uint256 outputStartingIndex = outputsPrefix;
-        
-        for (uint256 i = 0; i < outputsCount; i++) {
-            // Use Bridge's proven method for extracting outputs
-            bytes memory output = outputVector.extractOutputAtIndex(i);
-            
-            if (output.length < 10) continue; // 8 bytes value + 1 byte script length + 1 byte OP_RETURN minimum
-            
-            // Extract script starting at byte 8 (after 8-byte value)
-            // Use similar pattern as Bridge's script extraction
-            uint256 scriptStart = 8;
-            uint256 scriptLen;
-            
-            // Parse script length using CompactSize (following Bridge patterns)
-            if (output[scriptStart] < 0xfd) {
-                scriptLen = uint8(output[scriptStart]);
-                scriptStart += 1;
-            } else if (output[scriptStart] == 0xfd) {
-                if (output.length < 11) continue;
-                // Little-endian parsing like Bridge
-                scriptLen = uint16(bytes2(abi.encodePacked(output[scriptStart + 2], output[scriptStart + 1])));
-                scriptStart += 3;
-            } else {
-                continue; // Skip larger encodings for simplicity
-            }
-            
-            // Check if script starts with OP_RETURN (0x6a) 
-            if (scriptStart >= output.length || output[scriptStart] != 0x6a) {
-                continue;
-            }
-            
-            // Look for challenge in OP_RETURN data
-            uint256 dataStart = scriptStart + 1;
-            uint256 remainingLen = scriptLen - 1; // Subtract OP_RETURN opcode
-            
-            if (remainingLen >= 32 && dataStart + 32 <= output.length) {
-                bytes32 foundChallenge;
-                assembly {
-                    // Extract 32 bytes starting at dataStart
-                    foundChallenge := mload(add(add(output, 32), dataStart))
-                }
-                if (foundChallenge == challenge) {
-                    return true;
-                }
-            }
-        }
-        
-        return false;
-    }
-    
-    /// @dev Verify transaction signature matches Bitcoin address
-    /// @param btcAddress The expected Bitcoin address
-    /// @param txInfo The transaction information
-    /// @return valid True if signature is valid for the address
-    function _verifyTransactionSignature(
-        string calldata btcAddress,
-        BitcoinTx.Info calldata txInfo
-    ) private pure returns (bool valid) {
-        // For wallet control proof, we need to verify that at least one input
-        // demonstrates control over the Bitcoin address
-        
-        // This is a complex verification that would involve:
-        // 1. Parsing transaction inputs
-        // 2. Extracting signature and public key from scriptSig/witness
-        // 3. Verifying signature against transaction hash
-        // 4. Deriving address from public key and comparing to btcAddress
-        
-        // For MVP implementation, we perform basic validation:
-        // - Transaction must have inputs (someone signed it)
-        // - Transaction must be properly formed
-        if (txInfo.inputVector.length == 0) {
-            return false;
-        }
-        
-        // In a full implementation, this would:
-        // - Parse each input's scriptSig/witness data
-        // - Extract ECDSA signature and public key
-        // - Verify signature against sighash
-        // - Derive address from public key using appropriate format
-        // - Compare derived address to btcAddress parameter
-        
-        // For now, accept if basic structure is valid
-        // This allows the system to function while full signature verification
-        // can be implemented based on specific requirements
-        return bytes(btcAddress).length > 0 && txInfo.inputVector.length > 0;
-    }
+    // SPV validation functions moved to QCManagerSPV library to reduce contract size
+    // The following functions were removed:
+    // - _verifyWalletControl() - now in QCManagerSPV.verifyWalletControl()
+    // - _evaluateProofDifficulty() - now in library
+    // - _validateWalletControlProof() - now in library
+    // - _decodeAndValidateBitcoinAddress() - now in library
+    // - _isValidBitcoinAddress() - now in library
+    // - _findChallengeInOpReturn() - now in library
+    // - _verifyTransactionSignature() - now in library
 
     /// @dev Get reserve balance and check staleness
     /// @param qc The QC address
@@ -1272,7 +1019,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         // Notify pause credit system
         _resumeEarly(qc);
         
-        emit QCEarlyResumed(qc, qc);
+        emit EarlyResumed(qc, qc);
     }
     
     // =================== WATCHDOG INTEGRATION ===================
@@ -1469,8 +1216,13 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param qc QC address
     function grantInitialCredit(address qc) 
         external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
+        onlyRole(PAUSER_ROLE) 
     {
+        // Verify QC is registered
+        if (!qcData.isQCRegistered(qc)) {
+            revert QCNotRegistered(qc);
+        }
+        
         if (pauseCredits[qc].lastUsed != 0) revert QCAlreadyInitialized();
         
         pauseCredits[qc].hasCredit = true;
@@ -1480,21 +1232,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     
     // =================== VIEW FUNCTIONS FOR CONSOLIDATED STATE ===================
     
-    /// @notice Get QC pause information
-    /// @param qc QC address
-    /// @return pauseTimestamp When the pause started (0 if not paused)
-    /// @return canEarlyResume Whether QC can resume early
-    /// @return escalationDeadline When auto-escalation will occur
-    function getQCPauseInfo(address qc) external view returns (
-        uint256 pauseTimestamp,
-        bool canEarlyResume,
-        uint256 escalationDeadline
-    ) {
-        pauseTimestamp = qcPauseTimestamp[qc];
-        canEarlyResume = qcCanEarlyResume[qc];
-        escalationDeadline = pauseTimestamp > 0 ? 
-            pauseTimestamp + SELF_PAUSE_TIMEOUT : 0;
-    }
+    // getQCPauseInfo() removed - use getPauseInfo() for comprehensive pause information
     
     /// @notice Check if QC has unfulfilled redemptions
     /// @param qc QC address
@@ -1541,25 +1279,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
         }
     }
     
-    /// @notice Check if QC is currently self-paused
-    /// @param qc QC address
-    /// @return isPaused Whether QC is paused
-    function isSelfPaused(address qc) external view returns (bool isPaused) {
-        return pauseCredits[qc].isPaused;
-    }
-    
-    /// @notice Get SPV state information for debugging
-    /// @return relay Current relay address
-    /// @return difficultyFactor Current difficulty factor
-    /// @return isInitialized Whether SPV is properly configured
-    function getSPVState() external view returns (
-        address relay,
-        uint96 difficultyFactor,
-        bool isInitialized
-    ) {
-        (relay, difficultyFactor) = spvState.getParameters();
-        isInitialized = spvState.isInitialized();
-    }
+    // isSelfPaused() removed - use getPauseInfo() instead
+    // getSPVState() removed - use getSPVParameters() and isSPVConfigured() instead
     
     /// @notice Get comprehensive pause credit information for a QC
     /// @param qc QC address
@@ -1668,6 +1389,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
         credit.pauseEndTime = 0;
         credit.pauseReason = bytes32(0);
         
-        emit EarlyResumed(qc);
+        emit EarlyResumed(qc, msg.sender);
     }
 }

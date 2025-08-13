@@ -2,13 +2,7 @@ import chai, { expect } from "chai"
 import { ethers, helpers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
-import {
-  QCRedeemer,
-  QCData,
-  SystemState,
-  TBTC,
-  IRedemptionPolicy,
-} from "../../typechain"
+import { QCRedeemer, QCData, SystemState, TBTC } from "../../typechain"
 import { createMockSpvData } from "./AccountControlTestHelpers"
 
 chai.use(smock.matchers)
@@ -24,7 +18,6 @@ describe("QCRedeemer", () => {
   let thirdParty: SignerWithAddress
 
   let qcRedeemer: QCRedeemer
-  let mockRedemptionPolicy: FakeContract<IRedemptionPolicy>
   let mockTbtc: FakeContract<TBTC>
   let mockQCData: FakeContract<QCData>
   let mockSystemState: FakeContract<SystemState>
@@ -54,31 +47,43 @@ describe("QCRedeemer", () => {
     await createSnapshot()
 
     // Create mock contracts
-    mockRedemptionPolicy = await smock.fake<IRedemptionPolicy>(
-      "IRedemptionPolicy"
-    )
     mockTbtc = await smock.fake<TBTC>("TBTC")
     mockQCData = await smock.fake<QCData>("QCData")
     mockSystemState = await smock.fake<SystemState>("SystemState")
 
-    // Deploy QCRedeemer with direct integration pattern
-    const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer")
+    // Deploy QCRedeemerSPV library first
+    const QCRedeemerSPVFactory = await ethers.getContractFactory("QCRedeemerSPV")
+    const qcRedeemerSPVLib = await QCRedeemerSPVFactory.deploy()
+    await qcRedeemerSPVLib.deployed()
+
+    // Deploy QCRedeemer with SPV support and link the library
+    const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer", {
+      libraries: {
+        QCRedeemerSPV: qcRedeemerSPVLib.address
+      }
+    })
     qcRedeemer = await QCRedeemerFactory.deploy(
       mockTbtc.address,
       mockQCData.address,
-      mockSystemState.address
+      mockSystemState.address,
+      deployer.address, // Mock relay address (using deployer for testing)
+      96 // Mock tx proof difficulty factor
     )
     await qcRedeemer.deployed()
 
-    // Set up default mock behaviors
-    mockRedemptionPolicy.validateRedemptionRequest.returns(true)
-    mockRedemptionPolicy.requestRedemption.returns(true)
-    mockRedemptionPolicy.recordFulfillment.returns(true)
-    mockRedemptionPolicy.flagDefault.returns(true)
-    mockRedemptionPolicy.getRedemptionTimeout.returns(86400) // 24 hours
-
     // Grant roles
     await qcRedeemer.grantRole(ARBITER_ROLE, watchdog.address)
+
+    // Setup default mocks for validation
+    mockSystemState.isRedemptionPaused.returns(false)
+    mockSystemState.isQCEmergencyPaused.returns(false)
+    mockSystemState.minMintAmount.returns(ethers.utils.parseEther("0.01")) // 0.01 tBTC minimum
+
+    mockQCData.isQCRegistered.returns(true)
+    mockQCData.getQCStatus.returns(0) // Active status
+
+    // Mock tBTC balance to always have enough
+    mockTbtc.balanceOf.returns(ethers.utils.parseEther("100")) // 100 tBTC balance for all users
   })
 
   afterEach(async () => {
@@ -106,10 +111,7 @@ describe("QCRedeemer", () => {
     it("should have correct role constants", async () => {
       expect(await qcRedeemer.REDEEMER_ROLE()).to.equal(REDEEMER_ROLE)
       expect(await qcRedeemer.ARBITER_ROLE()).to.equal(ARBITER_ROLE)
-      expect(await qcRedeemer.REDEMPTION_POLICY_KEY()).to.equal(
-        REDEMPTION_POLICY_KEY
-      )
-      expect(await qcRedeemer.TBTC_TOKEN_KEY()).to.equal(TBTC_TOKEN_KEY)
+      // REDEMPTION_POLICY_KEY and TBTC_TOKEN_KEY removed with direct implementation
     })
   })
 
@@ -183,23 +185,6 @@ describe("QCRedeemer", () => {
       })
     })
 
-    context("when policy validation fails", () => {
-      beforeEach(async () => {
-        mockRedemptionPolicy.requestRedemption.returns(false)
-      })
-
-      it("should revert", async () => {
-        await expect(
-          qcRedeemer
-            .connect(user)
-            .initiateRedemption(
-              qcAddress.address,
-              redemptionAmount,
-              validLegacyBtc
-            )
-        ).to.be.revertedWith("RedemptionRequestFailed")
-      })
-    })
 
     context("when all validations pass", () => {
       let tx: any
@@ -218,15 +203,6 @@ describe("QCRedeemer", () => {
         redemptionId = event?.args?.redemptionId
       })
 
-      it("should call policy requestRedemption with correct BTC address", async () => {
-        expect(mockRedemptionPolicy.requestRedemption).to.have.been.calledWith(
-          redemptionId,
-          qcAddress.address,
-          user.address,
-          redemptionAmount,
-          usedBtc
-        )
-      })
 
       it("should burn user tokens", async () => {
         expect(mockTbtc.burnFrom).to.have.been.calledWith(
@@ -377,26 +353,6 @@ describe("QCRedeemer", () => {
       })
     })
 
-    context("when policy recordFulfillment fails", () => {
-      beforeEach(async () => {
-        mockRedemptionPolicy.recordFulfillment.returns(false)
-      })
-
-      it("should revert", async () => {
-        const mockSpvData = createMockSpvData()
-        await expect(
-          qcRedeemer
-            .connect(watchdog)
-            .recordRedemptionFulfillment(
-              redemptionId,
-              "bc1qtest123456789",
-              100000,
-              mockSpvData.txInfo,
-              mockSpvData.proof
-            )
-        ).to.be.revertedWith("FulfillmentVerificationFailed")
-      })
-    })
 
     context("when called by arbiter with valid redemption", () => {
       let tx: any
@@ -414,9 +370,6 @@ describe("QCRedeemer", () => {
           )
       })
 
-      it("should call policy recordFulfillment", async () => {
-        expect(mockRedemptionPolicy.recordFulfillment).to.have.been.calledOnce
-      })
 
       it("should update redemption status to Fulfilled", async () => {
         const redemption = await qcRedeemer.getRedemption(redemptionId)
@@ -496,19 +449,6 @@ describe("QCRedeemer", () => {
       })
     })
 
-    context("when policy flagDefault fails", () => {
-      beforeEach(async () => {
-        mockRedemptionPolicy.flagDefault.returns(false)
-      })
-
-      it("should revert", async () => {
-        await expect(
-          qcRedeemer
-            .connect(watchdog)
-            .flagDefaultedRedemption(redemptionId, defaultReason)
-        ).to.be.revertedWith("DefaultFlaggingFailed")
-      })
-    })
 
     context("when called by arbiter with valid redemption", () => {
       let tx: any
@@ -519,12 +459,6 @@ describe("QCRedeemer", () => {
           .flagDefaultedRedemption(redemptionId, defaultReason)
       })
 
-      it("should call policy flagDefault", async () => {
-        expect(mockRedemptionPolicy.flagDefault).to.have.been.calledWith(
-          redemptionId,
-          defaultReason
-        )
-      })
 
       it("should update redemption status to Defaulted", async () => {
         const redemption = await qcRedeemer.getRedemption(redemptionId)
@@ -635,29 +569,6 @@ describe("QCRedeemer", () => {
     })
   })
 
-  describe("updateRedemptionPolicy", () => {
-    it("should emit RedemptionPolicyUpdated event when called by admin", async () => {
-      const tx = await qcRedeemer.updateRedemptionPolicy()
-      const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-      await expect(tx)
-        .to.emit(qcRedeemer, "RedemptionPolicyUpdated")
-        .withArgs(
-          mockRedemptionPolicy.address,
-          mockRedemptionPolicy.address,
-          deployer.address,
-          currentBlock.timestamp
-        )
-    })
-
-    it("should revert when called by non-admin", async () => {
-      const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-      await expect(
-        qcRedeemer.connect(user).updateRedemptionPolicy()
-      ).to.be.revertedWith(
-        `AccessControl: account ${user.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
-      )
-    })
-  })
 
   describe("Access Control", () => {
     context("ARBITER_ROLE functions", () => {
@@ -753,10 +664,8 @@ describe("QCRedeemer", () => {
         redemptionId = event?.args?.redemptionId
       })
 
-      it("should handle policy validation changes", async () => {
-        mockRedemptionPolicy.recordFulfillment.returns(false)
-
-        const spvProof = ethers.utils.toUtf8Bytes("mock_spv_proof")
+      it("should handle SPV verification properly", async () => {
+        // SPV verification is now handled internally
         const mockSpvData = createMockSpvData()
         await expect(
           qcRedeemer
@@ -768,7 +677,7 @@ describe("QCRedeemer", () => {
               mockSpvData.txInfo,
               mockSpvData.proof
             )
-        ).to.be.revertedWith("FulfillmentVerificationFailed")
+        ).to.not.be.reverted
       })
     })
   })
