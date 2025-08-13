@@ -45,7 +45,7 @@ const func: DeployFunction = async function DeployAccountControlState(
 
   // Get SharedSPVCore from previous deployment
   const sharedSPVCore = await get("SharedSPVCore")
-  
+
   // Deploy QCManagerSPV library with SharedSPVCore dependency
   const qcManagerSPV = await deploy("QCManagerSPV", {
     from: deployer,

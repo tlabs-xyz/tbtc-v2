@@ -86,16 +86,21 @@ describe("QCManager", () => {
     mockQCRedeemer = await smock.fake<IQCRedeemer>("IQCRedeemer")
 
     // Deploy SharedSPVCore library first
-    const SharedSPVCoreFactory = await ethers.getContractFactory("SharedSPVCore")
+    const SharedSPVCoreFactory = await ethers.getContractFactory(
+      "SharedSPVCore"
+    )
     const sharedSPVCore = await SharedSPVCoreFactory.deploy()
     await sharedSPVCore.deployed()
-    
+
     // Deploy QCManagerSPV library with SharedSPVCore dependency
-    const QCManagerSPVFactory = await ethers.getContractFactory("QCManagerSPV", {
-      libraries: {
-        SharedSPVCore: sharedSPVCore.address,
-      },
-    })
+    const QCManagerSPVFactory = await ethers.getContractFactory(
+      "QCManagerSPV",
+      {
+        libraries: {
+          SharedSPVCore: sharedSPVCore.address,
+        },
+      }
+    )
     const qcManagerSPV = await QCManagerSPVFactory.deploy()
     await qcManagerSPV.deployed()
 
