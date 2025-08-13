@@ -15,13 +15,13 @@ const func: DeployFunction = async function DeployAccountControlCore(
 
   // Deploy SPV libraries first
   log("Deploying SPV libraries...")
-  
+
   const sharedSPVCore = await deploy("SharedSPVCore", {
     from: deployer,
     log: true,
     waitConfirmations: network.live ? 5 : 1,
   })
-  
+
   const qcManagerSPV = await deploy("QCManagerSPV", {
     from: deployer,
     libraries: {
@@ -30,7 +30,7 @@ const func: DeployFunction = async function DeployAccountControlCore(
     log: true,
     waitConfirmations: network.live ? 5 : 1,
   })
-  
+
   const qcRedeemerSPV = await deploy("QCRedeemerSPV", {
     from: deployer,
     libraries: {

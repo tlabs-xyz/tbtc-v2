@@ -1,11 +1,11 @@
 import { ethers } from "hardhat"
 import { expect } from "chai"
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers"
-import type { 
-  QCManagerSPVTest, 
-  QCRedeemerSPVTest, 
-  TestRelay, 
-  SharedSPVCore 
+import type {
+  QCManagerSPVTest,
+  QCRedeemerSPVTest,
+  TestRelay,
+  SharedSPVCore,
 } from "../../typechain"
 
 /**
@@ -107,7 +107,7 @@ describe("SPV Libraries Integration", () => {
     })
     const qcManagerSPV = await QCManagerSPV.deploy()
 
-    // Deploy QCRedeemerSPV library with SharedSPVCore linked  
+    // Deploy QCRedeemerSPV library with SharedSPVCore linked
     const QCRedeemerSPV = await ethers.getContractFactory("QCRedeemerSPV", {
       libraries: {
         SharedSPVCore: sharedSPVCore.address,
@@ -116,23 +116,29 @@ describe("SPV Libraries Integration", () => {
     const qcRedeemerSPV = await QCRedeemerSPV.deploy()
 
     // Deploy test contracts with all libraries linked
-    const QCManagerSPVTest = await ethers.getContractFactory("QCManagerSPVTest", {
-      libraries: {
-        SharedSPVCore: sharedSPVCore.address,
-        QCManagerSPV: qcManagerSPV.address,
-      },
-    })
+    const QCManagerSPVTest = await ethers.getContractFactory(
+      "QCManagerSPVTest",
+      {
+        libraries: {
+          SharedSPVCore: sharedSPVCore.address,
+          QCManagerSPV: qcManagerSPV.address,
+        },
+      }
+    )
     qcManagerSPVTest = await QCManagerSPVTest.deploy(
       testRelay.address,
       1 // txProofDifficultyFactor for testing
     )
 
-    const QCRedeemerSPVTest = await ethers.getContractFactory("QCRedeemerSPVTest", {
-      libraries: {
-        SharedSPVCore: sharedSPVCore.address,
-        QCRedeemerSPV: qcRedeemerSPV.address,
-      },
-    })
+    const QCRedeemerSPVTest = await ethers.getContractFactory(
+      "QCRedeemerSPVTest",
+      {
+        libraries: {
+          SharedSPVCore: sharedSPVCore.address,
+          QCRedeemerSPV: qcRedeemerSPV.address,
+        },
+      }
+    )
     qcRedeemerSPVTest = await QCRedeemerSPVTest.deploy(
       testRelay.address,
       1 // txProofDifficultyFactor for testing
@@ -165,22 +171,39 @@ describe("SPV Libraries Integration", () => {
     it("should validate Bitcoin address formats correctly", async () => {
       // Test different Bitcoin address formats
       const testAddresses = [
-        { address: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", valid: true, type: "P2PKH" },
-        { address: "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", valid: true, type: "P2SH" },
-        { address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", valid: true, type: "Bech32" },
+        {
+          address: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+          valid: true,
+          type: "P2PKH",
+        },
+        {
+          address: "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+          valid: true,
+          type: "P2SH",
+        },
+        {
+          address: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+          valid: true,
+          type: "Bech32",
+        },
         { address: "invalid_address", valid: false, type: "Invalid" },
         { address: "", valid: false, type: "Empty" },
       ]
 
       for (const test of testAddresses) {
-        const isValid = await qcManagerSPVTest.isValidBitcoinAddress(test.address)
-        expect(isValid).to.equal(test.valid, `${test.type} address validation failed`)
+        const isValid = await qcManagerSPVTest.isValidBitcoinAddress(
+          test.address
+        )
+        expect(isValid).to.equal(
+          test.valid,
+          `${test.type} address validation failed`
+        )
       }
     })
 
     it("should decode Bitcoin addresses correctly", async () => {
       // Test address decoding through SharedSPVCore
-      const [valid, scriptType, scriptHash] = 
+      const [valid, scriptType, scriptHash] =
         await qcManagerSPVTest.decodeAndValidateBitcoinAddress(
           "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
         )
@@ -200,11 +223,13 @@ describe("SPV Libraries Integration", () => {
     it("should validate wallet control with real Bitcoin data", async () => {
       // Create a transaction with OP_RETURN containing our challenge
       const challengeBytes = testChallenge.slice(2)
-      const opReturnOutput = `0x01${"00".repeat(8)}${"22"}${"6a"}${"20"}${challengeBytes}`
-      
+      const opReturnOutput = `0x01${"00".repeat(
+        8
+      )}${"22"}${"6a"}${"20"}${challengeBytes}`
+
       const txInfoWithChallenge = {
         ...validBitcoinTx.txInfo,
-        outputVector: opReturnOutput
+        outputVector: opReturnOutput,
       }
 
       const result = await qcManagerSPVTest.validateWalletControlProof(
@@ -218,7 +243,9 @@ describe("SPV Libraries Integration", () => {
 
     it("should detect challenge in OP_RETURN outputs", async () => {
       const challengeBytes = testChallenge.slice(2)
-      const opReturnOutput = `0x01${"00".repeat(8)}${"22"}${"6a"}${"20"}${challengeBytes}`
+      const opReturnOutput = `0x01${"00".repeat(
+        8
+      )}${"22"}${"6a"}${"20"}${challengeBytes}`
 
       const found = await qcManagerSPVTest.findChallengeInOpReturn(
         opReturnOutput,
@@ -253,7 +280,7 @@ describe("SPV Libraries Integration", () => {
 
     it("should validate redemption transactions", async () => {
       const redemptionStatus = 1 // Active redemption
-      
+
       const result = await qcRedeemerSPVTest.validateRedemptionTransaction(
         redemptionStatus,
         validBitcoinTx.txInfo
@@ -264,25 +291,26 @@ describe("SPV Libraries Integration", () => {
 
     it("should calculate payment amounts correctly", async () => {
       // Create output vector with payment to user address
-      const paymentOutput = await qcRedeemerSPVTest.testCalculatePaymentToAddress(
-        validBitcoinTx.txInfo.outputVector,
-        userBtcAddress
-      )
+      const paymentOutput =
+        await qcRedeemerSPVTest.testCalculatePaymentToAddress(
+          validBitcoinTx.txInfo.outputVector,
+          userBtcAddress
+        )
 
       // Should return 0 for our test data since it doesn't contain payment to userBtcAddress
-      expect(paymentOutput.toString()).to.equal('0')
+      expect(paymentOutput.toString()).to.equal("0")
     })
 
     it("should match output hashes correctly", async () => {
       // Test address matching logic
-      const outputHash = "0x" + "00".repeat(20) // Mock output hash
+      const outputHash = `0x${"00".repeat(20)}` // Mock output hash
 
       const matches = await qcRedeemerSPVTest.testAddressMatchesOutputHash(
         userBtcAddress,
         outputHash
       )
 
-      expect(matches).to.be.a('boolean')
+      expect(matches).to.be.a("boolean")
     })
   })
 
@@ -305,14 +333,19 @@ describe("SPV Libraries Integration", () => {
         SharedSPVCore: 2220599,
         QCManagerSPV: 961217,
         QCRedeemerSPV: "Not tested yet",
-        TestRelay: 325006
+        TestRelay: 325006,
       }
 
       console.log("\n⛽ Deployment Gas Analysis:")
       console.log("================================")
       Object.entries(deploymentCosts).forEach(([contract, cost]) => {
-        const percentage = typeof cost === 'number' ? (cost / 30000000 * 100).toFixed(1) : 'N/A'
-        console.log(`${contract.padEnd(20)}: ${cost} gas (${percentage}% of block limit)`)
+        const percentage =
+          typeof cost === "number"
+            ? ((cost / 30000000) * 100).toFixed(1)
+            : "N/A"
+        console.log(
+          `${contract.padEnd(20)}: ${cost} gas (${percentage}% of block limit)`
+        )
       })
     })
   })
@@ -321,34 +354,40 @@ describe("SPV Libraries Integration", () => {
     it("should handle invalid SPV proofs correctly", async () => {
       const invalidProof = {
         ...validBitcoinTx.proof,
-        merkleProof: "0x1234" // Invalid proof
+        merkleProof: "0x1234", // Invalid proof
       }
 
       // Test that function exists and throws an error (specific error testing requires chai extensions)
       let errorOccurred = false
       try {
-        await qcManagerSPVTest.validateSPVProof(validBitcoinTx.txInfo, invalidProof)
+        await qcManagerSPVTest.validateSPVProof(
+          validBitcoinTx.txInfo,
+          invalidProof
+        )
       } catch (error) {
         errorOccurred = true
       }
-      
+
       expect(errorOccurred).to.be.true
     })
 
     it("should handle invalid transaction data", async () => {
       const invalidTxInfo = {
         ...validBitcoinTx.txInfo,
-        inputVector: "0xFF" // Invalid input vector
+        inputVector: "0xFF", // Invalid input vector
       }
 
       // Test that function exists and throws an error (specific error testing requires chai extensions)
       let errorOccurred = false
       try {
-        await qcRedeemerSPVTest.validateSPVProof(invalidTxInfo, validBitcoinTx.proof)
+        await qcRedeemerSPVTest.validateSPVProof(
+          invalidTxInfo,
+          validBitcoinTx.proof
+        )
       } catch (error) {
         errorOccurred = true
       }
-      
+
       expect(errorOccurred).to.be.true
     })
   })
