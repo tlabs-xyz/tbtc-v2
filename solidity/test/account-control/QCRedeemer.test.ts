@@ -52,10 +52,12 @@ describe("QCRedeemer", () => {
     mockSystemState = await smock.fake<SystemState>("SystemState")
 
     // Deploy SharedSPVCore library first
-    const SharedSPVCoreFactory = await ethers.getContractFactory("SharedSPVCore")
+    const SharedSPVCoreFactory = await ethers.getContractFactory(
+      "SharedSPVCore"
+    )
     const sharedSPVCore = await SharedSPVCoreFactory.deploy()
     await sharedSPVCore.deployed()
-    
+
     // Deploy QCRedeemerSPV library with SharedSPVCore dependency
     const QCRedeemerSPVFactory = await ethers.getContractFactory(
       "QCRedeemerSPV",

@@ -28,6 +28,18 @@ describe("QCManagerSPV Library", () => {
   )
   const testBitcoinAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
 
+  // Helper function to create OP_RETURN output with challenge
+  function createOpReturnOutput(challenge: string): string {
+    // Create OP_RETURN output with challenge
+    // Format: [value(8)] [script_len] [OP_RETURN(1)] [data_len(1)] [challenge(32)]
+    const value = "0000000000000000" // 0 satoshis
+    const scriptLen = "22" // 34 bytes script (1 + 1 + 32)
+    const opReturn = "6a" // OP_RETURN
+    const dataLen = "20" // 32 bytes challenge
+    const challengeBytes = challenge.slice(2) // Remove 0x prefix
+    return `0x01${value}${scriptLen}${opReturn}${dataLen}${challengeBytes}`
+  }
+
   before(async () => {
     const signers = await ethers.getSigners()
     deployer = signers[0]
@@ -53,12 +65,15 @@ describe("QCManagerSPV Library", () => {
     const qcManagerSPVLib = await QCManagerSPV.deploy()
 
     // Deploy the test contract with both libraries linked
-    const QCManagerSPVTest = await ethers.getContractFactory("QCManagerSPVTest", {
-      libraries: {
-        SharedSPVCore: sharedSPVCore.address,
-        QCManagerSPV: qcManagerSPVLib.address,
-      },
-    })
+    const QCManagerSPVTest = await ethers.getContractFactory(
+      "QCManagerSPVTest",
+      {
+        libraries: {
+          SharedSPVCore: sharedSPVCore.address,
+          QCManagerSPV: qcManagerSPVLib.address,
+        },
+      }
+    )
     qcManagerSPV = await QCManagerSPVTest.deploy(
       testRelay.address,
       1 // txProofDifficultyFactor for testing
@@ -75,18 +90,6 @@ describe("QCManagerSPV Library", () => {
       inputVector: `0x01${"00".repeat(36)}00${"00".repeat(4)}`, // Valid minimal input
       outputVector: createOpReturnOutput(testChallenge), // OP_RETURN with challenge
       locktime: "0x00000000",
-    }
-
-    function createOpReturnOutput(challenge: string): string {
-      // Create OP_RETURN output with challenge
-      // Format: [value(8)] [script_len] [OP_RETURN(1)] [data_len(1)] [challenge(32)]
-      const value = "0000000000000000" // 0 satoshis
-      const scriptLen = "22" // 34 bytes script (1 + 1 + 32)
-      const opReturn = "6a" // OP_RETURN
-      const dataLen = "20" // 32 bytes challenge
-      const challengeBytes = challenge.slice(2) // Remove 0x prefix
-
-      return `0x01${value}${scriptLen}${opReturn}${dataLen}${challengeBytes}`
     }
 
     it("should revert with SPVErr(1) when relay not set", async () => {
@@ -492,10 +495,16 @@ describe("QCManagerSPV Library", () => {
 
     it("should handle multiple outputs and find challenge in second output", async () => {
       // Create output vector with regular output first, then OP_RETURN
-      const regularOutput = `${"00".repeat(8)}1976a914${"00".repeat(20)}88ac`
-      const opReturnOutput = createOpReturnOutput(testChallenge).slice(4) // Remove count prefix
+      const value1 = "00e1f50500000000" // 1 BTC
+      const scriptLen1 = "19" // 25 bytes P2PKH script
+      const script1 = `76a914${"aa".repeat(20)}88ac` // P2PKH script
+      const regularOutput = `${value1}${scriptLen1}${script1}`
 
-      const multiOutputVector = `0x02${regularOutput}${opReturnOutput.slice(2)}` // 2 outputs
+      // Extract just the output part (without the count prefix) from createOpReturnOutput
+      const fullOpReturnOutput = createOpReturnOutput(testChallenge) // Returns "0x01..." 
+      const opReturnOutputOnly = fullOpReturnOutput.slice(4) // Remove "0x01"
+
+      const multiOutputVector = `0x02${regularOutput}${opReturnOutputOnly}` // 2 outputs
 
       const result = await qcManagerSPV.findChallengeInOpReturn(
         multiOutputVector,
