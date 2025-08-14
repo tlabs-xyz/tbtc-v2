@@ -23,13 +23,13 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// ## Integration Points
 /// - **QCManager**: Uses reserve balances for minting capacity calculations and solvency checks
 /// - **Attesters**: External systems (APIs, blockchain monitors) submit balance attestations
-/// - **Emergency Response**: ARBITER_ROLE can handle emergency situations and reset consensus
+/// - **Emergency Response**: DISPUTE_ARBITER_ROLE can handle emergency situations and reset consensus
 ///
 /// SECURITY: This contract is critical for system solvency. All balance updates require
 /// consensus from multiple independent attesters to prevent single points of failure.
 contract ReserveOracle is AccessControl {
     bytes32 public constant ATTESTER_ROLE = keccak256("ATTESTER_ROLE");
-    bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
+    bytes32 public constant DISPUTE_ARBITER_ROLE = keccak256("DISPUTE_ARBITER_ROLE");
 
     struct ReserveData {
         uint256 balance;
@@ -112,7 +112,7 @@ contract ReserveOracle is AccessControl {
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ATTESTER_ROLE, msg.sender);
-        _grantRole(ARBITER_ROLE, msg.sender);
+        _grantRole(DISPUTE_ARBITER_ROLE, msg.sender);
     }
 
     /// @notice Submit balance attestation for a QC
@@ -210,11 +210,11 @@ contract ReserveOracle is AccessControl {
         return (attestation.balance, attestation.timestamp);
     }
 
-    /// @notice Update consensus threshold (ARBITER_ROLE only)
+    /// @notice Update consensus threshold (DISPUTE_ARBITER_ROLE only)
     /// @param newThreshold New consensus threshold (minimum 2)
     function setConsensusThreshold(uint256 newThreshold)
         external
-        onlyRole(ARBITER_ROLE)
+        onlyRole(DISPUTE_ARBITER_ROLE)
     {
         if (newThreshold < 2) revert InvalidThreshold();
 
@@ -224,11 +224,11 @@ contract ReserveOracle is AccessControl {
         emit ConsensusThresholdUpdated(oldThreshold, newThreshold);
     }
 
-    /// @notice Update attestation timeout (ARBITER_ROLE only)
+    /// @notice Update attestation timeout (DISPUTE_ARBITER_ROLE only)
     /// @param newTimeout New timeout in seconds (minimum 1 hour, maximum 24 hours)
     function setAttestationTimeout(uint256 newTimeout)
         external
-        onlyRole(ARBITER_ROLE)
+        onlyRole(DISPUTE_ARBITER_ROLE)
     {
         if (newTimeout < 1 hours || newTimeout > 24 hours)
             revert InvalidTimeout();
@@ -239,11 +239,11 @@ contract ReserveOracle is AccessControl {
         emit AttestationTimeoutUpdated(oldTimeout, newTimeout);
     }
 
-    /// @notice Update maximum staleness period (ARBITER_ROLE only)
+    /// @notice Update maximum staleness period (DISPUTE_ARBITER_ROLE only)
     /// @param newMaxStaleness New staleness period in seconds (minimum 1 hour)
     function setMaxStaleness(uint256 newMaxStaleness)
         external
-        onlyRole(ARBITER_ROLE)
+        onlyRole(DISPUTE_ARBITER_ROLE)
     {
         if (newMaxStaleness < 1 hours) revert InvalidStaleness();
 
@@ -253,18 +253,18 @@ contract ReserveOracle is AccessControl {
         emit MaxStalenessUpdated(oldMaxStaleness, newMaxStaleness);
     }
 
-    /// @notice Emergency function to reset consensus for a QC (ARBITER_ROLE only)
+    /// @notice Emergency function to reset consensus for a QC (DISPUTE_ARBITER_ROLE only)
     /// @param qc The address of the Qualified Custodian
-    function resetConsensus(address qc) external onlyRole(ARBITER_ROLE) {
+    function resetConsensus(address qc) external onlyRole(DISPUTE_ARBITER_ROLE) {
         _clearPendingAttestations(qc);
     }
 
-    /// @notice Emergency function to manually set reserve balance (ARBITER_ROLE only)
+    /// @notice Emergency function to manually set reserve balance (DISPUTE_ARBITER_ROLE only)
     /// @param qc The address of the Qualified Custodian
     /// @param balance The new reserve balance
     function emergencySetReserve(address qc, uint256 balance)
         external
-        onlyRole(ARBITER_ROLE)
+        onlyRole(DISPUTE_ARBITER_ROLE)
     {
         uint256 oldBalance = reserves[qc].balance;
         reserves[qc] = ReserveData({

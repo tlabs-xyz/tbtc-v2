@@ -22,16 +22,15 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const tbtc = await get("TBTC")
   const bank = await get("Bank")
 
-  // Define role constants
-  const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-  const QC_MANAGER_ROLE = ethers.utils.id("QC_MANAGER_ROLE")
-  const MINTER_ROLE = ethers.utils.id("MINTER_ROLE")
-  const REDEEMER_ROLE = ethers.utils.id("REDEEMER_ROLE")
-  const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
-  const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
-  const PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")
-  const PARAMETER_ADMIN_ROLE = ethers.utils.id("PARAMETER_ADMIN_ROLE")
-  const WATCHDOG_ENFORCER_ROLE = ethers.utils.id("WATCHDOG_ENFORCER_ROLE")
+  // Define role constants (updated with new role structure)
+  const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero // OpenZeppelin standard admin
+  const QC_MANAGER_ROLE = ethers.utils.id("QC_MANAGER_ROLE") // Internal storage access
+  const MINTER_ROLE = ethers.utils.id("MINTER_ROLE") // Grant only to QCMinter contract
+  const DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE") // Handle disputes and enforcement
+  const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE") // Reserve attestations
+  const EMERGENCY_ROLE = ethers.utils.id("EMERGENCY_ROLE") // Emergency pause/unpause
+  const OPERATIONS_ROLE = ethers.utils.id("OPERATIONS_ROLE") // Non-critical parameter updates
+  const ENFORCEMENT_ROLE = ethers.utils.id("ENFORCEMENT_ROLE") // Automated enforcement (WatchdogEnforcer)
 
   // Step 1: Configure QCData permissions
   log("Step 1: Configuring QCData permissions...")
@@ -50,10 +49,10 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     "SystemState",
     { from: deployer, log: true },
     "grantRole",
-    PAUSER_ROLE,
+    EMERGENCY_ROLE,
     watchdogEnforcer.address
   )
-  log("✅ WatchdogEnforcer granted PAUSER_ROLE in SystemState")
+  log("✅ WatchdogEnforcer granted EMERGENCY_ROLE in SystemState")
 
   // Step 3: Configure QCManager permissions
   log("Step 3: Configuring QCManager permissions...")
@@ -61,10 +60,10 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     "QCManager",
     { from: deployer, log: true },
     "grantRole",
-    ARBITER_ROLE,
+    ENFORCEMENT_ROLE,
     watchdogEnforcer.address
   )
-  log("✅ WatchdogEnforcer granted ARBITER_ROLE in QCManager")
+  log("✅ WatchdogEnforcer granted ENFORCEMENT_ROLE in QCManager")
 
   // Step 4: Configure ReserveOracle permissions
   log("Step 4: Configuring ReserveOracle permissions...")

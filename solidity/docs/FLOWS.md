@@ -97,7 +97,7 @@ UnderReview → Active/Revoked (Council decision)
 
 1. **DAO Registers QC** (Instant action)
 
-   - DAO calls `QCManager.registerQC(qcAddress, maxMintingCap)` with `QC_GOVERNANCE_ROLE`
+   - DAO calls `QCManager.registerQC(qcAddress, maxMintingCap)` with `GOVERNANCE_ROLE`
    - QC status immediately set to `Active` in QCData
    - Events: `QCRegistrationInitiated`, `QCOnboarded`
 
@@ -116,7 +116,7 @@ UnderReview → Active/Revoked (Council decision)
 **Script Requirements**:
 
 - Deploy all system contracts
-- Set up DAO governance roles (`QC_GOVERNANCE_ROLE`)
+- Set up DAO governance roles (`GOVERNANCE_ROLE`)
 - Set up watchdog roles (`REGISTRAR_ROLE`, `ATTESTER_ROLE`)
 - Generate Bitcoin addresses and OP_RETURN proofs
 - Validate final QC state and wallet registrations
@@ -910,11 +910,11 @@ export abstract class BaseFlowTest {
     // Grant watchdog roles
     const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
     const REGISTRAR_ROLE = ethers.utils.id("REGISTRAR_ROLE")
-    const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
+    const DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE")
 
     await reserveOracle.grantRole(ATTESTER_ROLE, watchdog.address)
     await qcManager.grantRole(REGISTRAR_ROLE, watchdog.address)
-    await qcManager.grantRole(ARBITER_ROLE, watchdog.address)
+    await qcManager.grantRole(DISPUTE_ARBITER_ROLE, watchdog.address)
   }
 
   abstract async executeFlow(): Promise<void>
@@ -1477,7 +1477,7 @@ event QCRegistered(
 - QC address
 - Initial minting capacity
 - Registration timestamp
-- Registering authority (must have QC_GOVERNANCE_ROLE)
+- Registering authority (must have GOVERNANCE_ROLE)
 - Transaction details (gas, block number)
 
 **Reconstruction Query**:

@@ -8,4 +8,5 @@ dist/
 
 yarn-error.log
 CLAUDE.md
+CLAUDE.local.md
 .claude/

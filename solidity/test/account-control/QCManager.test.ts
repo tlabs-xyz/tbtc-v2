@@ -32,13 +32,12 @@ describe("QCManager", () => {
 
   // Role constants
   let DEFAULT_ADMIN_ROLE: string
-  let QC_ADMIN_ROLE: string
+  let GOVERNANCE_ROLE: string
   let REGISTRAR_ROLE: string
-  let ARBITER_ROLE: string
-  let WATCHDOG_ENFORCER_ROLE: string
-  let WATCHDOG_ROLE: string
-  let PAUSER_ROLE: string
-  let QC_GOVERNANCE_ROLE: string
+  let DISPUTE_ARBITER_ROLE: string
+  let ENFORCEMENT_ROLE: string
+  let MONITOR_ROLE: string
+  let EMERGENCY_ROLE: string
 
   // Test constants
   const initialMintingCapacity = ethers.utils.parseEther("100")
@@ -67,13 +66,13 @@ describe("QCManager", () => {
 
     // Generate role hashes
     DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-    QC_ADMIN_ROLE = ethers.utils.id("QC_ADMIN_ROLE")
+    GOVERNANCE_ROLE = ethers.utils.id("GOVERNANCE_ROLE")
     REGISTRAR_ROLE = ethers.utils.id("REGISTRAR_ROLE")
-    ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
-    WATCHDOG_ENFORCER_ROLE = ethers.utils.id("WATCHDOG_ENFORCER_ROLE")
-    WATCHDOG_ROLE = ethers.utils.id("WATCHDOG_ROLE")
-    PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")
-    QC_GOVERNANCE_ROLE = ethers.utils.id("QC_GOVERNANCE_ROLE")
+    DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE")
+    ENFORCEMENT_ROLE = ethers.utils.id("ENFORCEMENT_ROLE")
+    MONITOR_ROLE = ethers.utils.id("MONITOR_ROLE")
+    EMERGENCY_ROLE = ethers.utils.id("EMERGENCY_ROLE")
+    GOVERNANCE_ROLE = ethers.utils.id("GOVERNANCE_ROLE")
   })
 
   beforeEach(async () => {
@@ -113,12 +112,12 @@ describe("QCManager", () => {
     mockQCRedeemer.getEarliestRedemptionDeadline.returns(0)
 
     // Grant roles for testing
-    await qcManager.grantRole(QC_GOVERNANCE_ROLE, governance.address)
-    await qcManager.grantRole(ARBITER_ROLE, arbiter.address)
-    await qcManager.grantRole(WATCHDOG_ENFORCER_ROLE, watchdog.address)
+    await qcManager.grantRole(GOVERNANCE_ROLE, governance.address)
+    await qcManager.grantRole(DISPUTE_ARBITER_ROLE, arbiter.address)
+    await qcManager.grantRole(ENFORCEMENT_ROLE, watchdog.address)
     await qcManager.grantRole(REGISTRAR_ROLE, registrar.address)
-    await qcManager.grantRole(PAUSER_ROLE, pauser.address)
-    await qcManager.grantRole(WATCHDOG_ROLE, watchdog.address)
+    await qcManager.grantRole(EMERGENCY_ROLE, pauser.address)
+    await qcManager.grantRole(MONITOR_ROLE, watchdog.address)
 
     // Set QCRedeemer reference for integrated functionality
     await qcManager.setQCRedeemer(mockQCRedeemer.address)
@@ -140,14 +139,14 @@ describe("QCManager", () => {
     })
 
     it("should have correct role constants", async () => {
-      expect(await qcManager.QC_ADMIN_ROLE()).to.equal(QC_ADMIN_ROLE)
+      expect(await qcManager.GOVERNANCE_ROLE()).to.equal(GOVERNANCE_ROLE)
       expect(await qcManager.REGISTRAR_ROLE()).to.equal(REGISTRAR_ROLE)
-      expect(await qcManager.ARBITER_ROLE()).to.equal(ARBITER_ROLE)
-      expect(await qcManager.WATCHDOG_ENFORCER_ROLE()).to.equal(
-        WATCHDOG_ENFORCER_ROLE
+      expect(await qcManager.DISPUTE_ARBITER_ROLE()).to.equal(
+        DISPUTE_ARBITER_ROLE
       )
-      expect(await qcManager.WATCHDOG_ROLE()).to.equal(WATCHDOG_ROLE)
-      expect(await qcManager.PAUSER_ROLE()).to.equal(PAUSER_ROLE)
+      expect(await qcManager.ENFORCEMENT_ROLE()).to.equal(ENFORCEMENT_ROLE)
+      expect(await qcManager.MONITOR_ROLE()).to.equal(MONITOR_ROLE)
+      expect(await qcManager.EMERGENCY_ROLE()).to.equal(EMERGENCY_ROLE)
     })
   })
 
@@ -206,7 +205,7 @@ describe("QCManager", () => {
             .connect(user)
             .registerQC(qcAddress.address, initialMintingCapacity)
         ).to.be.revertedWith(
-          `AccessControl: account ${user.address.toLowerCase()} is missing role ${QC_GOVERNANCE_ROLE}`
+          `AccessControl: account ${user.address.toLowerCase()} is missing role ${GOVERNANCE_ROLE}`
         )
       })
     })
@@ -482,7 +481,7 @@ describe("QCManager", () => {
           await expect(
             qcManager.connect(user).setQCStatus(qcAddress.address, 4, reason)
           ).to.be.revertedWith(
-            `AccessControl: account ${user.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
+            `AccessControl: account ${user.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
           )
         })
       })
@@ -689,7 +688,7 @@ describe("QCManager", () => {
           await expect(
             qcManager.connect(user).grantInitialCredit(qcAddress.address)
           ).to.be.revertedWith(
-            `AccessControl: account ${user.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
+            `AccessControl: account ${user.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
           )
         })
       })
@@ -884,10 +883,12 @@ describe("QCManager", () => {
       mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(0) // Active
 
       // Setup a paused QC with escalation timer
-      await qcManager.connect(deployer).grantRole(PAUSER_ROLE, deployer.address)
       await qcManager
         .connect(deployer)
-        .grantRole(WATCHDOG_ROLE, watchdog.address)
+        .grantRole(EMERGENCY_ROLE, deployer.address)
+      await qcManager
+        .connect(deployer)
+        .grantRole(MONITOR_ROLE, watchdog.address)
       await qcManager.connect(deployer).grantInitialCredit(qcAddress.address)
 
       // Call selfPause
