@@ -205,9 +205,9 @@ describe("Message Signing Integration Flows", () => {
     })
 
     it("should require valid SPV proof for redemption fulfillment", async () => {
-      // Grant ARBITER_ROLE for redemption fulfillment
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      // Grant DISPUTE_ARBITER_ROLE for redemption fulfillment
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       // Prepare mock transaction with insufficient SPV data
       const txInfo: BitcoinTx.InfoStruct = {
@@ -238,8 +238,8 @@ describe("Message Signing Integration Flows", () => {
     })
 
     it("should validate Bitcoin transaction structure in SPV flow", async () => {
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       // Test with invalid input vector format
       const txInfo: BitcoinTx.InfoStruct = {
@@ -270,8 +270,8 @@ describe("Message Signing Integration Flows", () => {
     })
 
     it("should integrate payment verification with SPV proof validation", async () => {
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       // Create valid transaction structure but with empty output vector
       // This tests that our integration correctly validates payment before SPV
@@ -353,8 +353,8 @@ describe("Message Signing Integration Flows", () => {
 
   describe("Error Handling Integration", () => {
     it("should provide clear error messages for SPV validation failures", async () => {
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       // Setup redemption
       await qcData.registerQC(
@@ -409,8 +409,8 @@ describe("Message Signing Integration Flows", () => {
     })
 
     it("should handle comprehensive SPV error scenarios with libraries", async () => {
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       // Setup redemption
       await qcData.registerQC(

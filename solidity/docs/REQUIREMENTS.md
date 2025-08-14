@@ -269,7 +269,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 **Requirement**: The system MUST implement granular emergency pause controls
 
 - Independent pause controls for minting, redemptions, registrations
-- PAUSER_ROLE for emergency function pausing
+- EMERGENCY_ROLE for emergency function pausing
 - Surgical response to threats without full system freeze
 - Pause/unpause events for audit trail
 
@@ -277,7 +277,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 - SystemState contract manages independent pause flags
 - Function-specific modifiers: whenMintingNotPaused, whenRedemptionNotPaused
-- PAUSER_ROLE separate from DAO for rapid response
+- EMERGENCY_ROLE separate from DAO for rapid response
 - Events emitted for all pause state changes
 
 ---
@@ -357,9 +357,9 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - **MINTER_ROLE**: QCMinter contract (request minting operations)
 - **ATTESTER_ROLE**: ReserveOracle attesters (submit reserve attestations)
 - **REGISTRAR_ROLE**: Authorized entities (finalize wallet registrations)
-- **ARBITER_ROLE**: WatchdogEnforcer (objective violation enforcement)
-- **WATCHDOG_ROLE**: Subjective reporters (submit observations)
-- **PAUSER_ROLE**: Emergency Council (granular function pausing)
+- **DISPUTE_ARBITER_ROLE**: WatchdogEnforcer (objective violation enforcement)
+- **MONITOR_ROLE**: Subjective reporters (submit observations)
+- **EMERGENCY_ROLE**: Emergency Council (granular function pausing)
 
 **Acceptance Criteria**:
 
@@ -566,7 +566,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Implementation**:
 
-- QC_GOVERNANCE_ROLE for instant governance actions
+- GOVERNANCE_ROLE for instant governance actions
 - Instant-by-default governance philosophy
 - registerQC() single-step process for QC onboarding
 - PendingAction struct tracks queued actions with execution timestamps
@@ -585,8 +585,8 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 **Acceptance Criteria**:
 
 - Emergency actions bypass governance delays
-- PAUSER_ROLE for immediate function pausing
-- ARBITER_ROLE for immediate QC status changes
+- EMERGENCY_ROLE for immediate function pausing
+- DISPUTE_ARBITER_ROLE for immediate QC status changes
 - Emergency procedures documented and tested
 
 ### 8.2 Role Management

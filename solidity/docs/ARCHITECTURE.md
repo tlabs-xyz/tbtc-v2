@@ -529,7 +529,7 @@ function submitAttestation(address qc, uint256 balance) external onlyRole(ATTEST
 function getReserveBalanceAndStaleness(address qc) external view returns (uint256, bool)
 function getLatestReserves(address qc) external view returns (uint256)
 function isReserveStale(address qc) external view returns (bool isStale, uint256 timeSinceUpdate)
-function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) // Emergency consensus
+function forceConsensus(address qc) external onlyRole(DISPUTE_ARBITER_ROLE) // Emergency consensus
 ```
 
 **Consensus Parameters**:
@@ -556,7 +556,7 @@ function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) // Emergency
 
 **Emergency Consensus Mechanism**:
 
-- **Function**: `forceConsensus(address qc)` - ARBITER_ROLE only
+- **Function**: `forceConsensus(address qc)` - DISPUTE_ARBITER_ROLE only
 - **Purpose**: Break consensus deadlocks when insufficient attestations prevent normal consensus
 - **Safety**: Requires at least 1 valid attestation to prevent arbitrary balance setting
 - **Use Case**: After QC enters UnderReview due to stale attestations, ARBITER can force consensus with available fresh attestations
@@ -623,8 +623,8 @@ The watchdog system implements a clear role hierarchy for security and operation
 | Role                   | Purpose                           | Contracts                         | Authority                          |
 | ---------------------- | --------------------------------- | --------------------------------- | ---------------------------------- |
 | **ATTESTER_ROLE**      | Submit reserve attestations       | ReserveOracle                     | Submit balance observations        |
-| **ARBITER_ROLE**       | Emergency consensus & enforcement | ReserveOracle, WatchdogEnforcer   | Force consensus, QC status changes |
-| **PAUSER_ROLE**        | Emergency pause controls          | SystemState                       | Emergency pause/unpause QCs        |
+| **DISPUTE_ARBITER_ROLE**       | Emergency consensus & enforcement | ReserveOracle, WatchdogEnforcer   | Force consensus, QC status changes |
+| **EMERGENCY_ROLE**        | Emergency pause controls          | SystemState                       | Emergency pause/unpause QCs        |
 | **DEFAULT_ADMIN_ROLE** | System administration             | All contracts                     | Grant/revoke roles                 |
 
 **Role Design Principles**:
@@ -684,7 +684,7 @@ ReserveOracle:
 └── Provides consensus data automatically
 
 WatchdogEnforcer:
-├── ARBITER_ROLE in QCManager (for status changes)
+├── DISPUTE_ARBITER_ROLE in QCManager (for status changes)
 ├── Permissionless enforcement (anyone can call)
 └── Uses machine-readable reason codes
 ```
@@ -836,12 +836,12 @@ attestationWindow: 6 hours      // Collection window for attestations
 |------|---------|-------------|
 | **DEFAULT_ADMIN_ROLE** | Ultimate authority | DAO governance |
 | **ATTESTER_ROLE** | Submit reserve attestations | Multiple oracle operators |
-| **ARBITER_ROLE** | Handle disputes and defaults | Emergency Council |
-| **WATCHDOG_ENFORCER_ROLE** | Trigger objective violations | WatchdogEnforcer contract |
+| **DISPUTE_ARBITER_ROLE** | Handle disputes and defaults | Emergency Council |
+| **ENFORCEMENT_ROLE** | Trigger objective violations | WatchdogEnforcer contract |
 | **MINTER_ROLE** | Authorize minting operations | QCMinter contract |
-| **PAUSER_ROLE** | Emergency pause capabilities | Emergency Council |
-| **QC_ADMIN_ROLE** | QC administration | QC operators |
-| **QC_GOVERNANCE_ROLE** | Register QCs, set capacity | DAO governance |
+| **EMERGENCY_ROLE** | Emergency pause capabilities | Emergency Council |
+| **GOVERNANCE_ROLE** | QC administration | QC operators |
+| **GOVERNANCE_ROLE** | Register QCs, set capacity | DAO governance |
 
 ### Operational Expectations
 
@@ -1074,7 +1074,7 @@ bytes32 constant STALE_ATTESTATIONS = keccak256("STALE_ATTESTATIONS");
 **Decision**: No explicit rate limiting - rely on:
 
 - Gas costs as natural deterrent
-- Role-gating (WATCHDOG_ROLE required)
+- Role-gating (MONITOR_ROLE required)
 - Support thresholds for importance
 
 **Consequences**:
@@ -1287,8 +1287,8 @@ The system tracks redemption defaults with graduated consequences:
 - `enforceObjectiveViolation(qc, reasonCode)` - Permissionless violation enforcement
 
 **Emergency Authority**:
-- **PAUSER_ROLE**: Execute pauses (Emergency Council)
-- **ARBITER_ROLE**: Force consensus, resolve disputes
+- **EMERGENCY_ROLE**: Execute pauses (Emergency Council)
+- **DISPUTE_ARBITER_ROLE**: Force consensus, resolve disputes
 - **Anyone**: Trigger objective violations via WatchdogEnforcer
 
 ---
@@ -1319,34 +1319,34 @@ The system implements 17 distinct roles across 4 categories:
 **1. Administrative Roles**
 
 - **DEFAULT_ADMIN_ROLE (0x00)**: Ultimate admin authority in all contracts
-- **PARAMETER_ADMIN_ROLE**: System parameter management
+- **OPERATIONS_ROLE**: System parameter management
 - **MANAGER_ROLE**: Operational management and configuration
 
 **2. Operational Roles**
 
-- **PAUSER_ROLE**: Emergency pause capabilities
+- **EMERGENCY_ROLE**: Emergency pause capabilities
 - **MINTER_ROLE**: Authorization to mint tBTC
-- **REDEEMER_ROLE**: Process redemption requests
-- **ARBITER_ROLE**: Handle disputes and full status changes
+- **DISPUTE_ARBITER_ROLE**: Process redemption requests
+- **DISPUTE_ARBITER_ROLE**: Handle disputes and full status changes
 
 **3. Watchdog Roles**
 
-- **WATCHDOG_ROLE**: Participate in consensus voting
+- **MONITOR_ROLE**: Participate in consensus voting
 - **WATCHDOG_OPERATOR_ROLE**: Individual watchdog operations
-- **WATCHDOG_ENFORCER_ROLE**: Limited enforcement (UnderReview only)
+- **ENFORCEMENT_ROLE**: Limited enforcement (UnderReview only)
 - **ATTESTER_ROLE**: Submit reserve attestations
 - **REGISTRAR_ROLE**: Register Bitcoin wallets
 
 **4. QC Management Roles**
 
-- **QC_ADMIN_ROLE**: QC administrative operations
+- **GOVERNANCE_ROLE**: QC administrative operations
 - **QC_MANAGER_ROLE**: Modify QC data
-- **QC_GOVERNANCE_ROLE**: QC governance decisions
+- **GOVERNANCE_ROLE**: QC governance decisions
 - **ESCALATOR_ROLE**: Create DAO escalation proposals
 
 #### Critical Role Definitions
 
-**ARBITER_ROLE**
+**DISPUTE_ARBITER_ROLE**
 
 **Purpose**: Authority for disputes and full status changes  
 **Capabilities**:
@@ -1361,7 +1361,7 @@ The system implements 17 distinct roles across 4 categories:
 - Governance multisig
 - Emergency responders
 
-**WATCHDOG_ENFORCER_ROLE**
+**ENFORCEMENT_ROLE**
 
 **Purpose**: Limited enforcement authority for objective violations  
 **Capabilities**:
@@ -1379,20 +1379,20 @@ The system implements 17 distinct roles across 4 categories:
 ```
 QCManager:
 ├── DEFAULT_ADMIN_ROLE → Full control
-├── ARBITER_ROLE → Any status change
-├── WATCHDOG_ENFORCER_ROLE → Only UnderReview
+├── DISPUTE_ARBITER_ROLE → Any status change
+├── ENFORCEMENT_ROLE → Only UnderReview
 ├── REGISTRAR_ROLE → Wallet registration
-└── QC_ADMIN_ROLE → QC administration
+└── GOVERNANCE_ROLE → QC administration
 
 QCReserveLedger:
 ├── DEFAULT_ADMIN_ROLE → Full control
 ├── ATTESTER_ROLE → Submit attestations
-└── ARBITER_ROLE → Force consensus
+└── DISPUTE_ARBITER_ROLE → Force consensus
 
 SystemState:
 ├── DEFAULT_ADMIN_ROLE → Full control
-├── PARAMETER_ADMIN_ROLE → Parameter updates
-└── PAUSER_ROLE → Pause operations
+├── OPERATIONS_ROLE → Parameter updates
+└── EMERGENCY_ROLE → Pause operations
 ```
 
 ### State Change Authority Model
@@ -1412,10 +1412,10 @@ This centralized approach ensures:
 
 ```solidity
 // FULL Authority - Can make any valid transition
-ARBITER_ROLE → setQCStatus(qc, newStatus, reason)
+DISPUTE_ARBITER_ROLE → setQCStatus(qc, newStatus, reason)
 
 // LIMITED Authority - Can only set to UnderReview
-WATCHDOG_ENFORCER_ROLE → requestStatusChange(qc, UnderReview, reason)
+ENFORCEMENT_ROLE → requestStatusChange(qc, UnderReview, reason)
 
 // INTERNAL Authority - Solvency checks
 _executeStatusChange(qc, UnderReview, reason, "SOLVENCY_CHECK")
@@ -1520,7 +1520,7 @@ The architecture supports 3-8 total objective violations:
 The QCReserveLedger includes emergency consensus for deadlock situations:
 
 ```solidity
-function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) {
+function forceConsensus(address qc) external onlyRole(DISPUTE_ARBITER_ROLE) {
   // Requires at least 1 valid attestation
   // Uses median calculation
   // Maintains Byzantine fault tolerance
@@ -1542,7 +1542,7 @@ function forceConsensus(address qc) external onlyRole(ARBITER_ROLE) {
 
 1. **WatchdogEnforcer → QCManager**
 
-   - Requires: WATCHDOG_ENFORCER_ROLE
+   - Requires: ENFORCEMENT_ROLE
    - Purpose: Set QCs to UnderReview
 
 2. **BasicMintingPolicy → Bank**
@@ -1609,7 +1609,7 @@ Attestations           Business Logic           Token Operations
 
 2. **Emergency Response**
 
-   - Multiple PAUSER_ROLE holders
+   - Multiple EMERGENCY_ROLE holders
    - Clear pause procedures
    - Maximum pause durations (7 days)
 

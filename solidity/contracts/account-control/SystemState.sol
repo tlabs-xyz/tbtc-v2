@@ -32,8 +32,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 ///
 /// ## Role Definitions
 /// - **DEFAULT_ADMIN_ROLE**: Can grant/revoke roles and set emergency council
-/// - **PARAMETER_ADMIN_ROLE**: Can update all system parameters within bounds
-/// - **PAUSER_ROLE**: Can pause/unpause system functions and individual QCs
+/// - **OPERATIONS_ROLE**: Can update all system parameters within bounds
+/// - **EMERGENCY_ROLE**: Can pause/unpause system functions and individual QCs
 ///
 /// ## Security Features
 /// - **Role-Based Access Control**: All emergency functions protected by OpenZeppelin AccessControl
@@ -41,9 +41,9 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// - **Comprehensive Event Logging**: Full audit trail for all emergency actions
 /// - **Expiry Mechanisms**: Automatic recovery from time-limited emergency states
 contract SystemState is AccessControl {
-    bytes32 public constant PARAMETER_ADMIN_ROLE =
-        keccak256("PARAMETER_ADMIN_ROLE");
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant OPERATIONS_ROLE =
+        keccak256("OPERATIONS_ROLE");
+    bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
 
     // Custom errors for gas-efficient reverts
     error MintingAlreadyPaused();
@@ -211,8 +211,8 @@ contract SystemState is AccessControl {
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(PARAMETER_ADMIN_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(OPERATIONS_ROLE, msg.sender);
+        _grantRole(EMERGENCY_ROLE, msg.sender);
 
         // Set default parameters
         staleThreshold = 24 hours; // Reserve attestations stale after 24 hours
@@ -233,7 +233,7 @@ contract SystemState is AccessControl {
     // =================== PAUSE FUNCTIONS ===================
 
     /// @notice Pause minting operations
-    function pauseMinting() external onlyRole(PAUSER_ROLE) {
+    function pauseMinting() external onlyRole(EMERGENCY_ROLE) {
         if (isMintingPaused) revert MintingAlreadyPaused();
         isMintingPaused = true;
         pauseTimestamps[keccak256("minting")] = block.timestamp;
@@ -241,7 +241,7 @@ contract SystemState is AccessControl {
     }
 
     /// @notice Unpause minting operations
-    function unpauseMinting() external onlyRole(PAUSER_ROLE) {
+    function unpauseMinting() external onlyRole(EMERGENCY_ROLE) {
         if (!isMintingPaused) revert MintingNotPaused();
         isMintingPaused = false;
         delete pauseTimestamps[keccak256("minting")];
@@ -249,7 +249,7 @@ contract SystemState is AccessControl {
     }
 
     /// @notice Pause redemption operations
-    function pauseRedemption() external onlyRole(PAUSER_ROLE) {
+    function pauseRedemption() external onlyRole(EMERGENCY_ROLE) {
         if (isRedemptionPaused) revert RedemptionAlreadyPaused();
         isRedemptionPaused = true;
         pauseTimestamps[keccak256("redemption")] = block.timestamp;
@@ -257,7 +257,7 @@ contract SystemState is AccessControl {
     }
 
     /// @notice Unpause redemption operations
-    function unpauseRedemption() external onlyRole(PAUSER_ROLE) {
+    function unpauseRedemption() external onlyRole(EMERGENCY_ROLE) {
         if (!isRedemptionPaused) revert RedemptionNotPaused();
         isRedemptionPaused = false;
         delete pauseTimestamps[keccak256("redemption")];
@@ -266,7 +266,7 @@ contract SystemState is AccessControl {
 
 
     /// @notice Pause wallet registration operations
-    function pauseWalletRegistration() external onlyRole(PAUSER_ROLE) {
+    function pauseWalletRegistration() external onlyRole(EMERGENCY_ROLE) {
         if (isWalletRegistrationPaused)
             revert WalletRegistrationAlreadyPaused();
         isWalletRegistrationPaused = true;
@@ -275,7 +275,7 @@ contract SystemState is AccessControl {
     }
 
     /// @notice Unpause wallet registration operations
-    function unpauseWalletRegistration() external onlyRole(PAUSER_ROLE) {
+    function unpauseWalletRegistration() external onlyRole(EMERGENCY_ROLE) {
         if (!isWalletRegistrationPaused) revert WalletRegistrationNotPaused();
         isWalletRegistrationPaused = false;
         delete pauseTimestamps[keccak256("wallet_registration")];
@@ -288,7 +288,7 @@ contract SystemState is AccessControl {
     /// @param newAmount The new minimum amount
     function setMinMintAmount(uint256 newAmount)
         external
-        onlyRole(PARAMETER_ADMIN_ROLE)
+        onlyRole(OPERATIONS_ROLE)
     {
         if (newAmount == 0) revert InvalidAmount();
         if (newAmount > maxMintAmount)
@@ -304,7 +304,7 @@ contract SystemState is AccessControl {
     /// @param newAmount The new maximum amount
     function setMaxMintAmount(uint256 newAmount)
         external
-        onlyRole(PARAMETER_ADMIN_ROLE)
+        onlyRole(OPERATIONS_ROLE)
     {
         if (newAmount < minMintAmount)
             revert MaxAmountBelowMin(newAmount, minMintAmount);
@@ -319,7 +319,7 @@ contract SystemState is AccessControl {
     /// @param newTimeout The new timeout in seconds
     function setRedemptionTimeout(uint256 newTimeout)
         external
-        onlyRole(PARAMETER_ADMIN_ROLE)
+        onlyRole(OPERATIONS_ROLE)
     {
         if (newTimeout == 0) revert InvalidTimeout();
         if (newTimeout > 30 days) revert TimeoutTooLong(newTimeout, 30 days);
@@ -334,7 +334,7 @@ contract SystemState is AccessControl {
     /// @param newThreshold The new threshold in seconds
     function setStaleThreshold(uint256 newThreshold)
         external
-        onlyRole(PARAMETER_ADMIN_ROLE)
+        onlyRole(OPERATIONS_ROLE)
     {
         if (newThreshold == 0) revert InvalidThreshold();
         if (newThreshold > 7 days)
@@ -350,7 +350,7 @@ contract SystemState is AccessControl {
     /// @param newDelay The new delay in seconds
     function setWalletRegistrationDelay(uint256 newDelay)
         external
-        onlyRole(PARAMETER_ADMIN_ROLE)
+        onlyRole(OPERATIONS_ROLE)
     {
         if (newDelay > 24 hours) revert DelayTooLong(newDelay, 24 hours);
 
@@ -364,7 +364,7 @@ contract SystemState is AccessControl {
     /// @param newDuration The new duration in seconds
     function setEmergencyPauseDuration(uint256 newDuration)
         external
-        onlyRole(PARAMETER_ADMIN_ROLE)
+        onlyRole(OPERATIONS_ROLE)
     {
         if (newDuration == 0) revert InvalidDuration();
         if (newDuration > 30 days) revert DurationTooLong(newDuration, 30 days);
@@ -390,11 +390,11 @@ contract SystemState is AccessControl {
         address oldCouncil = emergencyCouncil;
         emergencyCouncil = newCouncil;
 
-        // Grant and revoke PAUSER_ROLE
+        // Grant and revoke EMERGENCY_ROLE
         if (oldCouncil != address(0)) {
-            _revokeRole(PAUSER_ROLE, oldCouncil);
+            _revokeRole(EMERGENCY_ROLE, oldCouncil);
         }
-        _grantRole(PAUSER_ROLE, newCouncil);
+        _grantRole(EMERGENCY_ROLE, newCouncil);
 
         emit EmergencyCouncilUpdated(oldCouncil, newCouncil, msg.sender);
     }
@@ -405,7 +405,7 @@ contract SystemState is AccessControl {
     /// @param newRatio The new minimum collateral ratio percentage (e.g., 90 for 90%)
     function setMinCollateralRatio(uint256 newRatio)
         external
-        onlyRole(PARAMETER_ADMIN_ROLE)
+        onlyRole(OPERATIONS_ROLE)
     {
         if (newRatio < 100 || newRatio > 200) revert InvalidAmount(); // Min 100%, Max 200%
 
@@ -419,7 +419,7 @@ contract SystemState is AccessControl {
     /// @param newThreshold The new failure threshold count
     function setFailureThreshold(uint256 newThreshold)
         external
-        onlyRole(PARAMETER_ADMIN_ROLE)
+        onlyRole(OPERATIONS_ROLE)
     {
         if (newThreshold == 0 || newThreshold > 10) revert InvalidThreshold();
 
@@ -433,7 +433,7 @@ contract SystemState is AccessControl {
     /// @param newWindow The new failure counting window in seconds
     function setFailureWindow(uint256 newWindow)
         external
-        onlyRole(PARAMETER_ADMIN_ROLE)
+        onlyRole(OPERATIONS_ROLE)
     {
         if (newWindow == 0) revert InvalidDuration();
         if (newWindow > 30 days) revert DurationTooLong(newWindow, 30 days);
@@ -461,7 +461,7 @@ contract SystemState is AccessControl {
     ///               - keccak256("SECURITY_INCIDENT") - Security breach
     ///               - keccak256("TECHNICAL_FAILURE") - System malfunction
     ///
-    /// @custom:security Only callable by PAUSER_ROLE holders (emergency council)
+    /// @custom:security Only callable by EMERGENCY_ROLE holders (emergency council)
     /// @custom:events Emits QCEmergencyPaused and EmergencyActionTaken events
     /// @custom:integration Other contracts should check qcNotEmergencyPaused modifier
     ///
@@ -473,7 +473,7 @@ contract SystemState is AccessControl {
     /// ```
     function emergencyPauseQC(address qc, bytes32 reason)
         external
-        onlyRole(PAUSER_ROLE)
+        onlyRole(EMERGENCY_ROLE)
     {
         if (qc == address(0)) revert InvalidCouncilAddress();
         if (qcEmergencyPauses[qc]) revert QCIsEmergencyPaused(qc);
@@ -499,7 +499,7 @@ contract SystemState is AccessControl {
     ///
     /// @param qc The QC address to unpause - must be currently paused
     ///
-    /// @custom:security Only callable by PAUSER_ROLE holders (emergency council)
+    /// @custom:security Only callable by EMERGENCY_ROLE holders (emergency council)
     /// @custom:validation Reverts if QC is not currently emergency paused
     /// @custom:events Emits QCEmergencyUnpaused and EmergencyActionTaken events
     /// @custom:cleanup Removes pause timestamp to prevent stale data
@@ -510,7 +510,7 @@ contract SystemState is AccessControl {
     /// systemState.emergencyUnpauseQC(problematicQC);
     /// // QC can now resume normal operations
     /// ```
-    function emergencyUnpauseQC(address qc) external onlyRole(PAUSER_ROLE) {
+    function emergencyUnpauseQC(address qc) external onlyRole(EMERGENCY_ROLE) {
         if (!qcEmergencyPauses[qc]) revert QCNotEmergencyPaused(qc);
 
         qcEmergencyPauses[qc] = false;

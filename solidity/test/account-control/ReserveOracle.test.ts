@@ -601,10 +601,10 @@ describe("ReserveOracle", () => {
 
   describe("forceConsensus", () => {
     let arbiter: SignerWithAddress
-    const ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
+    const DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE")
 
     beforeEach(async () => {
-      arbiter = deployer // deployer has ARBITER_ROLE by default
+      arbiter = deployer // deployer has DISPUTE_ARBITER_ROLE by default
     })
 
     it("should allow arbiter to force consensus with one attestation", async () => {
@@ -683,11 +683,11 @@ describe("ReserveOracle", () => {
         .connect(attester1)
         .submitAttestation(qcAddress.address, ethers.utils.parseEther("100"))
 
-      // Try to force consensus without ARBITER_ROLE
+      // Try to force consensus without DISPUTE_ARBITER_ROLE
       await expect(
         reserveOracle.connect(attester1).forceConsensus(qcAddress.address)
       ).to.be.revertedWith(
-        `AccessControl: account ${attester1.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
+        `AccessControl: account ${attester1.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
       )
     })
 
