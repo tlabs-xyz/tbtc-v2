@@ -41,11 +41,12 @@ describe("WatchdogEnforcer", () => {
   const minCollateralRatio = 100 // 100% = 1:1 ratio
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
-    watchdog = signers[1]
-    qcAddress = signers[2]
-    randomUser = signers[3]
+    const [deployerSigner, watchdogSigner, qcAddressSigner, randomUserSigner] =
+      await ethers.getSigners()
+    deployer = deployerSigner
+    watchdog = watchdogSigner
+    qcAddress = qcAddressSigner
+    randomUser = randomUserSigner
 
     // Generate role hashes
     MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")

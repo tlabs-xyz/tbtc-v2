@@ -13,15 +13,14 @@ import type {
 } from "../../../typechain"
 
 /**
- * Integration Tests for Complete SPV Flows
+ * Integration Tests for Message Signing Flows
  *
- * Tests end-to-end SPV validation flows that were implemented:
- * 1. QCManager wallet control verification using SPV proofs
- * 2. QCRedeemer payment verification using SPV proofs
- * 3. Integration with Bridge SPV libraries and patterns
- * 4. Real Bitcoin address validation in SPV context
+ * Tests end-to-end message signing validation flows that replaced SPV:
+ * 1. QCManager wallet ownership verification using Bitcoin message signatures
+ * 2. QCRedeemer payment verification (still uses SPV for payment validation)
+ * 3. Bitcoin address validation in message signing context
  */
-describe("SPV Integration Flows", () => {
+describe("Message Signing Integration Flows", () => {
   let deployer: HardhatEthersSigner
   let qc: HardhatEthersSigner
   let user: HardhatEthersSigner
@@ -35,7 +34,7 @@ describe("SPV Integration Flows", () => {
 
   // Bitcoin test data (real mainnet transaction structure)
   const validBitcoinAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-  const testAmount = ethers.parseEther("1")
+  const testAmount = ethers.utils.parseEther("1")
 
   before(async () => {
     const signers = await ethers.getSigners()
@@ -56,13 +55,12 @@ describe("SPV Integration Flows", () => {
     const SystemState = await ethers.getContractFactory("SystemState")
     systemState = await SystemState.deploy(deployer.address)
 
-    // Deploy QC contracts with SPV capabilities
+    // Deploy QC contracts with message signing capabilities
     const QCManager = await ethers.getContractFactory("QCManager")
     qcManager = await QCManager.deploy(
       await qcData.getAddress(),
       await systemState.getAddress(),
-      await testRelay.getAddress(),
-      1 // txProofDifficultyFactor
+      ethers.ZeroAddress // No reserve oracle needed for this test
     )
 
     const QCRedeemer = await ethers.getContractFactory("QCRedeemer")
@@ -75,7 +73,7 @@ describe("SPV Integration Flows", () => {
     )
 
     // Setup initial state
-    await systemState.setMinMintAmount(ethers.parseEther("0.01"))
+    await systemState.setMinMintAmount(ethers.utils.parseEther("0.01"))
     await systemState.setRedemptionTimeout(86400) // 1 day
 
     // Mint tokens for user
@@ -101,7 +99,7 @@ describe("SPV Integration Flows", () => {
         qc.address,
         "Test QC",
         "https://test.qc",
-        ethers.parseEther("100"),
+        ethers.utils.parseEther("100"),
         86400 // timeout
       )
 
@@ -175,7 +173,7 @@ describe("SPV Integration Flows", () => {
         qc.address,
         "Test QC",
         "https://test.qc",
-        ethers.parseEther("100"),
+        ethers.utils.parseEther("100"),
         86400
       )
 
@@ -365,7 +363,7 @@ describe("SPV Integration Flows", () => {
         qc.address,
         "Test QC",
         "https://test.qc",
-        ethers.parseEther("100"),
+        ethers.utils.parseEther("100"),
         86400
       )
       await qcData.activateQC(qc.address)
@@ -421,7 +419,7 @@ describe("SPV Integration Flows", () => {
         qc.address,
         "Test QC",
         "https://test.qc",
-        ethers.parseEther("100"),
+        ethers.utils.parseEther("100"),
         86400
       )
       await qcData.activateQC(qc.address)

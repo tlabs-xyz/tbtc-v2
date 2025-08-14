@@ -3,17 +3,11 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {BTCUtils} from "@keep-network/bitcoin-spv-sol/contracts/BTCUtils.sol";
-import {BytesLib} from "@keep-network/bitcoin-spv-sol/contracts/BytesLib.sol";
-import {ValidateSPV} from "@keep-network/bitcoin-spv-sol/contracts/ValidateSPV.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
 import "./ReserveOracle.sol";
-import "./SPVState.sol";
 import "./BitcoinAddressUtils.sol";
-import "../bridge/BitcoinTx.sol";
-import "../bridge/IRelay.sol";
-import {QCManagerSPV} from "./libraries/QCManagerSPV.sol";
+import {MessageSigning} from "./libraries/MessageSigning.sol";
 
 // =================== CONSOLIDATED INTERFACES ===================
 // Interfaces for contracts that will be removed in consolidation
@@ -50,19 +44,13 @@ interface IQCRedeemer {
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update system configurations
 /// - QC_ADMIN_ROLE: Can update minting amounts, request wallet deregistration
-/// - REGISTRAR_ROLE: Can register/deregister wallets with SPV verification
+/// - REGISTRAR_ROLE: Can register/deregister wallets with message signature verification
 /// - ARBITER_ROLE: Can pause QCs, change status, verify solvency, handle defaults (emergency response)
 /// - WATCHDOG_ENFORCER_ROLE: Can request status changes to UnderReview (limited authority)
 /// - QC_GOVERNANCE_ROLE: Can register QCs and manage minting capacity (instant actions)
 /// - WATCHDOG_ROLE: Can check QC escalations and trigger auto-escalation
 /// - PAUSER_ROLE: Can clear emergency pauses and restore credits
 contract QCManager is AccessControl, ReentrancyGuard {
-    using BTCUtils for bytes;
-    using BTCUtils for uint256;
-    using ValidateSPV for bytes;
-    using ValidateSPV for bytes32;
-    using BytesLib for bytes;
-    using SPVState for SPVState.Storage;
     
     bytes32 public constant QC_ADMIN_ROLE = keccak256("QC_ADMIN_ROLE");
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
@@ -97,7 +85,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     error InvalidWalletAddress();
     error QCNotRegistered(address qc);
     error QCNotActive(address qc);
-    error SPVVerificationFailed();
+    error MessageSignatureVerificationFailed();
     error NotAuthorizedForSolvency(address caller);
     error QCNotRegisteredForSolvency(address qc);
     error ReasonRequired();
@@ -112,10 +100,10 @@ contract QCManager is AccessControl, ReentrancyGuard {
     error WalletNotPendingDeregistration(string btcAddress);
     error QCWouldBecomeInsolvent(uint256 newBalance, uint256 mintedAmount);
     error QCReserveLedgerNotAvailable();
-    error SPVValidatorNotAvailable();
+
     error ServiceNotAvailable(string service);
     error InvalidRelayAddress();
-    // SPV-related errors moved to QCManagerSPV library (including RelayNotSet)
+
     
     // =================== STATE MANAGEMENT ERRORS ===================
     
@@ -168,9 +156,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
     SystemState public immutable systemState;
     ReserveOracle public immutable reserveOracle;
     
-    // SPV validation storage
-    SPVState.Storage internal spvState;
-    
     // =================== STATE MANAGEMENT STORAGE ===================
     
     /// @dev Track QC self-pause timeouts for auto-escalation
@@ -221,6 +206,16 @@ contract QCManager is AccessControl, ReentrancyGuard {
     event WalletRegistrationRequested(
         address indexed qc,
         string btcAddress,
+        bytes32 challenge,
+        address indexed requestedBy,
+        uint256 timestamp
+    );
+
+    /// @dev Emitted when wallet ownership verification is requested
+    event WalletOwnershipVerificationRequested(
+        address indexed qc,
+        string bitcoinAddress,
+        bytes32 challenge,
         address indexed requestedBy,
         uint256 timestamp
     );
@@ -371,16 +366,11 @@ contract QCManager is AccessControl, ReentrancyGuard {
     constructor(
         address _qcData,
         address _systemState,
-        address _reserveOracle,
-        address _relay,
-        uint96 _txProofDifficultyFactor
+        address _reserveOracle
     ) {
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
         reserveOracle = ReserveOracle(_reserveOracle);
-        
-        // Initialize SPV state
-        spvState.initialize(_relay, _txProofDifficultyFactor);
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(QC_ADMIN_ROLE, msg.sender);
@@ -400,36 +390,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         qcRedeemer = IQCRedeemer(_qcRedeemer);
     }
     
-    // =================== SPV CONFIGURATION FUNCTIONS ===================
-    
-    /// @notice Update the Bitcoin relay address
-    /// @param _relay New relay address
-    function setRelay(address _relay) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
-        spvState.setRelay(_relay);
-    }
-    
-    /// @notice Update the transaction proof difficulty factor
-    /// @param _txProofDifficultyFactor New difficulty factor
-    function setTxProofDifficultyFactor(uint96 _txProofDifficultyFactor) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
-        spvState.setTxProofDifficultyFactor(_txProofDifficultyFactor);
-    }
-    
-    /// @notice Get current SPV parameters
-    /// @return relay The current relay address
-    /// @return difficultyFactor The current difficulty factor
-    function getSPVParameters() 
-        external 
-        view 
-        returns (address relay, uint96 difficultyFactor) 
-    {
-        return spvState.getParameters();
-    }
+
 
     // =================== INSTANT GOVERNANCE FUNCTIONS ===================
 
@@ -594,19 +555,17 @@ contract QCManager is AccessControl, ReentrancyGuard {
         );
     }
 
-    /// @notice Register a wallet for a QC (REGISTRAR_ROLE)
-    /// @dev SECURITY: nonReentrant protects against reentrancy via SPVValidator and QCData external calls
+    /// @notice Register a wallet for a QC using message signature verification
+    /// @dev SECURITY: nonReentrant protects against reentrancy via ReserveOracle and QCData external calls
     /// @param qc The address of the QC
     /// @param btcAddress The Bitcoin address to register
-    /// @param challenge The challenge bytes that should be in OP_RETURN
-    /// @param txInfo Bitcoin transaction information
-    /// @param proof SPV proof of transaction inclusion
+    /// @param challenge The challenge message that was signed
+    /// @param signature The Bitcoin message signature from the QC
     function registerWallet(
         address qc,
         string calldata btcAddress,
         bytes32 challenge,
-        BitcoinTx.Info calldata txInfo,
-        BitcoinTx.Proof calldata proof
+        bytes calldata signature
     )
         external
         onlyRole(REGISTRAR_ROLE)
@@ -643,15 +602,15 @@ contract QCManager is AccessControl, ReentrancyGuard {
             revert QCNotActive(qc);
         }
 
-        // Verify wallet control using SPV client library
-        if (!QCManagerSPV.verifyWalletControl(spvState, btcAddress, challenge, txInfo, proof)) {
+        // Verify wallet ownership using direct on-chain Bitcoin signature verification
+        if (!MessageSigning.verifyBitcoinSignature(btcAddress, challenge, signature)) {
             emit WalletRegistrationFailed(
                 qc,
                 btcAddress,
-                "SPV_VERIFICATION_FAILED",
+                "MESSAGE_SIGNATURE_VERIFICATION_FAILED",
                 msg.sender
             );
-            revert SPVVerificationFailed();
+            revert MessageSignatureVerificationFailed();
         }
 
         qcData.registerWallet(qc, btcAddress);
@@ -659,9 +618,53 @@ contract QCManager is AccessControl, ReentrancyGuard {
         emit WalletRegistrationRequested(
             qc,
             btcAddress,
+            challenge,
             msg.sender,
             block.timestamp
         );
+    }
+
+    /// @notice Request wallet ownership verification (called by QC or authorized registrar)
+    /// @dev This generates a challenge that QCs must sign with their Bitcoin private key
+    /// @param bitcoinAddress The Bitcoin address to verify ownership of
+    /// @param nonce A unique nonce to prevent challenge collisions
+    /// @return challenge The challenge that must be signed with the Bitcoin private key
+    function requestWalletOwnershipVerification(
+        string calldata bitcoinAddress,
+        uint256 nonce
+    ) external returns (bytes32 challenge) {
+        address qc;
+        
+        // Allow QCs to request verification for their own wallets
+        if (qcData.isQCRegistered(msg.sender)) {
+            qc = msg.sender;
+        } 
+        // Allow REGISTRAR_ROLE to initiate verification on behalf of QCs
+        else if (hasRole(REGISTRAR_ROLE, msg.sender)) {
+            // For registrars, the QC address should be derived from context or passed separately
+            // For now, revert with clear message
+            revert("REGISTRAR_MUST_USE_REGISTER_WALLET");
+        }
+        else {
+            revert("UNAUTHORIZED_WALLET_VERIFICATION");
+        }
+
+        // Validate Bitcoin address format
+        if (bytes(bitcoinAddress).length == 0) revert InvalidWalletAddress();
+        if (!MessageSigning.isValidBitcoinAddress(bitcoinAddress)) revert InvalidWalletAddress();
+
+        // Generate unique challenge
+        challenge = MessageSigning.generateChallenge(qc, nonce);
+
+        emit WalletOwnershipVerificationRequested(
+            qc,
+            bitcoinAddress,
+            challenge,
+            msg.sender,
+            block.timestamp
+        );
+
+        return challenge;
     }
 
     /// @notice Request wallet deregistration
@@ -898,15 +901,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         return false;
     }
 
-    // SPV validation functions moved to QCManagerSPV library to reduce contract size
-    // The following functions were removed:
-    // - _verifyWalletControl() - now in QCManagerSPV.verifyWalletControl()
-    // - _evaluateProofDifficulty() - now in library
-    // - _validateWalletControlProof() - now in library
-    // - _decodeAndValidateBitcoinAddress() - now in library
-    // - _isValidBitcoinAddress() - now in library
-    // - _findChallengeInOpReturn() - now in library
-    // - _verifyTransactionSignature() - now in library
+
 
     /// @dev Get reserve balance and check staleness
     /// @param qc The QC address
@@ -920,11 +915,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         return reserveOracle.getReserveBalanceAndStaleness(qc);
     }
     
-    /// @notice Check if SPV validation is properly configured
-    /// @return isConfigured True if SPV state is initialized
-    function isSPVConfigured() external view returns (bool isConfigured) {
-        return spvState.isInitialized();
-    }
+
 
     /// @dev Update reserve balance and check solvency
     /// @param qc The QC address
@@ -1283,15 +1274,15 @@ contract QCManager is AccessControl, ReentrancyGuard {
         returns (uint256 deadline) 
     {
         if (address(qcRedeemer) == address(0)) return 0;
-        try qcRedeemer.getEarliestRedemptionDeadline(qc) returns (uint256 deadline) {
-            return deadline;
+        try qcRedeemer.getEarliestRedemptionDeadline(qc) returns (uint256 redemptionDeadline) {
+            return redemptionDeadline;
         } catch {
             return 0;
         }
     }
     
     // isSelfPaused() removed - use getPauseInfo() instead
-    // getSPVState() removed - use getSPVParameters() and isSPVConfigured() instead
+
     
     /// @notice Get comprehensive pause credit information for a QC
     /// @param qc QC address

@@ -30,13 +30,20 @@ describe("QCRedeemer", () => {
   const validLegacyBtc = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
-    governance = signers[1]
-    user = signers[2]
-    qcAddress = signers[3]
-    watchdog = signers[4]
-    thirdParty = signers[5]
+    const [
+      deployerSigner,
+      governanceSigner,
+      userSigner,
+      qcAddressSigner,
+      watchdogSigner,
+      thirdPartySigner,
+    ] = await ethers.getSigners()
+    deployer = deployerSigner
+    governance = governanceSigner
+    user = userSigner
+    qcAddress = qcAddressSigner
+    watchdog = watchdogSigner
+    thirdParty = thirdPartySigner
 
     // Generate role hashes
     REDEEMER_ROLE = ethers.utils.id("REDEEMER_ROLE")
