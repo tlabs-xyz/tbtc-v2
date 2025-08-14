@@ -768,6 +768,12 @@ contract QCManager is AccessControl, ReentrancyGuard {
         }
         
         // NEW: Check if wallet has pending redemption obligations
+        // KNOWN LIMITATION: Small race condition window exists between this check
+        // and the actual de-registration. A new redemption could theoretically be
+        // initiated after this check but before de-registration completes.
+        // Mitigation: Window is very small (single transaction), and QCs control
+        // their own wallet usage, making exploitation unlikely in practice.
+        // Future improvement: Consider atomic check-and-act pattern or mutex in V2.
         if (address(qcRedeemer) != address(0)) {
             require(
                 !IQCRedeemer(address(qcRedeemer)).hasWalletObligations(btcAddress),
