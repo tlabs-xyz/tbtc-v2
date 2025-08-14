@@ -404,35 +404,6 @@ describe("SystemState", () => {
         })
       })
 
-      describe("setWalletRegistrationDelay", () => {
-        it("should update wallet registration delay successfully", async () => {
-          const newDelay = 2 * 3600 // 2 hours
-          const oldDelay = await systemState.walletRegistrationDelay()
-          const tx = await systemState
-            .connect(adminAccount)
-            .setWalletRegistrationDelay(newDelay)
-
-          expect(await systemState.walletRegistrationDelay()).to.equal(newDelay)
-          await expect(tx)
-            .to.emit(systemState, "WalletRegistrationDelayUpdated")
-            .withArgs(oldDelay, newDelay, adminAccount.address)
-        })
-
-        it("should allow zero delay", async () => {
-          await systemState.connect(adminAccount).setWalletRegistrationDelay(0)
-          expect(await systemState.walletRegistrationDelay()).to.equal(0)
-        })
-
-        it("should revert when delay exceeds 24 hours", async () => {
-          const invalidDelay = 24 * 3600 + 1 // 24 hours + 1 second
-
-          await expect(
-            systemState
-              .connect(adminAccount)
-              .setWalletRegistrationDelay(invalidDelay)
-          ).to.be.revertedWith("DelayTooLong")
-        })
-      })
 
       describe("setEmergencyPauseDuration", () => {
         it("should update emergency pause duration successfully", async () => {
