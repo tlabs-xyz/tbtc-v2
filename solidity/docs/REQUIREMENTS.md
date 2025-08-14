@@ -135,14 +135,14 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Requirement**: The system MUST support Bitcoin wallet registration with cryptographic proof
 
-- Wallet control verification via OP_RETURN challenges
-- SPV proof validation for wallet registration
+- Wallet control verification via Bitcoin message signatures
+- Direct on-chain signature validation for wallet registration
 - Two-step deregistration process (request → finalize)
 - Wallet states: Inactive, Active, PendingDeRegistration
 
 **Acceptance Criteria**:
 
-- Registration requires Watchdog-verified SPV proof
+- Registration requires Watchdog-verified message signature
 - Atomic solvency check during wallet deregistration
 - Events emitted for all wallet state changes
 - Only REGISTRAR_ROLE can finalize registrations
@@ -300,20 +300,20 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - **Deployment**: Hardhat-deploy with numbered scripts
 - **Verification**: Etherscan verification support
 
-### 4.2 SPV Integration Requirements
+### 4.2 Message Signing Integration Requirements
 
-#### 4.2.1 SPV Validator Implementation (REQ-TECH-SPV-001)
+#### 4.2.1 Message Signature Validator Implementation (REQ-TECH-MSG-001)
 
-**Requirement**: The system MUST leverage existing Bitcoin SPV infrastructure
+**Requirement**: The system MUST implement Bitcoin message signature verification
 
-- Use existing LightRelay for Bitcoin header validation
-- SPVValidator contract replicating Bridge's SPV logic exactly
-- Wallet control verification via OP_RETURN challenges
-- Redemption fulfillment verification through SPV proofs
+- Use native Solidity ECDSA recovery for signature validation
+- MessageSigning library for direct on-chain verification
+- Wallet control verification via Bitcoin message signatures
+- Direct cryptographic proof without complex transaction validation
 
 **Acceptance Criteria**:
 
-- SPVValidator uses identical cryptographic verification as Bridge
+- MessageSigning uses standard ECDSA recovery for verification
 - Minimum 6 confirmations for transaction finality
 - Transaction hash tracking prevents replay attacks
 - Zero risk to production Bridge contract
