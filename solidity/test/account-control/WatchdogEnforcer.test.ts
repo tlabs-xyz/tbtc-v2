@@ -108,8 +108,8 @@ describe("WatchdogEnforcer", () => {
       expect(
         await watchdogEnforcer.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)
       ).to.be.true
-      expect(await watchdogEnforcer.hasRole(ENFORCEMENT_ROLE, deployer.address)).to
-        .be.true
+      expect(await watchdogEnforcer.hasRole(ENFORCEMENT_ROLE, deployer.address))
+        .to.be.true
     })
 
     it("should have correct reason codes", async () => {

@@ -87,13 +87,19 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   const DEFAULT_ADMIN_ROLE =
     "0x0000000000000000000000000000000000000000000000000000000000000000"
 
-  for (const contractName of contracts) {
+  // Process contracts sequentially to avoid race conditions in deployment
+  // eslint-disable-next-line no-restricted-syntax
+  for (let i = 0; i < contracts.length; i++) {
+    const contractName = contracts[i]
     try {
+      // eslint-disable-next-line no-await-in-loop
       const contractDeployment = await get(contractName)
+      // eslint-disable-next-line no-await-in-loop
       const contract = await ethers.getContractAt(
         contractName,
         contractDeployment.address
       )
+      // eslint-disable-next-line no-await-in-loop
       const governanceIsAdmin = await contract.hasRole(
         DEFAULT_ADMIN_ROLE,
         governance
@@ -101,6 +107,7 @@ const func: DeployFunction = async function TransferRolesToGovernance(
 
       if (!governanceIsAdmin) {
         log(`Granting DEFAULT_ADMIN_ROLE to governance in ${contractName}...`)
+        // eslint-disable-next-line no-await-in-loop
         await execute(
           contractName,
           { from: deployer, log: true },
@@ -185,9 +192,6 @@ func.skip = async (hre: HardhatRuntimeEnvironment) => {
 
   // Skip if no separate governance account
   if (!governance || governance === deployer) {
-    console.log(
-      "Skipping role transfer: No separate governance account configured"
-    )
     return true
   }
 
