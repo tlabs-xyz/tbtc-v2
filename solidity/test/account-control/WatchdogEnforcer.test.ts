@@ -28,7 +28,7 @@ describe("WatchdogEnforcer", () => {
   let mockSystemState: FakeContract<SystemState>
 
   // Roles
-  let MANAGER_ROLE: string
+  let DEFAULT_ADMIN_ROLE: string
   let ENFORCEMENT_ROLE: string
 
   // Reason codes
@@ -49,7 +49,7 @@ describe("WatchdogEnforcer", () => {
     randomUser = randomUserSigner
 
     // Generate role hashes
-    MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")
+    DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
     ENFORCEMENT_ROLE = ethers.utils.id("ENFORCEMENT_ROLE")
 
     // Generate reason codes
@@ -108,7 +108,7 @@ describe("WatchdogEnforcer", () => {
       expect(
         await watchdogEnforcer.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)
       ).to.be.true
-      expect(await watchdogEnforcer.hasRole(MANAGER_ROLE, deployer.address)).to
+      expect(await watchdogEnforcer.hasRole(ENFORCEMENT_ROLE, deployer.address)).to
         .be.true
     })
 

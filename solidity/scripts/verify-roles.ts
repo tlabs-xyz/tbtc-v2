@@ -2,24 +2,20 @@ import { ethers } from "hardhat"
 import { Contract } from "ethers"
 import fs from "fs"
 
-// Role definitions
+// Role definitions (updated for Account Control v2.0)
 const ROLES = {
   DEFAULT_ADMIN_ROLE:
     "0x0000000000000000000000000000000000000000000000000000000000000000",
-  PARAMETER_ADMIN_ROLE: ethers.utils.id("PARAMETER_ADMIN_ROLE"),
-  PAUSER_ROLE: ethers.utils.id("PAUSER_ROLE"),
-  MANAGER_ROLE: ethers.utils.id("MANAGER_ROLE"),
+  GOVERNANCE_ROLE: ethers.utils.id("GOVERNANCE_ROLE"),
+  OPERATIONS_ROLE: ethers.utils.id("OPERATIONS_ROLE"),
+  EMERGENCY_ROLE: ethers.utils.id("EMERGENCY_ROLE"),
   MINTER_ROLE: ethers.utils.id("MINTER_ROLE"),
-  REDEEMER_ROLE: ethers.utils.id("REDEEMER_ROLE"),
-  ARBITER_ROLE: ethers.utils.id("ARBITER_ROLE"),
+  DISPUTE_ARBITER_ROLE: ethers.utils.id("DISPUTE_ARBITER_ROLE"),
   ATTESTER_ROLE: ethers.utils.id("ATTESTER_ROLE"),
   REGISTRAR_ROLE: ethers.utils.id("REGISTRAR_ROLE"),
-  WATCHDOG_ROLE: ethers.utils.id("WATCHDOG_ROLE"),
-  WATCHDOG_OPERATOR_ROLE: ethers.utils.id("WATCHDOG_OPERATOR_ROLE"),
-  QC_ADMIN_ROLE: ethers.utils.id("QC_ADMIN_ROLE"),
+  MONITOR_ROLE: ethers.utils.id("MONITOR_ROLE"),
   QC_MANAGER_ROLE: ethers.utils.id("QC_MANAGER_ROLE"),
-  QC_GOVERNANCE_ROLE: ethers.utils.id("QC_GOVERNANCE_ROLE"),
-  ESCALATOR_ROLE: ethers.utils.id("ESCALATOR_ROLE"),
+  ENFORCEMENT_ROLE: ethers.utils.id("ENFORCEMENT_ROLE"),
 }
 
 // Expected role assignments
@@ -30,7 +26,7 @@ interface RoleAssignment {
   critical: boolean // If true, missing this role is a critical error
 }
 
-// Contract role requirements
+// Contract role requirements (updated for v2.0 simplified architecture)
 const EXPECTED_ROLES: RoleAssignment[] = [
   // SystemState
   {
@@ -41,13 +37,13 @@ const EXPECTED_ROLES: RoleAssignment[] = [
   },
   {
     contract: "SystemState",
-    role: "PARAMETER_ADMIN_ROLE",
+    role: "OPERATIONS_ROLE",
     expectedHolders: ["governance"],
     critical: true,
   },
   {
     contract: "SystemState",
-    role: "PAUSER_ROLE",
+    role: "EMERGENCY_ROLE",
     expectedHolders: ["governance"],
     critical: true,
   },
@@ -61,24 +57,39 @@ const EXPECTED_ROLES: RoleAssignment[] = [
   },
   {
     contract: "QCManager",
-    role: "QC_ADMIN_ROLE",
-    expectedHolders: ["BasicMintingPolicy"],
+    role: "GOVERNANCE_ROLE",
+    expectedHolders: ["governance"],
     critical: true,
   },
   {
     contract: "QCManager",
     role: "REGISTRAR_ROLE",
-    expectedHolders: ["QCWatchdog"],
+    expectedHolders: ["governance"],
     critical: false,
-  }, // Individual instances
+  },
   {
     contract: "QCManager",
-    role: "ARBITER_ROLE",
-    expectedHolders: [
-      "WatchdogConsensusManager",
-      "WatchdogAutomatedEnforcement",
-    ],
+    role: "DISPUTE_ARBITER_ROLE",
+    expectedHolders: ["WatchdogEnforcer"],
     critical: true,
+  },
+  {
+    contract: "QCManager",
+    role: "MONITOR_ROLE",
+    expectedHolders: ["governance"],
+    critical: false,
+  },
+  {
+    contract: "QCManager",
+    role: "ENFORCEMENT_ROLE",
+    expectedHolders: ["WatchdogEnforcer"],
+    critical: true,
+  },
+  {
+    contract: "QCManager",
+    role: "EMERGENCY_ROLE",
+    expectedHolders: ["governance"],
+    critical: false,
   },
 
   // QCData
@@ -118,141 +129,36 @@ const EXPECTED_ROLES: RoleAssignment[] = [
   },
   {
     contract: "QCRedeemer",
-    role: "ARBITER_ROLE",
-    expectedHolders: [
-      "WatchdogConsensusManager",
-      "WatchdogAutomatedEnforcement",
-    ],
+    role: "DISPUTE_ARBITER_ROLE",
+    expectedHolders: ["WatchdogEnforcer"],
     critical: true,
   },
 
-  // QCReserveLedger
+  // ReserveOracle (replaced QCReserveLedger)
   {
-    contract: "QCReserveLedger",
+    contract: "ReserveOracle",
     role: "DEFAULT_ADMIN_ROLE",
     expectedHolders: ["governance"],
     critical: true,
   },
   {
-    contract: "QCReserveLedger",
+    contract: "ReserveOracle",
     role: "ATTESTER_ROLE",
-    expectedHolders: ["QCWatchdog"],
+    expectedHolders: ["governance"],
     critical: false,
-  }, // Individual instances
+  },
 
-  // BasicMintingPolicy
+  // WatchdogEnforcer (simplified from complex watchdog system)
   {
-    contract: "BasicMintingPolicy",
+    contract: "WatchdogEnforcer",
     role: "DEFAULT_ADMIN_ROLE",
     expectedHolders: ["governance"],
     critical: true,
   },
   {
-    contract: "BasicMintingPolicy",
-    role: "MINTER_ROLE",
-    expectedHolders: ["QCMinter"],
-    critical: true,
-  },
-
-  // BasicRedemptionPolicy
-  {
-    contract: "BasicRedemptionPolicy",
-    role: "DEFAULT_ADMIN_ROLE",
+    contract: "WatchdogEnforcer",
+    role: "ENFORCEMENT_ROLE",
     expectedHolders: ["governance"],
-    critical: true,
-  },
-  {
-    contract: "BasicRedemptionPolicy",
-    role: "REDEEMER_ROLE",
-    expectedHolders: ["QCRedeemer"],
-    critical: true,
-  },
-
-  // WatchdogConsensusManager
-  {
-    contract: "WatchdogConsensusManager",
-    role: "DEFAULT_ADMIN_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
-  {
-    contract: "WatchdogConsensusManager",
-    role: "MANAGER_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
-  {
-    contract: "WatchdogConsensusManager",
-    role: "WATCHDOG_ROLE",
-    expectedHolders: [],
-    critical: false,
-  }, // Added by operators
-
-  // WatchdogMonitor
-  {
-    contract: "WatchdogMonitor",
-    role: "DEFAULT_ADMIN_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
-  {
-    contract: "WatchdogMonitor",
-    role: "MANAGER_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
-  {
-    contract: "WatchdogMonitor",
-    role: "WATCHDOG_OPERATOR_ROLE",
-    expectedHolders: [],
-    critical: false,
-  }, // Added by operators
-
-  // WatchdogAutomatedEnforcement
-  {
-    contract: "WatchdogAutomatedEnforcement",
-    role: "DEFAULT_ADMIN_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
-  {
-    contract: "WatchdogAutomatedEnforcement",
-    role: "MANAGER_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
-
-  // WatchdogThresholdActions
-  {
-    contract: "WatchdogThresholdActions",
-    role: "DEFAULT_ADMIN_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
-  {
-    contract: "WatchdogThresholdActions",
-    role: "MANAGER_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
-
-  // WatchdogDAOEscalation
-  {
-    contract: "WatchdogDAOEscalation",
-    role: "DEFAULT_ADMIN_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
-  {
-    contract: "WatchdogDAOEscalation",
-    role: "MANAGER_ROLE",
-    expectedHolders: ["governance"],
-    critical: true,
-  },
-  {
-    contract: "WatchdogDAOEscalation",
-    role: "ESCALATOR_ROLE",
-    expectedHolders: ["WatchdogThresholdActions"],
     critical: true,
   },
 ]
@@ -323,17 +229,15 @@ async function getRoleHolders(
       const [deployer, governance] = await ethers.getSigners()
       const addresses = [deployer.address, governance.address]
 
-      // Check common contract addresses
+      // Check common contract addresses (updated for v2.0)
       const contractsToCheck = [
         "QCManager",
         "QCMinter",
         "QCRedeemer",
-        "BasicMintingPolicy",
-        "BasicRedemptionPolicy",
-        "WatchdogConsensusManager",
-        "WatchdogMonitor",
-        "WatchdogAutomatedEnforcement",
-        "WatchdogThresholdActions",
+        "QCData",
+        "SystemState",
+        "ReserveOracle",
+        "WatchdogEnforcer",
       ]
 
       for (const contractName of contractsToCheck) {
@@ -379,8 +283,8 @@ async function verifyRoles(): Promise<void> {
   const warnings: string[] = []
   const deployerPrivileges: string[] = []
 
-  // Check v1 roles
-  console.log("Checking v1 contracts...")
+  // Check v2.0 simplified architecture roles
+  console.log("Checking v2.0 Account Control contracts...")
   for (const assignment of EXPECTED_ROLES) {
     const contract = await getContractAddress(assignment.contract)
     if (!contract) {
