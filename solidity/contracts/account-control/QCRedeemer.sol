@@ -22,6 +22,13 @@ import {QCRedeemerSPV} from "./libraries/QCRedeemerSPV.sol";
 /// - Role-based access control for sensitive operations
 /// - Integration with tBTC v2 token burning mechanism
 /// - SPV proof verification for Bitcoin transaction validation
+/// - Wallet Obligation Tracking System (WOTS) for preventing wallet abandonment
+///
+/// WOTS Design Notes:
+/// - Uses dual tracking: arrays for history + counters for active obligations
+/// - Prioritizes gas efficiency (O(1) obligation checks) over storage efficiency
+/// - Arrays never shrink but counters are accurately maintained
+/// - This prevents wallet de-registration while having redemption obligations
 ///
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
@@ -113,9 +120,15 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     mapping(address => uint256) public qcActiveRedemptionCount;
     
     /// @dev Track redemptions by wallet for obligation management
+    /// @notice KNOWN LIMITATION: Arrays don't shrink after fulfillment/default
+    ///         This causes gas costs to increase over time as arrays grow.
+    ///         Mitigation: Use counter for obligation checks (O(1) complexity).
+    ///         Future improvement: Implement array cleanup or use EnumerableSet in V2.
     mapping(string => bytes32[]) public walletActiveRedemptions;
     
     /// @dev Track number of active redemptions per wallet
+    /// @notice This counter is properly decremented on fulfillment/default,
+    ///         providing accurate obligation tracking despite array growth.
     mapping(string => uint256) public walletActiveRedemptionCount;
 
     // =================== EVENTS ===================
@@ -376,6 +389,9 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         string memory qcWalletAddress = redemptions[redemptionId].qcWalletAddress;
         if (walletActiveRedemptionCount[qcWalletAddress] > 0) {
             walletActiveRedemptionCount[qcWalletAddress]--;
+            // NOTE: We decrement the counter but don't remove from walletActiveRedemptions array
+            // This is intentional for V1 to keep logic simple and gas costs predictable
+            // The counter provides accurate obligation tracking for hasWalletObligations()
         }
 
         Redemption memory redemption = redemptions[redemptionId];
@@ -420,6 +436,9 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         string memory qcWalletAddress = redemptions[redemptionId].qcWalletAddress;
         if (walletActiveRedemptionCount[qcWalletAddress] > 0) {
             walletActiveRedemptionCount[qcWalletAddress]--;
+            // NOTE: We decrement the counter but don't remove from walletActiveRedemptions array
+            // This is intentional for V1 to keep logic simple and gas costs predictable
+            // The counter provides accurate obligation tracking for hasWalletObligations()
         }
 
         Redemption memory redemption = redemptions[redemptionId];
@@ -823,6 +842,10 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     /// @notice Check if a wallet has unfulfilled redemption obligations
     /// @param walletAddress The Bitcoin wallet address to check
     /// @return hasObligations True if wallet has pending redemptions
+    /// @dev CRITICAL FUNCTION: Used by QCManager to prevent wallet de-registration.
+    ///      This relies on walletActiveRedemptionCount being accurately maintained.
+    ///      Counter is decremented on fulfillment/default but arrays are not cleaned up.
+    ///      This design choice prioritizes gas efficiency (O(1)) over storage efficiency.
     function hasWalletObligations(string calldata walletAddress) 
         external 
         view 
@@ -845,6 +868,9 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     /// @notice Get earliest redemption deadline for a wallet
     /// @param walletAddress The Bitcoin wallet address to check
     /// @return deadline Earliest deadline timestamp, or type(uint256).max if no pending redemptions
+    /// @notice GAS WARNING: This function iterates through ALL redemption IDs for a wallet,
+    ///         including fulfilled/defaulted ones. Gas cost increases over time as array grows.
+    ///         For production use, consider caching results or implementing array cleanup.
     function getWalletEarliestRedemptionDeadline(string calldata walletAddress) 
         external 
         view 
@@ -868,6 +894,8 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     /// @return activeCount Number of active redemptions
     /// @return totalAmount Total tBTC amount being redeemed
     /// @return earliestDeadline Earliest redemption deadline
+    /// @notice GAS WARNING: This function iterates through ALL redemption IDs for a wallet.
+    ///         Consider using getWalletPendingRedemptionCount() alone for basic checks.
     function getWalletObligationDetails(string calldata walletAddress)
         external
         view
@@ -883,6 +911,8 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         earliestDeadline = type(uint256).max;
         totalAmount = 0;
         
+        // NOTE: This loops through ALL redemption IDs, including non-pending ones
+        // Counter provides accurate activeCount, but we need to iterate for amounts/deadlines
         for (uint256 i = 0; i < redemptionIds.length; i++) {
             Redemption memory redemption = redemptions[redemptionIds[i]];
             if (redemption.status == RedemptionStatus.Pending) {
@@ -894,11 +924,14 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         }
     }
     
-    /// @notice Get active redemption IDs for a wallet
+    /// @notice Get all redemption IDs for a wallet
     /// @param walletAddress The Bitcoin wallet address to check
-    /// @return redemptionIds Array of redemption IDs
-    /// @dev Returns all redemption IDs including fulfilled/defaulted ones
-    ///      Caller should check status to filter active ones
+    /// @return redemptionIds Array of ALL redemption IDs (including fulfilled/defaulted)
+    /// @dev IMPORTANT: Returns all redemption IDs including fulfilled/defaulted ones.
+    ///      Array never shrinks, so this includes historical redemptions.
+    ///      Caller must check redemption status to filter active ones.
+    ///      For active count only, use getWalletPendingRedemptionCount() instead.
+    /// @notice GAS WARNING: Array size grows over time and never shrinks.
     function getWalletRedemptions(string calldata walletAddress)
         external
         view
