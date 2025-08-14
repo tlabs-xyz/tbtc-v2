@@ -223,7 +223,7 @@ describe("QCRedeemer", () => {
     })
 
     context("when all validations pass", () => {
-      let tx: any
+      let tx: any // ContractTransaction
       let redemptionId: string
       let usedBtc: string
 
@@ -234,7 +234,7 @@ describe("QCRedeemer", () => {
           .initiateRedemption(qcAddress.address, redemptionAmount, usedBtc)
         const receipt = await tx.wait()
         const event = receipt.events?.find(
-          (e: any) => e.event === "RedemptionRequested"
+          (e: any) => e.event === "RedemptionRequested" // Event interface
         )
         redemptionId = event?.args?.redemptionId
       })
@@ -280,7 +280,7 @@ describe("QCRedeemer", () => {
           )
         const receipt2 = await tx2.wait()
         const event2 = receipt2.events?.find(
-          (e: any) => e.event === "RedemptionRequested"
+          (e: any) => e.event === "RedemptionRequested" // Event interface
         )
         const redemptionId2 = event2?.args?.redemptionId
         expect(redemptionId).to.not.equal(redemptionId2)
@@ -389,7 +389,7 @@ describe("QCRedeemer", () => {
     })
 
     context("when called by arbiter with valid redemption", () => {
-      let tx: any
+      let tx: any // ContractTransaction
 
       beforeEach(async () => {
         // Use mock data for successful test - SPV validation will be skipped with mock data
@@ -485,7 +485,7 @@ describe("QCRedeemer", () => {
     })
 
     context("when called by arbiter with valid redemption", () => {
-      let tx: any
+      let tx: any // ContractTransaction
 
       beforeEach(async () => {
         tx = await qcRedeemer
@@ -619,7 +619,7 @@ describe("QCRedeemer", () => {
           )
         const receipt = await tx.wait()
         const event = receipt.events?.find(
-          (e: any) => e.event === "RedemptionRequested"
+          (e: any) => e.event === "RedemptionRequested" // Event interface
         )
         redemptionId = event?.args?.redemptionId
       })
@@ -691,7 +691,7 @@ describe("QCRedeemer", () => {
           )
         const receipt = await tx.wait()
         const event = receipt.events?.find(
-          (e: any) => e.event === "RedemptionRequested"
+          (e: any) => e.event === "RedemptionRequested" // Event interface
         )
         redemptionId = event?.args?.redemptionId
       })

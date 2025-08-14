@@ -125,7 +125,7 @@ describe("WatchdogEnforcer", () => {
   describe("enforceObjectiveViolation", () => {
     context("when enforcing insufficient reserves", () => {
       context("when QC has insufficient reserves", () => {
-        let tx: any
+        let tx: any // ContractTransaction
 
         beforeEach(async () => {
           // Setup: reserves < minted amount
@@ -228,7 +228,7 @@ describe("WatchdogEnforcer", () => {
 
     context("when enforcing stale attestations", () => {
       context("when attestations are stale", () => {
-        let tx: any
+        let tx: any // ContractTransaction
 
         beforeEach(async () => {
           // Setup: stale attestations
