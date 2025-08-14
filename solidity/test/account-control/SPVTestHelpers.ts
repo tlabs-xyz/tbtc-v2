@@ -151,9 +151,7 @@ class SPVTestHelpers {
       emptyInputs: {
         version: "0x02000000",
         inputVector: "0x00",
-        outputVector: `${"0x01" + "00e1f50500000000" + "1976a914"}${"a".repeat(
-          40
-        )}88ac`,
+        outputVector: `${"0x0100e1f505000000001976a914"}${"a".repeat(40)}88ac`,
         locktime: "0x00000000",
       },
 
@@ -169,9 +167,7 @@ class SPVTestHelpers {
       invalidVersion: {
         version: "0x00000000", // Version 0 is invalid
         inputVector: `0x01${"a".repeat(72)}ffffffff`,
-        outputVector: `${"0x01" + "00e1f50500000000" + "1976a914"}${"a".repeat(
-          40
-        )}88ac`,
+        outputVector: `${"0x0100e1f505000000001976a914"}${"a".repeat(40)}88ac`,
         locktime: "0x00000000",
       },
     }

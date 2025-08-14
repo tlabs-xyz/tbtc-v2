@@ -33,11 +33,7 @@ const func: DeployFunction = async function DeployAccountControlState(
   // Deploy QCManager - Unified business logic with state management and pause credits, message signing support
   const qcManager = await deploy("QCManager", {
     from: deployer,
-    args: [
-      qcData.address,
-      systemState.address,
-      reserveOracle.address,
-    ],
+    args: [qcData.address, systemState.address, reserveOracle.address],
     log: true,
     waitConfirmations: network.live ? 5 : 1,
   })

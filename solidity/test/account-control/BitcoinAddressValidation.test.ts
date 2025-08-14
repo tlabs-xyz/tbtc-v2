@@ -17,7 +17,7 @@ describe("Bitcoin Address Validation Integration", () => {
 
   before(async () => {
     const signers = await ethers.getSigners()
-    deployer = signers[0]
+    ;[deployer] = signers
 
     // Deploy mock dependencies for QCRedeemer
     const MockTBTC = await ethers.getContractFactory("MockTBTCToken")
@@ -36,7 +36,7 @@ describe("Bitcoin Address Validation Integration", () => {
     // Deploy SPV libraries for QCRedeemer
     const SharedSPVCoreLib = await ethers.getContractFactory("SharedSPVCore")
     const sharedSPVCoreLib = await SharedSPVCoreLib.deploy()
-    
+
     const QCRedeemerSPVLib = await ethers.getContractFactory("QCRedeemerSPV", {
       libraries: {
         SharedSPVCore: sharedSPVCoreLib.address,
