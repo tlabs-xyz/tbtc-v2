@@ -14,6 +14,9 @@ import {MessageSigning} from "./libraries/MessageSigning.sol";
 interface IQCRedeemer {
     function hasUnfulfilledRedemptions(address qc) external view returns (bool);
     function getEarliestRedemptionDeadline(address qc) external view returns (uint256);
+    function hasWalletObligations(string calldata walletAddress) external view returns (bool);
+    function getWalletPendingRedemptionCount(string calldata walletAddress) external view returns (uint256);
+    function getWalletEarliestRedemptionDeadline(string calldata walletAddress) external view returns (uint256);
 }
 
 /// @title QCManager
@@ -43,22 +46,21 @@ interface IQCRedeemer {
 ///
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles and update system configurations
-/// - QC_ADMIN_ROLE: Can update minting amounts, request wallet deregistration
+/// - GOVERNANCE_ROLE: Can register QCs, manage minting capacity, update minting amounts
 /// - REGISTRAR_ROLE: Can register/deregister wallets with message signature verification
-/// - ARBITER_ROLE: Can pause QCs, change status, verify solvency, handle defaults (emergency response)
-/// - WATCHDOG_ENFORCER_ROLE: Can request status changes to UnderReview (limited authority)
-/// - QC_GOVERNANCE_ROLE: Can register QCs and manage minting capacity (instant actions)
-/// - WATCHDOG_ROLE: Can check QC escalations and trigger auto-escalation
-/// - PAUSER_ROLE: Can clear emergency pauses and restore credits
+/// - DISPUTE_ARBITER_ROLE: Can pause QCs, change status, verify solvency, handle defaults (emergency response)
+/// - ENFORCEMENT_ROLE: Can request status changes to UnderReview (limited authority)
+/// - MONITOR_ROLE: Can check QC escalations and trigger auto-escalation
+/// - EMERGENCY_ROLE: Can clear emergency pauses and restore credits
 contract QCManager is AccessControl, ReentrancyGuard {
     
-    bytes32 public constant QC_ADMIN_ROLE = keccak256("QC_ADMIN_ROLE");
+    bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
-    bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
-    bytes32 public constant WATCHDOG_ENFORCER_ROLE =
-        keccak256("WATCHDOG_ENFORCER_ROLE");
-    bytes32 public constant WATCHDOG_ROLE = keccak256("WATCHDOG_ROLE");
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant DISPUTE_ARBITER_ROLE = keccak256("DISPUTE_ARBITER_ROLE");
+    bytes32 public constant ENFORCEMENT_ROLE =
+        keccak256("ENFORCEMENT_ROLE");
+    bytes32 public constant MONITOR_ROLE = keccak256("MONITOR_ROLE");
+    bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
 
     // =================== STATE MANAGEMENT CONSTANTS ===================
     
@@ -132,8 +134,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
     error EscalationPeriodNotReached();
     error OnlyStateManager();
     
-    bytes32 public constant QC_GOVERNANCE_ROLE =
-        keccak256("QC_GOVERNANCE_ROLE");
 
     // =================== ENUMS AND STRUCTS ===================
     
@@ -379,12 +379,11 @@ contract QCManager is AccessControl, ReentrancyGuard {
         reserveOracle = ReserveOracle(_reserveOracle);
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(QC_ADMIN_ROLE, msg.sender);
+        _grantRole(GOVERNANCE_ROLE, msg.sender);
         _grantRole(REGISTRAR_ROLE, msg.sender);
-        _grantRole(ARBITER_ROLE, msg.sender);
-        _grantRole(QC_GOVERNANCE_ROLE, msg.sender);
-        _grantRole(WATCHDOG_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(DISPUTE_ARBITER_ROLE, msg.sender);
+        _grantRole(MONITOR_ROLE, msg.sender);
+        _grantRole(EMERGENCY_ROLE, msg.sender);
     }
     
     /// @notice Set QCRedeemer contract reference (temporary until full consolidation)
@@ -406,7 +405,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param maxMintingCap Maximum minting capacity for the QC
     function registerQC(address qc, uint256 maxMintingCap)
         external
-        onlyRole(QC_GOVERNANCE_ROLE)
+        onlyRole(GOVERNANCE_ROLE)
         nonReentrant
     {
         if (qc == address(0)) {
@@ -433,7 +432,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param newCap New minting capacity (must be higher than current)
     function increaseMintingCapacity(address qc, uint256 newCap)
         external
-        onlyRole(QC_GOVERNANCE_ROLE)
+        onlyRole(GOVERNANCE_ROLE)
         nonReentrant
     {
         if (qc == address(0)) {
@@ -467,8 +466,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
 
     // =================== OPERATIONAL FUNCTIONS ===================
 
-    /// @notice Change QC status with full authority (ARBITER_ROLE only)
-    /// @dev ARBITER_ROLE has full authority to make any valid status transition.
+    /// @notice Change QC status with full authority (DISPUTE_ARBITER_ROLE only)
+    /// @dev DISPUTE_ARBITER_ROLE has full authority to make any valid status transition.
     ///      This is typically used by governance or emergency response.
     ///      SECURITY: nonReentrant protects against reentrancy via QCData external calls
     /// @param qc The address of the QC
@@ -480,18 +479,18 @@ contract QCManager is AccessControl, ReentrancyGuard {
         bytes32 reason
     )
         external
-        onlyRole(ARBITER_ROLE)
+        onlyRole(DISPUTE_ARBITER_ROLE)
         nonReentrant
     {
         _executeStatusChange(qc, newStatus, reason, "ARBITER");
     }
 
-    /// @notice Request status change from WatchdogEnforcer (WATCHDOG_ENFORCER_ROLE only)
-    /// @dev WATCHDOG_ENFORCER_ROLE has LIMITED authority - can ONLY set QCs to UnderReview.
+    /// @notice Request status change from WatchdogEnforcer (ENFORCEMENT_ROLE only)
+    /// @dev ENFORCEMENT_ROLE has LIMITED authority - can ONLY set QCs to UnderReview.
     ///      This design provides automated detection with human oversight:
     ///      - Watchdog detects objective violations (insufficient reserves, stale attestations)
     ///      - Sets QC to UnderReview (temporary suspension) to prevent further minting
-    ///      - Human governance (ARBITER_ROLE) reviews and decides final outcome
+    ///      - Human governance (DISPUTE_ARBITER_ROLE) reviews and decides final outcome
     ///      This prevents false positives from permanently damaging QCs while ensuring rapid response.
     ///      SECURITY: nonReentrant protects against reentrancy via QCData external calls
     /// @param qc The address of the QC
@@ -503,7 +502,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         bytes32 reason
     )
         external
-        onlyRole(WATCHDOG_ENFORCER_ROLE)
+        onlyRole(ENFORCEMENT_ROLE)
         nonReentrant
     {
         // AUTHORITY VALIDATION: WatchdogEnforcer can only set QCs to UnderReview
@@ -761,11 +760,19 @@ contract QCManager is AccessControl, ReentrancyGuard {
         if (qc == address(0)) {
             revert WalletNotRegistered(btcAddress);
         }
-        if (msg.sender != qc && !hasRole(QC_ADMIN_ROLE, msg.sender)) {
+        if (msg.sender != qc && !hasRole(GOVERNANCE_ROLE, msg.sender)) {
             revert NotAuthorizedForWalletDeregistration(msg.sender);
         }
         if (qcData.getWalletStatus(btcAddress) != QCData.WalletStatus.Active) {
             revert WalletNotActive(btcAddress);
+        }
+        
+        // NEW: Check if wallet has pending redemption obligations
+        if (address(qcRedeemer) != address(0)) {
+            require(
+                !IQCRedeemer(address(qcRedeemer)).hasWalletObligations(btcAddress),
+                "Cannot deregister: wallet has pending redemptions"
+            );
         }
 
         qcData.requestWalletDeRegistration(btcAddress);
@@ -860,7 +867,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         nonReentrant
         returns (bool solvent)
     {
-        if (!hasRole(ARBITER_ROLE, msg.sender)) {
+        if (!hasRole(DISPUTE_ARBITER_ROLE, msg.sender)) {
             revert NotAuthorizedForSolvency(msg.sender);
         }
 
@@ -903,7 +910,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param newAmount The new total minted amount
     function updateQCMintedAmount(address qc, uint256 newAmount)
         external
-        onlyRole(QC_ADMIN_ROLE)
+        onlyRole(GOVERNANCE_ROLE)
         nonReentrant
     {
         if (!qcData.isQCRegistered(qc)) {
@@ -1101,7 +1108,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param qcAddresses Array of QC addresses to check
     function checkQCEscalations(address[] calldata qcAddresses) 
         external 
-        onlyRole(WATCHDOG_ROLE) 
+        onlyRole(MONITOR_ROLE) 
         nonReentrant 
     {
         for (uint256 i = 0; i < qcAddresses.length; i++) {
@@ -1142,7 +1149,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param redemptionId ID of the defaulted redemption
     function handleRedemptionDefault(address qc, bytes32 redemptionId)
         external
-        onlyRole(ARBITER_ROLE)
+        onlyRole(DISPUTE_ARBITER_ROLE)
         nonReentrant
     {
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
@@ -1178,7 +1185,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param qc QC address to clear
     function clearQCBacklog(address qc) 
         external 
-        onlyRole(ARBITER_ROLE) 
+        onlyRole(DISPUTE_ARBITER_ROLE) 
         nonReentrant 
     {
         // Check for pending redemptions
@@ -1276,7 +1283,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param reason Reason for clearing
     function emergencyClearPause(address qc, string calldata reason) 
         external 
-        onlyRole(PAUSER_ROLE) 
+        onlyRole(EMERGENCY_ROLE) 
     {
         PauseCredit storage credit = pauseCredits[qc];
         
@@ -1298,7 +1305,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param qc QC address
     function grantInitialCredit(address qc) 
         external 
-        onlyRole(PAUSER_ROLE) 
+        onlyRole(EMERGENCY_ROLE) 
     {
         // Verify QC is registered
         if (!qcData.isQCRegistered(qc)) {

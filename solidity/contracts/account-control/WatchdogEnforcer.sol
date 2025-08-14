@@ -31,6 +31,9 @@ import "./SystemState.sol";
 ///      3. If watchdogs are offline/inactive, any participant can enforce violations
 ///      4. All enforcement attempts are logged via events for transparency
 contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
+    // Role definitions
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    
     // Reason codes for objective violations
     bytes32 public constant INSUFFICIENT_RESERVES =
         keccak256("INSUFFICIENT_RESERVES");
@@ -38,8 +41,6 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         keccak256("STALE_ATTESTATIONS");
     bytes32 public constant SUSTAINED_RESERVE_VIOLATION =
         keccak256("SUSTAINED_RESERVE_VIOLATION");
-
-    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     // Escalation parameters
     uint256 public constant ESCALATION_DELAY = 45 minutes;
