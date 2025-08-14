@@ -34,8 +34,8 @@ describe("QCRedeemer", () => {
   let testRelay: TestRelay
 
   // Roles
-  let REDEEMER_ROLE: string
-  let ARBITER_ROLE: string
+  let DISPUTE_ARBITER_ROLE: string
+  let DISPUTE_ARBITER_ROLE: string
 
   // Bitcoin addresses for testing
   const validLegacyBtc = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
@@ -57,8 +57,8 @@ describe("QCRedeemer", () => {
     thirdParty = thirdPartySigner
 
     // Generate role hashes
-    REDEEMER_ROLE = ethers.utils.id("REDEEMER_ROLE")
-    ARBITER_ROLE = ethers.utils.id("ARBITER_ROLE")
+    DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE")
+    DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE")
   })
 
   beforeEach(async () => {
@@ -109,7 +109,7 @@ describe("QCRedeemer", () => {
     await qcRedeemer.deployed()
 
     // Grant roles
-    await qcRedeemer.grantRole(ARBITER_ROLE, watchdog.address)
+    await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, watchdog.address)
 
     // Setup default mocks for validation
     mockSystemState.isRedemptionPaused.returns(false)
@@ -137,17 +137,21 @@ describe("QCRedeemer", () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
       expect(await qcRedeemer.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to
         .be.true
-      expect(await qcRedeemer.hasRole(REDEEMER_ROLE, deployer.address)).to.be
-        .true
-      expect(await qcRedeemer.hasRole(ARBITER_ROLE, deployer.address)).to.be
-        .true
+      expect(await qcRedeemer.hasRole(DISPUTE_ARBITER_ROLE, deployer.address))
+        .to.be.true
+      expect(await qcRedeemer.hasRole(DISPUTE_ARBITER_ROLE, deployer.address))
+        .to.be.true
     })
   })
 
   describe("Role Constants", () => {
     it("should have correct role constants", async () => {
-      expect(await qcRedeemer.REDEEMER_ROLE()).to.equal(REDEEMER_ROLE)
-      expect(await qcRedeemer.ARBITER_ROLE()).to.equal(ARBITER_ROLE)
+      expect(await qcRedeemer.DISPUTE_ARBITER_ROLE()).to.equal(
+        DISPUTE_ARBITER_ROLE
+      )
+      expect(await qcRedeemer.DISPUTE_ARBITER_ROLE()).to.equal(
+        DISPUTE_ARBITER_ROLE
+      )
       // REDEMPTION_POLICY_KEY and TBTC_TOKEN_KEY removed with direct implementation
     })
   })
@@ -358,7 +362,7 @@ describe("QCRedeemer", () => {
               mockSpvData.proof
             )
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
         )
       })
     })
@@ -454,7 +458,7 @@ describe("QCRedeemer", () => {
             .connect(thirdParty)
             .flagDefaultedRedemption(redemptionId, defaultReason)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
         )
       })
     })
@@ -603,7 +607,7 @@ describe("QCRedeemer", () => {
   })
 
   describe("Access Control", () => {
-    context("ARBITER_ROLE functions", () => {
+    context("DISPUTE_ARBITER_ROLE functions", () => {
       let redemptionId: string
       const spvProof = ethers.utils.toUtf8Bytes("mock_spv_proof")
       const defaultReason = ethers.utils.id("TIMEOUT")
@@ -660,7 +664,7 @@ describe("QCRedeemer", () => {
               mockSpvData.proof
             )
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
         )
       })
 
@@ -670,7 +674,7 @@ describe("QCRedeemer", () => {
             .connect(thirdParty)
             .flagDefaultedRedemption(redemptionId, defaultReason)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${ARBITER_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
         )
       })
     })

@@ -284,8 +284,8 @@ describe("SPV Library Integration", () => {
     })
 
     it("should delegate SPV validation to QCRedeemerSPV library", async () => {
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       const txInfo = {
         version: ValidMainnetProof.txInfo.version,
@@ -317,8 +317,8 @@ describe("SPV Library Integration", () => {
     })
 
     it("should propagate library errors correctly", async () => {
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       const txInfo = {
         version: "0x01000000",
@@ -348,8 +348,8 @@ describe("SPV Library Integration", () => {
     })
 
     it("should validate transaction structure through library", async () => {
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       // Create transaction that passes SPV but fails transaction validation
       const txInfo = {
@@ -446,8 +446,8 @@ describe("SPV Library Integration", () => {
       const redemptionId = qcRedeemer.interface.parseLog(event as any)?.args
         .redemptionId
 
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       // Test SPVErr(4) - Mismatched proof lengths
       const txInfo = {
@@ -544,8 +544,8 @@ describe("SPV Library Integration", () => {
       const redemptionId = qcRedeemer.interface.parseLog(event as any)?.args
         .redemptionId
 
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       const txInfo = {
         version: "0x02000000",

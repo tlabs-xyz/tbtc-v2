@@ -29,7 +29,7 @@ describe("WatchdogEnforcer", () => {
 
   // Roles
   let MANAGER_ROLE: string
-  let WATCHDOG_ENFORCER_ROLE: string
+  let ENFORCEMENT_ROLE: string
 
   // Reason codes
   let INSUFFICIENT_RESERVES: string
@@ -50,7 +50,7 @@ describe("WatchdogEnforcer", () => {
 
     // Generate role hashes
     MANAGER_ROLE = ethers.utils.id("MANAGER_ROLE")
-    WATCHDOG_ENFORCER_ROLE = ethers.utils.id("WATCHDOG_ENFORCER_ROLE")
+    ENFORCEMENT_ROLE = ethers.utils.id("ENFORCEMENT_ROLE")
 
     // Generate reason codes
     INSUFFICIENT_RESERVES = ethers.utils.id("INSUFFICIENT_RESERVES")

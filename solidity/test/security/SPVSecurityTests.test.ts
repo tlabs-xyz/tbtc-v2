@@ -170,8 +170,8 @@ describe("SPV Security Tests", () => {
     it("should prevent reuse of same transaction for multiple redemptions", async () => {
       // Attack: Try to use same Bitcoin transaction to fulfill multiple redemptions
 
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       // Create two separate redemptions
       const tx1 = await qcRedeemer
@@ -237,8 +237,8 @@ describe("SPV Security Tests", () => {
       // Attack: Use very old Bitcoin transaction for recent redemption
       // Our _validateRedemptionTransaction includes timestamp validation (currently stubbed)
 
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       const tx = await qcRedeemer
         .connect(user)
@@ -341,8 +341,8 @@ describe("SPV Security Tests", () => {
     it("should prevent dust amount attacks", async () => {
       // Attack: Try to fulfill redemption with dust payment below threshold
 
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       const tx = await qcRedeemer
         .connect(user)
@@ -397,8 +397,8 @@ describe("SPV Security Tests", () => {
     it("should prevent payment to wrong address attacks", async () => {
       // Attack: Provide transaction that pays to different address than specified
 
-      const ARBITER_ROLE = await qcRedeemer.ARBITER_ROLE()
-      await qcRedeemer.grantRole(ARBITER_ROLE, deployer.address)
+      const DISPUTE_ARBITER_ROLE = await qcRedeemer.DISPUTE_ARBITER_ROLE()
+      await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
 
       const tx = await qcRedeemer
         .connect(user)

@@ -18,11 +18,11 @@ describe("SystemState Security Tests", () => {
 
   // Role constants
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-  const PARAMETER_ADMIN_ROLE = ethers.utils.keccak256(
-    ethers.utils.toUtf8Bytes("PARAMETER_ADMIN_ROLE")
+  const OPERATIONS_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("OPERATIONS_ROLE")
   )
-  const PAUSER_ROLE = ethers.utils.keccak256(
-    ethers.utils.toUtf8Bytes("PAUSER_ROLE")
+  const EMERGENCY_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("EMERGENCY_ROLE")
   )
 
   async function fixture() {
@@ -35,8 +35,8 @@ describe("SystemState Security Tests", () => {
 
     // Setup roles
     await systemState.grantRole(DEFAULT_ADMIN_ROLE, governance.address)
-    await systemState.grantRole(PAUSER_ROLE, pauser.address)
-    await systemState.grantRole(PARAMETER_ADMIN_ROLE, paramAdmin.address)
+    await systemState.grantRole(EMERGENCY_ROLE, pauser.address)
+    await systemState.grantRole(OPERATIONS_ROLE, paramAdmin.address)
 
     return {
       deployer,
@@ -64,12 +64,12 @@ describe("SystemState Security Tests", () => {
 
   describe("Pause Mechanism Security", () => {
     describe("Access Control", () => {
-      it("should only allow PAUSER_ROLE to pause operations", async () => {
+      it("should only allow EMERGENCY_ROLE to pause operations", async () => {
         // Attacker cannot pause
         await expect(
           systemState.connect(attacker).pauseMinting()
         ).to.be.revertedWith(
-          `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
+          `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
         )
 
         // Pauser can pause
@@ -78,14 +78,14 @@ describe("SystemState Security Tests", () => {
           .withArgs(pauser.address)
       })
 
-      it("should only allow PAUSER_ROLE to unpause operations", async () => {
+      it("should only allow EMERGENCY_ROLE to unpause operations", async () => {
         await systemState.connect(pauser).pauseMinting()
 
         // Attacker cannot unpause
         await expect(
           systemState.connect(attacker).unpauseMinting()
         ).to.be.revertedWith(
-          `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
+          `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
         )
 
         // Pauser can unpause
@@ -171,10 +171,10 @@ describe("SystemState Security Tests", () => {
 
     describe("Concurrent Pause Attempts", () => {
       it("should handle concurrent pause attempts safely", async () => {
-        // Grant PAUSER_ROLE to multiple addresses
+        // Grant EMERGENCY_ROLE to multiple addresses
         await systemState
           .connect(governance)
-          .grantRole(PAUSER_ROLE, emergencyCouncil.address)
+          .grantRole(EMERGENCY_ROLE, emergencyCouncil.address)
 
         // First pause succeeds
         await systemState.connect(pauser).pauseMinting()
@@ -274,7 +274,7 @@ describe("SystemState Security Tests", () => {
           .connect(attacker)
           .setEmergencyCouncil(emergencyCouncil.address)
       ).to.be.revertedWith(
-        `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${PARAMETER_ADMIN_ROLE}`
+        `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
       )
     })
 

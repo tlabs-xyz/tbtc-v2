@@ -15,8 +15,8 @@ describe("SystemState", () => {
   let systemState: SystemState
 
   // Roles
-  let PAUSER_ROLE: string
-  let PARAMETER_ADMIN_ROLE: string
+  let EMERGENCY_ROLE: string
+  let OPERATIONS_ROLE: string
 
   // Test parameters
   const testMinMintAmount = ethers.utils.parseEther("0.1")
@@ -39,8 +39,8 @@ describe("SystemState", () => {
     thirdParty = thirdPartySigner
 
     // Generate role hashes
-    PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")
-    PARAMETER_ADMIN_ROLE = ethers.utils.id("PARAMETER_ADMIN_ROLE")
+    EMERGENCY_ROLE = ethers.utils.id("EMERGENCY_ROLE")
+    OPERATIONS_ROLE = ethers.utils.id("OPERATIONS_ROLE")
   })
 
   beforeEach(async () => {
@@ -52,8 +52,8 @@ describe("SystemState", () => {
     await systemState.deployed()
 
     // Grant roles
-    await systemState.grantRole(PAUSER_ROLE, pauserAccount.address)
-    await systemState.grantRole(PARAMETER_ADMIN_ROLE, adminAccount.address)
+    await systemState.grantRole(EMERGENCY_ROLE, pauserAccount.address)
+    await systemState.grantRole(OPERATIONS_ROLE, adminAccount.address)
   })
 
   afterEach(async () => {
@@ -65,17 +65,15 @@ describe("SystemState", () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
       expect(await systemState.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to
         .be.true
-      expect(await systemState.hasRole(PAUSER_ROLE, deployer.address)).to.be
+      expect(await systemState.hasRole(EMERGENCY_ROLE, deployer.address)).to.be
         .true
-      expect(await systemState.hasRole(PARAMETER_ADMIN_ROLE, deployer.address))
-        .to.be.true
+      expect(await systemState.hasRole(OPERATIONS_ROLE, deployer.address)).to.be
+        .true
     })
 
     it("should have correct role constants", async () => {
-      expect(await systemState.PAUSER_ROLE()).to.equal(PAUSER_ROLE)
-      expect(await systemState.PARAMETER_ADMIN_ROLE()).to.equal(
-        PARAMETER_ADMIN_ROLE
-      )
+      expect(await systemState.EMERGENCY_ROLE()).to.equal(EMERGENCY_ROLE)
+      expect(await systemState.OPERATIONS_ROLE()).to.equal(OPERATIONS_ROLE)
     })
 
     it("should initialize with default values", async () => {
@@ -238,7 +236,7 @@ describe("SystemState", () => {
         await expect(
           systemState.connect(thirdParty).pauseMinting()
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
         )
       })
 
@@ -246,7 +244,7 @@ describe("SystemState", () => {
         await expect(
           systemState.connect(thirdParty).pauseRedemption()
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
         )
       })
 
@@ -254,7 +252,7 @@ describe("SystemState", () => {
         await expect(
           systemState.connect(thirdParty).pauseWalletRegistration()
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
         )
       })
     })
@@ -490,22 +488,22 @@ describe("SystemState", () => {
             .withArgs(oldCouncil, newCouncil.address, deployer.address)
         })
 
-        it("should grant PAUSER_ROLE to new council", async () => {
+        it("should grant EMERGENCY_ROLE to new council", async () => {
           await systemState
             .connect(deployer)
             .setEmergencyCouncil(newCouncil.address)
 
-          expect(await systemState.hasRole(PAUSER_ROLE, newCouncil.address)).to
-            .be.true
+          expect(await systemState.hasRole(EMERGENCY_ROLE, newCouncil.address))
+            .to.be.true
         })
 
-        it("should revoke PAUSER_ROLE from old council", async () => {
+        it("should revoke EMERGENCY_ROLE from old council", async () => {
           // First set a council
           await systemState
             .connect(deployer)
             .setEmergencyCouncil(newCouncil.address)
-          expect(await systemState.hasRole(PAUSER_ROLE, newCouncil.address)).to
-            .be.true
+          expect(await systemState.hasRole(EMERGENCY_ROLE, newCouncil.address))
+            .to.be.true
 
           // Then change to another council
           const anotherCouncil = thirdParty
@@ -513,10 +511,11 @@ describe("SystemState", () => {
             .connect(deployer)
             .setEmergencyCouncil(anotherCouncil.address)
 
-          expect(await systemState.hasRole(PAUSER_ROLE, newCouncil.address)).to
-            .be.false
-          expect(await systemState.hasRole(PAUSER_ROLE, anotherCouncil.address))
-            .to.be.true
+          expect(await systemState.hasRole(EMERGENCY_ROLE, newCouncil.address))
+            .to.be.false
+          expect(
+            await systemState.hasRole(EMERGENCY_ROLE, anotherCouncil.address)
+          ).to.be.true
         })
 
         it("should revert with zero address", async () => {
@@ -546,7 +545,7 @@ describe("SystemState", () => {
         await expect(
           systemState.connect(thirdParty).setMinMintAmount(testMinMintAmount)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PARAMETER_ADMIN_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
 
@@ -554,7 +553,7 @@ describe("SystemState", () => {
         await expect(
           systemState.connect(thirdParty).setMaxMintAmount(testMaxMintAmount)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PARAMETER_ADMIN_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
 
@@ -564,7 +563,7 @@ describe("SystemState", () => {
             .connect(thirdParty)
             .setRedemptionTimeout(testRedemptionTimeout)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PARAMETER_ADMIN_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
 
@@ -572,7 +571,7 @@ describe("SystemState", () => {
         await expect(
           systemState.connect(thirdParty).setStaleThreshold(testStaleThreshold)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PARAMETER_ADMIN_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
 
@@ -580,7 +579,7 @@ describe("SystemState", () => {
         await expect(
           systemState.connect(thirdParty).setWalletRegistrationDelay(3600)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PARAMETER_ADMIN_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
 
@@ -588,7 +587,7 @@ describe("SystemState", () => {
         await expect(
           systemState.connect(thirdParty).setEmergencyPauseDuration(86400)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${PARAMETER_ADMIN_ROLE}`
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
     })
@@ -641,10 +640,10 @@ describe("SystemState", () => {
   describe("Access Control", () => {
     context("role management", () => {
       it("should allow admin to grant pauser role", async () => {
-        await systemState.grantRole(PAUSER_ROLE, thirdParty.address)
+        await systemState.grantRole(EMERGENCY_ROLE, thirdParty.address)
 
-        expect(await systemState.hasRole(PAUSER_ROLE, thirdParty.address)).to.be
-          .true
+        expect(await systemState.hasRole(EMERGENCY_ROLE, thirdParty.address)).to
+          .be.true
 
         // Third party should now be able to pause
         await systemState.connect(thirdParty).pauseMinting()
@@ -652,11 +651,10 @@ describe("SystemState", () => {
       })
 
       it("should allow admin to grant parameter admin role", async () => {
-        await systemState.grantRole(PARAMETER_ADMIN_ROLE, thirdParty.address)
+        await systemState.grantRole(OPERATIONS_ROLE, thirdParty.address)
 
-        expect(
-          await systemState.hasRole(PARAMETER_ADMIN_ROLE, thirdParty.address)
-        ).to.be.true
+        expect(await systemState.hasRole(OPERATIONS_ROLE, thirdParty.address))
+          .to.be.true
 
         // Third party should now be able to set parameters
         await systemState
@@ -666,15 +664,15 @@ describe("SystemState", () => {
       })
 
       it("should allow admin to revoke roles", async () => {
-        await systemState.revokeRole(PAUSER_ROLE, pauserAccount.address)
+        await systemState.revokeRole(EMERGENCY_ROLE, pauserAccount.address)
 
-        expect(await systemState.hasRole(PAUSER_ROLE, pauserAccount.address)).to
-          .be.false
+        expect(await systemState.hasRole(EMERGENCY_ROLE, pauserAccount.address))
+          .to.be.false
 
         await expect(
           systemState.connect(pauserAccount).pauseMinting()
         ).to.be.revertedWith(
-          `AccessControl: account ${pauserAccount.address.toLowerCase()} is missing role ${PAUSER_ROLE}`
+          `AccessControl: account ${pauserAccount.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
         )
       })
     })
@@ -947,7 +945,7 @@ describe("SystemState", () => {
 
       context("when called by admin", () => {
         it("should work if admin also has pauser role", async () => {
-          await systemState.grantRole(PAUSER_ROLE, adminAccount.address)
+          await systemState.grantRole(EMERGENCY_ROLE, adminAccount.address)
 
           await expect(
             systemState
@@ -1171,7 +1169,7 @@ describe("SystemState", () => {
         it("should allow emergency council to pause if granted pauser role", async () => {
           const emergencyCouncil = thirdParty
           await systemState.setEmergencyCouncil(emergencyCouncil.address)
-          await systemState.grantRole(PAUSER_ROLE, emergencyCouncil.address)
+          await systemState.grantRole(EMERGENCY_ROLE, emergencyCouncil.address)
 
           await expect(
             systemState
@@ -1344,7 +1342,7 @@ describe("SystemState", () => {
             .emergencyPauseQC(testQC, testReason)
 
           // Grant pauser role to new account
-          await systemState.grantRole(PAUSER_ROLE, newPauser.address)
+          await systemState.grantRole(EMERGENCY_ROLE, newPauser.address)
 
           // New pauser should be able to unpause
           await expect(
