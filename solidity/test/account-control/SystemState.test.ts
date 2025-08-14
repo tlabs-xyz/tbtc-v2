@@ -473,7 +473,7 @@ describe("SystemState", () => {
         let newCouncil: SignerWithAddress
 
         beforeEach(async () => {
-          [, , , , , newCouncil] = await ethers.getSigners();
+          ;[, , , , , newCouncil] = await ethers.getSigners()
         })
 
         it("should update emergency council successfully", async () => {

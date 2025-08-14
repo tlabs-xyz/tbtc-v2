@@ -269,7 +269,7 @@ describe("QCManager", () => {
       // Setup registered QC
       mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
       mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(0) // Active
-      
+
       // Note: Wallet ownership verification now happens on-chain via MessageSigning.verifyBitcoinSignature()
       // No mocking needed - the library will validate signature format and return true for valid signatures
     })
@@ -277,7 +277,7 @@ describe("QCManager", () => {
     context("when called by registrar with verified wallet ownership", () => {
       it("should register wallet successfully", async () => {
         const challenge = ethers.utils.id("test_challenge")
-        const mockSignature = "0x" + "aa".repeat(65) // Mock 65-byte signature
+        const mockSignature = `0x${"aa".repeat(65)}` // Mock 65-byte signature
 
         const tx = await qcManager
           .connect(registrar)
@@ -302,8 +302,8 @@ describe("QCManager", () => {
           .returns(false)
 
         const challenge = ethers.utils.id("test_challenge")
-        const mockSignature = "0x" + "aa".repeat(65)
-        
+        const mockSignature = `0x${"aa".repeat(65)}`
+
         await expect(
           qcManager
             .connect(registrar)
@@ -318,24 +318,19 @@ describe("QCManager", () => {
 
       it("should revert with invalid wallet address", async () => {
         const challenge = ethers.utils.id("test_challenge")
-        const mockSignature = "0x" + "aa".repeat(65)
-        
+        const mockSignature = `0x${"aa".repeat(65)}`
+
         await expect(
           qcManager
             .connect(registrar)
-            .registerWallet(
-              qcAddress.address,
-              "",
-              challenge,
-              mockSignature
-            )
+            .registerWallet(qcAddress.address, "", challenge, mockSignature)
         ).to.be.revertedWith("InvalidWalletAddress")
       })
 
       it("should revert with invalid signature format", async () => {
         const challenge = ethers.utils.id("test_challenge")
-        const invalidSignature = "0x" + "aa".repeat(32) // Invalid length (32 bytes instead of 65)
-        
+        const invalidSignature = `0x${"aa".repeat(32)}` // Invalid length (32 bytes instead of 65)
+
         await expect(
           qcManager
             .connect(registrar)
@@ -352,8 +347,8 @@ describe("QCManager", () => {
     context("when called by non-registrar", () => {
       it("should revert", async () => {
         const challenge = ethers.utils.id("test_challenge")
-        const mockSignature = "0x" + "aa".repeat(65)
-        
+        const mockSignature = `0x${"aa".repeat(65)}`
+
         await expect(
           qcManager
             .connect(user)
@@ -379,13 +374,16 @@ describe("QCManager", () => {
     context("when called by registered QC", () => {
       it("should generate challenge and emit event", async () => {
         const nonce = 12345
-        
+
         const tx = await qcManager
           .connect(qcAddress)
           .requestWalletOwnershipVerification(validBtcAddress, nonce)
-        
-        await expect(tx).to.emit(qcManager, "WalletOwnershipVerificationRequested")
-        
+
+        await expect(tx).to.emit(
+          qcManager,
+          "WalletOwnershipVerificationRequested"
+        )
+
         // Should return a challenge (bytes32)
         const challenge = await qcManager
           .connect(qcAddress)
@@ -395,7 +393,7 @@ describe("QCManager", () => {
 
       it("should revert with invalid wallet address", async () => {
         const nonce = 12345
-        
+
         await expect(
           qcManager
             .connect(qcAddress)
@@ -407,7 +405,7 @@ describe("QCManager", () => {
     context("when called by registrar", () => {
       it("should revert with clear message", async () => {
         const nonce = 12345
-        
+
         await expect(
           qcManager
             .connect(registrar)
@@ -419,7 +417,7 @@ describe("QCManager", () => {
     context("when called by unauthorized user", () => {
       it("should revert", async () => {
         const nonce = 12345
-        
+
         await expect(
           qcManager
             .connect(user)

@@ -48,9 +48,7 @@ describe("SPV Library Integration", () => {
 
   before(async () => {
     const signers = await ethers.getSigners()
-    deployer = signers[0]
-    qc = signers[1]
-    user = signers[2]
+    ;[deployer, qc, user] = signers
 
     // Deploy dependencies first
     const MockTBTC = await ethers.getContractFactory("MockTBTCToken")

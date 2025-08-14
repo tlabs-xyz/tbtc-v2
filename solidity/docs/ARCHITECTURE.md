@@ -217,6 +217,8 @@ registry.setService("MINTING_POLICY", newPolicyAddress);
 
 **Purpose**: Simplified Bitcoin wallet ownership verification using cryptographic message signatures instead of complex SPV proofs
 
+**Important**: Message signatures are used only for **wallet registration**. SPV proofs are still required for **redemption fulfillment** verification.
+
 **MessageSigning.sol Library**:
 - Direct on-chain ECDSA signature verification using `ecrecover`
 - Bitcoin message format compatibility: `"Bitcoin Signed Message:\n" + length + message`
@@ -426,6 +428,20 @@ function verifyBitcoinSignature(
 **Gas Optimization**: Storage layouts and function designs prioritize gas efficiency for institutional users performing frequent operations.
 
 **Message Signing Simplicity**: Bitcoin message signature verification uses standard ECDSA recovery, eliminating complex proof validation infrastructure.
+
+### Dual Bitcoin Verification Approach
+
+The system uses **two different methods** for Bitcoin verification:
+
+1. **Message Signatures**: For wallet registration (proving QC controls Bitcoin addresses)
+   - ✅ 95%+ complexity reduction vs SPV
+   - ✅ 60-80% gas savings
+   - ✅ Direct on-chain verification
+
+2. **SPV Proofs**: For redemption fulfillment (proving QC actually sent Bitcoin to users) 
+   - Uses existing Bridge SPV infrastructure
+   - Required to prove actual Bitcoin transactions occurred
+   - Provides cryptographic proof of payment
 
 **Testing Requirements**: Advanced mocking capabilities needed for comprehensive coverage across multiple blockchain interactions.
 
@@ -1418,9 +1434,10 @@ _executeStatusChange(qc, UnderReview, reason, "SOLVENCY_CHECK")
 **Valid Transitions**
 
 - **Active → UnderReview**: Temporary suspension (any authority)
-- **Active → Revoked**: Permanent termination (ARBITER only)
+- **MintingPaused → UnderReview**: Escalation (any authority)  
+- **Paused → UnderReview**: Escalation (any authority)
 - **UnderReview → Active**: Issues resolved (ARBITER only)
-- **UnderReview → Revoked**: Permanent termination (ARBITER only)
+- **ANY State → Revoked**: Permanent termination (ARBITER only) - Revoked is reachable from all states
 - **Revoked → \***: No transitions (terminal state)
 
 #### Implementation Pattern
