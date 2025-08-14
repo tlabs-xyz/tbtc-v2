@@ -34,7 +34,7 @@ describe("QCRedeemer", () => {
   let testRelay: TestRelay
 
   // Roles
-  let DISPUTE_ARBITER_ROLE: string
+  let DEFAULT_ADMIN_ROLE: string
   let DISPUTE_ARBITER_ROLE: string
 
   // Bitcoin addresses for testing
@@ -57,7 +57,7 @@ describe("QCRedeemer", () => {
     thirdParty = thirdPartySigner
 
     // Generate role hashes
-    DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE")
+    DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
     DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE")
   })
 

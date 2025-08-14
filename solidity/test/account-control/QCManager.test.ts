@@ -72,7 +72,6 @@ describe("QCManager", () => {
     ENFORCEMENT_ROLE = ethers.utils.id("ENFORCEMENT_ROLE")
     MONITOR_ROLE = ethers.utils.id("MONITOR_ROLE")
     EMERGENCY_ROLE = ethers.utils.id("EMERGENCY_ROLE")
-    GOVERNANCE_ROLE = ethers.utils.id("GOVERNANCE_ROLE")
   })
 
   beforeEach(async () => {
