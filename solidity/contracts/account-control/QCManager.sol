@@ -86,6 +86,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     error QCNotRegistered(address qc);
     error QCNotActive(address qc);
     error MessageSignatureVerificationFailed();
+    error NonceAlreadyUsed(address qc, uint256 nonce);
     error NotAuthorizedForSolvency(address caller);
     error QCNotRegisteredForSolvency(address qc);
     error ReasonRequired();
@@ -170,6 +171,11 @@ contract QCManager is AccessControl, ReentrancyGuard {
     // =================== PAUSE CREDIT STORAGE ===================
     
     mapping(address => PauseCredit) public pauseCredits;
+    
+    // =================== WALLET REGISTRATION STORAGE ===================
+    
+    /// @dev Track used nonces for each QC to prevent replay attacks
+    mapping(address => mapping(uint256 => bool)) public usedNonces;
     
     // Temporary reference for QCRedeemer until full consolidation
     IQCRedeemer public qcRedeemer;
@@ -617,6 +623,80 @@ contract QCManager is AccessControl, ReentrancyGuard {
 
         emit WalletRegistrationRequested(
             qc,
+            btcAddress,
+            challenge,
+            msg.sender,
+            block.timestamp
+        );
+    }
+
+    /// @notice Direct wallet registration by QCs themselves (simplified flow)
+    /// @dev This function allows registered QCs to directly register their Bitcoin wallets
+    ///      without requiring a watchdog intermediary. The QC must:
+    ///      1. Be registered and active
+    ///      2. Generate a deterministic challenge off-chain using the same parameters
+    ///      3. Sign the challenge with their Bitcoin private key
+    ///      4. Submit the signature with a unique nonce
+    /// @param btcAddress The Bitcoin address to register
+    /// @param nonce A unique nonce to prevent replay attacks (QC must track their nonces)
+    /// @param signature The Bitcoin message signature proving ownership
+    function registerWalletDirect(
+        string calldata btcAddress,
+        uint256 nonce,
+        bytes calldata signature
+    )
+        external
+        onlyWhenNotPaused("wallet_registration")
+        nonReentrant
+    {
+        // Gate: Only registered, active QCs can register their own wallets
+        if (!qcData.isQCRegistered(msg.sender)) {
+            revert QCNotRegistered(msg.sender);
+        }
+        if (qcData.getQCStatus(msg.sender) != QCData.QCStatus.Active) {
+            revert QCNotActive(msg.sender);
+        }
+
+        // Validate Bitcoin address
+        if (bytes(btcAddress).length == 0) {
+            revert InvalidWalletAddress();
+        }
+
+        // Generate deterministic challenge on-chain
+        // QCs can compute this same challenge off-chain before signing
+        bytes32 challenge = keccak256(
+            abi.encodePacked(
+                "TBTC_QC_WALLET_DIRECT:",
+                msg.sender,
+                btcAddress,
+                nonce,
+                block.chainid  // Prevent cross-chain replay
+            )
+        );
+
+        // Verify Bitcoin signature
+        if (!MessageSigning.verifyBitcoinSignature(btcAddress, challenge, signature)) {
+            emit WalletRegistrationFailed(
+                msg.sender,
+                btcAddress,
+                "DIRECT_SIGNATURE_VERIFICATION_FAILED",
+                msg.sender
+            );
+            revert MessageSignatureVerificationFailed();
+        }
+
+        // Check and mark nonce as used to prevent replay
+        if (usedNonces[msg.sender][nonce]) {
+            revert NonceAlreadyUsed(msg.sender, nonce);
+        }
+        usedNonces[msg.sender][nonce] = true;
+
+        // Register the wallet
+        qcData.registerWallet(msg.sender, btcAddress);
+
+        // Emit success event
+        emit WalletRegistrationRequested(
+            msg.sender,
             btcAddress,
             challenge,
             msg.sender,
