@@ -234,14 +234,14 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 - Redemption initiation with tBTC burning
 - Pending/Fulfilled/Defaulted state management
-- SPV proof verification for fulfillment
+- Message signature verification for fulfillment
 - Timeout and default handling
 
 **Acceptance Criteria**:
 
 - initiateRedemption burns tBTC and creates Pending redemption
 - Collision-resistant redemption IDs using user nonces
-- SPV proof verification for fulfillment confirmation
+- Message signature verification for fulfillment confirmation
 - Automatic default flagging after timeout periods
 
 #### 3.5.2 Delinquency Enforcement (REQ-FUNC-DELIN-001)
@@ -323,7 +323,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - **Hash Functions**: Secure hash functions for all operations
 - **Signature Verification**: Proper validation of all cryptographic signatures
 - **Randomness**: Secure randomness sources for non-deterministic operations
-- **SPV Proofs**: Leverage existing @keep-network/bitcoin-spv-sol libraries
+- **Message Signatures**: Direct Bitcoin message signature verification
 
 ### 4.3 Storage and State Management
 
@@ -377,12 +377,12 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 ### 5.2 Cryptographic Security
 
-#### 5.2.1 SPV Security (REQ-SEC-SPV-001)
+#### 5.2.1 Message Signature Security (REQ-SEC-MSG-001)
 
-- **Proof Validation**: Leverage existing LightRelay for header validation
-- **Challenge Verification**: OP_RETURN challenge verification for wallet control
-- **Confirmation Requirements**: Minimum confirmation depths for security
-- **Replay Prevention**: Transaction hash tracking to prevent replay attacks
+- **Signature Validation**: Bitcoin message signature verification using ECDSA recovery
+- **Challenge Verification**: Message signature challenges for wallet control proof
+- **Address Support**: Support for all Bitcoin address types (P2PKH, P2SH, P2WPKH, P2WSH)
+- **Replay Prevention**: Challenge nonce management to prevent replay attacks
 
 #### 5.2.2 Signature Security (REQ-SEC-SIG-001)
 
@@ -647,7 +647,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 
 **Requirement**: Secure and user-friendly wallet management
 
-- SPV-verified wallet registration with OP_RETURN challenges
+- Message signature-verified wallet registration
 - Two-step deregistration with solvency verification
 - Clear status tracking for all wallet operations
 - Comprehensive error handling and recovery paths
@@ -718,7 +718,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 #### 10.2.1 System Integration (REQ-TEST-INTEGRATION-001)
 
 - **Bank Integration**: Comprehensive testing of Bank interaction patterns
-- **SPV Integration**: Validation of SPV proof verification
+- **Message Signing Integration**: Validation of Bitcoin message signatures
 - **Governance Integration**: Testing of all governance workflows
 - **Monitoring Integration**: Validation of event emission and monitoring
 
@@ -799,7 +799,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 - Direct Bank integration for minting operations
 - Reserve attestation and solvency monitoring system
 - Redemption lifecycle management with default handling
-- SPV-verified wallet management
+- Message signature-verified wallet management
 - Emergency controls and granular pause mechanisms
 - Time-locked governance for critical operations
 - Comprehensive monitoring and event emission
@@ -844,7 +844,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 | Dependency                    | Version        | Criticality | Impact                              |
 | ----------------------------- | -------------- | ----------- | ----------------------------------- |
 | @openzeppelin/contracts       | ^4.8.1         | High        | Security primitives, access control |
-| @keep-network/bitcoin-spv-sol | 3.4.0-solc-0.8 | High        | SPV proof validation                |
+| MessageSigning (native)        | Built-in       | High        | Bitcoin message signature validation |
 | Existing tBTC v2 contracts    | Current        | Critical    | Bank/Vault integration              |
 | Ethereum network              | Mainnet        | Critical    | Platform availability               |
 
@@ -883,7 +883,7 @@ The tBTC v2 Account Control feature introduces "Qualified Custodian" (QC) functi
 | ---------------------------------- | ----------- | -------- | ------------------------------------------------------ |
 | Critical bug in QCMinter           | Medium      | High     | Comprehensive testing, security audits, bug bounty     |
 | Bank integration issues            | Low         | High     | Extensive integration testing, staged deployment       |
-| SPV verification vulnerabilities   | Low         | Critical | Leverage proven SPV infrastructure, additional testing |
+| Message signature vulnerabilities  | Low         | Critical | Leverage proven ECDSA cryptography, additional testing |
 | Gas limit exceeded                 | Low         | Medium   | Gas optimization, transaction batching                 |
 
 #### 14.1.2 Security Risks (REQ-RISK-SECURITY-001)

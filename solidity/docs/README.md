@@ -14,12 +14,9 @@
 ### Core Documentation
 
 
-- **ARCHITECTURE.md** - Technical architecture and design
-
+- **ARCHITECTURE.md** - Technical architecture, design, and security model
 - **REQUIREMENTS.md** - Complete requirements specification
-- **FLOWS.md** - User journeys and operational sequences
-- **SECURITY_ARCHITECTURE.md** - Role-based access control and security
-- **ACCOUNT_CONTROL_AUDIT_TRAIL.md** - Event tracking and compliance
+- **FLOWS.md** - User journeys, operational sequences, and audit trails
 
 ### Watchdog System
 
