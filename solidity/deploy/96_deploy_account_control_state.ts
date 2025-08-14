@@ -27,48 +27,17 @@ const func: DeployFunction = async function DeployAccountControlState(
     waitConfirmations: network.live ? 5 : 1,
   })
 
-  // Get dependencies for QCManager direct injection
+  // Get dependencies for QCManager
   const reserveOracle = await get("ReserveOracle")
-  const lightRelay = await get("LightRelay")
 
-  // Configure SPV parameters based on network
-  // NOTE: SPV infrastructure is 90% complete (post-76ac14f3)
-  // Production deployment requires completing business logic in:
-  // - QCManager._validateWalletControlProof() (OP_RETURN parsing)
-  // - QCRedeemer._verifyRedemptionPayment() (output validation)
-  const txProofDifficultyFactor =
-    network.name === "hardhat" ||
-    network.name === "development" ||
-    network.name === "system_tests"
-      ? 1 // Lower requirement for testing
-      : 6 // Production requirement (6 confirmations)
-
-  // Get SharedSPVCore from previous deployment
-  const sharedSPVCore = await get("SharedSPVCore")
-
-  // Deploy QCManagerSPV library with SharedSPVCore dependency
-  const qcManagerSPV = await deploy("QCManagerSPV", {
-    from: deployer,
-    libraries: {
-      SharedSPVCore: sharedSPVCore.address,
-    },
-    log: true,
-    waitConfirmations: network.live ? 5 : 1,
-  })
-
-  // Deploy QCManager - Unified business logic with state management and pause credits, SPV support
+  // Deploy QCManager - Unified business logic with state management and pause credits, message signing support
   const qcManager = await deploy("QCManager", {
     from: deployer,
     args: [
       qcData.address,
       systemState.address,
       reserveOracle.address,
-      lightRelay.address,
-      txProofDifficultyFactor,
     ],
-    libraries: {
-      QCManagerSPV: qcManagerSPV.address,
-    },
     log: true,
     waitConfirmations: network.live ? 5 : 1,
   })
@@ -81,4 +50,4 @@ const func: DeployFunction = async function DeployAccountControlState(
 
 export default func
 func.tags = ["AccountControlState", "QCData", "SystemState", "QCManager"]
-func.dependencies = ["ReserveOracle", "LightRelay", "AccountControlCore"]
+func.dependencies = ["ReserveOracle", "AccountControlCore"]

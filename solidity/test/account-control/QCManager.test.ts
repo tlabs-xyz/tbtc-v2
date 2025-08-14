@@ -85,37 +85,12 @@ describe("QCManager", () => {
     mockReserveOracle = await smock.fake<ReserveOracle>("ReserveOracle")
     mockQCRedeemer = await smock.fake<IQCRedeemer>("IQCRedeemer")
 
-    // Deploy SharedSPVCore library first
-    const SharedSPVCoreFactory = await ethers.getContractFactory(
-      "SharedSPVCore"
-    )
-    const sharedSPVCore = await SharedSPVCoreFactory.deploy()
-    await sharedSPVCore.deployed()
-
-    // Deploy QCManagerSPV library with SharedSPVCore dependency
-    const QCManagerSPVFactory = await ethers.getContractFactory(
-      "QCManagerSPV",
-      {
-        libraries: {
-          SharedSPVCore: sharedSPVCore.address,
-        },
-      }
-    )
-    const qcManagerSPV = await QCManagerSPVFactory.deploy()
-    await qcManagerSPV.deployed()
-
-    // Deploy QCManager with library linking
-    const QCManagerFactory = await ethers.getContractFactory("QCManager", {
-      libraries: {
-        QCManagerSPV: qcManagerSPV.address,
-      },
-    })
+    // Deploy QCManager with message signing support
+    const QCManagerFactory = await ethers.getContractFactory("QCManager")
     qcManager = await QCManagerFactory.deploy(
       mockQCData.address,
       mockSystemState.address,
-      mockReserveOracle.address,
-      deployer.address, // Mock relay address (using deployer for testing)
-      96 // Mock tx proof difficulty factor
+      mockReserveOracle.address
     )
     await qcManager.deployed()
 
@@ -293,45 +268,24 @@ describe("QCManager", () => {
     beforeEach(async () => {
       // Setup registered QC
       mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
+      mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(0) // Active
+      
+      // Note: Wallet ownership verification now happens on-chain via MessageSigning.verifyBitcoinSignature()
+      // No mocking needed - the library will validate signature format and return true for valid signatures
     })
 
-    context("when called by registrar with valid SPV proof", () => {
+    context("when called by registrar with verified wallet ownership", () => {
       it("should register wallet successfully", async () => {
         const challenge = ethers.utils.id("test_challenge")
+        const mockSignature = "0x" + "aa".repeat(65) // Mock 65-byte signature
 
-        // Create a valid Bitcoin transaction structure
-        // Input vector: 1 input with proper format
-        const mockTxInfo = {
-          version: "0x02000000",
-          // Valid input vector: [count=01][prevTxHash(32)][prevOutIdx(4)][scriptSigLen][scriptSig][sequence(4)]
-          inputVector: `0x01${"00".repeat(32)}${"00".repeat(4)}00ffffffff`,
-          // Valid output vector with OP_RETURN containing challenge
-          outputVector:
-            "0x02" + // 2 outputs
-            "00e1f50500000000" +
-            "19" +
-            `76a914${"bb".repeat(20)}88ac` + // Regular P2PKH output (25 bytes = 0x19)
-            "0000000000000000" +
-            "22" +
-            `6a20${challenge.slice(2)}`, // OP_RETURN with challenge (34 bytes = 0x22)
-          locktime: "0x00000000",
-        }
-        // Use empty proof data to bypass SPV validation in testing
-        const mockProof = {
-          merkleProof: "0x",
-          txIndexInBlock: 0,
-          bitcoinHeaders: "0x",
-          coinbasePreimage: ethers.constants.HashZero,
-          coinbaseProof: "0x",
-        }
         const tx = await qcManager
           .connect(registrar)
           .registerWallet(
             qcAddress.address,
             validBtcAddress,
             challenge,
-            mockTxInfo,
-            mockProof
+            mockSignature
           )
 
         expect(mockQCData.registerWallet).to.have.been.calledWith(
@@ -347,21 +301,9 @@ describe("QCManager", () => {
           .whenCalledWith(qcAddress.address)
           .returns(false)
 
-        const mockTxInfo = {
-          version: "0x02000000",
-          inputVector: "0x01",
-          outputVector: "0x01",
-          locktime: "0x00000000",
-        }
-        const mockProof = {
-          merkleProof: "0x",
-          txIndexInBlock: 0,
-          bitcoinHeaders: "0x",
-          coinbasePreimage: ethers.utils.id("mock"),
-          coinbaseProof: "0x",
-        }
-
         const challenge = ethers.utils.id("test_challenge")
+        const mockSignature = "0x" + "aa".repeat(65)
+        
         await expect(
           qcManager
             .connect(registrar)
@@ -369,28 +311,15 @@ describe("QCManager", () => {
               qcAddress.address,
               validBtcAddress,
               challenge,
-              mockTxInfo,
-              mockProof
+              mockSignature
             )
         ).to.be.revertedWith("QCNotRegistered")
       })
 
       it("should revert with invalid wallet address", async () => {
-        const mockTxInfo = {
-          version: "0x02000000",
-          inputVector: "0x01",
-          outputVector: "0x01",
-          locktime: "0x00000000",
-        }
-        const mockProof = {
-          merkleProof: "0x",
-          txIndexInBlock: 0,
-          bitcoinHeaders: "0x",
-          coinbasePreimage: ethers.utils.id("mock"),
-          coinbaseProof: "0x",
-        }
-
         const challenge = ethers.utils.id("test_challenge")
+        const mockSignature = "0x" + "aa".repeat(65)
+        
         await expect(
           qcManager
             .connect(registrar)
@@ -398,30 +327,33 @@ describe("QCManager", () => {
               qcAddress.address,
               "",
               challenge,
-              mockTxInfo,
-              mockProof
+              mockSignature
             )
         ).to.be.revertedWith("InvalidWalletAddress")
+      })
+
+      it("should revert with invalid signature format", async () => {
+        const challenge = ethers.utils.id("test_challenge")
+        const invalidSignature = "0x" + "aa".repeat(32) // Invalid length (32 bytes instead of 65)
+        
+        await expect(
+          qcManager
+            .connect(registrar)
+            .registerWallet(
+              qcAddress.address,
+              validBtcAddress,
+              challenge,
+              invalidSignature
+            )
+        ).to.be.revertedWith("MessageSignatureVerificationFailed")
       })
     })
 
     context("when called by non-registrar", () => {
       it("should revert", async () => {
-        const mockTxInfo = {
-          version: "0x02000000",
-          inputVector: "0x01",
-          outputVector: "0x01",
-          locktime: "0x00000000",
-        }
-        const mockProof = {
-          merkleProof: "0x",
-          txIndexInBlock: 0,
-          bitcoinHeaders: "0x",
-          coinbasePreimage: ethers.utils.id("mock"),
-          coinbaseProof: "0x",
-        }
-
         const challenge = ethers.utils.id("test_challenge")
+        const mockSignature = "0x" + "aa".repeat(65)
+        
         await expect(
           qcManager
             .connect(user)
@@ -429,12 +361,70 @@ describe("QCManager", () => {
               qcAddress.address,
               validBtcAddress,
               challenge,
-              mockTxInfo,
-              mockProof
+              mockSignature
             )
         ).to.be.revertedWith(
           `AccessControl: account ${user.address.toLowerCase()} is missing role ${REGISTRAR_ROLE}`
         )
+      })
+    })
+  })
+
+  describe("Wallet Ownership Verification Request", () => {
+    beforeEach(async () => {
+      // Setup registered QC
+      mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
+    })
+
+    context("when called by registered QC", () => {
+      it("should generate challenge and emit event", async () => {
+        const nonce = 12345
+        
+        const tx = await qcManager
+          .connect(qcAddress)
+          .requestWalletOwnershipVerification(validBtcAddress, nonce)
+        
+        await expect(tx).to.emit(qcManager, "WalletOwnershipVerificationRequested")
+        
+        // Should return a challenge (bytes32)
+        const challenge = await qcManager
+          .connect(qcAddress)
+          .callStatic.requestWalletOwnershipVerification(validBtcAddress, nonce)
+        expect(challenge).to.not.equal(ethers.constants.HashZero)
+      })
+
+      it("should revert with invalid wallet address", async () => {
+        const nonce = 12345
+        
+        await expect(
+          qcManager
+            .connect(qcAddress)
+            .requestWalletOwnershipVerification("", nonce)
+        ).to.be.revertedWith("InvalidWalletAddress")
+      })
+    })
+
+    context("when called by registrar", () => {
+      it("should revert with clear message", async () => {
+        const nonce = 12345
+        
+        await expect(
+          qcManager
+            .connect(registrar)
+            .requestWalletOwnershipVerification(validBtcAddress, nonce)
+        ).to.be.revertedWith("REGISTRAR_MUST_USE_REGISTER_WALLET")
+      })
+    })
+
+    context("when called by unauthorized user", () => {
+      it("should revert", async () => {
+        const nonce = 12345
+        
+        await expect(
+          qcManager
+            .connect(user)
+            .requestWalletOwnershipVerification(validBtcAddress, nonce)
+        ).to.be.revertedWith("UNAUTHORIZED_WALLET_VERIFICATION")
       })
     })
   })

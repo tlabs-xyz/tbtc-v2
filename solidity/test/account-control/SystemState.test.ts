@@ -25,12 +25,18 @@ describe("SystemState", () => {
   const testStaleThreshold = 3600 // 1 hour
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
-    governance = signers[1]
-    pauserAccount = signers[2]
-    adminAccount = signers[3]
-    thirdParty = signers[4]
+    const [
+      deployerSigner,
+      governanceSigner,
+      pauserAccountSigner,
+      adminAccountSigner,
+      thirdPartySigner,
+    ] = await ethers.getSigners()
+    deployer = deployerSigner
+    governance = governanceSigner
+    pauserAccount = pauserAccountSigner
+    adminAccount = adminAccountSigner
+    thirdParty = thirdPartySigner
 
     // Generate role hashes
     PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")
@@ -467,7 +473,7 @@ describe("SystemState", () => {
         let newCouncil: SignerWithAddress
 
         beforeEach(async () => {
-          ;[, , , , , newCouncil] = await ethers.getSigners()
+          [, , , , , newCouncil] = await ethers.getSigners();
         })
 
         it("should update emergency council successfully", async () => {

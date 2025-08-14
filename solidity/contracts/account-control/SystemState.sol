@@ -3,7 +3,7 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
-import "../bridge/IRelay.sol";
+
 
 /// @title SystemState
 /// @dev Global system state and emergency controls for the tBTC v2 Account Control system.
@@ -69,9 +69,8 @@ contract SystemState is AccessControl {
     error QCIsEmergencyPaused(address qc);
     error QCNotEmergencyPaused(address qc);
     error QCEmergencyPauseExpired(address qc);
-    error RelayNotSet();
-    error InvalidRelayAddress();
-    error InvalidDifficultyFactor();
+
+
 
     /// @dev Global pause flags for granular emergency controls
     bool public isMintingPaused;
@@ -97,9 +96,6 @@ contract SystemState is AccessControl {
     mapping(address => bool) public qcEmergencyPauses; // Tracks QC-specific emergency pauses
     mapping(address => uint256) public qcPauseTimestamps; // Tracks when QCs were emergency paused
     
-    /// @dev SPV validation parameters
-    address public lightRelay; // Bitcoin light relay for SPV proof validation
-    uint96 public txProofDifficultyFactor; // Required confirmations for SPV proofs
 
     // =================== STANDARDIZED EVENTS ===================
 
@@ -195,18 +191,7 @@ contract SystemState is AccessControl {
         address indexed updatedBy
     );
     
-    /// @dev Emitted when SPV parameters are updated
-    event LightRelayUpdated(
-        address indexed oldRelay,
-        address indexed newRelay,
-        address indexed updatedBy
-    );
-    
-    event TxProofDifficultyFactorUpdated(
-        uint96 indexed oldFactor,
-        uint96 indexed newFactor,
-        address indexed updatedBy
-    );
+
 
     /// @dev Events for role management are inherited from AccessControl
 
@@ -242,8 +227,7 @@ contract SystemState is AccessControl {
         failureThreshold = 3; // 3 failures trigger enforcement
         failureWindow = 7 days; // Count failures over 7 days
         
-        // Set SPV defaults (will be configured during deployment)
-        txProofDifficultyFactor = 6; // Default difficulty factor for mainnet
+
     }
 
     // =================== PAUSE FUNCTIONS ===================
@@ -460,52 +444,7 @@ contract SystemState is AccessControl {
         emit FailureWindowUpdated(oldWindow, newWindow, msg.sender);
     }
     
-    // =================== SPV CONFIGURATION FUNCTIONS ===================
-    
-    /// @notice Update the Bitcoin light relay address
-    /// @param newRelay The new light relay address
-    function setLightRelay(address newRelay)
-        external
-        onlyRole(PARAMETER_ADMIN_ROLE)
-    {
-        if (newRelay == address(0)) revert InvalidRelayAddress();
-        
-        address oldRelay = lightRelay;
-        lightRelay = newRelay;
-        
-        emit LightRelayUpdated(oldRelay, newRelay, msg.sender);
-    }
-    
-    /// @notice Update the transaction proof difficulty factor
-    /// @param newFactor The new difficulty factor
-    function setTxProofDifficultyFactor(uint96 newFactor)
-        external
-        onlyRole(PARAMETER_ADMIN_ROLE)
-    {
-        if (newFactor == 0) revert InvalidDifficultyFactor();
-        
-        uint96 oldFactor = txProofDifficultyFactor;
-        txProofDifficultyFactor = newFactor;
-        
-        emit TxProofDifficultyFactorUpdated(oldFactor, newFactor, msg.sender);
-    }
-    
-    /// @notice Get current SPV parameters
-    /// @return relay The current light relay address
-    /// @return difficultyFactor The current difficulty factor
-    function getSPVParameters()
-        external
-        view
-        returns (address relay, uint96 difficultyFactor)
-    {
-        return (lightRelay, txProofDifficultyFactor);
-    }
-    
-    /// @notice Check if SPV is properly configured
-    /// @return isConfigured True if relay is set and difficulty factor is non-zero
-    function isSPVConfigured() external view returns (bool isConfigured) {
-        return lightRelay != address(0) && txProofDifficultyFactor > 0;
-    }
+
 
     /// @notice Emergency pause for a specific QC (called by automated systems)
     /// @dev This function provides granular emergency control for individual QCs without

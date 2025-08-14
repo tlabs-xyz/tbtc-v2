@@ -21,12 +21,18 @@ describe("QCData", () => {
   const mintedAmount = ethers.utils.parseEther("5")
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
-    governance = signers[1]
-    qcAddress = signers[2]
-    qcManager = signers[3]
-    thirdParty = signers[4]
+    const [
+      deployerSigner,
+      governanceSigner,
+      qcAddressSigner,
+      qcManagerSigner,
+      thirdPartySigner,
+    ] = await ethers.getSigners()
+    deployer = deployerSigner
+    governance = governanceSigner
+    qcAddress = qcAddressSigner
+    qcManager = qcManagerSigner
+    thirdParty = thirdPartySigner
   })
 
   beforeEach(async () => {
