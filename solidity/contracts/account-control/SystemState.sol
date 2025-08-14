@@ -59,7 +59,6 @@ contract SystemState is AccessControl {
     error TimeoutTooLong(uint256 timeout, uint256 maxTimeout);
     error InvalidThreshold();
     error ThresholdTooLong(uint256 threshold, uint256 maxThreshold);
-    error DelayTooLong(uint256 delay, uint256 maxDelay);
     error InvalidDuration();
     error DurationTooLong(uint256 duration, uint256 maxDuration);
     error InvalidCouncilAddress();
@@ -80,7 +79,6 @@ contract SystemState is AccessControl {
     /// @dev Global system parameters
     uint256 public staleThreshold; // Time after which reserve attestations are stale
     uint256 public redemptionTimeout; // Maximum time for redemption fulfillment
-    uint256 public walletRegistrationDelay; // Delay for wallet registration finalization
     uint256 public minMintAmount; // Minimum amount for minting operations
     uint256 public maxMintAmount; // Maximum amount for single minting operation
 
@@ -124,11 +122,6 @@ contract SystemState is AccessControl {
         address indexed updatedBy
     );
 
-    event WalletRegistrationDelayUpdated(
-        uint256 indexed oldDelay,
-        uint256 indexed newDelay,
-        address indexed updatedBy
-    );
 
     event EmergencyPauseDurationUpdated(
         uint256 indexed oldDuration,
@@ -217,7 +210,6 @@ contract SystemState is AccessControl {
         // Set default parameters
         staleThreshold = 24 hours; // Reserve attestations stale after 24 hours
         redemptionTimeout = 7 days; // 7 days to fulfill redemptions
-        walletRegistrationDelay = 1 hours; // 1 hour delay for wallet registration
         minMintAmount = 0.01 ether; // Minimum 0.01 tBTC
         maxMintAmount = 1000 ether; // Maximum 1000 tBTC per transaction
         emergencyPauseDuration = 7 days; // Emergency pauses last max 7 days
@@ -346,19 +338,6 @@ contract SystemState is AccessControl {
         emit StaleThresholdUpdated(oldThreshold, newThreshold, msg.sender);
     }
 
-    /// @notice Update wallet registration delay
-    /// @param newDelay The new delay in seconds
-    function setWalletRegistrationDelay(uint256 newDelay)
-        external
-        onlyRole(OPERATIONS_ROLE)
-    {
-        if (newDelay > 24 hours) revert DelayTooLong(newDelay, 24 hours);
-
-        uint256 oldDelay = walletRegistrationDelay;
-        walletRegistrationDelay = newDelay;
-
-        emit WalletRegistrationDelayUpdated(oldDelay, newDelay, msg.sender);
-    }
 
     /// @notice Update emergency pause duration
     /// @param newDuration The new duration in seconds
