@@ -16,6 +16,7 @@
 6. [Implementation Requirements](#6-implementation-requirements)
 7. [Script Structure and Examples](#7-script-structure-and-examples)
 8. [Testnet Environment Setup](#8-testnet-environment-setup)
+9. [Audit Trail and Monitoring](#9-audit-trail-and-monitoring)
 
 ---
 
@@ -1418,3 +1419,658 @@ The Account Control system is deployed with the following components:
 - **Documentation**: Complete implementation guide for future maintainers
 
 This comprehensive flows document provides the foundation for implementing robust testnet testing scripts that validate all critical paths in the tBTC v2 Account Control system. Each flow includes detailed implementation requirements, error scenarios, and success criteria to ensure thorough validation of the system's functionality on real testnet environments.
+
+---
+
+## 9. Audit Trail and Monitoring
+
+### 9.1 Overview
+
+This section provides a comprehensive guide for implementing audit trails across all Account Control user flows. Each flow is documented with:
+
+- **Entry Points**: External/public functions that initiate the flow
+- **Key Events**: Events emitted for audit trail reconstruction
+- **Data Requirements**: Essential data points for complete visibility
+- **Correlation Patterns**: How to link related events across contracts
+
+#### Core Principles
+
+1. **Complete Traceability**: Every user action must be traceable from initiation to completion
+2. **Actor Attribution**: All actions must be attributable to specific addresses and roles
+3. **State Reconstruction**: System state at any point must be reconstructible from events
+4. **Economic Transparency**: All value transfers must be tracked and auditable
+
+### 9.2 QC Lifecycle Management Flows
+
+#### 9.2.1 QC Registration Flow
+
+**Purpose**: Onboard new Qualified Custodians to the system
+
+**Entry Point**: `QCManager.registerQC(address qc, uint256 maxMintingCap)`
+
+**Key Events**:
+
+```solidity
+// From QCManager.sol
+event QCRegistrationInitiated(
+    address indexed qc,
+    address indexed initiatedBy,
+    uint256 indexed timestamp
+);
+
+event QCOnboarded(
+    address indexed qc,
+    uint256 indexed maxMintingCap,
+    address indexed onboardedBy,
+    uint256 timestamp
+);
+
+// From QCData.sol
+event QCRegistered(
+    address indexed qc,
+    address indexed registeredBy,
+    uint256 indexed maxMintingCapacity,
+    uint256 timestamp
+);
+```
+
+**Audit Data Points**:
+
+- QC address
+- Initial minting capacity
+- Registration timestamp
+- Registering authority (must have QC_GOVERNANCE_ROLE)
+- Transaction details (gas, block number)
+
+**Reconstruction Query**:
+
+```sql
+SELECT * FROM events
+WHERE event_name IN ('QCRegistrationInitiated', 'QCOnboarded', 'QCRegistered')
+AND qc_address = ?
+ORDER BY timestamp ASC;
+```
+
+#### 9.2.2 Minting Capacity Increase Flow
+
+**Purpose**: Expand operational limits for existing QCs
+
+**Entry Point**: `QCManager.increaseMintingCapacity(address qc, uint256 newCap)`
+
+**Key Events**:
+
+```solidity
+event MintingCapacityIncreased(
+    address indexed qc,
+    uint256 oldCapacity,
+    uint256 indexed newCapacity,
+    address indexed increasedBy,
+    uint256 timestamp
+);
+```
+
+**Audit Data Points**:
+
+- QC address
+- Previous capacity
+- New capacity
+- Authority approving increase
+- Justification/reason
+
+#### 9.2.3 QC Status Change Flow
+
+**Purpose**: Track all QC status transitions (Active → MintingPaused → Paused → UnderReview → Revoked)
+
+**Entry Points**: Multiple functions in QCManager
+
+**Key Events**:
+
+```solidity
+event QCStatusChanged(
+    address indexed qc,
+    QCData.QCStatus oldStatus,
+    QCData.QCStatus indexed newStatus,
+    bytes32 indexed reason,
+    address changedBy,
+    uint256 timestamp
+);
+
+event PauseCreditUsed(
+    address indexed qc,
+    uint256 indexed pauseNumber,
+    uint256 expiryTimestamp,
+    address indexed triggeredBy
+);
+
+event PauseCreditExpired(
+    address indexed qc,
+    uint256 indexed pauseNumber,
+    address indexed triggeredBy
+);
+```
+
+**Audit Data Points**:
+
+- QC address
+- Status transitions (from → to)
+- Reason codes (machine-readable)
+- Authority making change
+- Pause credits used/expired
+
+### 9.3 Wallet Management Flows
+
+#### 9.3.1 Bitcoin Wallet Registration Flow
+
+**Purpose**: Register Bitcoin addresses for QC reserve monitoring
+
+**Entry Point**: `QCManager.registerWallet(address qc, string btcAddress, bytes signature)`
+
+**Key Events**:
+
+```solidity
+event WalletRegistrationRequested(
+    address indexed qc,
+    string btcAddress,
+    address indexed requestedBy,
+    uint256 timestamp
+);
+
+event WalletRegistered(
+    address indexed qc,
+    string btcAddress,
+    address indexed registeredBy,
+    uint256 timestamp
+);
+
+event WalletRegistrationFailed(
+    address indexed qc,
+    string btcAddress,
+    string reason,
+    address indexed failedBy,
+    uint256 timestamp
+);
+```
+
+**Audit Data Points**:
+
+- QC address
+- Bitcoin address
+- Message signature used for proof
+- Verification status
+- Registration authority
+
+#### 9.3.2 Wallet De-registration Flow
+
+**Purpose**: Remove Bitcoin addresses from monitoring
+
+**Entry Point**: `QCManager.deregisterWallet(address qc, string btcAddress)`
+
+**Key Events**:
+
+```solidity
+event WalletDeregistrationRequested(
+    address indexed qc,
+    string btcAddress,
+    address indexed requestedBy,
+    uint256 timestamp
+);
+
+event WalletDeregistered(
+    address indexed qc,
+    string btcAddress,
+    address indexed deregisteredBy,
+    uint256 timestamp
+);
+```
+
+### 9.4 Reserve Operations Flows
+
+#### 9.4.1 Reserve Attestation Flow
+
+**Purpose**: Track Bitcoin reserve balance updates
+
+**Entry Point**: `QCReserveLedger.submitAttestation(address qc, uint256 newBalance)`
+
+**Key Events**:
+
+```solidity
+event AttestationSubmitted(
+    address indexed qc,
+    address indexed attester,
+    uint256 indexed newBalance,
+    uint256 timestamp,
+    bytes32 attestationHash
+);
+
+event ConsensusReached(
+    address indexed qc,
+    uint256 indexed consensusBalance,
+    uint256 numberOfAttesters,
+    uint256 timestamp
+);
+
+event AttestationExpired(
+    address indexed qc,
+    uint256 indexed oldBalance,
+    uint256 expiryTimestamp,
+    uint256 timestamp
+);
+```
+
+**Audit Data Points**:
+
+- QC address
+- Attester addresses
+- Balance values
+- Consensus mechanism
+- Staleness tracking
+
+#### 9.4.2 Solvency Check Flow
+
+**Purpose**: Track automatic solvency enforcement
+
+**Entry Point**: Automatic via WatchdogEnforcer
+
+**Key Events**:
+
+```solidity
+event SolvencyCheckTriggered(
+    address indexed qc,
+    uint256 indexed currentReserves,
+    uint256 indexed mintedAmount,
+    address triggeredBy,
+    uint256 timestamp
+);
+
+event SolvencyViolationDetected(
+    address indexed qc,
+    uint256 shortfall,
+    bytes32 indexed reason,
+    address indexed detectedBy,
+    uint256 timestamp
+);
+```
+
+### 9.5 Minting Operations Flows
+
+#### 9.5.1 User Minting Flow
+
+**Purpose**: Track tBTC minting requests and execution
+
+**Entry Point**: `QCMinter.requestQCMint(address qc, uint256 amount)`
+
+**Key Events**:
+
+```solidity
+event MintingRequested(
+    address indexed user,
+    address indexed qc,
+    uint256 indexed amount,
+    uint256 timestamp,
+    bytes32 requestId
+);
+
+event MintingCompleted(
+    address indexed user,
+    address indexed qc,
+    uint256 indexed amount,
+    uint256 timestamp,
+    bytes32 requestId
+);
+
+event MintingFailed(
+    address indexed user,
+    address indexed qc,
+    uint256 indexed amount,
+    string reason,
+    uint256 timestamp,
+    bytes32 requestId
+);
+```
+
+**Audit Data Points**:
+
+- User address
+- QC address
+- Minting amount
+- Success/failure status
+- Reason for failure (if any)
+
+### 9.6 Redemption Operations Flows
+
+#### 9.6.1 User Redemption Flow
+
+**Purpose**: Track redemption requests and fulfillment
+
+**Entry Point**: `QCRedeemer.initiateRedemption(address qc, uint256 amount, string btcAddress)`
+
+**Key Events**:
+
+```solidity
+event RedemptionRequested(
+    address indexed user,
+    address indexed qc,
+    uint256 indexed amount,
+    string btcAddress,
+    uint256 timeoutTimestamp,
+    bytes32 redemptionId
+);
+
+event RedemptionFulfilled(
+    address indexed user,
+    address indexed qc,
+    uint256 indexed amount,
+    string btcTxHash,
+    bytes32 redemptionId,
+    uint256 timestamp
+);
+
+event RedemptionDefaulted(
+    address indexed user,
+    address indexed qc,
+    uint256 indexed amount,
+    bytes32 redemptionId,
+    uint256 timeoutTimestamp
+);
+```
+
+**Audit Data Points**:
+
+- User address
+- QC address
+- Redemption amount
+- Bitcoin address
+- Timeout tracking
+- Fulfillment status
+
+#### 9.6.2 Default Handling Flow
+
+**Purpose**: Track redemption defaults and consequences
+
+**Entry Point**: Automatic timeout detection
+
+**Key Events**:
+
+```solidity
+event DefaultDetected(
+    address indexed qc,
+    bytes32 indexed redemptionId,
+    uint256 defaultedAmount,
+    uint256 detectionTimestamp
+);
+
+event DefaultConsequenceApplied(
+    address indexed qc,
+    QCData.QCStatus newStatus,
+    uint256 consecutiveDefaults,
+    uint256 timestamp
+);
+```
+
+### 9.7 Watchdog Operations Flows
+
+#### 9.7.1 Objective Violation Enforcement
+
+**Purpose**: Track automated enforcement of violations
+
+**Entry Point**: `WatchdogEnforcer.enforceObjectiveViolation(address qc, bytes32 reasonCode)`
+
+**Key Events**:
+
+```solidity
+event ObjectiveViolationDetected(
+    address indexed qc,
+    bytes32 indexed reasonCode,
+    address indexed detectedBy,
+    uint256 timestamp
+);
+
+event EnforcementActionTaken(
+    address indexed qc,
+    bytes32 indexed reasonCode,
+    QCData.QCStatus newStatus,
+    address indexed enforcedBy,
+    uint256 timestamp
+);
+```
+
+### 9.8 System Administration Flows
+
+#### 9.8.1 Parameter Updates
+
+**Purpose**: Track system parameter changes
+
+**Entry Point**: Various admin functions
+
+**Key Events**:
+
+```solidity
+event SystemParameterUpdated(
+    string parameterName,
+    bytes32 oldValue,
+    bytes32 indexed newValue,
+    address indexed updatedBy,
+    uint256 timestamp
+);
+
+event EmergencyPauseTriggered(
+    address indexed target,
+    string reason,
+    address indexed triggeredBy,
+    uint256 timestamp
+);
+
+event EmergencyPauseLifted(
+    address indexed target,
+    address indexed liftedBy,
+    uint256 timestamp
+);
+```
+
+### 9.9 Event Correlation Patterns
+
+#### 9.9.1 Cross-Contract Event Relationships
+
+**QC Registration to First Minting**:
+
+```sql
+-- Find QC registration followed by first minting
+SELECT 
+    r.qc_address,
+    r.timestamp AS registration_time,
+    m.timestamp AS first_mint_time,
+    TIMEDIFF(m.timestamp, r.timestamp) AS time_to_first_mint
+FROM qc_registered r
+LEFT JOIN minting_completed m ON r.qc_address = m.qc_address
+WHERE m.timestamp = (
+    SELECT MIN(timestamp) 
+    FROM minting_completed 
+    WHERE qc_address = r.qc_address
+);
+```
+
+**Redemption Request to Fulfillment**:
+
+```sql
+-- Track redemption fulfillment times
+SELECT 
+    req.redemption_id,
+    req.qc_address,
+    req.amount,
+    req.timeout_timestamp,
+    ful.timestamp AS fulfillment_time,
+    TIMEDIFF(ful.timestamp, req.timestamp) AS fulfillment_duration
+FROM redemption_requested req
+LEFT JOIN redemption_fulfilled ful ON req.redemption_id = ful.redemption_id
+ORDER BY req.timestamp DESC;
+```
+
+#### 9.9.2 Status Change Tracking
+
+**QC Status Transition Analysis**:
+
+```sql
+-- Analyze QC status changes over time
+SELECT 
+    qc_address,
+    old_status,
+    new_status,
+    reason,
+    changed_by,
+    timestamp,
+    LAG(timestamp) OVER (PARTITION BY qc_address ORDER BY timestamp) AS previous_change
+FROM qc_status_changed
+ORDER BY qc_address, timestamp;
+```
+
+### 9.10 Dashboard Implementation Guide
+
+#### 9.10.1 Real-Time Monitoring Dashboard
+
+**Key Metrics to Display**:
+
+1. **QC Overview Panel**:
+   - Total registered QCs
+   - Active vs. paused QCs
+   - Total minting capacity
+   - Current utilization rates
+
+2. **Operations Panel**:
+   - Recent minting requests
+   - Pending redemptions
+   - Redemption fulfillment rates
+   - Average fulfillment times
+
+3. **Security Panel**:
+   - Recent status changes
+   - Objective violations detected
+   - Solvency alerts
+   - Emergency actions taken
+
+4. **Reserve Panel**:
+   - Total Bitcoin reserves
+   - Attestation freshness
+   - Consensus status
+   - Reserve trends
+
+#### 9.10.2 Alerting System
+
+**Critical Alerts**:
+
+```javascript
+// Example alert conditions
+const criticalAlerts = {
+  // QC status degradation
+  qcStatusDegraded: {
+    condition: "QCStatusChanged.newStatus IN ('UnderReview', 'Revoked')",
+    severity: "HIGH",
+    notification: ["email", "slack", "sms"]
+  },
+  
+  // Redemption near timeout
+  redemptionTimeout: {
+    condition: "RedemptionRequested.timeoutTimestamp - NOW() < 3600", // 1 hour
+    severity: "CRITICAL",
+    notification: ["email", "slack", "sms", "phone"]
+  },
+  
+  // Objective violation
+  objectiveViolation: {
+    condition: "ObjectiveViolationDetected.*",
+    severity: "HIGH",
+    notification: ["email", "slack"]
+  },
+  
+  // Emergency pause
+  emergencyPause: {
+    condition: "EmergencyPauseTriggered.*",
+    severity: "CRITICAL",
+    notification: ["email", "slack", "sms", "phone"]
+  }
+};
+```
+
+#### 9.10.3 Audit Report Generation
+
+**Daily Operations Report**:
+
+```sql
+-- Daily operations summary
+SELECT 
+    DATE(timestamp) AS report_date,
+    COUNT(CASE WHEN event_name = 'MintingCompleted' THEN 1 END) AS total_mints,
+    SUM(CASE WHEN event_name = 'MintingCompleted' THEN amount ELSE 0 END) AS total_minted_amount,
+    COUNT(CASE WHEN event_name = 'RedemptionRequested' THEN 1 END) AS total_redemptions,
+    COUNT(CASE WHEN event_name = 'RedemptionFulfilled' THEN 1 END) AS fulfilled_redemptions,
+    COUNT(CASE WHEN event_name = 'QCStatusChanged' THEN 1 END) AS status_changes
+FROM events 
+WHERE DATE(timestamp) = CURDATE()
+GROUP BY DATE(timestamp);
+```
+
+**QC Performance Report**:
+
+```sql
+-- QC performance analysis
+SELECT 
+    qc_address,
+    COUNT(CASE WHEN event_name = 'MintingCompleted' THEN 1 END) AS total_mints,
+    AVG(CASE WHEN event_name = 'RedemptionFulfilled' 
+        THEN TIMEDIFF(timestamp, request_timestamp) END) AS avg_fulfillment_time,
+    COUNT(CASE WHEN event_name = 'RedemptionDefaulted' THEN 1 END) AS defaults,
+    MAX(CASE WHEN event_name = 'QCStatusChanged' THEN timestamp END) AS last_status_change
+FROM events 
+WHERE timestamp >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+GROUP BY qc_address
+ORDER BY total_mints DESC;
+```
+
+### 9.11 Compliance and Regulatory Reporting
+
+#### 9.11.1 Audit Trail Completeness
+
+**Event Coverage Verification**:
+
+```sql
+-- Ensure all critical flows have complete event coverage
+SELECT 
+    flow_type,
+    expected_events,
+    actual_events,
+    coverage_percentage
+FROM (
+    SELECT 
+        'minting' AS flow_type,
+        COUNT(*) AS expected_events,
+        COUNT(CASE WHEN event_name = 'MintingCompleted' THEN 1 END) AS actual_events,
+        (COUNT(CASE WHEN event_name = 'MintingCompleted' THEN 1 END) * 100.0 / COUNT(*)) AS coverage_percentage
+    FROM (SELECT * FROM events WHERE event_name IN ('MintingRequested', 'MintingCompleted', 'MintingFailed')) e
+) coverage_analysis;
+```
+
+#### 9.11.2 Regulatory Compliance Data
+
+**Reserve Backing Verification**:
+
+```sql
+-- Verify reserve backing for all minted tokens
+SELECT 
+    qc_address,
+    total_minted,
+    current_reserves,
+    (current_reserves - total_minted) AS reserve_buffer,
+    (current_reserves * 100.0 / total_minted) AS collateralization_ratio
+FROM (
+    SELECT 
+        qc_address,
+        SUM(CASE WHEN event_name = 'MintingCompleted' THEN amount 
+                 WHEN event_name = 'RedemptionFulfilled' THEN -amount 
+                 ELSE 0 END) AS total_minted,
+        (SELECT consensus_balance FROM latest_consensus WHERE qc_address = e.qc_address) AS current_reserves
+    FROM events e
+    WHERE event_name IN ('MintingCompleted', 'RedemptionFulfilled')
+    GROUP BY qc_address
+) reserves_analysis;
+```
+
+This comprehensive audit trail system ensures complete transparency and regulatory compliance for all Account Control operations while providing the necessary tools for monitoring, alerting, and reporting.
