@@ -41,10 +41,7 @@ describe("SPV Security Tests", () => {
 
   before(async () => {
     const signers = await ethers.getSigners()
-    deployer = signers[0]
-    attacker = signers[1]
-    qc = signers[2]
-    user = signers[3]
+    ;[deployer, attacker, qc, user] = signers
 
     // Deploy test contracts
     const MockTBTC = await ethers.getContractFactory("MockTBTCToken")
@@ -206,7 +203,7 @@ describe("SPV Security Tests", () => {
       const txInfo: BitcoinTx.InfoStruct = {
         version: "0x01000000",
         inputVector: `0x01${"00".repeat(36)}00${"00".repeat(4)}`,
-        outputVector: `0x01${"00".repeat(8)}16` + `0014${"00".repeat(20)}`, // P2WPKH output
+        outputVector: `0x01${"00".repeat(8)}160014${"00".repeat(20)}`, // P2WPKH output
         locktime: "0x00000000",
       }
 
@@ -257,7 +254,7 @@ describe("SPV Security Tests", () => {
       const oldTxInfo: BitcoinTx.InfoStruct = {
         version: "0x01000000",
         inputVector: `0x01${"00".repeat(36)}00${"00".repeat(4)}`,
-        outputVector: `0x01${"00".repeat(8)}16` + `0014${"00".repeat(20)}`,
+        outputVector: `0x01${"00".repeat(8)}160014${"00".repeat(20)}`,
         locktime: "0x01000000", // Old locktime from 2009
       }
 
@@ -364,13 +361,12 @@ describe("SPV Security Tests", () => {
         version: "0x01000000",
         inputVector: `0x01${"00".repeat(36)}00${"00".repeat(4)}`,
         // Output with dust amount
-        outputVector:
-          `0x01${dustAmount
-            .toString(16)
-            .padStart(16, "0")
-            .match(/.{2}/g)!
-            .reverse()
-            .join("")}16` + `0014${"00".repeat(20)}`,
+        outputVector: `0x01${dustAmount
+          .toString(16)
+          .padStart(16, "0")
+          .match(/.{2}/g)!
+          .reverse()
+          .join("")}160014${"00".repeat(20)}`,
         locktime: "0x00000000",
       }
 
@@ -417,7 +413,7 @@ describe("SPV Security Tests", () => {
         version: "0x01000000",
         inputVector: `0x01${"00".repeat(36)}00${"00".repeat(4)}`,
         // Output that pays to different address (different hash)
-        outputVector: `0x01${"00".repeat(8)}16` + `0014${"11".repeat(20)}`, // Different hash
+        outputVector: `0x01${"00".repeat(8)}160014${"11".repeat(20)}`, // Different hash
         locktime: "0x00000000",
       }
 
@@ -450,7 +446,7 @@ describe("SPV Security Tests", () => {
       const txInfo: BitcoinTx.InfoStruct = {
         version: "0x01000000",
         inputVector: `0x01${"00".repeat(36)}00${"00".repeat(4)}`,
-        outputVector: `0x01${"00".repeat(8)}16` + `0014${"00".repeat(20)}`,
+        outputVector: `0x01${"00".repeat(8)}160014${"00".repeat(20)}`,
         locktime: "0x00000000",
       }
 
@@ -485,7 +481,7 @@ describe("SPV Security Tests", () => {
       const txInfo: BitcoinTx.InfoStruct = {
         version: "0x01000000",
         inputVector: `0x01${"00".repeat(36)}00${"00".repeat(4)}`,
-        outputVector: `0x01${"00".repeat(8)}16` + `0014${"00".repeat(20)}`,
+        outputVector: `0x01${"00".repeat(8)}160014${"00".repeat(20)}`,
         locktime: "0x00000000",
       }
 
@@ -525,7 +521,7 @@ describe("SPV Security Tests", () => {
       const txInfo: BitcoinTx.InfoStruct = {
         version: "0x01000000",
         inputVector: `0x01${"00".repeat(36)}00${"00".repeat(4)}`,
-        outputVector: `0x01${"00".repeat(8)}16` + `0014${"00".repeat(20)}`,
+        outputVector: `0x01${"00".repeat(8)}160014${"00".repeat(20)}`,
         locktime: "0x00000000",
       }
 
