@@ -19,14 +19,22 @@ describe("ReserveOracle", () => {
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
-    attester1 = signers[1]
-    attester2 = signers[2]
-    attester3 = signers[3]
-    attester4 = signers[4]
-    qcAddress = signers[5]
-    qcManager = signers[6]
+    const [
+      deployerSigner,
+      attester1Signer,
+      attester2Signer,
+      attester3Signer,
+      attester4Signer,
+      qcAddressSigner,
+      qcManagerSigner,
+    ] = await ethers.getSigners()
+    deployer = deployerSigner
+    attester1 = attester1Signer
+    attester2 = attester2Signer
+    attester3 = attester3Signer
+    attester4 = attester4Signer
+    qcAddress = qcAddressSigner
+    qcManager = qcManagerSigner
   })
 
   beforeEach(async () => {

@@ -31,9 +31,9 @@ describe("QCRedeemerSPV Library", () => {
   }
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
-    user = signers[1]
+    const [deployerSigner, userSigner] = await ethers.getSigners()
+    deployer = deployerSigner
+    user = userSigner
 
     // Deploy test dependencies
     const TestRelay = await ethers.getContractFactory("TestRelay")

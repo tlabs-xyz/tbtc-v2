@@ -88,8 +88,8 @@ describe("SPV Libraries Integration", () => {
   }
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
+    const [deployerSigner] = await ethers.getSigners()
+    deployer = deployerSigner
 
     // Deploy TestRelay first
     const TestRelay = await ethers.getContractFactory("TestRelay")
@@ -190,15 +190,17 @@ describe("SPV Libraries Integration", () => {
         { address: "", valid: false, type: "Empty" },
       ]
 
-      for (const test of testAddresses) {
-        const isValid = await qcManagerSPVTest.isValidBitcoinAddress(
-          test.address
-        )
-        expect(isValid).to.equal(
-          test.valid,
-          `${test.type} address validation failed`
-        )
-      }
+      await Promise.all(
+        testAddresses.map(async (test) => {
+          const isValid = await qcManagerSPVTest.isValidBitcoinAddress(
+            test.address
+          )
+          expect(isValid).to.equal(
+            test.valid,
+            `${test.type} address validation failed`
+          )
+        })
+      )
     })
 
     it("should decode Bitcoin addresses correctly", async () => {

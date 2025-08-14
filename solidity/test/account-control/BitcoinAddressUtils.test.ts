@@ -9,8 +9,8 @@ describe("BitcoinAddressUtils", () => {
   let testContract: TestBitcoinAddressUtils
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
+    const [deployerSigner] = await ethers.getSigners()
+    deployer = deployerSigner
 
     // Deploy test contract wrapper
     const TestBitcoinAddressUtils = await ethers.getContractFactory(

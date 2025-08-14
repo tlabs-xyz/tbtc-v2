@@ -11,7 +11,7 @@ import type { SPVProofTestData } from "../data/bitcoin/spv/valid-spv-proofs"
 /**
  * Helper utilities for SPV validation testing
  */
-export class SPVTestHelpers {
+class SPVTestHelpers {
   /**
    * Sets up the relay with appropriate difficulty for the given SPV proof
    */
@@ -245,3 +245,5 @@ export class SPVTestHelpers {
     return results
   }
 }
+
+export default SPVTestHelpers

@@ -404,4 +404,5 @@ contract ReserveOracle is AccessControl {
 
         delete pendingAttesters[qc];
     }
+
 }

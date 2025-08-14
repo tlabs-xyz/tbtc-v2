@@ -21,15 +21,9 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const watchdogEnforcer = await get("WatchdogEnforcer")
   const tbtc = await get("TBTC")
   const bank = await get("Bank")
-  const lightRelay = await get("LightRelay")
 
-  // Configure SPV parameters based on network
-  const txProofDifficultyFactor =
-    hre.network.name === "hardhat" ||
-    hre.network.name === "development" ||
-    hre.network.name === "system_tests"
-      ? 1 // Lower requirement for testing
-      : 6 // Production requirement (6 confirmations)
+
+
 
   // Define role constants
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
@@ -140,23 +134,15 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     48 * 60 * 60 // 48 hours
   )
 
-  // Step 8: Configure SPV parameters
-  log("Step 8: Configuring SPV parameters...")
+  // Step 8: Configure reserve attestation consensus parameters
+  log("Step 8: Configuring reserve attestation parameters...")
   await execute(
-    "SystemState",
+    "ReserveOracle",
     { from: deployer, log: true },
-    "setLightRelay",
-    lightRelay.address
+    "setConsensusThreshold",
+    3 // Require 3 attester confirmations for reserve balance attestations
   )
-  await execute(
-    "SystemState",
-    { from: deployer, log: true },
-    "setTxProofDifficultyFactor",
-    txProofDifficultyFactor
-  )
-  log(
-    `✅ SPV parameters configured (relay: ${lightRelay.address}, difficulty: ${txProofDifficultyFactor})`
-  )
+  log("✅ Reserve attestation consensus parameters configured (threshold: 3 attesters)")
 
   log("✅ System parameters configured")
 
@@ -171,7 +157,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log("  3. Redemption via QCRedeemer")
   log("  4. Reserve attestation via ReserveOracle")
   log("  5. Enforcement via WatchdogEnforcer")
-  log("  6. SPV validation for wallet registration and redemption proofs")
+  log("  6. Direct on-chain Bitcoin signature verification for wallet ownership")
   log("")
   log("Important next steps:")
   log("  - Grant actual attester addresses ATTESTER_ROLE in ReserveOracle")

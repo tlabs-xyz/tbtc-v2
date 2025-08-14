@@ -1,11 +1,11 @@
 import { expect } from "chai"
 import { ethers } from "hardhat"
-import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers"
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 
 import type { QCRedeemer } from "../../typechain"
 
 describe("Bitcoin Address Validation Integration", () => {
-  let deployer: HardhatEthersSigner
+  let deployer: SignerWithAddress
   let qcRedeemer: QCRedeemer
 
   // Test Bitcoin addresses (real mainnet addresses)
@@ -24,18 +24,37 @@ describe("Bitcoin Address Validation Integration", () => {
     const mockTBTC = await MockTBTC.deploy()
 
     const QCData = await ethers.getContractFactory("QCData")
-    const qcData = await QCData.deploy(deployer.address)
+    const qcData = await QCData.deploy()
 
     const SystemState = await ethers.getContractFactory("SystemState")
-    const systemState = await SystemState.deploy(deployer.address)
+    const systemState = await SystemState.deploy()
 
-    // Deploy QCRedeemer with BitcoinAddressUtils integration
-    const QCRedeemer = await ethers.getContractFactory("QCRedeemer")
+    // Deploy TestRelay for SPV validation
+    const TestRelay = await ethers.getContractFactory("TestRelay")
+    const testRelay = await TestRelay.deploy()
+
+    // Deploy SPV libraries for QCRedeemer
+    const SharedSPVCoreLib = await ethers.getContractFactory("SharedSPVCore")
+    const sharedSPVCoreLib = await SharedSPVCoreLib.deploy()
+    
+    const QCRedeemerSPVLib = await ethers.getContractFactory("QCRedeemerSPV", {
+      libraries: {
+        SharedSPVCore: sharedSPVCoreLib.address,
+      },
+    })
+    const qcRedeemerSPVLib = await QCRedeemerSPVLib.deploy()
+
+    // Deploy QCRedeemer with BitcoinAddressUtils integration and SPV library linking
+    const QCRedeemer = await ethers.getContractFactory("QCRedeemer", {
+      libraries: {
+        QCRedeemerSPV: qcRedeemerSPVLib.address,
+      },
+    })
     qcRedeemer = await QCRedeemer.deploy(
-      await mockTBTC.getAddress(),
-      await qcData.getAddress(),
-      await systemState.getAddress(),
-      ethers.ZeroAddress, // relay (not needed for address validation test)
+      mockTBTC.address,
+      qcData.address,
+      systemState.address,
+      testRelay.address, // relay for SPV validation
       1 // txProofDifficultyFactor
     )
   })
@@ -55,10 +74,10 @@ describe("Bitcoin Address Validation Integration", () => {
       await expect(
         qcRedeemer.initiateRedemption(
           deployer.address, // qc (will fail QC validation)
-          ethers.parseEther("1"), // amount
+          ethers.utils.parseEther("1"), // amount
           validP2PKHAddress // userBtcAddress - this should pass validation
         )
-      ).to.be.revertedWithCustomError(qcRedeemer, "ValidationFailed")
+      ).to.be.revertedWith("ValidationFailed")
 
       // The fact that we get ValidationFailed (not InvalidBitcoinAddressFormat)
       // means the Bitcoin address validation passed
@@ -68,10 +87,10 @@ describe("Bitcoin Address Validation Integration", () => {
       await expect(
         qcRedeemer.initiateRedemption(
           deployer.address,
-          ethers.parseEther("1"),
+          ethers.utils.parseEther("1"),
           validP2SHAddress
         )
-      ).to.be.revertedWithCustomError(qcRedeemer, "ValidationFailed")
+      ).to.be.revertedWith("ValidationFailed")
       // P2SH validation passed (error is from QC validation, not address)
     })
 
@@ -79,10 +98,10 @@ describe("Bitcoin Address Validation Integration", () => {
       await expect(
         qcRedeemer.initiateRedemption(
           deployer.address,
-          ethers.parseEther("1"),
+          ethers.utils.parseEther("1"),
           validP2WPKHAddress
         )
-      ).to.be.revertedWithCustomError(qcRedeemer, "ValidationFailed")
+      ).to.be.revertedWith("ValidationFailed")
       // Bech32 validation passed
     })
 
@@ -90,10 +109,10 @@ describe("Bitcoin Address Validation Integration", () => {
       await expect(
         qcRedeemer.initiateRedemption(
           deployer.address,
-          ethers.parseEther("1"),
+          ethers.utils.parseEther("1"),
           "invalid_address_format"
         )
-      ).to.be.revertedWithCustomError(qcRedeemer, "InvalidBitcoinAddressFormat")
+      ).to.be.revertedWith("InvalidBitcoinAddressFormat")
       // Address validation correctly failed
     })
 
@@ -101,20 +120,20 @@ describe("Bitcoin Address Validation Integration", () => {
       await expect(
         qcRedeemer.initiateRedemption(
           deployer.address,
-          ethers.parseEther("1"),
+          ethers.utils.parseEther("1"),
           ""
         )
-      ).to.be.revertedWithCustomError(qcRedeemer, "BitcoinAddressRequired")
+      ).to.be.revertedWith("BitcoinAddressRequired")
     })
 
     it("should reject address with wrong prefix", async () => {
       await expect(
         qcRedeemer.initiateRedemption(
           deployer.address,
-          ethers.parseEther("1"),
+          ethers.utils.parseEther("1"),
           "xyz123invalid" // Wrong prefix
         )
-      ).to.be.revertedWithCustomError(qcRedeemer, "InvalidBitcoinAddressFormat")
+      ).to.be.revertedWith("InvalidBitcoinAddressFormat")
     })
   })
 
@@ -124,10 +143,10 @@ describe("Bitcoin Address Validation Integration", () => {
       await expect(
         qcRedeemer.initiateRedemption(
           deployer.address,
-          ethers.parseEther("1"),
+          ethers.utils.parseEther("1"),
           validP2WSHAddress
         )
-      ).to.be.revertedWithCustomError(qcRedeemer, "ValidationFailed")
+      ).to.be.revertedWith("ValidationFailed")
       // P2WSH validation passed (32-byte hash handled correctly)
     })
   })

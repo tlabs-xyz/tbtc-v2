@@ -44,7 +44,7 @@ describe("SPV Library Integration", () => {
   let testRelay: TestRelay
 
   const validBitcoinAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-  const testAmount = ethers.parseEther("1")
+  const testAmount = ethers.utils.parseEther("1")
 
   before(async () => {
     const signers = await ethers.getSigners()
@@ -99,7 +99,7 @@ describe("SPV Library Integration", () => {
     )
 
     // Setup test environment
-    await systemState.setMinMintAmount(ethers.parseEther("0.01"))
+    await systemState.setMinMintAmount(ethers.utils.parseEther("0.01"))
     await systemState.setRedemptionTimeout(86400)
     await tbtcToken.mint(user.address, testAmount)
     await tbtcToken
@@ -162,7 +162,7 @@ describe("SPV Library Integration", () => {
         qc.address,
         "Test QC",
         "https://test.qc",
-        ethers.parseEther("100"),
+        ethers.utils.parseEther("100"),
         86400
       )
     })
@@ -266,7 +266,7 @@ describe("SPV Library Integration", () => {
         qc.address,
         "Test QC",
         "https://test.qc",
-        ethers.parseEther("100"),
+        ethers.utils.parseEther("100"),
         86400
       )
       await qcData.activateQC(qc.address)
@@ -391,7 +391,7 @@ describe("SPV Library Integration", () => {
         qc.address,
         "Test QC",
         "https://test.qc",
-        ethers.parseEther("100"),
+        ethers.utils.parseEther("100"),
         86400
       )
 
@@ -431,7 +431,7 @@ describe("SPV Library Integration", () => {
         qc.address,
         "Test QC",
         "https://test.qc",
-        ethers.parseEther("100"),
+        ethers.utils.parseEther("100"),
         86400
       )
       await qcData.activateQC(qc.address)
@@ -487,7 +487,7 @@ describe("SPV Library Integration", () => {
         qc.address,
         "Test QC",
         "https://test.qc",
-        ethers.parseEther("100"),
+        ethers.utils.parseEther("100"),
         86400
       )
 
@@ -528,7 +528,7 @@ describe("SPV Library Integration", () => {
         qc.address,
         "Test QC",
         "https://test.qc",
-        ethers.parseEther("100"),
+        ethers.utils.parseEther("100"),
         86400
       )
       await qcData.activateQC(qc.address)

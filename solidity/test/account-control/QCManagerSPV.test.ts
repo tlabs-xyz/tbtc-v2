@@ -41,9 +41,9 @@ describe("QCManagerSPV Library", () => {
   }
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
-    user = signers[1]
+    const [deployerSigner, userSigner] = await ethers.getSigners()
+    deployer = deployerSigner
+    user = userSigner
 
     // Deploy test dependencies
     const TestRelay = await ethers.getContractFactory("TestRelay")
@@ -501,7 +501,7 @@ describe("QCManagerSPV Library", () => {
       const regularOutput = `${value1}${scriptLen1}${script1}`
 
       // Extract just the output part (without the count prefix) from createOpReturnOutput
-      const fullOpReturnOutput = createOpReturnOutput(testChallenge) // Returns "0x01..." 
+      const fullOpReturnOutput = createOpReturnOutput(testChallenge) // Returns "0x01..."
       const opReturnOutputOnly = fullOpReturnOutput.slice(4) // Remove "0x01"
 
       const multiOutputVector = `0x02${regularOutput}${opReturnOutputOnly}` // 2 outputs

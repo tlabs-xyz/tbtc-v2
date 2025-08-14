@@ -36,11 +36,12 @@ describe("QCMinter", () => {
   const maxMintingCapacity = ethers.utils.parseEther("100")
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    deployer = signers[0]
-    user = signers[1]
-    qcAddress = signers[2]
-    thirdParty = signers[3]
+    const [deployerSigner, userSigner, qcAddressSigner, thirdPartySigner] =
+      await ethers.getSigners()
+    deployer = deployerSigner
+    user = userSigner
+    qcAddress = qcAddressSigner
+    thirdParty = thirdPartySigner
   })
 
   beforeEach(async () => {
