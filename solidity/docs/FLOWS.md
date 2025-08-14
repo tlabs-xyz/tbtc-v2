@@ -108,7 +108,7 @@ UnderReview → Active/Revoked (Council decision)
    - Event: `WalletRegistrationRequested`
 
 3. **Watchdog Validates and Registers Wallet**
-   - Watchdog validates OP_RETURN proof using `SPVValidator`
+   - Watchdog validates message signature for wallet ownership
    - Watchdog calls `QCManager.registerWallet(qc, btcAddress, spvProof)` with `REGISTRAR_ROLE`
    - Wallet status set to `Active`
    - Event: `WalletRegistered`
@@ -142,7 +142,7 @@ The onboarding flow now supports the complete QC lifecycle from registration thr
 
 - **Invalid QC Address**: Zero address validation
 - **Insufficient Capacity**: Zero minting capacity provided
-- **Invalid SPV Proof**: Watchdog rejects wallet registration
+- **Invalid Message Signature**: Watchdog rejects wallet registration
 - **Duplicate Registration**: Attempt to register same QC twice
 - **Unauthorized Role**: Non-governance attempts QC registration
 
@@ -1350,12 +1350,10 @@ The Account Control system is deployed with the following components:
 
 #### 9.2.3 Stubbed/Pending Implementation ⚠️
 
-**SPV Proof Verification**: Currently stubbed in multiple contracts ⚠️ DEVELOPMENT ONLY
-- `QCManager._verifyWalletControl()` - SPV validation returns true (line 651)  
-- `QCRedeemer._verifySPVProof()` - Always returns true (line 587)
-- **Impact**: Bitcoin transaction validation not enforced - allows any proof to pass
-- **Status**: TODO for production implementation - requires Bridge SPV infrastructure integration
-- **Security**: DO NOT deploy to production without implementing actual SPV validation
+**Bitcoin Verification Methods**:
+- **Message Signatures**: Used for wallet registration (proving QC controls Bitcoin addresses) ✅ PRODUCTION READY
+- **SPV Proof Verification**: Used for redemption fulfillment (proving QC actually sent Bitcoin to users) - Leverages existing Bridge SPV infrastructure
+- **Important**: Message signatures replaced SPV for wallet registration only. Redemption fulfillment still requires SPV proofs.
 
 **IQCRedeemer Interface Methods**: Placeholder implementations in QCRedeemer
 - `hasUnfulfilledRedemptions(qc)` - Always returns false (line 625)
@@ -1519,7 +1517,7 @@ event MintingCapacityIncreased(
 
 #### 9.2.3 QC Status Change Flow
 
-**Purpose**: Track all QC status transitions (Active → MintingPaused → Paused → UnderReview → Revoked)
+**Purpose**: Track all QC status transitions (Active → MintingPaused → Paused → UnderReview → Revoked). Note: Revoked is reachable from ANY state via governance decision for severe violations.
 
 **Entry Points**: Multiple functions in QCManager
 
