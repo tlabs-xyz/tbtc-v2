@@ -66,7 +66,8 @@ contract MaliciousTBTC is ERC20 {
                 targetRedeemer.initiateRedemption(
                     attackQC,
                     attackAmount,
-                    attackBtcAddress
+                    attackBtcAddress,
+                    attackBtcAddress // Using same address as wallet for test
                 )
             returns (bytes32) {
                 emit AttackResult(
