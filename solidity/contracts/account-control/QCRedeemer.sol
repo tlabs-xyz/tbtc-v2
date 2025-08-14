@@ -25,8 +25,7 @@ import {QCRedeemerSPV} from "./libraries/QCRedeemerSPV.sol";
 ///
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
-/// - REDEEMER_ROLE: Reserved for future functionality (currently unused)
-/// - ARBITER_ROLE: Can record redemption fulfillments and flag defaults
+/// - DISPUTE_ARBITER_ROLE: Can record redemption fulfillments and flag defaults
 contract QCRedeemer is AccessControl, ReentrancyGuard {
     using SPVState for SPVState.Storage;
     
@@ -61,8 +60,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     error InsufficientPayment(uint64 expected, uint64 actual);
 
     // Role definitions for access control
-    bytes32 public constant REDEEMER_ROLE = keccak256("REDEEMER_ROLE");
-    bytes32 public constant ARBITER_ROLE = keccak256("ARBITER_ROLE");
+    bytes32 public constant DISPUTE_ARBITER_ROLE = keccak256("DISPUTE_ARBITER_ROLE");
 
 
     /// @dev Redemption status enumeration
@@ -82,6 +80,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         uint256 deadline;           // Added: Deadline for fulfillment
         RedemptionStatus status;
         string userBtcAddress;
+        string qcWalletAddress;     // Added: QC's chosen wallet for this redemption
     }
 
     // Contract dependencies
@@ -112,6 +111,12 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     
     /// @dev Track number of active redemptions per QC
     mapping(address => uint256) public qcActiveRedemptionCount;
+    
+    /// @dev Track redemptions by wallet for obligation management
+    mapping(string => bytes32[]) public walletActiveRedemptions;
+    
+    /// @dev Track number of active redemptions per wallet
+    mapping(string => uint256) public walletActiveRedemptionCount;
 
     // =================== EVENTS ===================
 
@@ -190,26 +195,28 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         spvState.initialize(_relay, _txProofDifficultyFactor);
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(REDEEMER_ROLE, msg.sender);
-        _grantRole(ARBITER_ROLE, msg.sender);
+        _grantRole(DISPUTE_ARBITER_ROLE, msg.sender);
     }
 
     /// @notice Initiate a redemption request
     /// @param qc The address of the Qualified Custodian
     /// @param amount The amount of tBTC to redeem
     /// @param userBtcAddress The user's Bitcoin address
+    /// @param qcWalletAddress The QC's Bitcoin wallet that will handle this redemption
     /// @return redemptionId Unique identifier for this redemption request
     /// @dev SECURITY: nonReentrant protects against reentrancy via TBTC burnFrom and external calls
     function initiateRedemption(
         address qc,
         uint256 amount,
-        string calldata userBtcAddress
+        string calldata userBtcAddress,
+        string calldata qcWalletAddress
     ) external nonReentrant returns (bytes32 redemptionId) {
         if (qc == address(0)) revert InvalidQCAddress();
         if (amount == 0) revert InvalidAmount();
         if (bytes(userBtcAddress).length == 0) revert BitcoinAddressRequired();
+        if (bytes(qcWalletAddress).length == 0) revert BitcoinAddressRequired();
 
-        // Bitcoin address format validation
+        // Bitcoin address format validation for user address
         bytes memory addr = bytes(userBtcAddress);
         if (
             !(addr[0] == 0x31 ||
@@ -218,6 +225,13 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         ) {
             revert InvalidBitcoinAddressFormat();
         }
+        
+        // Validate QC wallet is registered and active
+        require(qcData.getWalletOwner(qcWalletAddress) == qc, "Wallet not registered to QC");
+        require(
+            qcData.getWalletStatus(qcWalletAddress) == QCData.WalletStatus.Active,
+            "Wallet not active"
+        );
 
         // Check if QC is emergency paused
         if (systemState.isQCEmergencyPaused(qc)) {
@@ -268,12 +282,17 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             requestedAt: block.timestamp,
             deadline: deadline,
             status: RedemptionStatus.Pending,
-            userBtcAddress: userBtcAddress
+            userBtcAddress: userBtcAddress,
+            qcWalletAddress: qcWalletAddress
         });
         
         // Track redemption for QC
         qcRedemptions[qc].push(redemptionId);
         qcActiveRedemptionCount[qc]++;
+        
+        // Track redemption for wallet
+        walletActiveRedemptions[qcWalletAddress].push(redemptionId);
+        walletActiveRedemptionCount[qcWalletAddress]++;
 
         emit RedemptionRequested(
             redemptionId,
@@ -288,7 +307,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         return redemptionId;
     }
 
-    /// @notice Record fulfillment of a redemption (ARBITER_ROLE)
+    /// @notice Record fulfillment of a redemption (DISPUTE_ARBITER_ROLE)
     /// @param redemptionId The unique identifier of the redemption
     /// @param userBtcAddress The user's Bitcoin address
     /// @param expectedAmount The expected payment amount in satoshis
@@ -301,7 +320,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         uint64 expectedAmount,
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
-    ) external onlyRole(ARBITER_ROLE) nonReentrant {
+    ) external onlyRole(DISPUTE_ARBITER_ROLE) nonReentrant {
         if (redemptions[redemptionId].status != RedemptionStatus.Pending) {
             revert RedemptionNotPending();
         }
@@ -322,10 +341,16 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Fulfilled;
         
-        // Update tracking
+        // Update tracking for QC
         address qc = redemptions[redemptionId].qc;
         if (qcActiveRedemptionCount[qc] > 0) {
             qcActiveRedemptionCount[qc]--;
+        }
+        
+        // Update tracking for wallet
+        string memory qcWalletAddress = redemptions[redemptionId].qcWalletAddress;
+        if (walletActiveRedemptionCount[qcWalletAddress] > 0) {
+            walletActiveRedemptionCount[qcWalletAddress]--;
         }
 
         Redemption memory redemption = redemptions[redemptionId];
@@ -339,13 +364,13 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         );
     }
 
-    /// @notice Flag a redemption as defaulted (ARBITER_ROLE)
+    /// @notice Flag a redemption as defaulted (DISPUTE_ARBITER_ROLE)
     /// @param redemptionId The unique identifier of the redemption
     /// @param reason The reason for the default
     /// @dev SECURITY: nonReentrant protects against reentrancy via external calls
     function flagDefaultedRedemption(bytes32 redemptionId, bytes32 reason)
         external
-        onlyRole(ARBITER_ROLE)
+        onlyRole(DISPUTE_ARBITER_ROLE)
         nonReentrant
     {
         if (redemptions[redemptionId].status != RedemptionStatus.Pending) {
@@ -360,10 +385,16 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Defaulted;
         
-        // Update tracking
+        // Update tracking for QC
         address qc = redemptions[redemptionId].qc;
         if (qcActiveRedemptionCount[qc] > 0) {
             qcActiveRedemptionCount[qc]--;
+        }
+        
+        // Update tracking for wallet
+        string memory qcWalletAddress = redemptions[redemptionId].qcWalletAddress;
+        if (walletActiveRedemptionCount[qcWalletAddress] > 0) {
+            walletActiveRedemptionCount[qcWalletAddress]--;
         }
 
         Redemption memory redemption = redemptions[redemptionId];
@@ -760,5 +791,81 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     ) {
         (relay, difficultyFactor) = spvState.getParameters();
         isInitialized = spvState.isInitialized();
+    }
+    
+    // =================== Wallet Obligation Management ===================
+    
+    /// @notice Check if a wallet has unfulfilled redemption obligations
+    /// @param walletAddress The Bitcoin wallet address to check
+    /// @return hasObligations True if wallet has pending redemptions
+    function hasWalletObligations(string calldata walletAddress) 
+        external 
+        view 
+        returns (bool hasObligations) 
+    {
+        return walletActiveRedemptionCount[walletAddress] > 0;
+    }
+    
+    /// @notice Get count of pending redemptions for a wallet
+    /// @param walletAddress The Bitcoin wallet address to check
+    /// @return count Number of pending redemptions
+    function getWalletPendingRedemptionCount(string calldata walletAddress) 
+        external 
+        view 
+        returns (uint256 count) 
+    {
+        return walletActiveRedemptionCount[walletAddress];
+    }
+    
+    /// @notice Get earliest redemption deadline for a wallet
+    /// @param walletAddress The Bitcoin wallet address to check
+    /// @return deadline Earliest deadline timestamp, or type(uint256).max if no pending redemptions
+    function getWalletEarliestRedemptionDeadline(string calldata walletAddress) 
+        external 
+        view 
+        returns (uint256 deadline) 
+    {
+        bytes32[] memory redemptionIds = walletActiveRedemptions[walletAddress];
+        uint256 earliest = type(uint256).max;
+        
+        for (uint256 i = 0; i < redemptionIds.length; i++) {
+            Redemption memory redemption = redemptions[redemptionIds[i]];
+            if (redemption.status == RedemptionStatus.Pending && redemption.deadline < earliest) {
+                earliest = redemption.deadline;
+            }
+        }
+        
+        return earliest;
+    }
+    
+    /// @notice Get detailed obligation information for a wallet
+    /// @param walletAddress The Bitcoin wallet address to check
+    /// @return activeCount Number of active redemptions
+    /// @return totalAmount Total tBTC amount being redeemed
+    /// @return earliestDeadline Earliest redemption deadline
+    function getWalletObligationDetails(string calldata walletAddress)
+        external
+        view
+        returns (
+            uint256 activeCount,
+            uint256 totalAmount,
+            uint256 earliestDeadline
+        )
+    {
+        activeCount = walletActiveRedemptionCount[walletAddress];
+        bytes32[] memory redemptionIds = walletActiveRedemptions[walletAddress];
+        
+        earliestDeadline = type(uint256).max;
+        totalAmount = 0;
+        
+        for (uint256 i = 0; i < redemptionIds.length; i++) {
+            Redemption memory redemption = redemptions[redemptionIds[i]];
+            if (redemption.status == RedemptionStatus.Pending) {
+                totalAmount += redemption.amount;
+                if (redemption.deadline < earliestDeadline) {
+                    earliestDeadline = redemption.deadline;
+                }
+            }
+        }
     }
 }
