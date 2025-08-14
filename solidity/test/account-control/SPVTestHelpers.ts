@@ -7,6 +7,7 @@ import type {
 } from "../../typechain"
 import { assertGasUsed } from "../integration/utils/gas"
 import type { SPVProofTestData } from "../data/bitcoin/spv/valid-spv-proofs"
+import type { BitcoinTxInfo, BitcoinTxProof } from "./AccountControlTestHelpers"
 
 /**
  * Helper utilities for SPV validation testing
@@ -90,8 +91,8 @@ class SPVTestHelpers {
   static createWalletControlProof(
     qcAddress: string,
     btcAddress: string,
-    txInfo: any,
-    proof: any
+    txInfo: BitcoinTxInfo,
+    proof: BitcoinTxProof
   ) {
     return {
       qc: qcAddress,
@@ -106,8 +107,8 @@ class SPVTestHelpers {
    */
   static createRedemptionFulfillmentProof(
     redemptionId: string,
-    txInfo: any,
-    proof: any
+    txInfo: BitcoinTxInfo,
+    proof: BitcoinTxProof
   ) {
     return {
       redemptionId: ethers.utils.id(redemptionId),
@@ -223,20 +224,20 @@ class SPVTestHelpers {
       txHash: string
     }[]
   > {
-    const results = []
+    const results = await Promise.all(
+      testCases.map(async (testCase) => {
+        const { gasUsed, txHash } = await this.validateProofWithGas(
+          spvValidator,
+          testCase
+        )
 
-    for (const testCase of testCases) {
-      const { gasUsed, txHash } = await this.validateProofWithGas(
-        spvValidator,
-        testCase
-      )
-
-      results.push({
-        testName: testCase.name,
-        gasUsed,
-        txHash,
+        return {
+          testName: testCase.name,
+          gasUsed,
+          txHash,
+        }
       })
-    }
+    )
 
     return results
   }

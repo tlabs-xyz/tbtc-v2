@@ -874,25 +874,29 @@ describe("SystemState", () => {
             ethers.utils.id("TECHNICAL_FAILURE"),
           ]
 
-          for (const reason of reasons) {
-            const qc = ethers.Wallet.createRandom().address
+          await Promise.all(
+            reasons.map(async (reason) => {
+              const qc = ethers.Wallet.createRandom().address
 
-            const tx = await systemState
-              .connect(pauserAccount)
-              .emergencyPauseQC(qc, reason)
-            const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
-
-            await expect(tx)
-              .to.emit(systemState, "QCEmergencyPaused")
-              .withArgs(
-                qc,
-                pauserAccount.address,
-                currentBlock.timestamp,
-                reason
+              const tx = await systemState
+                .connect(pauserAccount)
+                .emergencyPauseQC(qc, reason)
+              const currentBlock = await ethers.provider.getBlock(
+                tx.blockNumber!
               )
 
-            expect(await systemState.isQCEmergencyPaused(qc)).to.be.true
-          }
+              await expect(tx)
+                .to.emit(systemState, "QCEmergencyPaused")
+                .withArgs(
+                  qc,
+                  pauserAccount.address,
+                  currentBlock.timestamp,
+                  reason
+                )
+
+              expect(await systemState.isQCEmergencyPaused(qc)).to.be.true
+            })
+          )
         })
 
         it("should allow multiple QCs to be paused independently", async () => {
@@ -1110,7 +1114,7 @@ describe("SystemState", () => {
 
     describe("Emergency Pause Integration", () => {
       describe("qcNotEmergencyPaused modifier", () => {
-        let testContract: any
+        let testContract: any // TestEmergencyIntegration contract interface
 
         beforeEach(async () => {
           // Deploy a test contract that uses the modifier
@@ -1288,11 +1292,13 @@ describe("SystemState", () => {
           ]
 
           // Pause all QCs
-          for (const qc of qcs) {
-            await systemState
-              .connect(pauserAccount)
-              .emergencyPauseQC(qc, testReason)
-          }
+          await Promise.all(
+            qcs.map(async (qc) => {
+              await systemState
+                .connect(pauserAccount)
+                .emergencyPauseQC(qc, testReason)
+            })
+          )
         })
 
         it("should support selective recovery", async () => {
@@ -1306,10 +1312,12 @@ describe("SystemState", () => {
 
         it("should support full recovery", async () => {
           // Unpause all QCs
-          for (const qc of qcs) {
-            await systemState.connect(pauserAccount).emergencyUnpauseQC(qc)
-            expect(await systemState.isQCEmergencyPaused(qc)).to.be.false
-          }
+          await Promise.all(
+            qcs.map(async (qc) => {
+              await systemState.connect(pauserAccount).emergencyUnpauseQC(qc)
+              expect(await systemState.isQCEmergencyPaused(qc)).to.be.false
+            })
+          )
         })
       })
 
