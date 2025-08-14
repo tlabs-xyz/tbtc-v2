@@ -130,6 +130,14 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         address requestedBy,
         uint256 timestamp
     );
+    
+    /// @dev Emitted when a redemption is assigned to a specific wallet
+    event RedemptionAssignedToWallet(
+        bytes32 indexed redemptionId,
+        address indexed qc,
+        string walletAddress,
+        uint256 timestamp
+    );
 
     /// @dev Emitted when a redemption is fulfilled
     event RedemptionFulfilled(
@@ -226,6 +234,16 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             revert InvalidBitcoinAddressFormat();
         }
         
+        // Bitcoin address format validation for QC wallet address
+        bytes memory qcAddr = bytes(qcWalletAddress);
+        if (
+            !(qcAddr[0] == 0x31 ||
+                qcAddr[0] == 0x33 ||
+                (qcAddr[0] == 0x62 && qcAddr.length > 1 && qcAddr[1] == 0x63))
+        ) {
+            revert InvalidBitcoinAddressFormat();
+        }
+        
         // Validate QC wallet is registered and active
         require(qcData.getWalletOwner(qcWalletAddress) == qc, "Wallet not registered to QC");
         require(
@@ -301,6 +319,13 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             amount,
             userBtcAddress,
             msg.sender,
+            block.timestamp
+        );
+        
+        emit RedemptionAssignedToWallet(
+            redemptionId,
+            qc,
+            qcWalletAddress,
             block.timestamp
         );
 
@@ -867,5 +892,18 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
                 }
             }
         }
+    }
+    
+    /// @notice Get active redemption IDs for a wallet
+    /// @param walletAddress The Bitcoin wallet address to check
+    /// @return redemptionIds Array of redemption IDs
+    /// @dev Returns all redemption IDs including fulfilled/defaulted ones
+    ///      Caller should check status to filter active ones
+    function getWalletRedemptions(string calldata walletAddress)
+        external
+        view
+        returns (bytes32[] memory)
+    {
+        return walletActiveRedemptions[walletAddress];
     }
 }
