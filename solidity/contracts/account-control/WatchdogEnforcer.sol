@@ -32,7 +32,7 @@ import "./SystemState.sol";
 ///      4. All enforcement attempts are logged via events for transparency
 contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
     // Role definitions
-    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    bytes32 public constant ENFORCEMENT_ROLE = keccak256("ENFORCEMENT_ROLE");
     
     // Reason codes for objective violations
     bytes32 public constant INSUFFICIENT_RESERVES =
@@ -108,7 +108,7 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         systemState = SystemState(_systemState);
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(MANAGER_ROLE, msg.sender);
+        _grantRole(ENFORCEMENT_ROLE, msg.sender);
     }
 
     /// @notice Enforce an objective violation (PERMISSIONLESS)

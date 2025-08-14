@@ -25,9 +25,9 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   )
   log("")
 
-  // Step 1: Transfer QC_GOVERNANCE_ROLE in QCManager
-  log("Step 1: Transferring QC_GOVERNANCE_ROLE in QCManager...")
-  const QC_GOVERNANCE_ROLE = ethers.utils.id("QC_GOVERNANCE_ROLE")
+  // Step 1: Transfer GOVERNANCE_ROLE in QCManager
+  log("Step 1: Transferring GOVERNANCE_ROLE in QCManager...")
+  const GOVERNANCE_ROLE = ethers.utils.id("GOVERNANCE_ROLE")
 
   // First check if governance already has the role
   const qcManager = await get("QCManager")
@@ -36,7 +36,7 @@ const func: DeployFunction = async function TransferRolesToGovernance(
     qcManager.address
   )
   const governanceHasRole = await qcManagerContract.hasRole(
-    QC_GOVERNANCE_ROLE,
+    GOVERNANCE_ROLE,
     governance
   )
 
@@ -45,29 +45,29 @@ const func: DeployFunction = async function TransferRolesToGovernance(
       "QCManager",
       { from: deployer, log: true },
       "grantRole",
-      QC_GOVERNANCE_ROLE,
+      GOVERNANCE_ROLE,
       governance
     )
-    log("✓ Granted QC_GOVERNANCE_ROLE to governance")
+    log("✓ Granted GOVERNANCE_ROLE to governance")
   } else {
-    log("✓ Governance already has QC_GOVERNANCE_ROLE")
+    log("✓ Governance already has GOVERNANCE_ROLE")
   }
 
   // Optionally revoke from deployer
   const deployerHasRole = await qcManagerContract.hasRole(
-    QC_GOVERNANCE_ROLE,
+    GOVERNANCE_ROLE,
     deployer
   )
   if (deployerHasRole && deployer !== governance) {
-    log("Revoking QC_GOVERNANCE_ROLE from deployer...")
+    log("Revoking GOVERNANCE_ROLE from deployer...")
     await execute(
       "QCManager",
       { from: deployer, log: true },
       "revokeRole",
-      QC_GOVERNANCE_ROLE,
+      GOVERNANCE_ROLE,
       deployer
     )
-    log("✓ Revoked QC_GOVERNANCE_ROLE from deployer")
+    log("✓ Revoked GOVERNANCE_ROLE from deployer")
   }
 
   // Step 2: Transfer DEFAULT_ADMIN_ROLE in all contracts
@@ -117,31 +117,31 @@ const func: DeployFunction = async function TransferRolesToGovernance(
     }
   }
 
-  // Step 3: Transfer PAUSER_ROLE in SystemState
+  // Step 3: Transfer EMERGENCY_ROLE in SystemState
   log("")
-  log("Step 3: Transferring PAUSER_ROLE in SystemState...")
-  const PAUSER_ROLE = ethers.utils.id("PAUSER_ROLE")
+  log("Step 3: Transferring EMERGENCY_ROLE in SystemState...")
+  const EMERGENCY_ROLE = ethers.utils.id("EMERGENCY_ROLE")
   const systemStateDeployment = await get("SystemState")
   const systemState = await ethers.getContractAt(
     "SystemState",
     systemStateDeployment.address
   )
-  const governanceHasPauserRole = await systemState.hasRole(
-    PAUSER_ROLE,
+  const governanceHasEmergencyRole = await systemState.hasRole(
+    EMERGENCY_ROLE,
     governance
   )
 
-  if (!governanceHasPauserRole) {
+  if (!governanceHasEmergencyRole) {
     await execute(
       "SystemState",
       { from: deployer, log: true },
       "grantRole",
-      PAUSER_ROLE,
+      EMERGENCY_ROLE,
       governance
     )
-    log("✓ Granted PAUSER_ROLE to governance")
+    log("✓ Granted EMERGENCY_ROLE to governance")
   } else {
-    log("✓ Governance already has PAUSER_ROLE")
+    log("✓ Governance already has EMERGENCY_ROLE")
   }
 
   // Step 4: Remind about watchdog configuration
@@ -162,9 +162,9 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   log("=== ROLE TRANSFER SUMMARY ===")
   log("")
   log("Roles transferred to governance:")
-  log("- QC_GOVERNANCE_ROLE in QCManager (can register QCs)")
+  log("- GOVERNANCE_ROLE in QCManager (can register QCs)")
   log("- DEFAULT_ADMIN_ROLE in all contracts (can manage roles)")
-  log("- PAUSER_ROLE in SystemState (can pause operations)")
+  log("- EMERGENCY_ROLE in SystemState (can pause operations)")
   log("")
   log("Next steps:")
   log("1. Governance should now revoke DEFAULT_ADMIN_ROLE from deployer")
