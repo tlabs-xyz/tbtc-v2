@@ -3,22 +3,16 @@ import type { BytesLike, BigNumberish } from "ethers"
 /**
  * Represents SPV proof test data for a Bitcoin transaction
  */
+import type {
+  BitcoinTxInfo,
+  BitcoinTxProof,
+} from "../../account-control/AccountControlTestHelpers"
+
 export interface SPVProofTestData {
   name: string
   description: string
-  txInfo: {
-    version: BytesLike
-    inputVector: BytesLike
-    outputVector: BytesLike
-    locktime: BytesLike
-  }
-  proof: {
-    merkleProof: BytesLike
-    txIndexInBlock: BigNumberish
-    bitcoinHeaders: BytesLike
-    coinbasePreimage: BytesLike
-    coinbaseProof: BytesLike
-  }
+  txInfo: BitcoinTxInfo
+  proof: BitcoinTxProof
   expectedTxHash: BytesLike
   chainDifficulty?: number
 }

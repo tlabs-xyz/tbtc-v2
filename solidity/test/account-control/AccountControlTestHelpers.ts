@@ -1,5 +1,27 @@
 import { ethers } from "hardhat"
+import type { BytesLike, BigNumberish } from "ethers"
 import { ValidMainnetProof } from "../data/bitcoin/spv/valid-spv-proofs"
+
+/**
+ * Bitcoin transaction info structure matching BitcoinTx.sol
+ */
+export interface BitcoinTxInfo {
+  version: BytesLike
+  inputVector: BytesLike
+  outputVector: BytesLike
+  locktime: BytesLike
+}
+
+/**
+ * Bitcoin SPV proof structure matching BitcoinTx.sol
+ */
+export interface BitcoinTxProof {
+  merkleProof: BytesLike
+  txIndexInBlock: BigNumberish
+  bitcoinHeaders: BytesLike
+  coinbasePreimage: BytesLike
+  coinbaseProof: BytesLike
+}
 
 /**
  * Helper utilities for Account Control testing
@@ -13,8 +35,8 @@ import { ValidMainnetProof } from "../data/bitcoin/spv/valid-spv-proofs"
  * Use createRealSpvData() for tests that need valid SPV proofs.
  */
 export function createMockSpvData(): {
-  txInfo: any
-  proof: any
+  txInfo: BitcoinTxInfo
+  proof: BitcoinTxProof
 } {
   // Mock BitcoinTx.Info structure - matches struct in BitcoinTx.sol with valid Bitcoin format
   const txInfo = {
@@ -41,8 +63,8 @@ export function createMockSpvData(): {
  * This will pass SPV validation when relay is properly configured
  */
 export function createRealSpvData(): {
-  txInfo: any
-  proof: any
+  txInfo: BitcoinTxInfo
+  proof: BitcoinTxProof
   expectedTxHash: string
   chainDifficulty: number
 } {
@@ -66,8 +88,8 @@ export function createMockWalletControlProof(
   _qcAddress: string,
   _btcAddress: string
 ): {
-  txInfo: any
-  proof: any
+  txInfo: BitcoinTxInfo
+  proof: BitcoinTxProof
 } {
   return createMockSpvData()
 }
@@ -77,7 +99,7 @@ export function createMockWalletControlProof(
  * Configures all necessary relay methods for SPV validation to pass
  */
 export async function setupMockRelayForSpv(
-  mockRelay: any,
+  mockRelay: any, // Mock relay interface varies, keeping any for flexibility
   chainDifficulty?: number
 ): Promise<void> {
   const difficulty = chainDifficulty || 0x1a00ffff
@@ -104,8 +126,8 @@ export async function setupMockRelayForSpv(
  * Creates a complete SPV test setup with real data and proper relay configuration
  */
 export function createCompleteSpvTestData(): {
-  txInfo: any
-  proof: any
+  txInfo: BitcoinTxInfo
+  proof: BitcoinTxProof
   expectedTxHash: string
   chainDifficulty: number
   userBtcAddress: string
@@ -125,9 +147,9 @@ export function createCompleteSpvTestData(): {
  * Uses a working SPV proof to bypass validation issues in setup
  */
 export async function fulfillRedemptionForTest(
-  qcRedeemer: any,
-  testRelay: any,
-  watchdogSigner: any,
+  qcRedeemer: any, // QCRedeemer contract interface
+  testRelay: any, // TestRelay contract interface
+  watchdogSigner: any, // Signer interface
   redemptionId: string
 ): Promise<void> {
   const realSpvData = createCompleteSpvTestData()
@@ -151,9 +173,10 @@ export async function fulfillRedemptionForTest(
         realSpvData.txInfo,
         realSpvData.proof
       )
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Expected to fail on payment verification - that's fine for test setup
-    if (!error.message.includes("Payment verification failed")) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    if (!errorMessage.includes("Payment verification failed")) {
       // If it's not a payment error, there might be another issue
       throw error
     }
