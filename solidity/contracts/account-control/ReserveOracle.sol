@@ -36,18 +36,23 @@ contract ReserveOracle is AccessControl {
         uint256 lastUpdateTimestamp;
     }
 
-    struct PendingAttestation {
-        uint256 balance;
-        uint256 timestamp;
-        address attester;
+    struct PackedAttestation {
+        uint128 balance;
+        uint64 timestamp;
+        uint64 attesterIndex;
     }
 
     // QC address => ReserveData
     mapping(address => ReserveData) public reserves;
 
-    // QC address => attester address => PendingAttestation
-    mapping(address => mapping(address => PendingAttestation))
+    // QC address => attester address => PackedAttestation
+    mapping(address => mapping(address => PackedAttestation))
         public pendingAttestations;
+    
+    // Attester registry for storage optimization
+    mapping(address => uint64) public attesterToIndex;
+    mapping(uint64 => address) public indexToAttester;
+    uint64 public nextAttesterIndex = 1; // Start from 1, 0 reserved for unset
 
     // QC address => array of attester addresses who have pending attestations
     mapping(address => address[]) public pendingAttesters;
@@ -62,6 +67,13 @@ contract ReserveOracle is AccessControl {
         address indexed qc,
         address indexed attester,
         uint256 balance,
+        uint256 timestamp
+    );
+    
+    event BatchAttestationSubmitted(
+        address indexed attester,
+        address[] qcs,
+        uint256[] balances,
         uint256 timestamp
     );
 
@@ -83,6 +95,11 @@ contract ReserveOracle is AccessControl {
         address indexed qc,
         address indexed attester,
         uint256 expiredBalance
+    );
+    
+    event AttesterRegistered(
+        address indexed attester,
+        uint64 attesterIndex
     );
 
     event ConsensusThresholdUpdated(
@@ -108,6 +125,8 @@ contract ReserveOracle is AccessControl {
     error InvalidThreshold();
     error InvalidTimeout();
     error InvalidStaleness();
+    error MismatchedArrays();
+    error BalanceOverflow();
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -115,38 +134,37 @@ contract ReserveOracle is AccessControl {
         _grantRole(DISPUTE_ARBITER_ROLE, msg.sender);
     }
 
-    /// @notice Submit balance attestation for a QC
+    /// @notice Submit balance attestations for multiple QCs in batch
+    /// @param qcs Array of Qualified Custodian addresses
+    /// @param balances Array of attested reserve balances (must match qcs length)
+    function batchAttestBalances(
+        address[] calldata qcs,
+        uint256[] calldata balances
+    ) external onlyRole(ATTESTER_ROLE) {
+        if (qcs.length != balances.length) revert MismatchedArrays();
+        if (qcs.length == 0) return; // No-op for empty arrays
+        
+        // Register attester if not already registered
+        _ensureAttesterRegistered(msg.sender);
+        
+        // Process each attestation
+        for (uint256 i = 0; i < qcs.length; i++) {
+            _attestBalanceInternal(qcs[i], balances[i]);
+        }
+        
+        emit BatchAttestationSubmitted(msg.sender, qcs, balances, block.timestamp);
+    }
+    
+    /// @notice Submit single balance attestation for a QC (for backward compatibility)
     /// @param qc The address of the Qualified Custodian
     /// @param balance The attested reserve balance
     function attestBalance(address qc, uint256 balance)
         external
         onlyRole(ATTESTER_ROLE)
     {
-        if (qc == address(0)) revert QCAddressRequired();
-
-        // Check if this attester has already submitted for this QC
-        if (pendingAttestations[qc][msg.sender].timestamp != 0) {
-            revert AttesterAlreadySubmitted();
-        }
-
-        // Clean up any expired attestations
-        _cleanExpiredAttestations(qc);
-
-        // Record the new attestation
-        pendingAttestations[qc][msg.sender] = PendingAttestation({
-            balance: balance,
-            timestamp: block.timestamp,
-            attester: msg.sender
-        });
-
-        pendingAttesters[qc].push(msg.sender);
-
+        _ensureAttesterRegistered(msg.sender);
+        _attestBalanceInternal(qc, balance);
         emit AttestationSubmitted(qc, msg.sender, balance, block.timestamp);
-
-        // Check if we have enough attestations to reach consensus
-        if (pendingAttesters[qc].length >= consensusThreshold) {
-            _processConsensus(qc);
-        }
     }
 
     /// @notice Get reserve balance and staleness for a QC
@@ -204,10 +222,10 @@ contract ReserveOracle is AccessControl {
         view
         returns (uint256 balance, uint256 timestamp)
     {
-        PendingAttestation memory attestation = pendingAttestations[qc][
+        PackedAttestation memory attestation = pendingAttestations[qc][
             attester
         ];
-        return (attestation.balance, attestation.timestamp);
+        return (uint256(attestation.balance), uint256(attestation.timestamp));
     }
 
     /// @notice Update consensus threshold (DISPUTE_ARBITER_ROLE only)
@@ -278,6 +296,47 @@ contract ReserveOracle is AccessControl {
         emit ReserveBalanceUpdated(qc, oldBalance, balance);
     }
 
+    /// @dev Ensure attester is registered in the index mapping
+    function _ensureAttesterRegistered(address attester) private {
+        if (attesterToIndex[attester] == 0) {
+            uint64 index = nextAttesterIndex++;
+            attesterToIndex[attester] = index;
+            indexToAttester[index] = attester;
+            emit AttesterRegistered(attester, index);
+        }
+    }
+    
+    /// @dev Internal function to process a single attestation
+    function _attestBalanceInternal(address qc, uint256 balance) private {
+        if (qc == address(0)) revert QCAddressRequired();
+        if (balance > type(uint128).max) revert BalanceOverflow();
+
+        // Check if this attester has already submitted for this QC
+        if (pendingAttestations[qc][msg.sender].timestamp != 0) {
+            revert AttesterAlreadySubmitted();
+        }
+
+        // Clean up any expired attestations
+        _cleanExpiredAttestations(qc);
+
+        // Get attester index
+        uint64 attesterIndex = attesterToIndex[msg.sender];
+
+        // Record the new attestation
+        pendingAttestations[qc][msg.sender] = PackedAttestation({
+            balance: uint128(balance),
+            timestamp: uint64(block.timestamp),
+            attesterIndex: attesterIndex
+        });
+
+        pendingAttesters[qc].push(msg.sender);
+
+        // Check if we have enough attestations to reach consensus
+        if (pendingAttesters[qc].length >= consensusThreshold) {
+            _processConsensus(qc);
+        }
+    }
+
     /// @dev Process consensus and update reserve balance
     function _processConsensus(address qc) private {
         uint256[] memory balances = new uint256[](pendingAttesters[qc].length);
@@ -289,15 +348,15 @@ contract ReserveOracle is AccessControl {
         uint256 validCount = 0;
         for (uint256 i = 0; i < pendingAttesters[qc].length; i++) {
             address attester = pendingAttesters[qc][i];
-            PendingAttestation memory attestation = pendingAttestations[qc][
+            PackedAttestation memory attestation = pendingAttestations[qc][
                 attester
             ];
 
             if (
                 attestation.timestamp != 0 &&
-                block.timestamp <= attestation.timestamp + attestationTimeout
+                block.timestamp <= uint256(attestation.timestamp) + attestationTimeout
             ) {
-                balances[validCount] = attestation.balance;
+                balances[validCount] = uint256(attestation.balance);
                 attesters[validCount] = attester;
                 validCount++;
             }
@@ -371,15 +430,15 @@ contract ReserveOracle is AccessControl {
 
         while (i < attesters.length) {
             address attester = attesters[i];
-            PendingAttestation storage attestation = pendingAttestations[qc][
+            PackedAttestation storage attestation = pendingAttestations[qc][
                 attester
             ];
 
             if (
                 attestation.timestamp != 0 &&
-                block.timestamp > attestation.timestamp + attestationTimeout
+                block.timestamp > uint256(attestation.timestamp) + attestationTimeout
             ) {
-                emit AttestationExpired(qc, attester, attestation.balance);
+                emit AttestationExpired(qc, attester, uint256(attestation.balance));
 
                 // Remove expired attestation
                 delete pendingAttestations[qc][attester];
