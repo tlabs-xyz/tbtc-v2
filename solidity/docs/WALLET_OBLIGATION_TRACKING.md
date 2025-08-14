@@ -190,23 +190,64 @@ for (const wallet of wallets) {
 - Cannot remove wallets with active obligations
 - Can implement custom distribution strategies
 
+## Known Limitations
+
+The current V1 implementation has some documented limitations that are acceptable for production use but could be improved in future versions:
+
+### 1. Array Growth Without Cleanup
+**Issue**: The `walletActiveRedemptions` arrays grow over time but never shrink when redemptions are fulfilled or defaulted.
+
+**Impact**: 
+- Gas costs increase over time for functions that iterate through arrays
+- Storage bloat for long-running wallets with many historical redemptions
+
+**Mitigation**: 
+- Critical functions like `hasWalletObligations()` use counters (O(1) complexity)
+- Gas warnings added to functions that iterate through arrays
+- Acceptable for V1 given the trade-off for simplicity
+
+**Future Fix**: Implement array cleanup, use EnumerableSet, or add pagination
+
+### 2. Small Race Condition Window
+**Issue**: In `requestWalletDeRegistration()`, there's a small window between checking obligations and executing de-registration.
+
+**Impact**: 
+- A new redemption could theoretically be initiated during this window
+- Very unlikely in practice since QCs control their own wallet usage
+
+**Mitigation**: 
+- Window is extremely small (single transaction execution)
+- QCs have no incentive to exploit this against themselves
+
+**Future Fix**: Implement atomic check-and-act pattern or mutex
+
 ## Future Enhancements
 
 Potential improvements for future versions:
 
-1. **Emergency De-registration**
+1. **Array Management**
+   - Implement array cleanup on fulfillment/default
+   - Use OpenZeppelin's EnumerableSet for better storage management
+   - Add pagination for large result sets
+
+2. **Emergency De-registration**
    - Time-based escape hatch for overdue redemptions
    - Automatic default flagging after deadline + grace period
 
-2. **Wallet Performance Metrics**
+3. **Wallet Performance Metrics**
    - Track fulfillment rates per wallet
    - Historical performance scoring
    - Reputation-based assignment preferences
 
-3. **Load Balancing**
+4. **Advanced Load Balancing**
    - Automatic distribution algorithms
    - Capacity-based routing
    - Priority queue management
+
+5. **Atomic Operations**
+   - Mutex-style locks for critical sections
+   - Atomic check-and-act patterns
+   - Better concurrency control
 
 ## Conclusion
 
