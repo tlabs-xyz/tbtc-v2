@@ -292,17 +292,11 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // 1 tBTC = 1e18 wei, 1 BTC = 1e8 satoshis
         uint256 satoshis = amount / SATOSHI_MULTIPLIER;
 
-        // Bank interaction with auto-minting
-        address[] memory depositors = new address[](1);
-        uint256[] memory amounts = new uint256[](1);
-        depositors[0] = user;
-        amounts[0] = satoshis;
-
         // Emit event before Bank interaction for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
 
-        // This will create Bank balance and automatically trigger TBTCVault minting
-        bank.increaseBalanceAndCall(address(tbtcVault), depositors, amounts);
+        // Create Bank balance (no longer auto-triggers TBTCVault minting)
+        bank.increaseBalance(user, satoshis);
 
         // Update QC minted amount
         _updateQCMintedAmount(qc, amount);
@@ -428,10 +422,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             completed: false
         });
 
-        // Verify this contract is authorized in Bank (same as original)
-        if (!bank.authorizedBalanceIncreasers(address(this))) {
-            revert NotAuthorizedInBank();
-        }
+        // No need to check authorization here - Bank will check when we call increaseBalance
 
         // Convert tBTC amount to satoshis for Bank balance
         uint256 satoshis = amount / SATOSHI_MULTIPLIER;
