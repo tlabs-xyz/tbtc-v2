@@ -10,6 +10,15 @@ import "../bank/Bank.sol";
 import "../vault/TBTCVault.sol";
 import "../token/TBTC.sol";
 
+/// @notice Interface for mint helper contract
+interface IMintHelper {
+    function autoMint(
+        address user,
+        uint256 satoshis,
+        bytes calldata permitData
+    ) external;
+}
+
 /// @title QCMinter
 /// @notice QC-backed tBTC minting implementation
 /// @dev This contract validates QC status, reserve freshness, and capacity
@@ -29,6 +38,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     error NotAuthorizedInBank();
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
     uint256 public constant SATOSHI_MULTIPLIER = 1e10;
 
     // Core protocol contracts
@@ -40,6 +50,9 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     QCData public immutable qcData;
     SystemState public immutable systemState;
     QCManager public immutable qcManager;
+
+    // Hybrid minting support
+    address public mintHelper;
 
     /// @dev Mapping to track mint requests
     mapping(bytes32 => MintRequest) public mintRequests;
@@ -104,6 +117,16 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         uint256 timestamp
     );
 
+    /// @notice Emitted when mint helper address is updated
+    event MintHelperUpdated(address indexed oldHelper, address indexed newHelper);
+
+    /// @notice Emitted when QC mint is completed (hybrid version)
+    event QCMintCompleted(
+        address indexed user,
+        uint256 satoshis,
+        bool automated
+    );
+
     constructor(
         address _bank,
         address _tbtcVault,
@@ -131,6 +154,14 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     }
 
     /// @notice Request minting of tBTC tokens
+    /// @notice Set the mint helper contract address
+    /// @param _mintHelper The new mint helper contract address
+    function setMintHelper(address _mintHelper) external onlyRole(GOVERNANCE_ROLE) {
+        address oldHelper = mintHelper;
+        mintHelper = _mintHelper;
+        emit MintHelperUpdated(oldHelper, _mintHelper);
+    }
+
     /// @dev Validates QC capacity, creates Bank balance, and triggers TBTCVault minting
     ///      SECURITY: nonReentrant protects against reentrancy via Bank.increaseBalanceAndCall
     /// @param qc The address of the Qualified Custodian
@@ -143,6 +174,21 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         returns (bytes32 mintId)
     {
         return _requestMint(qc, msg.sender, amount);
+    }
+
+    /// @notice Request QC-backed minting with hybrid options
+    /// @param qc The address of the Qualified Custodian
+    /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
+    /// @param autoMint Whether to use automated minting via helper contract
+    /// @param permitData Optional permit data for gasless approval (empty for pre-approved)
+    /// @return mintId Unique identifier for this minting request
+    function requestQCMintHybrid(
+        address qc,
+        uint256 amount,
+        bool autoMint,
+        bytes calldata permitData
+    ) external onlyRole(MINTER_ROLE) nonReentrant returns (bytes32 mintId) {
+        return _requestMintHybrid(qc, msg.sender, amount, autoMint, permitData);
     }
 
     /// @notice Internal minting logic
@@ -266,6 +312,159 @@ contract QCMinter is AccessControl, ReentrancyGuard {
 
         // Emit events
         emit QCBackedDepositCredited(user, satoshis, qc, mintId, true);
+        emit MintCompleted(
+            mintId,
+            qc,
+            user,
+            amount,
+            msg.sender,
+            block.timestamp
+        );
+        emit QCMintRequested(
+            qc,
+            user,
+            amount,
+            mintId,
+            msg.sender,
+            block.timestamp
+        );
+
+        return mintId;
+    }
+
+    /// @notice Internal hybrid minting logic
+    /// @param qc The address of the Qualified Custodian
+    /// @param user The address receiving the tBTC tokens
+    /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
+    /// @param autoMint Whether to use automated minting via helper contract
+    /// @param permitData Optional permit data for gasless approval
+    /// @return mintId Unique identifier for this minting request
+    function _requestMintHybrid(
+        address qc,
+        address user,
+        uint256 amount,
+        bool autoMint,
+        bytes calldata permitData
+    ) internal returns (bytes32 mintId) {
+        // Validate inputs (same as original)
+        if (qc == address(0)) revert InvalidQCAddress();
+        if (user == address(0)) revert InvalidUserAddress();
+        if (amount == 0) revert InvalidAmount();
+
+        // Check system state (same as original)
+        if (systemState.isMintingPaused()) {
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "Minting paused",
+                msg.sender,
+                block.timestamp
+            );
+            revert MintingPaused();
+        }
+        if (systemState.isQCEmergencyPaused(qc)) {
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "QC emergency paused",
+                msg.sender,
+                block.timestamp
+            );
+            revert SystemState.QCIsEmergencyPaused(qc);
+        }
+        if (
+            amount < systemState.minMintAmount() ||
+            amount > systemState.maxMintAmount()
+        ) {
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "Amount outside allowed range",
+                msg.sender,
+                block.timestamp
+            );
+            revert AmountOutsideAllowedRange();
+        }
+
+        // Check QC status (same as original)
+        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "QC not active",
+                msg.sender,
+                block.timestamp
+            );
+            revert QCNotActive();
+        }
+
+        // Check minting capacity (same as original)
+        uint256 availableCapacity = getAvailableMintingCapacity(qc);
+        if (amount > availableCapacity) {
+            emit MintRejected(
+                qc,
+                user,
+                amount,
+                "Insufficient capacity",
+                msg.sender,
+                block.timestamp
+            );
+            revert InsufficientMintingCapacity();
+        }
+
+        // Generate unique mint ID (same as original)
+        mintId = _generateMintId(qc, user, amount);
+
+        // Store mint request (same as original)
+        mintRequests[mintId] = MintRequest({
+            qc: qc,
+            user: user,
+            amount: amount,
+            timestamp: block.timestamp,
+            completed: false
+        });
+
+        // Verify this contract is authorized in Bank (same as original)
+        if (!bank.authorizedBalanceIncreasers(address(this))) {
+            revert NotAuthorizedInBank();
+        }
+
+        // Convert tBTC amount to satoshis for Bank balance
+        uint256 satoshis = amount / SATOSHI_MULTIPLIER;
+
+        // HYBRID LOGIC: Choose between manual and automated minting
+        if (autoMint && mintHelper != address(0)) {
+            // Option 1: Automated via helper contract
+            bank.increaseBalance(user, satoshis);
+            
+            // Trigger automated minting via helper
+            IMintHelper(mintHelper).autoMint(user, satoshis, permitData);
+            
+            // Emit event for automated completion
+            emit QCMintCompleted(user, satoshis, true);
+        } else {
+            // Option 2: Manual process - just create Bank balance
+            bank.increaseBalance(user, satoshis);
+            
+            // Emit event with helper address for potential automation
+            emit QCMintCompleted(user, satoshis, false);
+        }
+
+        // Emit event for QC attribution (same as original)
+        emit QCBankBalanceCreated(qc, user, satoshis, mintId);
+
+        // Update QC minted amount (same as original)
+        _updateQCMintedAmount(qc, amount);
+
+        // Mark mint as completed (same as original)
+        mintRequests[mintId].completed = true;
+
+        // Emit completion events (same as original)
+        emit QCBackedDepositCredited(user, satoshis, qc, mintId, autoMint);
         emit MintCompleted(
             mintId,
             qc,
