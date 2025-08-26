@@ -84,7 +84,7 @@ describe("QCMinter", () => {
     mockQCManager.updateQCMintedAmount.returns()
 
     mockBank.authorizedBalanceIncreasers.returns(true)
-    mockBank.increaseBalanceAndCall.returns()
+    mockBank.increaseBalance.returns()
   })
 
   afterEach(async () => {
@@ -143,10 +143,9 @@ describe("QCMinter", () => {
           .connect(user)
           .requestQCMint(qcAddress.address, mintAmount)
 
-        expect(mockBank.increaseBalanceAndCall).to.have.been.calledWith(
-          mockTBTCVault.address,
-          [user.address],
-          [satoshis]
+        expect(mockBank.increaseBalance).to.have.been.calledWith(
+          user.address,
+          satoshis
         )
       })
 
