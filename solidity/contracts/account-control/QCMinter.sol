@@ -162,8 +162,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         emit MintHelperUpdated(oldHelper, _mintHelper);
     }
 
-    /// @dev Validates QC capacity, creates Bank balance, and triggers TBTCVault minting
-    ///      SECURITY: nonReentrant protects against reentrancy via Bank.increaseBalanceAndCall
+    /// @dev Validates QC capacity and creates Bank balance
+    ///      SECURITY: nonReentrant protects against reentrancy
     /// @param qc The address of the Qualified Custodian
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
     /// @return mintId Unique identifier for this minting request
