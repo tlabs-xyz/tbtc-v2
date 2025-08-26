@@ -16,20 +16,8 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   let bank, tbtcVault, tbtc, lightRelay
   
   try {
-    // For testnet: Use BankV2 if available (has increaseBalanceAndCall)
-    // For mainnet: Use existing Bank (would need governance upgrade)
-    if (network.name !== "mainnet") {
-      try {
-        bank = await get("BankV2")
-        log("Using BankV2 for Account Control (with increaseBalanceAndCall)")
-      } catch {
-        bank = await get("Bank")
-        log("WARNING: Using original Bank - increaseBalanceAndCall may not be available")
-        log("Consider deploying BankV2 first with: npx hardhat deploy --tags BankV2")
-      }
-    } else {
-      bank = await get("Bank")
-    }
+    // Use the existing Bank contract
+    bank = await get("Bank")
     
     tbtcVault = await get("TBTCVault")  
     tbtc = await get("TBTC")
@@ -236,6 +224,19 @@ const func: DeployFunction = async function DeployAccountControlUnified(
     await qcMinterContract.grantRole(GOVERNANCE_ROLE, deployer)
     await qcMinterContract.setMintHelper(qcMintHelper.address)
     log(`Configured QCMintHelper in QCMinter`)
+
+    // Authorize QCMinter in Bank (for testnet only)
+    if (network.name !== "mainnet") {
+      const bankContract = await ethers.getContractAt("Bank", bank.address)
+      const bankOwner = await bankContract.owner()
+      
+      if (bankOwner.toLowerCase() === deployer.toLowerCase()) {
+        await bankContract.setAuthorizedBalanceIncreaser(qcMinter.address, true)
+        log(`Authorized QCMinter to increase Bank balances`)
+      } else {
+        log(`WARNING: Bank owned by ${bankOwner}, manual authorization required`)
+      }
+    }
 
   } catch (error) {
     log(`Warning: Could not configure roles automatically: ${error.message}`)
