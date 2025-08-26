@@ -14,7 +14,6 @@ contract QCMintHelper is ReentrancyGuard {
     error InvalidQCMinter();
     error InsufficientBalance();
     error InvalidUser();
-    error PermitFailed();
     error ZeroAmount();
 
     Bank public immutable bank;
@@ -34,12 +33,6 @@ contract QCMintHelper is ReentrancyGuard {
         address indexed user,
         uint256 satoshis,
         uint256 tbtcAmount
-    );
-
-    event PermitExecuted(
-        address indexed user,
-        uint256 amount,
-        uint256 deadline
     );
 
     modifier onlyQCMinter() {
@@ -66,9 +59,10 @@ contract QCMintHelper is ReentrancyGuard {
 
     /// @notice Automatically mint tBTC for user using their Bank balance
     /// @dev Called by QCMinter after Bank balance is created
+    ///      User must have pre-approved this contract to spend their Bank balance
     /// @param user The user receiving tBTC tokens
     /// @param satoshis Amount of satoshis to convert to tBTC
-    /// @param permitData Optional EIP-2612 permit data for gasless approval
+    /// @param permitData Reserved for future use (currently ignored)
     function autoMint(
         address user,
         uint256 satoshis,
@@ -78,9 +72,9 @@ contract QCMintHelper is ReentrancyGuard {
         if (satoshis == 0) revert ZeroAmount();
         if (bank.balanceOf(user) < satoshis) revert InsufficientBalance();
 
-        // Handle permit if provided (gasless approval)
-        if (permitData.length > 0) {
-            _handlePermit(user, satoshis, permitData);
+        // Check user has approved this contract to spend their balance
+        if (bank.allowance(user, address(this)) < satoshis) {
+            revert InsufficientBalance(); // Reusing error for insufficient allowance
         }
 
         // Transfer Bank balance from user to helper
@@ -115,39 +109,6 @@ contract QCMintHelper is ReentrancyGuard {
         emit ManualMintCompleted(user, satoshis, tbtcAmount);
     }
 
-    /// @notice Handle EIP-2612 permit for gasless approval
-    /// @dev Decodes and executes permit data to approve Bank balance spending
-    /// @param user The user granting permission
-    /// @param amount The amount to approve (in satoshis)
-    /// @param permitData Encoded permit parameters (owner, spender, value, deadline, v, r, s)
-    function _handlePermit(
-        address user,
-        uint256 amount,
-        bytes calldata permitData
-    ) internal {
-        // Decode permit parameters
-        // permitData format: abi.encode(owner, spender, value, deadline, v, r, s)
-        (
-            address owner,
-            address spender,
-            uint256 value,
-            uint256 deadline,
-            uint8 v,
-            bytes32 r,
-            bytes32 s
-        ) = abi.decode(permitData, (address, address, uint256, uint256, uint8, bytes32, bytes32));
-
-        // Validate permit parameters
-        require(owner == user, "Permit owner mismatch");
-        require(spender == address(this), "Permit spender mismatch");
-        require(value >= amount, "Permit value insufficient");
-
-        try bank.permit(owner, spender, value, deadline, v, r, s) {
-            emit PermitExecuted(user, value, deadline);
-        } catch {
-            revert PermitFailed();
-        }
-    }
 
     /// @notice Get the expected tBTC amount for given satoshi amount
     /// @param satoshis Amount in satoshis

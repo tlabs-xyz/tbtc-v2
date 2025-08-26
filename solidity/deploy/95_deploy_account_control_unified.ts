@@ -159,6 +159,20 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   })
   log(`QCMinter deployed at: ${qcMinter.address}`)
 
+  // Deploy QCMintHelper for hybrid minting
+  const qcMintHelper = await deploy("QCMintHelper", {
+    from: deployer,
+    args: [
+      bank.address,
+      tbtcVault.address,
+      tbtc.address,
+      qcMinter.address,
+    ],
+    log: true,
+    waitConfirmations: network.live ? 5 : 1,
+  })
+  log(`QCMintHelper deployed at: ${qcMintHelper.address}`)
+
   // Configure SPV parameters for QCRedeemer
   const txProofDifficultyFactor =
     network.name === "hardhat" ||
@@ -214,6 +228,15 @@ const func: DeployFunction = async function DeployAccountControlUnified(
     await qcDataContract.grantRole(QC_MANAGER_ROLE, qcRedeemer.address)
     log(`Granted storage access to QCMinter and QCRedeemer`)
 
+    // Configure QCMintHelper in QCMinter
+    const qcMinterContract = await ethers.getContractAt("QCMinter", qcMinter.address)
+    const GOVERNANCE_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("GOVERNANCE_ROLE"))
+    
+    // Grant GOVERNANCE_ROLE to deployer temporarily for configuration
+    await qcMinterContract.grantRole(GOVERNANCE_ROLE, deployer)
+    await qcMinterContract.setMintHelper(qcMintHelper.address)
+    log(`Configured QCMintHelper in QCMinter`)
+
   } catch (error) {
     log(`Warning: Could not configure roles automatically: ${error.message}`)
     log("Roles will need to be configured manually")
@@ -226,6 +249,7 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   log(`  ReserveOracle:    ${reserveOracle.address}`)
   log(`  QCManager:        ${qcManager.address}`)
   log(`  QCMinter:         ${qcMinter.address}`)
+  log(`  QCMintHelper:     ${qcMintHelper.address}`)
   log(`  QCRedeemer:       ${qcRedeemer.address}`)
   log(`  WatchdogEnforcer: ${watchdogEnforcer.address}`)
   log("\nLibraries:")
