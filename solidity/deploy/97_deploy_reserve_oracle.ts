@@ -21,6 +21,6 @@ const func: DeployFunction = async function DeployReserveOracle(
 }
 
 func.tags = ["ReserveOracle"]
-func.dependencies = ["QCData", "SystemState"] // Basic dependencies only
+func.dependencies = [] // Fixed: ReserveOracle is standalone, no dependencies
 
 export default func

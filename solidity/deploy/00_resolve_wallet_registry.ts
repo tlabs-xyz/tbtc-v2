@@ -5,6 +5,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, helpers } = hre
   const { log } = deployments
 
+  // Skip WalletRegistry check for test networks
+  if (hre.network.name === "hardhat" || 
+      hre.network.name === "localhost" ||
+      hre.network.name === "development") {
+    log("Skipping WalletRegistry resolution for test network")
+    return
+  }
+
   const WalletRegistry = await deployments.getOrNull("WalletRegistry")
 
   if (WalletRegistry && helpers.address.isValid(WalletRegistry.address)) {
