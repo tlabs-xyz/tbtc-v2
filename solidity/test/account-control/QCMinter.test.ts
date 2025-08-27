@@ -370,6 +370,260 @@ describe("QCMinter", () => {
     })
   })
 
+  describe("Auto-minting functionality", () => {
+    describe("setAutoMintEnabled", () => {
+      it("should set auto-minting enabled", async () => {
+        await qcMinter.setAutoMintEnabled(true)
+        expect(await qcMinter.autoMintEnabled()).to.be.true
+      })
+
+      it("should set auto-minting disabled", async () => {
+        await qcMinter.setAutoMintEnabled(false)
+        expect(await qcMinter.autoMintEnabled()).to.be.false
+      })
+
+      it("should emit AutoMintToggled event", async () => {
+        await expect(qcMinter.setAutoMintEnabled(true))
+          .to.emit(qcMinter, "AutoMintToggled")
+          .withArgs(true)
+      })
+
+      it("should revert when called by non-governance", async () => {
+        await expect(
+          qcMinter.connect(user).setAutoMintEnabled(true)
+        ).to.be.reverted
+      })
+    })
+
+    describe("manualMint", () => {
+      beforeEach(async () => {
+        // Set up mocks for manual minting
+        mockBank.balanceOf.returns(satoshis)
+        mockBank.allowance.returns(satoshis)
+        mockBank.transferBalanceFrom.returns()
+        mockTBTCVault.mint.returns()
+        mockTBTC.transfer.returns(true)
+      })
+
+      it("should check user has Bank balance", async () => {
+        await qcMinter.connect(user).manualMint(user.address)
+        
+        expect(mockBank.balanceOf).to.have.been.calledWith(user.address)
+      })
+
+      it("should check user has sufficient allowance", async () => {
+        await qcMinter.connect(user).manualMint(user.address)
+        
+        expect(mockBank.allowance).to.have.been.calledWith(
+          user.address,
+          qcMinter.address
+        )
+      })
+
+      it("should transfer balance from user", async () => {
+        await qcMinter.connect(user).manualMint(user.address)
+        
+        expect(mockBank.transferBalanceFrom).to.have.been.calledWith(
+          user.address,
+          qcMinter.address,
+          satoshis
+        )
+      })
+
+      it("should mint tBTC", async () => {
+        await qcMinter.connect(user).manualMint(user.address)
+        
+        expect(mockTBTCVault.mint).to.have.been.calledWith(mintAmount)
+      })
+
+      it("should transfer tBTC to user", async () => {
+        await qcMinter.connect(user).manualMint(user.address)
+        
+        expect(mockTBTC.transfer).to.have.been.calledWith(
+          user.address,
+          mintAmount
+        )
+      })
+
+      it("should emit ManualMintCompleted event", async () => {
+        await expect(qcMinter.connect(user).manualMint(user.address))
+          .to.emit(qcMinter, "ManualMintCompleted")
+          .withArgs(user.address, satoshis, mintAmount)
+      })
+
+      it("should revert when user has no balance", async () => {
+        mockBank.balanceOf.returns(0)
+        
+        await expect(
+          qcMinter.connect(user).manualMint(user.address)
+        ).to.be.revertedWith("InsufficientBalance")
+      })
+
+      it("should revert when user has insufficient allowance", async () => {
+        mockBank.allowance.returns(satoshis.sub(1))
+        
+        await expect(
+          qcMinter.connect(user).manualMint(user.address)
+        ).to.be.revertedWith("InsufficientAllowance")
+      })
+    })
+
+    describe("checkMintEligibility (Bank balance)", () => {
+      beforeEach(async () => {
+        mockBank.balanceOf.returns(satoshis)
+        mockBank.allowance.returns(satoshis)
+      })
+
+      it("should return balance and allowance info", async () => {
+        const result = await qcMinter.checkMintEligibility(user.address)
+        
+        expect(result.hasBalance).to.be.true
+        expect(result.hasAllowance).to.be.true
+        expect(result.balance).to.equal(satoshis)
+        expect(result.allowance).to.equal(satoshis)
+      })
+
+      it("should return false when no balance", async () => {
+        mockBank.balanceOf.returns(0)
+        
+        const result = await qcMinter.checkMintEligibility(user.address)
+        
+        expect(result.hasBalance).to.be.false
+        expect(result.balance).to.equal(0)
+      })
+
+      it("should return false when insufficient allowance", async () => {
+        mockBank.allowance.returns(0)
+        
+        const result = await qcMinter.checkMintEligibility(user.address)
+        
+        expect(result.hasAllowance).to.be.false
+        expect(result.allowance).to.equal(0)
+      })
+    })
+
+    describe("getSatoshiToTBTCAmount", () => {
+      it("should convert satoshis to tBTC amount", async () => {
+        const result = await qcMinter.getSatoshiToTBTCAmount(satoshis)
+        
+        expect(result).to.equal(mintAmount)
+      })
+
+      it("should handle zero satoshis", async () => {
+        const result = await qcMinter.getSatoshiToTBTCAmount(0)
+        
+        expect(result).to.equal(0)
+      })
+
+      it("should handle large amounts", async () => {
+        const largeSatoshis = ethers.utils.parseUnits("1", 8) // 1 BTC
+        const expectedTBTC = ethers.utils.parseEther("1") // 1 tBTC
+        
+        const result = await qcMinter.getSatoshiToTBTCAmount(largeSatoshis)
+        
+        expect(result).to.equal(expectedTBTC)
+      })
+    })
+
+    describe("requestQCMintHybrid with auto-minting", () => {
+      beforeEach(async () => {
+        // Enable auto-minting
+        await qcMinter.setAutoMintEnabled(true)
+        
+        // Set up mocks for auto-minting
+        mockBank.allowance.returns(satoshis)
+        mockBank.transferBalanceFrom.returns()
+        mockTBTCVault.mint.returns()
+        mockTBTC.transfer.returns(true)
+      })
+
+      it("should perform auto-mint when enabled and requested", async () => {
+        const permitData = "0x" // Empty permit data
+        
+        await qcMinter
+          .connect(user)
+          .requestQCMintHybrid(qcAddress.address, mintAmount, true, permitData)
+
+        // Should call the regular mint flow
+        expect(mockBank.increaseBalance).to.have.been.calledWith(
+          user.address,
+          satoshis
+        )
+        
+        // Should also call auto-mint flow
+        expect(mockBank.transferBalanceFrom).to.have.been.calledWith(
+          user.address,
+          qcMinter.address,
+          satoshis
+        )
+        expect(mockTBTCVault.mint).to.have.been.calledWith(mintAmount)
+        expect(mockTBTC.transfer).to.have.been.calledWith(
+          user.address,
+          mintAmount
+        )
+      })
+
+      it("should emit AutoMintCompleted when auto-mint succeeds", async () => {
+        const permitData = "0x"
+        
+        await expect(
+          qcMinter
+            .connect(user)
+            .requestQCMintHybrid(qcAddress.address, mintAmount, true, permitData)
+        ).to.emit(qcMinter, "AutoMintCompleted")
+          .withArgs(user.address, satoshis, mintAmount)
+      })
+
+      it("should not auto-mint when autoMint flag is false", async () => {
+        const permitData = "0x"
+        
+        await qcMinter
+          .connect(user)
+          .requestQCMintHybrid(qcAddress.address, mintAmount, false, permitData)
+
+        // Should call the regular mint flow
+        expect(mockBank.increaseBalance).to.have.been.calledWith(
+          user.address,
+          satoshis
+        )
+        
+        // Should NOT call auto-mint flow
+        expect(mockBank.transferBalanceFrom).to.not.have.been.called
+        expect(mockTBTCVault.mint).to.not.have.been.called
+        expect(mockTBTC.transfer).to.not.have.been.called
+      })
+
+      it("should not auto-mint when auto-minting is disabled", async () => {
+        await qcMinter.setAutoMintEnabled(false)
+        const permitData = "0x"
+        
+        await qcMinter
+          .connect(user)
+          .requestQCMintHybrid(qcAddress.address, mintAmount, true, permitData)
+
+        // Should call the regular mint flow
+        expect(mockBank.increaseBalance).to.have.been.calledWith(
+          user.address,
+          satoshis
+        )
+        
+        // Should NOT call auto-mint flow
+        expect(mockBank.transferBalanceFrom).to.not.have.been.called
+      })
+
+      it("should revert when insufficient allowance for auto-mint", async () => {
+        mockBank.allowance.returns(satoshis.sub(1))
+        const permitData = "0x"
+        
+        await expect(
+          qcMinter
+            .connect(user)
+            .requestQCMintHybrid(qcAddress.address, mintAmount, true, permitData)
+        ).to.be.revertedWith("InsufficientAllowance")
+      })
+    })
+  })
+
   describe("Access Control", () => {
     context("when caller does not have MINTER_ROLE", () => {
       it("should revert requestQCMint", async () => {

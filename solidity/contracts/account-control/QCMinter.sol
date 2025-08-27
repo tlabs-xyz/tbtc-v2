@@ -10,14 +10,6 @@ import "../bank/Bank.sol";
 import "../vault/TBTCVault.sol";
 import "../token/TBTC.sol";
 
-/// @notice Interface for mint helper contract
-interface IMintHelper {
-    function autoMint(
-        address user,
-        uint256 satoshis,
-        bytes calldata permitData
-    ) external;
-}
 
 /// @title QCMinter
 /// @notice QC-backed tBTC minting implementation
@@ -36,6 +28,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     error QCNotActive();
     error InsufficientMintingCapacity();
     error NotAuthorizedInBank();
+    error InsufficientBalance();
+    error ZeroAmount();
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
@@ -51,8 +45,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     SystemState public immutable systemState;
     QCManager public immutable qcManager;
 
-    // Hybrid minting support
-    address public mintHelper;
+    // Auto-minting support
+    bool public autoMintEnabled;
 
     /// @dev Mapping to track mint requests
     mapping(bytes32 => MintRequest) public mintRequests;
@@ -117,8 +111,22 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         uint256 timestamp
     );
 
-    /// @notice Emitted when mint helper address is updated
-    event MintHelperUpdated(address indexed oldHelper, address indexed newHelper);
+    /// @notice Emitted when auto-mint feature is enabled/disabled
+    event AutoMintToggled(bool enabled);
+
+    /// @notice Emitted when auto-mint is completed
+    event AutoMintCompleted(
+        address indexed user,
+        uint256 satoshis,
+        uint256 tbtcAmount
+    );
+
+    /// @notice Emitted when manual mint is completed
+    event ManualMintCompleted(
+        address indexed user,
+        uint256 satoshis,
+        uint256 tbtcAmount
+    );
 
     /// @notice Emitted when QC mint is completed (hybrid version)
     event QCMintCompleted(
@@ -153,13 +161,11 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         _grantRole(MINTER_ROLE, msg.sender);
     }
 
-    /// @notice Request minting of tBTC tokens
-    /// @notice Set the mint helper contract address
-    /// @param _mintHelper The new mint helper contract address
-    function setMintHelper(address _mintHelper) external onlyRole(GOVERNANCE_ROLE) {
-        address oldHelper = mintHelper;
-        mintHelper = _mintHelper;
-        emit MintHelperUpdated(oldHelper, _mintHelper);
+    /// @notice Enable or disable auto-minting feature
+    /// @param enabled Whether auto-minting should be enabled
+    function setAutoMintEnabled(bool enabled) external onlyRole(GOVERNANCE_ROLE) {
+        autoMintEnabled = enabled;
+        emit AutoMintToggled(enabled);
     }
 
     /// @dev Validates QC capacity and creates Bank balance
@@ -179,8 +185,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @notice Request QC-backed minting with hybrid options
     /// @param qc The address of the Qualified Custodian
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
-    /// @param autoMint Whether to use automated minting via helper contract
-    /// @param permitData Optional permit data for gasless approval (empty for pre-approved)
+    /// @param autoMint Whether to use automated minting (if enabled)
+    /// @param permitData Optional permit data for gasless approval (currently unused)
     /// @return mintId Unique identifier for this minting request
     function requestQCMintHybrid(
         address qc,
@@ -330,8 +336,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @param qc The address of the Qualified Custodian
     /// @param user The address receiving the tBTC tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
-    /// @param autoMint Whether to use automated minting via helper contract
-    /// @param permitData Optional permit data for gasless approval
+    /// @param autoMint Whether to use automated minting (if enabled)
+    /// @param permitData Optional permit data for gasless approval (currently unused)
     /// @return mintId Unique identifier for this minting request
     function _requestMintHybrid(
         address qc,
@@ -428,12 +434,12 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         uint256 satoshis = amount / SATOSHI_MULTIPLIER;
 
         // HYBRID LOGIC: Choose between manual and automated minting
-        if (autoMint && mintHelper != address(0)) {
-            // Option 1: Automated via helper contract
+        if (autoMint && autoMintEnabled) {
+            // Option 1: Automated minting - create balance and immediately mint tBTC
             bank.increaseBalance(user, satoshis);
             
-            // Trigger automated minting via helper
-            IMintHelper(mintHelper).autoMint(user, satoshis, permitData);
+            // Execute automated minting directly
+            _executeAutoMint(user, satoshis);
             
             // Emit event for automated completion
             emit QCMintCompleted(user, satoshis, true);
@@ -441,7 +447,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             // Option 2: Manual process - just create Bank balance
             bank.increaseBalance(user, satoshis);
             
-            // Emit event with helper address for potential automation
+            // Emit event for manual completion (user needs to mint separately)
             emit QCMintCompleted(user, satoshis, false);
         }
 
@@ -516,6 +522,81 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // Check capacity
         uint256 availableCapacity = getAvailableMintingCapacity(qc);
         return amount <= availableCapacity;
+    }
+
+    /// @notice Manually mint tBTC for user using their Bank balance
+    /// @dev User must have pre-approved this contract to spend their Bank balance
+    /// @param user The user to mint tBTC for
+    function manualMint(address user) external nonReentrant {
+        if (user == address(0)) revert InvalidUserAddress();
+        
+        uint256 satoshis = bank.balanceOf(user);
+        if (satoshis == 0) revert ZeroAmount();
+
+        // User must have pre-approved this contract (or transaction will revert)
+        bank.transferBalanceFrom(user, address(this), satoshis);
+
+        uint256 tbtcAmount = satoshis * SATOSHI_MULTIPLIER;
+        tbtcVault.mint(tbtcAmount);
+        tbtc.transfer(user, tbtcAmount);
+
+        emit ManualMintCompleted(user, satoshis, tbtcAmount);
+    }
+
+    /// @notice Get the expected tBTC amount for given satoshi amount
+    /// @param satoshis Amount in satoshis
+    /// @return tbtcAmount Equivalent tBTC amount in wei
+    function getSatoshiToTBTCAmount(uint256 satoshis) external pure returns (uint256 tbtcAmount) {
+        return satoshis * SATOSHI_MULTIPLIER;
+    }
+
+    /// @notice Check if user has sufficient Bank balance and allowance
+    /// @param user The user to check
+    /// @return hasBalance True if user has Bank balance > 0
+    /// @return hasAllowance True if user has approved this contract for their balance
+    /// @return balance User's current Bank balance
+    /// @return allowance User's current allowance to this contract
+    function checkMintEligibility(address user) 
+        external 
+        view 
+        returns (
+            bool hasBalance,
+            bool hasAllowance,
+            uint256 balance,
+            uint256 allowance
+        ) 
+    {
+        balance = bank.balanceOf(user);
+        allowance = bank.allowance(user, address(this));
+        
+        hasBalance = balance > 0;
+        hasAllowance = allowance >= balance;
+    }
+
+    /// @dev Execute automated minting for user
+    /// @param user The user receiving tBTC tokens
+    /// @param satoshis Amount of satoshis to convert to tBTC
+    function _executeAutoMint(address user, uint256 satoshis) internal {
+        if (user == address(0)) revert InvalidUserAddress();
+        if (satoshis == 0) revert ZeroAmount();
+        if (bank.balanceOf(user) < satoshis) revert InsufficientBalance();
+
+        // Check user has approved this contract to spend their balance
+        if (bank.allowance(user, address(this)) < satoshis) {
+            revert InsufficientBalance(); // Reusing error for insufficient allowance
+        }
+
+        // Transfer Bank balance from user to this contract
+        bank.transferBalanceFrom(user, address(this), satoshis);
+
+        // Mint tBTC (mints to this contract)
+        uint256 tbtcAmount = satoshis * SATOSHI_MULTIPLIER;
+        tbtcVault.mint(tbtcAmount);
+
+        // Transfer tBTC tokens to user
+        tbtc.transfer(user, tbtcAmount);
+
+        emit AutoMintCompleted(user, satoshis, tbtcAmount);
     }
 
     /// @dev Generate unique mint ID

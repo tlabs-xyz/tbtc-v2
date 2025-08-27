@@ -19,7 +19,6 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const qcManager = await get("QCManager")
   const reserveOracle = await get("ReserveOracle")
   const watchdogEnforcer = await get("WatchdogEnforcer")
-  const qcMintHelper = await get("QCMintHelper")
   const tbtc = await get("TBTC")
   const bank = await get("Bank")
   const bridge = await get("Bridge") // Need Bridge to check Bank ownership
@@ -172,15 +171,15 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     "✅ Reserve attestation consensus parameters configured (threshold: 3 attesters)"
   )
 
-  // Step 9: Configure QCMintHelper in QCMinter
-  log("Step 9: Configuring QCMintHelper integration...")
+  // Step 9: Enable auto-minting in QCMinter
+  log("Step 9: Enabling auto-minting in QCMinter...")
   await execute(
     "QCMinter",
     { from: deployer, log: true },
-    "setMintHelper",
-    qcMintHelper.address
+    "setAutoMintEnabled",
+    true
   )
-  log(`✅ QCMintHelper configured in QCMinter: ${qcMintHelper.address}`)
+  log("✅ Auto-minting enabled in QCMinter")
 
   log("✅ System parameters configured")
 
@@ -195,7 +194,7 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log("  3. Redemption via QCRedeemer")
   log("  4. Reserve attestation via ReserveOracle")
   log("  5. Enforcement via WatchdogEnforcer")
-  log("  6. Automated minting via QCMintHelper")
+  log("  6. Automated minting integrated in QCMinter")
   log(
     "  7. Direct on-chain Bitcoin signature verification for wallet ownership"
   )
@@ -214,5 +213,5 @@ func.dependencies = [
   "AccountControlState", 
   "ReserveOracle",
   "WatchdogEnforcer",
-  "QCMintHelper",
+  "AccountControlUnified",
 ]
