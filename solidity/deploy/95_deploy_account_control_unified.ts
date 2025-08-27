@@ -147,19 +147,8 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   })
   log(`QCMinter deployed at: ${qcMinter.address}`)
 
-  // Deploy QCMintHelper for hybrid minting
-  const qcMintHelper = await deploy("QCMintHelper", {
-    from: deployer,
-    args: [
-      bank.address,
-      tbtcVault.address,
-      tbtc.address,
-      qcMinter.address,
-    ],
-    log: true,
-    waitConfirmations: network.live ? 5 : 1,
-  })
-  log(`QCMintHelper deployed at: ${qcMintHelper.address}`)
+  // Note: QCMintHelper functionality now integrated into QCMinter
+  // Auto-minting can be enabled via setAutoMintEnabled() governance call
 
   // Configure SPV parameters for QCRedeemer
   const txProofDifficultyFactor =
@@ -216,14 +205,14 @@ const func: DeployFunction = async function DeployAccountControlUnified(
     await qcDataContract.grantRole(QC_MANAGER_ROLE, qcRedeemer.address)
     log(`Granted storage access to QCMinter and QCRedeemer`)
 
-    // Configure QCMintHelper in QCMinter
+    // Enable auto-minting in QCMinter (consolidated functionality)
     const qcMinterContract = await ethers.getContractAt("QCMinter", qcMinter.address)
     const GOVERNANCE_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("GOVERNANCE_ROLE"))
     
     // Grant GOVERNANCE_ROLE to deployer temporarily for configuration
     await qcMinterContract.grantRole(GOVERNANCE_ROLE, deployer)
-    await qcMinterContract.setMintHelper(qcMintHelper.address)
-    log(`Configured QCMintHelper in QCMinter`)
+    await qcMinterContract.setAutoMintEnabled(true)
+    log(`Enabled auto-minting in QCMinter`)
 
     // Authorize QCMinter in Bank (for testnet only)
     if (network.name !== "mainnet") {
