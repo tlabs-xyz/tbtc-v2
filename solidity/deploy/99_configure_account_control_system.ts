@@ -19,8 +19,10 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   const qcManager = await get("QCManager")
   const reserveOracle = await get("ReserveOracle")
   const watchdogEnforcer = await get("WatchdogEnforcer")
+  const qcMintHelper = await get("QCMintHelper")
   const tbtc = await get("TBTC")
   const bank = await get("Bank")
+  const bridge = await get("Bridge") // Need Bridge to check Bank ownership
 
   // Define role constants (updated with new role structure)
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero // OpenZeppelin standard admin
@@ -79,30 +81,58 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   // Step 5: Configure Bank authorization for QCMinter
   log("Step 5: Configuring Bank authorization...")
   try {
+    // Get Bank contract instance
+    const bankContract = await ethers.getContractAt("Bank", bank.address)
+    
     // Check if QCMinter is already authorized
-    const isAuthorized = await hre.ethers.provider.call({
-      to: bank.address,
-      data: ethers.utils.defaultAbiCoder.encode(
-        ["bytes4", "address"],
-        [
-          ethers.utils.id("authorizedBalanceIncreasers(address)").slice(0, 10),
-          qcMinter.address,
-        ]
-      ),
-    })
+    const isAuthorized = await bankContract.authorizedBalanceIncreasers(
+      qcMinter.address
+    )
 
-    if (
-      !isAuthorized ||
-      isAuthorized ===
-        "0x0000000000000000000000000000000000000000000000000000000000000000"
-    ) {
-      log("QCMinter not yet authorized in Bank, requires governance action")
-      log("TODO: Submit governance proposal to authorize QCMinter in Bank")
+    if (!isAuthorized) {
+      log("QCMinter not yet authorized in Bank")
+      
+      // Check who owns Bank to determine authorization approach
+      const bankOwner = await bankContract.owner()
+      log(`Bank owner: ${bankOwner}`)
+      
+      // Get Bridge address to check if it owns Bank
+      const bridgeAddress = bridge.address
+      log(`Bridge address: ${bridgeAddress}`)
+      
+      if (bankOwner === bridgeAddress) {
+        log("Bank is owned by Bridge - governance action required")
+        log("")
+        log("⚠️  CRITICAL: Manual governance action required!")
+        log("Submit governance proposal with the following transaction:")
+        log(`  Contract: Bank (${bank.address})`)
+        log(`  Function: setAuthorizedBalanceIncreaser`)
+        log(`  Parameters: ${qcMinter.address}, true`)
+        log("")
+        log("Without this authorization, QCMinter cannot create Bank balances!")
+      } else if (bankOwner === deployer) {
+        // In test/development environment, deployer might own Bank
+        log("Bank owned by deployer - attempting direct authorization...")
+        await execute(
+          "Bank",
+          { from: deployer, log: true },
+          "setAuthorizedBalanceIncreaser",
+          qcMinter.address,
+          true
+        )
+        log("✅ QCMinter authorized in Bank")
+      } else {
+        log(`Bank owned by: ${bankOwner}`)
+        log("Manual authorization required from Bank owner")
+        log(`Execute: bank.setAuthorizedBalanceIncreaser(${qcMinter.address}, true)`)
+      }
     } else {
       log("✅ QCMinter already authorized in Bank")
     }
   } catch (error) {
-    log("Could not check Bank authorization, manual verification needed")
+    log("Error checking Bank authorization:")
+    log(error.message || error)
+    log("Manual verification and authorization required")
   }
 
   // Step 6: Configure TBTC token permissions for QCRedeemer
@@ -142,6 +172,16 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     "✅ Reserve attestation consensus parameters configured (threshold: 3 attesters)"
   )
 
+  // Step 9: Configure QCMintHelper in QCMinter
+  log("Step 9: Configuring QCMintHelper integration...")
+  await execute(
+    "QCMinter",
+    { from: deployer, log: true },
+    "setMintHelper",
+    qcMintHelper.address
+  )
+  log(`✅ QCMintHelper configured in QCMinter: ${qcMintHelper.address}`)
+
   log("✅ System parameters configured")
 
   log("")
@@ -151,12 +191,13 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
   log("")
   log("System is ready for:")
   log("  1. QC registration via QCManager")
-  log("  2. Minting via QCMinter")
+  log("  2. Minting via QCMinter (manual and automated)")
   log("  3. Redemption via QCRedeemer")
   log("  4. Reserve attestation via ReserveOracle")
   log("  5. Enforcement via WatchdogEnforcer")
+  log("  6. Automated minting via QCMintHelper")
   log(
-    "  6. Direct on-chain Bitcoin signature verification for wallet ownership"
+    "  7. Direct on-chain Bitcoin signature verification for wallet ownership"
   )
   log("")
   log("Important next steps:")
@@ -170,7 +211,8 @@ export default func
 func.tags = ["ConfigureAccountControl"]
 func.dependencies = [
   "AccountControlCore",
-  "AccountControlState",
+  "AccountControlState", 
   "ReserveOracle",
   "WatchdogEnforcer",
+  "QCMintHelper",
 ]
