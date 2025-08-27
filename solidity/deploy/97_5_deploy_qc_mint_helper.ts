@@ -67,10 +67,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 export default func
 
-func.tags = ["QCMintHelper"]
+func.tags = ["QCMintHelper", "AccountControl"] // Added AccountControl tag for fixture inclusion
 func.dependencies = [
   "Bank",
   "TBTCVault", 
   "TBTC",
-  "QCMinter"
+  "AccountControlCore" // Changed: QCMinter is deployed by AccountControlCore
 ]
