@@ -46,4 +46,4 @@ const func: DeployFunction = async function DeployAccountControlState(
 
 export default func
 func.tags = ["AccountControlState", "QCData", "SystemState", "QCManager"]
-func.dependencies = ["ReserveOracle", "AccountControlCore"]
+func.dependencies = ["ReserveOracle"] // Fixed: Removed circular dependency on AccountControlCore

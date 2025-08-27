@@ -40,45 +40,32 @@ describe("QCMintHelper Integration", () => {
   const MAX_MINT_AMOUNT = ethers.utils.parseEther("1000") // 1000 tBTC maximum
 
   before(async () => {
-    // Deploy core tBTC infrastructure
+    // Deploy all contracts using corrected fixture dependencies
     await deployments.fixture([
-      "Bank",
-      "TBTCVault", 
-      "TBTC",
-      "Bridge",
-      "LightRelay" // Needed for some Account Control contracts
+      "LightRelay",           // Base infrastructure
+      "TBTC",                 // Token
+      "Bank",                 // Banking system
+      "Bridge",               // Bridge (if needed)
+      "TBTCVault",           // Vault
+      "ReserveOracle",       // Oracle (standalone now)
+      "AccountControlState", // QCData, SystemState, QCManager
+      "AccountControlCore",  // QCMinter, QCRedeemer
+      "QCMintHelper"         // Helper (now in fixtures)
     ])
 
     // Get signers
     ;[deployer, governance, qc, user, otherUser] = await ethers.getSigners()
 
-    // Get deployed core contracts
+    // Get deployed contracts
     bank = await ethers.getContract("Bank")
     tbtcVault = await ethers.getContract("TBTCVault")
     tbtc = await ethers.getContract("TBTC")
     bridge = await ethers.getContract("Bridge")
-
-    // Deploy Account Control contracts
-    await deployments.fixture([
-      "AccountControlState",  // QCData, SystemState, QCManager
-      "AccountControlCore"    // QCMinter, QCRedeemer
-    ])
-
-    // Get Account Control contracts
     qcData = await ethers.getContract("QCData")
     systemState = await ethers.getContract("SystemState")
     qcManager = await ethers.getContract("QCManager")
     qcMinter = await ethers.getContract("QCMinter")
-
-    // Deploy QCMintHelper manually (not in fixture yet)
-    const QCMintHelperFactory = await ethers.getContractFactory("QCMintHelper")
-    qcMintHelper = await QCMintHelperFactory.deploy(
-      bank.address,
-      tbtcVault.address,
-      tbtc.address,
-      qcMinter.address
-    )
-    await qcMintHelper.deployed()
+    qcMintHelper = await ethers.getContract("QCMintHelper") // Now deployed by fixture
 
     // CRITICAL: Set up Bank authorization for QCMinter
     await setupBankAuthorization()
