@@ -306,9 +306,7 @@ contract ReserveOracle is AccessControl {
         });
 
         // V2 Integration - Update backing in Account Control with oracle consensus
-        if (v2ModeEnabled && accountControl != address(0)) {
-            AccountControl(accountControl).updateBackingFromOracle(qc, balance);
-        }
+        AccountControl(accountControl).updateBackingFromOracle(qc, balance);
 
         // Clear any pending attestations
         _clearPendingAttestations(qc);
@@ -397,9 +395,7 @@ contract ReserveOracle is AccessControl {
         });
 
         // V2 Integration - Update backing in Account Control with oracle consensus
-        if (v2ModeEnabled && accountControl != address(0)) {
-            AccountControl(accountControl).updateBackingFromOracle(qc, consensusBalance);
-        }
+        AccountControl(accountControl).updateBackingFromOracle(qc, consensusBalance);
 
         // Create array of participating attesters for event
         address[] memory participatingAttesters = new address[](validCount);
