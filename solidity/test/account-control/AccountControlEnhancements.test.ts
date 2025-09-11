@@ -107,6 +107,47 @@ describe("AccountControl Enhancements", function () {
     });
   });
 
+  describe("Enhancement 3: setMintingCap Validation Improvements", function () {
+    it("should revert when setting cap for unauthorized reserve", async function () {
+      const unauthorizedReserve = ethers.Wallet.createRandom();
+      
+      await expect(
+        accountControl.connect(owner).setMintingCap(unauthorizedReserve.address, 1000000)
+      ).to.be.revertedWith("NotAuthorized");
+    });
+
+    it("should enforce global cap validation when setting individual caps", async function () {
+      // Set a low global cap
+      await accountControl.connect(owner).setGlobalMintingCap(1500000); // 1.5M total
+      
+      // Reserve1 already has 1M cap, Reserve2 has 2M cap
+      // Setting Reserve1 to 1M should work (1M + 2M = 3M > 1.5M global, so should fail)
+      await expect(
+        accountControl.connect(owner).setMintingCap(reserve1.address, 1000000)
+      ).to.be.revertedWith("ExceedsGlobalCap");
+    });
+
+    it("should allow setting cap when total doesn't exceed global cap", async function () {
+      // Set a high global cap
+      await accountControl.connect(owner).setGlobalMintingCap(5000000); // 5M total
+      
+      // Reserve1: 1M, Reserve2: 2M, setting Reserve1 to 1.5M = 3.5M total < 5M
+      await accountControl.connect(owner).setMintingCap(reserve1.address, 1500000);
+      const reserveInfo = await accountControl.reserveInfo(reserve1.address);
+      expect(reserveInfo.mintingCap).to.equal(1500000);
+    });
+
+    it("should ignore global cap validation when global cap is zero", async function () {
+      // Ensure global cap is zero (unlimited)
+      await accountControl.connect(owner).setGlobalMintingCap(0);
+      
+      // Should allow setting any cap when global cap is disabled
+      await accountControl.connect(owner).setMintingCap(reserve1.address, 10000000); // 10M
+      const reserveInfo = await accountControl.reserveInfo(reserve1.address);
+      expect(reserveInfo.mintingCap).to.equal(10000000);
+    });
+  });
+
   describe("Enhancement 3: Authorization Race Condition Protection", function () {
     it("should prevent double authorization", async function () {
       await expect(
