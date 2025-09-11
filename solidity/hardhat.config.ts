@@ -7,7 +7,7 @@ import "@keep-network/hardhat-local-networks-config"
 import "@nomiclabs/hardhat-waffle"
 import "@nomiclabs/hardhat-etherscan"
 import "hardhat-gas-reporter"
-// import "hardhat-contract-sizer"
+import "hardhat-contract-sizer"
 import "hardhat-deploy"
 import "@tenderly/hardhat-tenderly"
 import "@typechain/hardhat"
@@ -246,17 +246,17 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
-  // contractSizer: {
-  //   alphaSort: true,
-  //   disambiguatePaths: false,
-  //   runOnCompile: true,
-  //   strict: true,
-  //   // WalletRegistry is excluded because it's an external dependency from @keep-network/ecdsa
-  //   // that exceeds the 24KB contract size limit (24.142 KB). We don't control this contract.
-  //   // QCRedeemer temporarily exceeds limit (25.391 KB) due to comprehensive SPV implementation.
-  //   // TODO: Optimize QCRedeemer by extracting SPV logic to a library similar to QCManagerSPV.
-  //   except: ["BridgeStub$", "WalletRegistry$", "QCRedeemer$"],
-  // },
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: true,
+    // WalletRegistry is excluded because it's an external dependency from @keep-network/ecdsa
+    // that exceeds the 24KB contract size limit (24.142 KB). We don't control this contract.
+    // QCRedeemer temporarily exceeds limit (25.391 KB) due to comprehensive SPV implementation.
+    // TODO: Optimize QCRedeemer by extracting SPV logic to a library similar to QCManagerSPV.
+    except: ["BridgeStub$", "WalletRegistry$", "QCRedeemer$"],
+  },
   mocha: {
     timeout: 60_000,
   },
