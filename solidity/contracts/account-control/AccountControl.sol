@@ -92,6 +92,9 @@ contract AccountControl is
     // Reserve type system (slots ~23-24)
     mapping(ReserveType => bool) public validReserveTypes;   // Slot 23: Valid reserve types
     ReserveType[] public reserveTypeList;                   // Slot 24: List of all reserve types
+    
+    // Reserve address tracking (slot ~25)
+    mapping(address => ReserveType) public reserveAddressType; // Slot 25: Track which type each address was assigned
 
     // ========== EVENTS ==========
     event MintExecuted(address indexed reserve, address indexed recipient, uint256 amount);
@@ -129,6 +132,7 @@ contract AccountControl is
     error InvalidReserveType();
     error ReserveTypeExists();
     error EmptyString();
+    error AddressAlreadyUsedForDifferentType();
 
     // ========== MODIFIERS ==========
     modifier onlyAuthorizedReserve() {
@@ -179,6 +183,12 @@ contract AccountControl is
 
     // ========== RESERVE MANAGEMENT ==========
     
+    /// @notice Authorize a reserve for minting operations
+    /// @param reserve The address of the reserve to authorize  
+    /// @param mintingCap The maximum amount this reserve can mint
+    /// @param reserveType The type of reserve being authorized
+    /// @dev SECURITY: Prevents address reuse across different reserve types to avoid
+    ///      shared state conflicts (backing, minted amounts, etc.)
     function authorizeReserve(address reserve, uint256 mintingCap, ReserveType reserveType) 
         external 
         onlyOwner 
@@ -187,12 +197,21 @@ contract AccountControl is
         if (!validReserveTypes[reserveType]) revert InvalidReserveType();
         if (mintingCap == 0) revert AmountTooSmall(); // Prevent zero caps, use pause instead
         
+        // Prevent address reuse across different reserve types
+        // Check if this address was ever used for a different reserve type
+        if (reserveAddressType[reserve] != ReserveType(0) && reserveAddressType[reserve] != reserveType) {
+            revert AddressAlreadyUsedForDifferentType();
+        }
+        
         authorized[reserve] = true;
         reserveInfo[reserve] = ReserveInfo({
             mintingCap: mintingCap,
             reserveType: reserveType
         });
         reserveList.push(reserve);
+        
+        // Record the reserve type for this address permanently
+        reserveAddressType[reserve] = reserveType;
         
         // Initialize totalMintedAmount to include any existing minted amount for this reserve
         // This handles cases where a reserve is re-authorized after being deauthorized
