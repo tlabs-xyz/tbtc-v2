@@ -44,7 +44,12 @@ contract AccountControl is
     
     // Authorization and limits (slots ~10-12)
     mapping(address => bool) public authorized;        // Slot 10: Reserve authorization status
-    mapping(address => uint256) public mintingCaps;    // Slot 11: Per-reserve minting caps
+    
+    struct ReserveInfo {
+        uint256 mintingCap;
+        string reserveType;
+    }
+    mapping(address => ReserveInfo) public reserveInfo; // Slot 11: Reserve info with type
     uint256 public globalMintingCap;                   // Slot 12: Global minting cap
     
     // Reserve tracking (slots ~13-14)
@@ -75,6 +80,10 @@ contract AccountControl is
      * ANY NEW VARIABLES MUST BE ADDED BELOW THIS COMMENT
      * TO MAINTAIN UPGRADE COMPATIBILITY
      */
+    
+    // Reserve type system (slots ~23-24)
+    mapping(string => bool) public validReserveTypes;   // Slot 23: Valid reserve types
+    string[] public reserveTypeList;                   // Slot 24: List of all reserve types
 
     // ========== EVENTS ==========
     event MintExecuted(address indexed reserve, address indexed recipient, uint256 amount);
@@ -92,6 +101,9 @@ contract AccountControl is
     event ReserveOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event RedemptionProcessed(address indexed reserve, uint256 amount);
     event ReserveDeauthorized(address indexed reserve);
+    event ReserveTypeAdded(string indexed reserveType);
+    event ReserveTypeSet(address indexed reserve, string reserveType);
+    event ReserveTypeChanged(address indexed reserve, string oldType, string newType);
 
     // ========== ERRORS ==========
     error InsufficientBacking();
@@ -109,6 +121,8 @@ contract AccountControl is
     error ZeroAddress();
     error InsufficientMinted();
     error ReserveNotFound();
+    error InvalidReserveType();
+    error ReserveTypeExists();
 
     // ========== MODIFIERS ==========
     modifier onlyAuthorizedReserve() {
@@ -159,17 +173,22 @@ contract AccountControl is
 
     // ========== RESERVE MANAGEMENT ==========
     
-    function authorizeReserve(address reserve, uint256 mintingCap) 
+    function authorizeReserve(address reserve, uint256 mintingCap, string calldata reserveType) 
         external 
         onlyOwner 
     {
         if (authorized[reserve]) revert AlreadyAuthorized();
+        if (!validReserveTypes[reserveType]) revert InvalidReserveType();
         
         authorized[reserve] = true;
-        mintingCaps[reserve] = mintingCap;
+        reserveInfo[reserve] = ReserveInfo({
+            mintingCap: mintingCap,
+            reserveType: reserveType
+        });
         reserveList.push(reserve);
         
         emit ReserveAuthorized(reserve, mintingCap);
+        emit ReserveTypeSet(reserve, reserveType);
     }
 
     function deauthorizeReserve(address reserve) 
@@ -179,7 +198,7 @@ contract AccountControl is
         if (!authorized[reserve]) revert ReserveNotFound();
         
         authorized[reserve] = false;
-        mintingCaps[reserve] = 0;
+        delete reserveInfo[reserve];
         
         // Remove from reserveList
         for (uint256 i = 0; i < reserveList.length; i++) {
@@ -202,8 +221,8 @@ contract AccountControl is
             revert ExceedsReserveCap(); // Reusing existing error for consistency
         }
         
-        uint256 oldCap = mintingCaps[reserve];
-        mintingCaps[reserve] = newCap;
+        uint256 oldCap = reserveInfo[reserve].mintingCap;
+        reserveInfo[reserve].mintingCap = newCap;
         emit MintingCapUpdated(reserve, oldCap, newCap);
     }
 
@@ -213,6 +232,34 @@ contract AccountControl is
     {
         globalMintingCap = cap;
         emit GlobalMintingCapUpdated(cap);
+    }
+
+    // ========== RESERVE TYPE MANAGEMENT ==========
+    
+    function addReserveType(string calldata reserveType) 
+        external 
+        onlyOwner 
+    {
+        if (validReserveTypes[reserveType]) revert ReserveTypeExists();
+        if (bytes(reserveType).length == 0) revert ZeroAddress(); // Reuse error for empty string
+        
+        validReserveTypes[reserveType] = true;
+        reserveTypeList.push(reserveType);
+        
+        emit ReserveTypeAdded(reserveType);
+    }
+
+    function setReserveType(address reserve, string calldata newType) 
+        external 
+        onlyOwner 
+    {
+        if (!authorized[reserve]) revert NotAuthorized();
+        if (!validReserveTypes[newType]) revert InvalidReserveType();
+        
+        string memory oldType = reserveInfo[reserve].reserveType;
+        reserveInfo[reserve].reserveType = newType;
+        
+        emit ReserveTypeChanged(reserve, oldType, newType);
     }
 
     // ========== MINTING OPERATIONS ==========
@@ -233,7 +280,7 @@ contract AccountControl is
         }
         
         // Check caps
-        if (minted[msg.sender] + amount > mintingCaps[msg.sender]) {
+        if (minted[msg.sender] + amount > reserveInfo[msg.sender].mintingCap) {
             revert ExceedsReserveCap();
         }
         
@@ -272,7 +319,7 @@ contract AccountControl is
         }
         
         // Check caps for total
-        if (minted[msg.sender] + totalAmount > mintingCaps[msg.sender]) {
+        if (minted[msg.sender] + totalAmount > reserveInfo[msg.sender].mintingCap) {
             revert ExceedsReserveCap();
         }
         
@@ -438,14 +485,18 @@ contract AccountControl is
             uint256 backingAmount,
             uint256 mintedAmount,
             uint256 mintingCap,
-            uint256 availableToMint
+            uint256 availableToMint,
+            string memory reserveType
         ) 
     {
+        ReserveInfo memory info = reserveInfo[reserve];
+        
         isAuthorized = authorized[reserve];
         isPaused = paused[reserve];
         backingAmount = backing[reserve];
         mintedAmount = minted[reserve];
-        mintingCap = mintingCaps[reserve];
+        mintingCap = info.mintingCap;
+        reserveType = info.reserveType;
         
         // Calculate available to mint considering backing and cap
         uint256 backingAvailable = 0;
@@ -459,6 +510,60 @@ contract AccountControl is
         }
         
         availableToMint = backingAvailable < capAvailable ? backingAvailable : capAvailable;
+    }
+
+    function getReservesByType(string calldata reserveType) 
+        external 
+        view 
+        returns (address[] memory) 
+    {
+        if (!validReserveTypes[reserveType]) revert InvalidReserveType();
+        
+        // Count first
+        uint256 count = 0;
+        for (uint256 i = 0; i < reserveList.length; i++) {
+            if (keccak256(bytes(reserveInfo[reserveList[i]].reserveType)) == keccak256(bytes(reserveType))) {
+                count++;
+            }
+        }
+        
+        // Populate array
+        address[] memory typeReserves = new address[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < reserveList.length; i++) {
+            if (keccak256(bytes(reserveInfo[reserveList[i]].reserveType)) == keccak256(bytes(reserveType))) {
+                typeReserves[index] = reserveList[i];
+                index++;
+            }
+        }
+        
+        return typeReserves;
+    }
+
+    function getReserveTypeStats() 
+        external 
+        view 
+        returns (string[] memory types, uint256[] memory counts, uint256[] memory totalMintedByType) 
+    {
+        types = new string[](reserveTypeList.length);
+        counts = new uint256[](reserveTypeList.length);
+        totalMintedByType = new uint256[](reserveTypeList.length);
+        
+        for (uint256 i = 0; i < reserveTypeList.length; i++) {
+            types[i] = reserveTypeList[i];
+            
+            // Count reserves and total minted for this type
+            for (uint256 j = 0; j < reserveList.length; j++) {
+                if (keccak256(bytes(reserveInfo[reserveList[j]].reserveType)) == keccak256(bytes(reserveTypeList[i]))) {
+                    counts[i]++;
+                    totalMintedByType[i] += minted[reserveList[j]];
+                }
+            }
+        }
+    }
+
+    function getReserveTypeCount() external view returns (uint256) {
+        return reserveTypeList.length;
     }
 
     // ========== GOVERNANCE ==========
