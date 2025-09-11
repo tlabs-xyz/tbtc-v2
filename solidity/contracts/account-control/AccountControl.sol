@@ -9,7 +9,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 /**
  * @title AccountControl
  * @notice Minimal invariant enforcer ensuring backing >= minted for each reserve
- * @dev Part of tBTC V2 Account Control system
+ * @dev Part of tBTC Account Control system
  */
 contract AccountControl is 
     Initializable, 

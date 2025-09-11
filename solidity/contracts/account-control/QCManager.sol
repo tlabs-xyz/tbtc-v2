@@ -787,7 +787,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         // initiated after this check but before de-registration completes.
         // Mitigation: Window is very small (single transaction), and QCs control
         // their own wallet usage, making exploitation unlikely in practice.
-        // Future improvement: Consider atomic check-and-act pattern or mutex in V2.
+        // Future improvement: Consider atomic check-and-act pattern or mutex.
         if (address(qcRedeemer) != address(0)) {
             require(
                 !IQCRedeemer(address(qcRedeemer)).hasWalletObligations(btcAddress),
