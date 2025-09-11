@@ -106,9 +106,9 @@ contract AccountControl is
     event ReserveOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event RedemptionProcessed(address indexed reserve, uint256 amount);
     event ReserveDeauthorized(address indexed reserve);
-    event ReserveTypeAdded(string indexed reserveType);
-    event ReserveTypeSet(address indexed reserve, string reserveType);
-    event ReserveTypeChanged(address indexed reserve, string oldType, string newType);
+    event ReserveTypeAdded(ReserveType indexed reserveType);
+    event ReserveTypeSet(address indexed reserve, ReserveType reserveType);
+    event ReserveTypeChanged(address indexed reserve, ReserveType oldType, ReserveType newType);
 
     // ========== ERRORS ==========
     error InsufficientBacking();
@@ -122,13 +122,13 @@ contract AccountControl is
     error ArrayLengthMismatch();
     error BatchSizeExceeded();
     error AlreadyAuthorized();
-    error NotAWatchdog();
     error ZeroAddress();
     error InsufficientMinted();
     error ReserveNotFound();
     error CannotDeauthorizeWithOutstandingBalance();
     error InvalidReserveType();
     error ReserveTypeExists();
+    error EmptyString();
 
     // ========== MODIFIERS ==========
     modifier onlyAuthorizedReserve() {
@@ -179,12 +179,13 @@ contract AccountControl is
 
     // ========== RESERVE MANAGEMENT ==========
     
-    function authorizeReserve(address reserve, uint256 mintingCap, string calldata reserveType) 
+    function authorizeReserve(address reserve, uint256 mintingCap, ReserveType reserveType) 
         external 
         onlyOwner 
     {
         if (authorized[reserve]) revert AlreadyAuthorized();
         if (!validReserveTypes[reserveType]) revert InvalidReserveType();
+        if (mintingCap == 0) revert AmountTooSmall(); // Prevent zero caps, use pause instead
         
         authorized[reserve] = true;
         reserveInfo[reserve] = ReserveInfo({
@@ -192,6 +193,13 @@ contract AccountControl is
             reserveType: reserveType
         });
         reserveList.push(reserve);
+        
+        // Initialize totalMintedAmount to include any existing minted amount for this reserve
+        // This handles cases where a reserve is re-authorized after being deauthorized
+        uint256 existingMinted = minted[reserve];
+        if (existingMinted > 0) {
+            totalMintedAmount += existingMinted;
+        }
         
         emit ReserveAuthorized(reserve, mintingCap);
         emit ReserveTypeSet(reserve, reserveType);
@@ -229,6 +237,9 @@ contract AccountControl is
         // Check that reserve is authorized
         if (!authorized[reserve]) revert NotAuthorized();
         
+        // Prevent zero caps - use pause functionality instead
+        if (newCap == 0) revert AmountTooSmall();
+        
         // Prevent reducing cap below current minted amount
         if (newCap < minted[reserve]) {
             revert ExceedsReserveCap(); // Reusing existing error for consistency
@@ -257,12 +268,11 @@ contract AccountControl is
 
     // ========== RESERVE TYPE MANAGEMENT ==========
     
-    function addReserveType(string calldata reserveType) 
+    function addReserveType(ReserveType reserveType) 
         external 
         onlyOwner 
     {
         if (validReserveTypes[reserveType]) revert ReserveTypeExists();
-        if (bytes(reserveType).length == 0) revert ZeroAddress(); // Reuse error for empty string
         
         validReserveTypes[reserveType] = true;
         reserveTypeList.push(reserveType);
@@ -270,14 +280,14 @@ contract AccountControl is
         emit ReserveTypeAdded(reserveType);
     }
 
-    function setReserveType(address reserve, string calldata newType) 
+    function setReserveType(address reserve, ReserveType newType) 
         external 
         onlyOwner 
     {
         if (!authorized[reserve]) revert NotAuthorized();
         if (!validReserveTypes[newType]) revert InvalidReserveType();
         
-        string memory oldType = reserveInfo[reserve].reserveType;
+        ReserveType oldType = reserveInfo[reserve].reserveType;
         reserveInfo[reserve].reserveType = newType;
         
         emit ReserveTypeChanged(reserve, oldType, newType);
@@ -454,30 +464,6 @@ contract AccountControl is
         systemPaused = false;
     }
 
-    // ========== WATCHDOG FUNCTIONS ==========
-    
-    function authorizeWatchdog(address watchdog) 
-        external 
-        onlyOwner 
-    {
-        watchdogs[watchdog] = true;
-        emit WatchdogAuthorized(watchdog);
-    }
-
-    function revokeWatchdog(address watchdog) 
-        external 
-        onlyOwner 
-    {
-        watchdogs[watchdog] = false;
-        emit WatchdogRevoked(watchdog);
-    }
-
-    function reportViolation(address reserve, string calldata violation) 
-        external 
-    {
-        if (!watchdogs[msg.sender]) revert NotAWatchdog();
-        emit ViolationReported(msg.sender, reserve, violation);
-    }
 
     // ========== VIEW FUNCTIONS ==========
     
@@ -507,7 +493,7 @@ contract AccountControl is
             uint256 mintedAmount,
             uint256 mintingCap,
             uint256 availableToMint,
-            string memory reserveType
+            ReserveType reserveType
         ) 
     {
         ReserveInfo memory info = reserveInfo[reserve];
@@ -533,7 +519,7 @@ contract AccountControl is
         availableToMint = backingAvailable < capAvailable ? backingAvailable : capAvailable;
     }
 
-    function getReservesByType(string calldata reserveType) 
+    function getReservesByType(ReserveType reserveType) 
         external 
         view 
         returns (address[] memory) 
@@ -543,7 +529,7 @@ contract AccountControl is
         // Count first
         uint256 count = 0;
         for (uint256 i = 0; i < reserveList.length; i++) {
-            if (keccak256(bytes(reserveInfo[reserveList[i]].reserveType)) == keccak256(bytes(reserveType))) {
+            if (reserveInfo[reserveList[i]].reserveType == reserveType) {
                 count++;
             }
         }
@@ -552,7 +538,7 @@ contract AccountControl is
         address[] memory typeReserves = new address[](count);
         uint256 index = 0;
         for (uint256 i = 0; i < reserveList.length; i++) {
-            if (keccak256(bytes(reserveInfo[reserveList[i]].reserveType)) == keccak256(bytes(reserveType))) {
+            if (reserveInfo[reserveList[i]].reserveType == reserveType) {
                 typeReserves[index] = reserveList[i];
                 index++;
             }
@@ -564,9 +550,9 @@ contract AccountControl is
     function getReserveTypeStats() 
         external 
         view 
-        returns (string[] memory types, uint256[] memory counts, uint256[] memory totalMintedByType) 
+        returns (ReserveType[] memory types, uint256[] memory counts, uint256[] memory totalMintedByType) 
     {
-        types = new string[](reserveTypeList.length);
+        types = new ReserveType[](reserveTypeList.length);
         counts = new uint256[](reserveTypeList.length);
         totalMintedByType = new uint256[](reserveTypeList.length);
         
@@ -575,7 +561,7 @@ contract AccountControl is
             
             // Count reserves and total minted for this type
             for (uint256 j = 0; j < reserveList.length; j++) {
-                if (keccak256(bytes(reserveInfo[reserveList[j]].reserveType)) == keccak256(bytes(reserveTypeList[i]))) {
+                if (reserveInfo[reserveList[j]].reserveType == reserveTypeList[i]) {
                     counts[i]++;
                     totalMintedByType[i] += minted[reserveList[j]];
                 }
@@ -621,6 +607,25 @@ contract AccountControl is
     /// @param excludeReserve Reserve to exclude from calculation
     /// @return totalCaps Sum of all other authorized reserves' minting caps
     function _calculateTotalCapsExcluding(address excludeReserve) internal view returns (uint256 totalCaps) {
+        // OPTIMIZATION PROPOSAL: This function has O(n) gas cost that grows with the number of reserves.
+        // For large numbers of reserves, this could become expensive.
+        //
+        // PROPOSED SOLUTION:
+        // 1. Add cached storage variable: uint256 public totalMintingCapsCache;
+        // 2. Update cache in authorizeReserve(): totalMintingCapsCache += mintingCap;
+        // 3. Update cache in deauthorizeReserve(): totalMintingCapsCache -= reserveInfo[reserve].mintingCap;
+        // 4. Update cache in setMintingCap(): totalMintingCapsCache = totalMintingCapsCache - oldCap + newCap;
+        // 5. Replace this function: return totalMintingCapsCache - reserveInfo[excludeReserve].mintingCap;
+        //
+        // TRADEOFFS:
+        // - PRO: O(1) gas cost, much more predictable
+        // - PRO: Scales to unlimited number of reserves
+        // - CON: Additional storage slot (~20k gas for first write)
+        // - CON: More complex state management across multiple functions
+        // - CON: Risk of cache desync if not maintained carefully
+        //
+        // RECOMMENDATION: Implement if expecting >10 reserves, otherwise current solution acceptable.
+        
         for (uint256 i = 0; i < reserveList.length; i++) {
             address reserve = reserveList[i];
             if (reserve != excludeReserve && authorized[reserve]) {
