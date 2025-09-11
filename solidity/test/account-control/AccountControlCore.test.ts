@@ -66,7 +66,7 @@ describe("AccountControl Core Functionality", function () {
       
       await expect(
         accountControl.connect(owner).deauthorizeReserve(nonExistentReserve)
-      ).to.be.revertedWith("ReserveNotFound");
+      ).to.be.revertedWithCustomError(accountControl, "ReserveNotFound");
     });
 
     it("should emit ReserveDeauthorized event", async function () {
@@ -84,7 +84,7 @@ describe("AccountControl Core Functionality", function () {
       
       await expect(
         accountControl.connect(owner).deauthorizeReserve(reserve.address)
-      ).to.be.revertedWith("CannotDeauthorizeWithOutstandingBalance");
+      ).to.be.revertedWithCustomError(accountControl, "CannotDeauthorizeWithOutstandingBalance");
     });
 
     it("should clear backing when deauthorizing clean reserve", async function () {
@@ -129,7 +129,7 @@ describe("AccountControl Core Functionality", function () {
     it("should revert when redeeming more than minted", async function () {
       await expect(
         accountControl.connect(reserve).redeem(1000000) // More than minted
-      ).to.be.revertedWith("InsufficientMinted");
+      ).to.be.revertedWithCustomError(accountControl, "InsufficientMinted");
     });
   });
 

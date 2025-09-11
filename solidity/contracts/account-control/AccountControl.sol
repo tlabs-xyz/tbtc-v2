@@ -114,36 +114,36 @@ contract AccountControl is
     event ReserveTypeChanged(address indexed reserve, ReserveType oldType, ReserveType newType);
 
     // ========== ERRORS ==========
-    error InsufficientBacking();
-    error ExceedsReserveCap();
-    error ExceedsGlobalCap();
-    error NotAuthorized();
-    error ReserveIsPaused();
+    error InsufficientBacking(uint256 available, uint256 required);
+    error ExceedsReserveCap(uint256 requested, uint256 available);
+    error ExceedsGlobalCap(uint256 requested, uint256 available);
+    error NotAuthorized(address caller);
+    error ReserveIsPaused(address reserve);
     error SystemIsPaused();
-    error AmountTooSmall();
-    error AmountTooLarge();
-    error ArrayLengthMismatch();
-    error BatchSizeExceeded();
-    error AlreadyAuthorized();
-    error ZeroAddress();
-    error InsufficientMinted();
-    error ReserveNotFound();
-    error CannotDeauthorizeWithOutstandingBalance();
-    error InvalidReserveType();
-    error ReserveTypeExists();
-    error EmptyString();
-    error AddressAlreadyUsedForDifferentType();
+    error AmountTooSmall(uint256 amount, uint256 minimum);
+    error AmountTooLarge(uint256 amount, uint256 maximum);
+    error ArrayLengthMismatch(uint256 recipientsLength, uint256 amountsLength);
+    error BatchSizeExceeded(uint256 size, uint256 maximum);
+    error AlreadyAuthorized(address reserve);
+    error ZeroAddress(string parameter);
+    error InsufficientMinted(uint256 available, uint256 requested);
+    error ReserveNotFound(address reserve);
+    error CannotDeauthorizeWithOutstandingBalance(address reserve, uint256 outstandingAmount);
+    error InvalidReserveType(ReserveType reserveType);
+    error ReserveTypeExists(ReserveType reserveType);
+    error EmptyString(string parameter);
+    error AddressAlreadyUsedForDifferentType(address reserve, ReserveType currentType, ReserveType requestedType);
 
     // ========== MODIFIERS ==========
     modifier onlyAuthorizedReserve() {
-        if (!authorized[msg.sender]) revert NotAuthorized();
-        if (paused[msg.sender]) revert ReserveIsPaused();
+        if (!authorized[msg.sender]) revert NotAuthorized(msg.sender);
+        if (paused[msg.sender]) revert ReserveIsPaused(msg.sender);
         if (systemPaused) revert SystemIsPaused();
         _;
     }
 
     modifier onlyReserveOracle() {
-        if (msg.sender != reserveOracle) revert NotAuthorized();
+        if (msg.sender != reserveOracle) revert NotAuthorized(msg.sender);
         _;
     }
 
@@ -167,9 +167,9 @@ contract AccountControl is
         address _emergencyCouncil,
         address _bank
     ) public initializer {
-        if (_owner == address(0)) revert ZeroAddress();
-        if (_emergencyCouncil == address(0)) revert ZeroAddress();
-        if (_bank == address(0)) revert ZeroAddress();
+        if (_owner == address(0)) revert ZeroAddress("owner");
+        if (_emergencyCouncil == address(0)) revert ZeroAddress("emergencyCouncil");
+        if (_bank == address(0)) revert ZeroAddress("bank");
         
         __Ownable_init();
         __UUPSUpgradeable_init();
@@ -193,14 +193,14 @@ contract AccountControl is
         external 
         onlyOwner 
     {
-        if (authorized[reserve]) revert AlreadyAuthorized();
-        if (!validReserveTypes[reserveType]) revert InvalidReserveType();
-        if (mintingCap == 0) revert AmountTooSmall(); // Prevent zero caps, use pause instead
+        if (authorized[reserve]) revert AlreadyAuthorized(reserve);
+        if (!validReserveTypes[reserveType]) revert InvalidReserveType(reserveType);
+        if (mintingCap == 0) revert AmountTooSmall(mintingCap, 1); // Prevent zero caps, use pause instead
         
         // Prevent address reuse across different reserve types
         // Check if this address was ever used for a different reserve type
         if (reserveAddressType[reserve] != ReserveType(0) && reserveAddressType[reserve] != reserveType) {
-            revert AddressAlreadyUsedForDifferentType();
+            revert AddressAlreadyUsedForDifferentType(reserve, reserveAddressType[reserve], reserveType);
         }
         
         authorized[reserve] = true;
@@ -228,10 +228,10 @@ contract AccountControl is
         external 
         onlyOwner 
     {
-        if (!authorized[reserve]) revert ReserveNotFound();
+        if (!authorized[reserve]) revert ReserveNotFound(reserve);
         
         // Safety check: cannot deauthorize reserves with outstanding minted balances
-        if (minted[reserve] > 0) revert CannotDeauthorizeWithOutstandingBalance();
+        if (minted[reserve] > 0) revert CannotDeauthorizeWithOutstandingBalance(reserve, minted[reserve]);
         
         authorized[reserve] = false;
         delete reserveInfo[reserve];
@@ -254,21 +254,21 @@ contract AccountControl is
         onlyOwner 
     {
         // Check that reserve is authorized
-        if (!authorized[reserve]) revert NotAuthorized();
+        if (!authorized[reserve]) revert NotAuthorized(msg.sender);
         
         // Prevent zero caps - use pause functionality instead
-        if (newCap == 0) revert AmountTooSmall();
+        if (newCap == 0) revert AmountTooSmall(newCap, 1);
         
         // Prevent reducing cap below current minted amount
         if (newCap < minted[reserve]) {
-            revert ExceedsReserveCap(); // Reusing existing error for consistency
+            revert ExceedsReserveCap(minted[reserve], newCap); // Current minted exceeds new cap
         }
         
         // Validate against global cap if set
         if (globalMintingCap > 0) {
             uint256 totalOtherCaps = _calculateTotalCapsExcluding(reserve);
             if (totalOtherCaps + newCap > globalMintingCap) {
-                revert ExceedsGlobalCap();
+                revert ExceedsGlobalCap(totalOtherCaps + newCap, globalMintingCap);
             }
         }
         
@@ -291,7 +291,7 @@ contract AccountControl is
         external 
         onlyOwner 
     {
-        if (validReserveTypes[reserveType]) revert ReserveTypeExists();
+        if (validReserveTypes[reserveType]) revert ReserveTypeExists(reserveType);
         
         validReserveTypes[reserveType] = true;
         reserveTypeList.push(reserveType);
@@ -303,8 +303,8 @@ contract AccountControl is
         external 
         onlyOwner 
     {
-        if (!authorized[reserve]) revert NotAuthorized();
-        if (!validReserveTypes[newType]) revert InvalidReserveType();
+        if (!authorized[reserve]) revert NotAuthorized(msg.sender);
+        if (!validReserveTypes[newType]) revert InvalidReserveType(newType);
         
         ReserveType oldType = reserveInfo[reserve].reserveType;
         reserveInfo[reserve].reserveType = newType;
@@ -321,21 +321,21 @@ contract AccountControl is
         returns (bool)
     {
         // Validate amount
-        if (amount < MIN_MINT_AMOUNT) revert AmountTooSmall();
-        if (amount > MAX_SINGLE_MINT) revert AmountTooLarge();
+        if (amount < MIN_MINT_AMOUNT) revert AmountTooSmall(amount, MIN_MINT_AMOUNT);
+        if (amount > MAX_SINGLE_MINT) revert AmountTooLarge(amount, MAX_SINGLE_MINT);
         
         // Check backing invariant
         if (backing[msg.sender] < minted[msg.sender] + amount) {
-            revert InsufficientBacking();
+            revert InsufficientBacking(backing[msg.sender], minted[msg.sender] + amount);
         }
         
         // Check caps
         if (minted[msg.sender] + amount > reserveInfo[msg.sender].mintingCap) {
-            revert ExceedsReserveCap();
+            revert ExceedsReserveCap(minted[msg.sender] + amount, reserveInfo[msg.sender].mintingCap);
         }
         
         if (globalMintingCap > 0 && totalMintedAmount + amount > globalMintingCap) {
-            revert ExceedsGlobalCap();
+            revert ExceedsGlobalCap(totalMintedAmount + amount, globalMintingCap);
         }
         
         // Update state
@@ -353,28 +353,28 @@ contract AccountControl is
         address[] calldata recipients,
         uint256[] calldata amounts
     ) external onlyAuthorizedReserve nonReentrant returns (bool) {
-        if (recipients.length != amounts.length) revert ArrayLengthMismatch();
-        if (recipients.length > MAX_BATCH_SIZE) revert BatchSizeExceeded();
+        if (recipients.length != amounts.length) revert ArrayLengthMismatch(recipients.length, amounts.length);
+        if (recipients.length > MAX_BATCH_SIZE) revert BatchSizeExceeded(recipients.length, MAX_BATCH_SIZE);
         
         uint256 totalAmount = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
-            if (amounts[i] < MIN_MINT_AMOUNT) revert AmountTooSmall();
-            if (amounts[i] > MAX_SINGLE_MINT) revert AmountTooLarge();
+            if (amounts[i] < MIN_MINT_AMOUNT) revert AmountTooSmall(amounts[i], MIN_MINT_AMOUNT);
+            if (amounts[i] > MAX_SINGLE_MINT) revert AmountTooLarge(amounts[i], MAX_SINGLE_MINT);
             totalAmount += amounts[i];
         }
         
         // Check backing invariant for total
         if (backing[msg.sender] < minted[msg.sender] + totalAmount) {
-            revert InsufficientBacking();
+            revert InsufficientBacking(backing[msg.sender], minted[msg.sender] + totalAmount);
         }
         
         // Check caps for total
         if (minted[msg.sender] + totalAmount > reserveInfo[msg.sender].mintingCap) {
-            revert ExceedsReserveCap();
+            revert ExceedsReserveCap(minted[msg.sender] + totalAmount, reserveInfo[msg.sender].mintingCap);
         }
         
         if (globalMintingCap > 0 && totalMintedAmount + totalAmount > globalMintingCap) {
-            revert ExceedsGlobalCap();
+            revert ExceedsGlobalCap(totalMintedAmount + totalAmount, globalMintingCap);
         }
         
         // Execute batch mints first to ensure atomicity
@@ -415,7 +415,7 @@ contract AccountControl is
         external 
         onlyReserveOracle 
     {
-        if (!authorized[qc]) revert NotAuthorized();
+        if (!authorized[qc]) revert NotAuthorized(msg.sender);
         
         backing[qc] = amount;
         
@@ -427,7 +427,7 @@ contract AccountControl is
         onlyAuthorizedReserve 
         returns (bool)
     {
-        if (minted[msg.sender] < amount) revert InsufficientMinted();
+        if (minted[msg.sender] < amount) revert InsufficientMinted(minted[msg.sender], amount);
         
         // Update state
         minted[msg.sender] -= amount;
@@ -543,7 +543,7 @@ contract AccountControl is
         view 
         returns (address[] memory) 
     {
-        if (!validReserveTypes[reserveType]) revert InvalidReserveType();
+        if (!validReserveTypes[reserveType]) revert InvalidReserveType(reserveType);
         
         // Count first
         uint256 count = 0;
@@ -598,7 +598,7 @@ contract AccountControl is
         external 
         onlyOwner 
     {
-        if (newCouncil == address(0)) revert ZeroAddress();
+        if (newCouncil == address(0)) revert ZeroAddress("emergencyCouncil");
         address oldCouncil = emergencyCouncil;
         emergencyCouncil = newCouncil;
         emit EmergencyCouncilUpdated(oldCouncil, newCouncil);
@@ -608,7 +608,7 @@ contract AccountControl is
         external 
         onlyOwner 
     {
-        if (newReserveOracle == address(0)) revert ZeroAddress();
+        if (newReserveOracle == address(0)) revert ZeroAddress("reserveOracle");
         reserveOracle = newReserveOracle;
         emit ReserveOracleUpdated(reserveOracle, newReserveOracle);
     }
