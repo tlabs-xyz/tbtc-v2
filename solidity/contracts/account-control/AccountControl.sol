@@ -28,9 +28,7 @@ contract AccountControl is
     /// via UUPS, enums provide better type safety and gas efficiency while still 
     /// allowing future type additions through upgrades.
     enum ReserveType {
-        QC,           // Qualified Custodian
-        ALLOWLISTED,  // Allowlisted reserve
-        L2_BRIDGE     // L2 bridge reserve
+        QC_PERMISSIONED  // Qualified Custodian with permissions
     }
 
     // ========== STATE VARIABLES ==========
