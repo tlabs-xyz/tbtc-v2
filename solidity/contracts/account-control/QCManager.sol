@@ -430,9 +430,9 @@ contract QCManager is AccessControl, ReentrancyGuard {
         // Register QC with provided minting capacity
         qcData.registerQC(qc, maxMintingCap);
 
-        // Authorize QC in Account Control with minting cap
+        // Authorize QC in Account Control with minting cap and type
         if (accountControl != address(0)) {
-            AccountControl(accountControl).authorizeReserve(qc, maxMintingCap);
+            AccountControl(accountControl).authorizeReserve(qc, maxMintingCap, "qc");
         }
 
         emit QCRegistrationInitiated(qc, msg.sender, block.timestamp);

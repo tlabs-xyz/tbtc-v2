@@ -40,8 +40,11 @@ describe("V2 Integration - Core Tests", function () {
     await accountControl.connect(owner).setReserveOracle(mockReserveOracle.address);
     await mockReserveOracle.setAccountControl(accountControl.address);
 
+    // Initialize reserve types
+    await accountControl.connect(owner).addReserveType("qc");
+    
     // Setup AccountControl
-    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP);
+    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, "qc");
     await mockReserveOracle.mockConsensusBackingUpdate(qc.address, QC_BACKING_AMOUNT);
   });
 
@@ -107,7 +110,7 @@ describe("V2 Integration - Core Tests", function () {
     it("should handle multiple QCs with independent accounting", async function () {
       // Setup second QC
       const qc2 = emergencyCouncil; // Reuse signer
-      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP);
+      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP, "qc");
       await mockReserveOracle.mockConsensusBackingUpdate(qc2.address, QC_BACKING_AMOUNT);
       
       const qc1MintAmount = 300000;
@@ -190,10 +193,11 @@ describe("V2 Integration - Core Tests", function () {
       // and removes from the reserveList, but doesn't check for outstanding tokens
       await accountControl.connect(owner).deauthorizeReserve(qc.address);
       expect(await accountControl.authorized(qc.address)).to.be.false;
-      expect(await accountControl.mintingCaps(qc.address)).to.equal(0);
+      const reserveInfo = await accountControl.reserveInfo(qc.address);
+      expect(reserveInfo.mintingCap).to.equal(0);
       
       // Redeem all tokens (still works even when deauthorized)
-      await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP); // Re-authorize for redeem
+      await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, "qc"); // Re-authorize for redeem
       await accountControl.connect(qc).redeem(mintAmount);
       expect(await accountControl.minted(qc.address)).to.equal(0);
     });
