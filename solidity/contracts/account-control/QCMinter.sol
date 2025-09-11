@@ -9,6 +9,7 @@ import "./SystemState.sol";
 import "../bank/Bank.sol";
 import "../vault/TBTCVault.sol";
 import "../token/TBTC.sol";
+import "./AccountControl.sol";
 
 
 /// @title QCMinter
@@ -47,6 +48,11 @@ contract QCMinter is AccessControl, ReentrancyGuard {
 
     // Auto-minting support
     bool public autoMintEnabled;
+
+    // =================== V2 INTEGRATION ===================
+    // Optional AccountControl integration for V2 invariant enforcement
+    address public accountControl;
+    bool public v2ModeEnabled;
 
     /// @dev Mapping to track mint requests
     mapping(bytes32 => MintRequest) public mintRequests;
@@ -114,6 +120,12 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @notice Emitted when auto-mint feature is enabled/disabled
     event AutoMintToggled(bool enabled);
 
+    /// @notice Emitted when V2 mode is enabled/disabled
+    event V2ModeToggled(bool enabled);
+
+    /// @notice Emitted when AccountControl address is updated
+    event AccountControlUpdated(address indexed accountControl);
+
     /// @notice Emitted when auto-mint is completed
     event AutoMintCompleted(
         address indexed user,
@@ -166,6 +178,22 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     function setAutoMintEnabled(bool enabled) external onlyRole(GOVERNANCE_ROLE) {
         autoMintEnabled = enabled;
         emit AutoMintToggled(enabled);
+    }
+
+    // =================== V2 CONFIGURATION ===================
+
+    /// @notice Enable/disable V2 mode integration
+    /// @param enabled Whether to enable V2 AccountControl integration
+    function setV2ModeEnabled(bool enabled) external onlyRole(GOVERNANCE_ROLE) {
+        v2ModeEnabled = enabled;
+        emit V2ModeToggled(enabled);
+    }
+
+    /// @notice Set AccountControl address for V2 integration
+    /// @param _accountControl Address of the AccountControl contract
+    function setAccountControl(address _accountControl) external onlyRole(GOVERNANCE_ROLE) {
+        accountControl = _accountControl;
+        emit AccountControlUpdated(_accountControl);
     }
 
     /// @dev Validates QC capacity and creates Bank balance
@@ -301,8 +329,13 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // Emit event before Bank interaction for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
 
-        // Create Bank balance (no longer auto-triggers TBTCVault minting)
-        bank.increaseBalance(user, satoshis);
+        // V2 Integration: Check invariant if V2 mode enabled
+        if (v2ModeEnabled && accountControl != address(0)) {
+            AccountControl(accountControl).mint(user, satoshis);
+        } else {
+            // V1 path: Create Bank balance directly
+            bank.increaseBalance(user, satoshis);
+        }
 
         // Update QC minted amount
         _updateQCMintedAmount(qc, amount);
@@ -436,7 +469,11 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // HYBRID LOGIC: Choose between manual and automated minting
         if (autoMint && autoMintEnabled) {
             // Option 1: Automated minting - create balance and immediately mint tBTC
-            bank.increaseBalance(user, satoshis);
+            if (v2ModeEnabled && accountControl != address(0)) {
+                AccountControl(accountControl).mint(user, satoshis);
+            } else {
+                bank.increaseBalance(user, satoshis);
+            }
             
             // Execute automated minting directly
             _executeAutoMint(user, satoshis);
@@ -445,7 +482,11 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             emit QCMintCompleted(user, satoshis, true);
         } else {
             // Option 2: Manual process - just create Bank balance
-            bank.increaseBalance(user, satoshis);
+            if (v2ModeEnabled && accountControl != address(0)) {
+                AccountControl(accountControl).mint(user, satoshis);
+            } else {
+                bank.increaseBalance(user, satoshis);
+            }
             
             // Emit event for manual completion (user needs to mint separately)
             emit QCMintCompleted(user, satoshis, false);

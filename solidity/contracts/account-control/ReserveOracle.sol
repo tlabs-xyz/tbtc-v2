@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./AccountControl.sol";
 
 /// @title ReserveOracle
 /// @notice Multi-attester consensus oracle with honest-majority assumption for QC reserve attestation
@@ -62,6 +63,13 @@ contract ReserveOracle is AccessControl {
     uint256 public attestationTimeout = 6 hours; // Time window for attestations to be considered valid
     uint256 public maxStaleness = 24 hours; // Maximum time before reserve data is considered stale
 
+    // V2 Integration - Account Control
+    /// @dev Address of the Account Control contract for V2 integration
+    address public accountControl;
+    
+    /// @dev Flag to enable V2 mode for backing updates
+    bool public v2ModeEnabled;
+
     // Events
     event AttestationSubmitted(
         address indexed qc,
@@ -116,6 +124,13 @@ contract ReserveOracle is AccessControl {
         uint256 oldMaxStaleness,
         uint256 newMaxStaleness
     );
+
+    // V2 Integration Events
+    /// @dev Emitted when V2 mode is toggled
+    event V2ModeToggled(bool enabled, address changedBy, uint256 timestamp);
+    
+    /// @dev Emitted when Account Control address is updated
+    event AccountControlUpdated(address indexed oldAddress, address indexed newAddress, address changedBy, uint256 timestamp);
 
     // Custom errors for gas efficiency
     error QCAddressRequired();
@@ -290,6 +305,11 @@ contract ReserveOracle is AccessControl {
             lastUpdateTimestamp: block.timestamp
         });
 
+        // V2 Integration - Update backing in Account Control
+        if (v2ModeEnabled && accountControl != address(0)) {
+            AccountControl(accountControl).updateBacking(balance);
+        }
+
         // Clear any pending attestations
         _clearPendingAttestations(qc);
 
@@ -375,6 +395,11 @@ contract ReserveOracle is AccessControl {
             balance: consensusBalance,
             lastUpdateTimestamp: block.timestamp
         });
+
+        // V2 Integration - Update backing in Account Control
+        if (v2ModeEnabled && accountControl != address(0)) {
+            AccountControl(accountControl).updateBacking(consensusBalance);
+        }
 
         // Create array of participating attesters for event
         address[] memory participatingAttesters = new address[](validCount);
@@ -462,6 +487,25 @@ contract ReserveOracle is AccessControl {
         }
 
         delete pendingAttesters[qc];
+    }
+
+    // =================== V2 INTEGRATION FUNCTIONS ===================
+
+    /// @notice Enable or disable V2 mode for Account Control integration
+    /// @param enabled Whether to enable V2 mode
+    /// @dev Only DEFAULT_ADMIN_ROLE can call this function
+    function setV2ModeEnabled(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        v2ModeEnabled = enabled;
+        emit V2ModeToggled(enabled, msg.sender, block.timestamp);
+    }
+
+    /// @notice Set the Account Control contract address for V2 integration
+    /// @param _accountControl The address of the Account Control contract
+    /// @dev Only DEFAULT_ADMIN_ROLE can call this function
+    function setAccountControl(address _accountControl) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address oldAddress = accountControl;
+        accountControl = _accountControl;
+        emit AccountControlUpdated(oldAddress, _accountControl, msg.sender, block.timestamp);
     }
 
 }
