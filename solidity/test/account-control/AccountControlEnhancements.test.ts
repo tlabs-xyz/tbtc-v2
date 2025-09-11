@@ -16,7 +16,6 @@ describe("AccountControl Enhancements", function () {
 
   // Mock Bank that supports both individual and batch operations
   let mockBankContract: any;
-  let mockReserveOracle: any;
 
   beforeEach(async function () {
     [owner, emergencyCouncil, mockBank, reserve1, reserve2, user1, user2] = await ethers.getSigners();
@@ -25,9 +24,6 @@ describe("AccountControl Enhancements", function () {
     const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBankContract = await MockBankFactory.deploy();
 
-    // Deploy MockReserveOracle
-    const MockReserveOracleFactory = await ethers.getContractFactory("MockReserveOracle");
-    mockReserveOracle = await MockReserveOracleFactory.deploy();
 
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
     accountControl = await upgrades.deployProxy(
@@ -37,8 +33,7 @@ describe("AccountControl Enhancements", function () {
     ) as AccountControl;
 
     // Setup ReserveOracle integration
-    await accountControl.connect(owner).setReserveOracle(mockReserveOracle.address);
-    await mockReserveOracle.setAccountControl(accountControl.address);
+    await accountControl.connect(owner).setReserveOracle(owner.address);
 
     // Initialize reserve types
     await accountControl.connect(owner).addReserveType("qc");
@@ -48,8 +43,8 @@ describe("AccountControl Enhancements", function () {
     await accountControl.connect(owner).authorizeReserve(reserve2.address, 2000000, "qc"); // 0.02 BTC cap
     
     // Set backing for reserves via oracle consensus
-    await mockReserveOracle.mockConsensusBackingUpdate(reserve1.address, 1000000);
-    await mockReserveOracle.mockConsensusBackingUpdate(reserve2.address, 2000000);
+    await accountControl.connect(owner).updateBacking(reserve1.address, 1000000);
+    await accountControl.connect(owner).updateBacking(reserve2.address, 2000000);
   });
 
   describe("Enhancement 1: Batch Atomicity", function () {

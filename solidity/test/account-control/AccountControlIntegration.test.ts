@@ -23,7 +23,6 @@ describe("AccountControl Integration Tests", function () {
   let mockQcData: any;
   let mockQcManager: any;
   let mockRelay: any;
-  let mockReserveOracle: any;
 
   const SATOSHI_MULTIPLIER = ethers.utils.parseEther("0.00000001"); // 1e10
   const QC_BACKING_AMOUNT = 1000000; // 0.01 BTC in satoshis
@@ -45,10 +44,6 @@ describe("AccountControl Integration Tests", function () {
     
     // Grant roles to deployer for testing
     await mockSystemState.connect(owner).grantRole(await mockSystemState.OPERATIONS_ROLE(), owner.address);
-
-    // Deploy MockReserveOracle
-    const MockReserveOracleFactory = await ethers.getContractFactory("MockReserveOracle");
-    mockReserveOracle = await MockReserveOracleFactory.deploy();
 
     // Deploy minimal mock contracts for QCMinter requirements
     const MockTBTCVaultFactory = await ethers.getContractFactory("MockTBTCVault");
@@ -88,16 +83,17 @@ describe("AccountControl Integration Tests", function () {
       100 // txProofDifficultyFactor
     ) as QCRedeemer;
 
-    // Setup ReserveOracle integration
-    await accountControl.connect(owner).setReserveOracle(mockReserveOracle.address);
-    await mockReserveOracle.setAccountControl(accountControl.address);
+    // Grant owner oracle role for direct backing updates in tests
+    await accountControl.connect(owner).setReserveOracle(owner.address);
 
-    // Initialize reserve types
+    // Initialize reserve types  
     await accountControl.connect(owner).addReserveType("qc");
     
     // Setup AccountControl
     await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, "qc");
-    await mockReserveOracle.mockConsensusBackingUpdate(qc.address, QC_BACKING_AMOUNT);
+    
+    // Set backing directly (owner has oracle role)
+    await accountControl.connect(owner).updateBacking(qc.address, QC_BACKING_AMOUNT);
 
     // Grant necessary roles
     const MINTER_ROLE = await qcMinter.MINTER_ROLE();
@@ -160,7 +156,7 @@ describe("AccountControl Integration Tests", function () {
 
     it("should enforce AccountControl backing invariant in AccountControl mode", async function () {
       // Set backing lower than mint amount
-      await mockReserveOracle.mockConsensusBackingUpdate(qc.address, 100000); // 0.001 BTC
+      await accountControl.connect(owner).updateBacking(qc.address, 100000); // 0.001 BTC
       
       const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
       const receipt = await tx.wait();
@@ -331,7 +327,7 @@ describe("AccountControl Integration Tests", function () {
       // Setup second QC
       const qc2 = emergencyCouncil; // Reuse signer
       await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP, "qc");
-      await mockReserveOracle.mockConsensusBackingUpdate(qc2.address, QC_BACKING_AMOUNT);
+      await accountControl.connect(owner).updateBacking(qc2.address, QC_BACKING_AMOUNT);
       
       // Mint from both QCs
       let tx1 = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
