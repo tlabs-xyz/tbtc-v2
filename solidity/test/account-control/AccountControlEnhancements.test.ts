@@ -22,7 +22,7 @@ describe("AccountControl Enhancements", function () {
     [owner, emergencyCouncil, mockBank, reserve1, reserve2, user1, user2] = await ethers.getSigners();
 
     // Deploy mock Bank with batch support
-    const MockBankFactory = await ethers.getContractFactory("MockBankEnhanced");
+    const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBankContract = await MockBankFactory.deploy();
 
     // Deploy MockReserveOracle

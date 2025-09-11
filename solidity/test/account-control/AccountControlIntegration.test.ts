@@ -34,14 +34,17 @@ describe("AccountControl Integration Tests", function () {
     [owner, emergencyCouncil, qc, user, minter] = await ethers.getSigners();
 
     // Deploy mock contracts
-    const MockBankFactory = await ethers.getContractFactory("MockBankEnhanced");
+    const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBank = await MockBankFactory.deploy();
 
     const MockTbtcTokenFactory = await ethers.getContractFactory("MockTBTCToken");
     mockTbtcToken = await MockTbtcTokenFactory.deploy();
 
-    const MockSystemStateFactory = await ethers.getContractFactory("MockSystemState");
-    mockSystemState = await MockSystemStateFactory.deploy();
+    const SystemStateFactory = await ethers.getContractFactory("SystemState");
+    mockSystemState = await SystemStateFactory.deploy();
+    
+    // Grant roles to deployer for testing
+    await mockSystemState.connect(owner).grantRole(await mockSystemState.OPERATIONS_ROLE(), owner.address);
 
     // Deploy MockReserveOracle
     const MockReserveOracleFactory = await ethers.getContractFactory("MockReserveOracle");
