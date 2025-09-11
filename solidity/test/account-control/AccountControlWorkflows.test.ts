@@ -4,7 +4,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { AccountControl } from "../../typechain";
 
-describe("AccountControl Integration - Core Tests", function () {
+describe("AccountControl Workflows", function () {
   let accountControl: AccountControl;
   let owner: SignerWithAddress;
   let emergencyCouncil: SignerWithAddress;
