@@ -192,8 +192,9 @@ export class RedemptionsService {
     const redeemerOutputScript = await this.getRedeemerOutputScript(
       bitcoinRedeemerAddress
     )
-    // guarantees uniqueness over time
-    const nonce = Date.now() * 1000 + Math.floor(Math.random() * 1000)
+    // Nonce must be a uint32. Use seconds since epoch which fits.
+    // Using milliseconds (Date.now()) would be too large.
+    const nonce = Math.floor(Date.now() / 1000)
 
     const txHash =
       await crossChainContracts.l2BitcoinRedeemer.requestRedemption(
