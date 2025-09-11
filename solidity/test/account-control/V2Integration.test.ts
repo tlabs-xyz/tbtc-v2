@@ -89,8 +89,11 @@ describe("V2 Integration Tests", function () {
     await accountControl.connect(owner).setReserveOracle(mockReserveOracle.address);
     await mockReserveOracle.setAccountControl(accountControl.address);
 
+    // Initialize reserve types
+    await accountControl.connect(owner).addReserveType("qc");
+    
     // Setup AccountControl
-    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP);
+    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, "qc");
     await mockReserveOracle.mockConsensusBackingUpdate(qc.address, QC_BACKING_AMOUNT);
 
     // Grant necessary roles
@@ -324,7 +327,7 @@ describe("V2 Integration Tests", function () {
     it("should handle multiple QCs operating simultaneously", async function () {
       // Setup second QC
       const qc2 = emergencyCouncil; // Reuse signer
-      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP);
+      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP, "qc");
       await mockReserveOracle.mockConsensusBackingUpdate(qc2.address, QC_BACKING_AMOUNT);
       
       // Mint from both QCs

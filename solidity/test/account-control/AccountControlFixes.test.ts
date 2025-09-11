@@ -30,8 +30,11 @@ describe("AccountControl Critical Fixes", function () {
     await accountControl.connect(owner).setReserveOracle(mockReserveOracle.address);
     await mockReserveOracle.setAccountControl(accountControl.address);
 
+    // Initialize reserve types
+    await accountControl.connect(owner).addReserveType("qc");
+    
     // Authorize a reserve for testing
-    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000); // 0.01 BTC cap in satoshis
+    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000, "qc"); // 0.01 BTC cap in satoshis
   });
 
   describe("Optimized totalMinted calculation", function () {
@@ -59,7 +62,8 @@ describe("AccountControl Critical Fixes", function () {
       await accountControl.connect(owner).deauthorizeReserve(reserve.address);
       
       expect(await accountControl.authorized(reserve.address)).to.be.false;
-      expect(await accountControl.mintingCaps(reserve.address)).to.equal(0);
+      const reserveInfo = await accountControl.reserveInfo(reserve.address);
+      expect(reserveInfo.mintingCap).to.equal(0);
     });
 
     it("should revert when deauthorizing non-existent reserve", async function () {
