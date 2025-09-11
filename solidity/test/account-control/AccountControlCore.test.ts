@@ -10,14 +10,10 @@ describe("AccountControl Core Functionality", function () {
   let emergencyCouncil: SignerWithAddress;
   let mockBank: SignerWithAddress;
   let reserve: SignerWithAddress;
-  let mockReserveOracle: any;
 
   beforeEach(async function () {
     [owner, emergencyCouncil, mockBank, reserve] = await ethers.getSigners();
 
-    // Deploy MockReserveOracle
-    const MockReserveOracleFactory = await ethers.getContractFactory("MockReserveOracle");
-    mockReserveOracle = await MockReserveOracleFactory.deploy();
 
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
     accountControl = await upgrades.deployProxy(
@@ -27,8 +23,7 @@ describe("AccountControl Core Functionality", function () {
     ) as AccountControl;
 
     // Setup ReserveOracle integration
-    await accountControl.connect(owner).setReserveOracle(mockReserveOracle.address);
-    await mockReserveOracle.setAccountControl(accountControl.address);
+    await accountControl.connect(owner).setReserveOracle(owner.address);
 
     // Initialize reserve types
     await accountControl.connect(owner).addReserveType("qc");
@@ -44,7 +39,7 @@ describe("AccountControl Core Functionality", function () {
 
     it("should track total minted amount efficiently", async function () {
       // Set backing for reserve via oracle consensus
-      await mockReserveOracle.mockConsensusBackingUpdate(reserve.address, 2000000); // 0.02 BTC
+      await accountControl.connect(owner).updateBacking(reserve.address, 2000000); // 0.02 BTC
 
       // Mock Bank.increaseBalance call (normally would be called)
       const amount = 500000; // 0.005 BTC in satoshis
@@ -86,7 +81,7 @@ describe("AccountControl Core Functionality", function () {
   describe("redeem function", function () {
     beforeEach(async function () {
       // Set up backing via oracle consensus and simulate a previous mint
-      await mockReserveOracle.mockConsensusBackingUpdate(reserve.address, 1000000);
+      await accountControl.connect(owner).updateBacking(reserve.address, 1000000);
       // We can't actually mint without a proper Bank mock, but we can test the redeem logic
       // by directly setting the minted amount using adjustMinted
       await accountControl.connect(reserve).adjustMinted(500000, true); // Add 0.005 BTC minted
