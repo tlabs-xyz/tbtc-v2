@@ -91,7 +91,7 @@ describe("AccountControl Enhancements", function () {
     it("should prevent reducing cap below current minted amount", async function () {
       await expect(
         accountControl.connect(owner).setMintingCap(reserve1.address, 400000) // Below 500000 minted
-      ).to.be.revertedWith("ExceedsReserveCap");
+      ).to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
     });
 
     it("should allow reducing cap to exactly current minted amount", async function () {
@@ -113,7 +113,7 @@ describe("AccountControl Enhancements", function () {
       
       await expect(
         accountControl.connect(owner).setMintingCap(unauthorizedReserve.address, 1000000)
-      ).to.be.revertedWith("NotAuthorized");
+      ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
     });
 
     it("should enforce global cap validation when setting individual caps", async function () {
@@ -124,7 +124,7 @@ describe("AccountControl Enhancements", function () {
       // Setting Reserve1 to 1M should work (1M + 2M = 3M > 1.5M global, so should fail)
       await expect(
         accountControl.connect(owner).setMintingCap(reserve1.address, 1000000)
-      ).to.be.revertedWith("ExceedsGlobalCap");
+      ).to.be.revertedWithCustomError(accountControl, "ExceedsGlobalCap");
     });
 
     it("should allow setting cap when total doesn't exceed global cap", async function () {
@@ -152,7 +152,7 @@ describe("AccountControl Enhancements", function () {
     it("should prevent double authorization", async function () {
       await expect(
         accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, 0) // ReserveType.QC_PERMISSIONED
-      ).to.be.revertedWith("AlreadyAuthorized");
+      ).to.be.revertedWithCustomError(accountControl, "AlreadyAuthorized");
     });
 
     it("should prevent deauthorizing non-existent reserve", async function () {
@@ -160,7 +160,7 @@ describe("AccountControl Enhancements", function () {
       
       await expect(
         accountControl.connect(owner).deauthorizeReserve(nonExistentReserve)
-      ).to.be.revertedWith("ReserveNotFound");
+      ).to.be.revertedWithCustomError(accountControl, "ReserveNotFound");
     });
 
     it("should prevent address reuse across different reserve types", async function () {
@@ -315,7 +315,7 @@ describe("AccountControl Enhancements", function () {
       // Test cap reduction safety
       await expect(
         accountControl.connect(owner).setMintingCap(reserve1.address, 200000)
-      ).to.be.revertedWith("ExceedsReserveCap");
+      ).to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
     });
   });
 });
