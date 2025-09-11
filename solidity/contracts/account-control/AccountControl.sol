@@ -22,6 +22,17 @@ contract AccountControl is
     uint256 public constant MAX_SINGLE_MINT = 100 * 10**8; // 100 BTC in satoshis
     uint256 public constant MAX_BATCH_SIZE = 100;
 
+    // ========== ENUMS ==========
+    /// @dev TODO: We considered using string-based reserve types to avoid requiring 
+    /// contract upgrades when adding new types, but since this contract is upgradeable 
+    /// via UUPS, enums provide better type safety and gas efficiency while still 
+    /// allowing future type additions through upgrades.
+    enum ReserveType {
+        QC,           // Qualified Custodian
+        ALLOWLISTED,  // Allowlisted reserve
+        L2_BRIDGE     // L2 bridge reserve
+    }
+
     // ========== STATE VARIABLES ==========
     /*
      * STORAGE LAYOUT DOCUMENTATION (CRITICAL FOR UPGRADEABILITY)
@@ -47,7 +58,7 @@ contract AccountControl is
     
     struct ReserveInfo {
         uint256 mintingCap;
-        string reserveType;
+        ReserveType reserveType;
     }
     mapping(address => ReserveInfo) public reserveInfo; // Slot 11: Reserve info with type
     uint256 public globalMintingCap;                   // Slot 12: Global minting cap
@@ -68,8 +79,7 @@ contract AccountControl is
     address public bank;                              // Slot 19: Bank contract address  
     uint256 public deploymentBlock;                   // Slot 20: Deployment block number
     
-    // Watchdog system (slot ~21)
-    mapping(address => bool) public watchdogs;        // Slot 21: Authorized watchdog addresses
+    // Slot ~21 available for future use
     
     // Event optimization (slot ~22)
     bool public emitIndividualEvents;                 // Slot 22: Individual event emission toggle
@@ -82,8 +92,8 @@ contract AccountControl is
      */
     
     // Reserve type system (slots ~23-24)
-    mapping(string => bool) public validReserveTypes;   // Slot 23: Valid reserve types
-    string[] public reserveTypeList;                   // Slot 24: List of all reserve types
+    mapping(ReserveType => bool) public validReserveTypes;   // Slot 23: Valid reserve types
+    ReserveType[] public reserveTypeList;                   // Slot 24: List of all reserve types
 
     // ========== EVENTS ==========
     event MintExecuted(address indexed reserve, address indexed recipient, uint256 amount);
@@ -94,9 +104,6 @@ contract AccountControl is
     event ReserveUnpaused(address indexed reserve);
     event MintingCapUpdated(address indexed reserve, uint256 oldCap, uint256 newCap);
     event GlobalMintingCapUpdated(uint256 cap);
-    event ViolationReported(address indexed watchdog, address indexed reserve, string violation);
-    event WatchdogAuthorized(address indexed watchdog);
-    event WatchdogRevoked(address indexed watchdog);
     event EmergencyCouncilUpdated(address indexed oldCouncil, address indexed newCouncil);
     event ReserveOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event RedemptionProcessed(address indexed reserve, uint256 amount);
