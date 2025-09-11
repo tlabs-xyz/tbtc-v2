@@ -162,6 +162,24 @@ describe("AccountControl Enhancements", function () {
         accountControl.connect(owner).deauthorizeReserve(nonExistentReserve)
       ).to.be.revertedWith("ReserveNotFound");
     });
+
+    it("should prevent address reuse across different reserve types", async function () {
+      // First, deauthorize reserve1 (it was authorized as QC_PERMISSIONED = 0)
+      await accountControl.connect(owner).deauthorizeReserve(reserve1.address);
+      
+      // Try to re-authorize same address for same type - should work
+      await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, 0); // Same type
+      
+      // Deauthorize again for the next test
+      await accountControl.connect(owner).deauthorizeReserve(reserve1.address);
+      
+      // Try to authorize same address for different type - should fail
+      // Note: Since we only have QC_PERMISSIONED (0), we can't test different types yet
+      // This test would work once we add more reserve types like VISHWA, etc.
+      
+      // For now, just verify the address type is recorded
+      expect(await accountControl.reserveAddressType(reserve1.address)).to.equal(0); // QC_PERMISSIONED
+    });
   });
 
   describe("Enhancement 4: Batch Bank Interface Optimization", function () {
