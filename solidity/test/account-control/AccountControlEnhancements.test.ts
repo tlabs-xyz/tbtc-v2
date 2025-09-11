@@ -36,11 +36,11 @@ describe("AccountControl Enhancements", function () {
     await accountControl.connect(owner).setReserveOracle(owner.address);
 
     // Initialize reserve types
-    await accountControl.connect(owner).addReserveType("qc");
+    await accountControl.connect(owner).addReserveType(0); // ReserveType.QC_PERMISSIONED
     
     // Authorize reserves for testing
-    await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, "qc"); // 0.01 BTC cap
-    await accountControl.connect(owner).authorizeReserve(reserve2.address, 2000000, "qc"); // 0.02 BTC cap
+    await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, 0); // 0.01 BTC cap, ReserveType.QC_PERMISSIONED
+    await accountControl.connect(owner).authorizeReserve(reserve2.address, 2000000, 0); // 0.02 BTC cap, ReserveType.QC_PERMISSIONED
     
     // Set backing for reserves via oracle consensus
     await accountControl.connect(owner).updateBacking(reserve1.address, 1000000);
@@ -151,7 +151,7 @@ describe("AccountControl Enhancements", function () {
   describe("Enhancement 3: Authorization Race Condition Protection", function () {
     it("should prevent double authorization", async function () {
       await expect(
-        accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, "qc")
+        accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, 0) // ReserveType.QC_PERMISSIONED
       ).to.be.revertedWith("AlreadyAuthorized");
     });
 
