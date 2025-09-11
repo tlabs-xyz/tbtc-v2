@@ -18,7 +18,7 @@ describe("Reserve Type System", function () {
     [owner, emergencyCouncil, qc1, qc2, l2Bridge] = await ethers.getSigners();
 
     // Deploy MockBank
-    const MockBankFactory = await ethers.getContractFactory("MockBankEnhanced");
+    const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBank = await MockBankFactory.deploy();
 
     // Deploy MockReserveOracle

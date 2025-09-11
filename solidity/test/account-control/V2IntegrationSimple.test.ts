@@ -21,7 +21,7 @@ describe("V2 Integration - Core Tests", function () {
     [owner, emergencyCouncil, qc, user] = await ethers.getSigners();
 
     // Deploy mock Bank
-    const MockBankFactory = await ethers.getContractFactory("MockBankEnhanced");
+    const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBank = await MockBankFactory.deploy();
 
     // Deploy MockReserveOracle
