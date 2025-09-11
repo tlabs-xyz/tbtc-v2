@@ -21,7 +21,6 @@ contract AccountControl is
     uint256 public constant MIN_MINT_AMOUNT = 10**4; // 0.0001 BTC in satoshis
     uint256 public constant MAX_SINGLE_MINT = 100 * 10**8; // 100 BTC in satoshis
     uint256 public constant MAX_BATCH_SIZE = 100;
-    uint256 public constant RATE_LIMIT_WINDOW = 3600; // 1 hour
 
     // ========== STATE VARIABLES ==========
     /*
@@ -56,8 +55,8 @@ contract AccountControl is
     mapping(address => bool) public paused;           // Slot 15: Per-reserve pause status
     bool public systemPaused;                         // Slot 16: System-wide pause status
     
-    // Rate limiting (slot ~17)
-    mapping(address => uint256) public lastBackingUpdate; // Slot 17: Rate limiting timestamps
+    // Oracle integration (slot ~17)
+    address public reserveOracle;                     // Slot 17: ReserveOracle contract address
     
     // Governance (slots ~18-20)
     address public emergencyCouncil;                  // Slot 18: Emergency council address
@@ -90,6 +89,7 @@ contract AccountControl is
     event WatchdogAuthorized(address indexed watchdog);
     event WatchdogRevoked(address indexed watchdog);
     event EmergencyCouncilUpdated(address indexed oldCouncil, address indexed newCouncil);
+    event ReserveOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event RedemptionProcessed(address indexed reserve, uint256 amount);
     event ReserveDeauthorized(address indexed reserve);
 
@@ -104,7 +104,6 @@ contract AccountControl is
     error AmountTooLarge();
     error ArrayLengthMismatch();
     error BatchSizeExceeded();
-    error RateLimitExceeded();
     error AlreadyAuthorized();
     error NotAWatchdog();
     error ZeroAddress();
@@ -116,6 +115,11 @@ contract AccountControl is
         if (!authorized[msg.sender]) revert NotAuthorized();
         if (paused[msg.sender]) revert ReserveIsPaused();
         if (systemPaused) revert SystemIsPaused();
+        _;
+    }
+
+    modifier onlyReserveOracle() {
+        if (msg.sender != reserveOracle) revert NotAuthorized();
         _;
     }
 
@@ -306,21 +310,19 @@ contract AccountControl is
 
     // ========== BACKING MANAGEMENT ==========
     
-    function updateBacking(uint256 amount) 
+    /// @notice Update QC backing amount based on oracle consensus
+    /// @param qc The QC address to update
+    /// @param amount The new backing amount from oracle consensus
+    /// @dev Only callable by authorized ReserveOracle
+    function updateBackingFromOracle(address qc, uint256 amount) 
         external 
-        onlyAuthorizedReserve 
+        onlyReserveOracle 
     {
-        // Rate limiting
-        if (lastBackingUpdate[msg.sender] > 0) {
-            if (block.timestamp < lastBackingUpdate[msg.sender] + RATE_LIMIT_WINDOW) {
-                revert RateLimitExceeded();
-            }
-        }
+        if (!authorized[qc]) revert NotAuthorized();
         
-        backing[msg.sender] = amount;
-        lastBackingUpdate[msg.sender] = block.timestamp;
+        backing[qc] = amount;
         
-        emit BackingUpdated(msg.sender, amount);
+        emit BackingUpdated(qc, amount);
     }
 
     function redeem(uint256 amount) 
@@ -469,6 +471,15 @@ contract AccountControl is
         address oldCouncil = emergencyCouncil;
         emergencyCouncil = newCouncil;
         emit EmergencyCouncilUpdated(oldCouncil, newCouncil);
+    }
+
+    function setReserveOracle(address newReserveOracle) 
+        external 
+        onlyOwner 
+    {
+        if (newReserveOracle == address(0)) revert ZeroAddress();
+        reserveOracle = newReserveOracle;
+        emit ReserveOracleUpdated(reserveOracle, newReserveOracle);
     }
     
     function setIndividualEventEmission(bool enabled) 
