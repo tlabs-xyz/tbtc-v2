@@ -19,11 +19,8 @@ class IntegrationTestRunner {
     console.log(chalk.blue("=".repeat(60)))
 
     const testFiles = [
-      "QCOnboardingIntegration.test.ts",
-      "ReserveAttestationIntegration.test.ts",
-      "QCMintingIntegration.test.ts",
-      "UserRedemptionIntegration.test.ts",
-      "CompleteFlowIntegration.test.ts",
+      "SPVIntegrationFlows.test.ts", 
+      "SPVLibraryIntegration.test.ts",
     ]
 
     for (const testFile of testFiles) {
