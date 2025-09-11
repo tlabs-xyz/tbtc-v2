@@ -26,10 +26,10 @@ describe("AccountControl Core Functionality", function () {
     await accountControl.connect(owner).setReserveOracle(owner.address);
 
     // Initialize reserve types
-    await accountControl.connect(owner).addReserveType("qc");
+    await accountControl.connect(owner).addReserveType(0); // ReserveType.QC_PERMISSIONED
     
     // Authorize a reserve for testing
-    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000, "qc"); // 0.01 BTC cap in satoshis
+    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000, 0); // 0.01 BTC cap in satoshis, ReserveType.QC_PERMISSIONED
   });
 
   describe("Optimized totalMinted calculation", function () {

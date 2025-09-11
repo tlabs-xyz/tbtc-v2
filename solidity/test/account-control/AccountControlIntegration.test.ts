@@ -87,10 +87,10 @@ describe("AccountControl Integration Tests", function () {
     await accountControl.connect(owner).setReserveOracle(owner.address);
 
     // Initialize reserve types  
-    await accountControl.connect(owner).addReserveType("qc");
+    await accountControl.connect(owner).addReserveType(0); // ReserveType.QC_PERMISSIONED
     
     // Setup AccountControl
-    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, "qc");
+    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, 0); // ReserveType.QC_PERMISSIONED
     
     // Set backing directly (owner has oracle role)
     await accountControl.connect(owner).updateBacking(qc.address, QC_BACKING_AMOUNT);
@@ -326,7 +326,7 @@ describe("AccountControl Integration Tests", function () {
     it("should handle multiple QCs operating simultaneously", async function () {
       // Setup second QC
       const qc2 = emergencyCouncil; // Reuse signer
-      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP, "qc");
+      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP, 0); // ReserveType.QC_PERMISSIONED
       await accountControl.connect(owner).updateBacking(qc2.address, QC_BACKING_AMOUNT);
       
       // Mint from both QCs

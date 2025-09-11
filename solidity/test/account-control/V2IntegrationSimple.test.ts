@@ -36,10 +36,10 @@ describe("AccountControl Integration - Core Tests", function () {
     await accountControl.connect(owner).setReserveOracle(owner.address);
 
     // Initialize reserve types
-    await accountControl.connect(owner).addReserveType("qc");
+    await accountControl.connect(owner).addReserveType(0); // ReserveType.QC_PERMISSIONED
     
     // Setup AccountControl
-    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, "qc");
+    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, 0); // ReserveType.QC_PERMISSIONED
     await accountControl.connect(owner).updateBacking(qc.address, QC_BACKING_AMOUNT);
   });
 
@@ -105,7 +105,7 @@ describe("AccountControl Integration - Core Tests", function () {
     it("should handle multiple QCs with independent accounting", async function () {
       // Setup second QC
       const qc2 = emergencyCouncil; // Reuse signer
-      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP, "qc");
+      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP, 0); // ReserveType.QC_PERMISSIONED
       await accountControl.connect(owner).updateBacking(qc2.address, QC_BACKING_AMOUNT);
       
       const qc1MintAmount = 300000;
@@ -192,7 +192,7 @@ describe("AccountControl Integration - Core Tests", function () {
       expect(reserveInfo.mintingCap).to.equal(0);
       
       // Redeem all tokens (still works even when deauthorized)
-      await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, "qc"); // Re-authorize for redeem
+      await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, 0); // Re-authorize for redeem, ReserveType.QC_PERMISSIONED
       await accountControl.connect(qc).redeem(mintAmount);
       expect(await accountControl.minted(qc.address)).to.equal(0);
     });
