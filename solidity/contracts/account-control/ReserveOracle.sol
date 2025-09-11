@@ -66,9 +66,6 @@ contract ReserveOracle is AccessControl {
     // V2 Integration - Account Control
     /// @dev Address of the Account Control contract for V2 integration
     address public accountControl;
-    
-    /// @dev Flag to enable V2 mode for backing updates
-    bool public v2ModeEnabled;
 
     // Events
     event AttestationSubmitted(
@@ -126,9 +123,6 @@ contract ReserveOracle is AccessControl {
     );
 
     // V2 Integration Events
-    /// @dev Emitted when V2 mode is toggled
-    event V2ModeToggled(bool enabled, address changedBy, uint256 timestamp);
-    
     /// @dev Emitted when Account Control address is updated
     event AccountControlUpdated(address indexed oldAddress, address indexed newAddress, address changedBy, uint256 timestamp);
 
@@ -487,13 +481,6 @@ contract ReserveOracle is AccessControl {
 
     // =================== V2 INTEGRATION FUNCTIONS ===================
 
-    /// @notice Enable or disable V2 mode for Account Control integration
-    /// @param enabled Whether to enable V2 mode
-    /// @dev Only DEFAULT_ADMIN_ROLE can call this function
-    function setV2ModeEnabled(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        v2ModeEnabled = enabled;
-        emit V2ModeToggled(enabled, msg.sender, block.timestamp);
-    }
 
     /// @notice Set the Account Control contract address for V2 integration
     /// @param _accountControl The address of the Account Control contract
