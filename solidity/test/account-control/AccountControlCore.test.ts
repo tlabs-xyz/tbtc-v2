@@ -76,6 +76,27 @@ describe("AccountControl Core Functionality", function () {
         .to.emit(accountControl, "ReserveDeauthorized")
         .withArgs(reserve.address);
     });
+
+    it("should revert when deauthorizing reserve with outstanding balance", async function () {
+      // Set backing and simulate minted balance
+      await accountControl.connect(owner).updateBacking(reserve.address, 1000000);
+      await accountControl.connect(reserve).adjustMinted(500000, true);
+      
+      await expect(
+        accountControl.connect(owner).deauthorizeReserve(reserve.address)
+      ).to.be.revertedWith("CannotDeauthorizeWithOutstandingBalance");
+    });
+
+    it("should clear backing when deauthorizing clean reserve", async function () {
+      // Set backing but no minted balance
+      await accountControl.connect(owner).updateBacking(reserve.address, 1000000);
+      
+      expect(await accountControl.backing(reserve.address)).to.equal(1000000);
+      
+      await accountControl.connect(owner).deauthorizeReserve(reserve.address);
+      
+      expect(await accountControl.backing(reserve.address)).to.equal(0);
+    });
   });
 
   describe("redeem function", function () {
