@@ -137,7 +137,7 @@ describe("AccountControl Workflows", function () {
       
       await expect(
         accountControl.connect(qc).mint(user.address, mintAmount)
-      ).to.be.revertedWith("InsufficientBacking");
+      ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
       
       // Restore proper backing  
       await accountControl.connect(owner).updateBacking(qc.address, QC_BACKING_AMOUNT);
@@ -148,12 +148,12 @@ describe("AccountControl Workflows", function () {
       
       await expect(
         accountControl.connect(qc).mint(user.address, mintAmount)
-      ).to.be.revertedWith("ExceedsReserveCap");
+      ).to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
       
       // Test redemption validation
       await expect(
         accountControl.connect(qc).redeem(100000)
-      ).to.be.revertedWith("InsufficientMinted");
+      ).to.be.revertedWithCustomError(accountControl, "InsufficientMinted");
     });
 
     it("should maintain consistency under batch operations", async function () {
@@ -226,7 +226,7 @@ describe("AccountControl Workflows", function () {
       // Should not be able to mint when paused
       await expect(
         accountControl.connect(qc).mint(user.address, mintAmount)
-      ).to.be.revertedWith("ReserveIsPaused");
+      ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
       
       // Oracle should still be able to update backing when QC is paused
       // (Oracle consensus is independent of QC operational status)
@@ -236,7 +236,7 @@ describe("AccountControl Workflows", function () {
       // Redemption is also blocked when paused (this is the actual behavior)
       await expect(
         accountControl.connect(qc).redeem(100000)
-      ).to.be.revertedWith("ReserveIsPaused");
+      ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
       
       // Unpause and then redeem should work
       await accountControl.connect(owner).unpauseReserve(qc.address);

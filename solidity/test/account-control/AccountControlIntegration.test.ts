@@ -165,7 +165,7 @@ describe("AccountControl Integration Tests", function () {
       // Should revert due to insufficient backing
       await expect(
         qcMinter.connect(qc).executeQCMint(mintId, user.address)
-      ).to.be.revertedWith("InsufficientBacking");
+      ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
     });
 
     it("should enforce AccountControl minting cap in AccountControl mode", async function () {
@@ -179,7 +179,7 @@ describe("AccountControl Integration Tests", function () {
       // Should revert due to cap exceeded
       await expect(
         qcMinter.connect(qc).executeQCMint(mintId, user.address)
-      ).to.be.revertedWith("ExceedsReserveCap");
+      ).to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
     });
   });
 
@@ -250,7 +250,7 @@ describe("AccountControl Integration Tests", function () {
           excessiveAmount,
           "0x1234"
         )
-      ).to.be.revertedWith("InsufficientMinted");
+      ).to.be.revertedWithCustomError(accountControl, "InsufficientMinted");
     });
   });
 
