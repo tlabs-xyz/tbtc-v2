@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 
 
 /// @title SystemState
-/// @dev Global system state and emergency controls for the tBTC v2 Account Control system.
+/// @dev Global system state and emergency controls for the tBTC Account Control system.
 ///
 /// This contract serves as the central control plane for emergency response and system-wide
 /// parameters. It provides both granular function-level pauses and QC-specific emergency

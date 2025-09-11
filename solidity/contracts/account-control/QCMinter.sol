@@ -49,8 +49,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     // Auto-minting support
     bool public autoMintEnabled;
 
-    // =================== V2 INTEGRATION ===================
-    // Required AccountControl integration for V2 system
+    // =================== ACCOUNT CONTROL INTEGRATION ===================
+    // Required AccountControl integration
     address public accountControl;
 
     /// @dev Mapping to track mint requests
@@ -176,9 +176,9 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         emit AutoMintToggled(enabled);
     }
 
-    // =================== V2 CONFIGURATION ===================
+    // =================== CONFIGURATION ===================
 
-    /// @notice Set AccountControl address for V2 integration
+    /// @notice Set AccountControl address
     /// @param _accountControl Address of the AccountControl contract
     function setAccountControl(address _accountControl) external onlyRole(GOVERNANCE_ROLE) {
         accountControl = _accountControl;
@@ -318,7 +318,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // Emit event before Bank interaction for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
 
-        // V2 Integration: Use AccountControl for minting
+        // Use AccountControl for minting
         AccountControl(accountControl).mint(user, satoshis);
 
         // Update QC minted amount

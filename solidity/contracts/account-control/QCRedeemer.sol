@@ -21,7 +21,7 @@ import "./AccountControl.sol";
 /// - Collision-resistant redemption ID generation
 /// - Direct validation and fulfillment logic
 /// - Role-based access control for sensitive operations
-/// - Integration with tBTC v2 token burning mechanism
+/// - Integration with tBTC token burning mechanism
 /// - SPV proof verification for Bitcoin transaction validation
 /// - Wallet Obligation Tracking System (WOTS) for preventing wallet abandonment
 ///
@@ -127,7 +127,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     /// @notice KNOWN LIMITATION: Arrays don't shrink after fulfillment/default
     ///         This causes gas costs to increase over time as arrays grow.
     ///         Mitigation: Use counter for obligation checks (O(1) complexity).
-    ///         Future improvement: Implement array cleanup or use EnumerableSet in V2.
+    ///         Future improvement: Implement array cleanup or use EnumerableSet.
     mapping(string => bytes32[]) public walletActiveRedemptions;
     
     /// @dev Track number of active redemptions per wallet
@@ -135,8 +135,8 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     ///         providing accurate obligation tracking despite array growth.
     mapping(string => uint256) public walletActiveRedemptionCount;
     
-    // V2 Integration - Account Control
-    /// @dev Address of the Account Control contract for V2 integration
+    // Account Control Integration
+    /// @dev Address of the Account Control contract
     address public accountControl;
 
     // =================== EVENTS ===================
@@ -205,7 +205,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         address attemptedBy
     );
 
-    // V2 Integration Events
+    // Account Control Events
     /// @dev Emitted when Account Control address is updated
     event AccountControlUpdated(address indexed oldAddress, address indexed newAddress, address changedBy, uint256 timestamp);
 
@@ -313,7 +313,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Burn the tBTC tokens
         tbtcToken.burnFrom(msg.sender, amount);
 
-        // V2 Integration: Notify AccountControl of redemption
+        // Notify AccountControl of redemption
         // Convert tBTC amount to satoshis for AccountControl
         uint256 satoshis = amount / SATOSHI_MULTIPLIER;
         AccountControl(accountControl).redeem(satoshis);
@@ -396,10 +396,10 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Fulfilled;
         
-        // V2 Integration - No action needed here
+        // No action needed here
         // Tokens were already burned during initiation (tbtcToken.burnFrom)
         // Backing will be updated in ReserveOracle when BTC reserves decrease
-        // This maintains proper V2 invariant: backing >= minted
+        // This maintains proper invariant: backing >= minted
         
         // Update tracking for QC
         address qc = redemptions[redemptionId].qc;
@@ -962,10 +962,10 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         return walletActiveRedemptions[walletAddress];
     }
 
-    // =================== V2 INTEGRATION FUNCTIONS ===================
+    // =================== CONFIGURATION FUNCTIONS ===================
 
 
-    /// @notice Set the Account Control contract address for V2 integration
+    /// @notice Set the Account Control contract address
     /// @param _accountControl The address of the Account Control contract
     /// @dev Only DEFAULT_ADMIN_ROLE can call this function
     function setAccountControl(address _accountControl) external onlyRole(DEFAULT_ADMIN_ROLE) {
