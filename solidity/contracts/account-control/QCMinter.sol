@@ -329,13 +329,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // Emit event before Bank interaction for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
 
-        // V2 Integration: Check invariant if V2 mode enabled
-        if (v2ModeEnabled && accountControl != address(0)) {
-            AccountControl(accountControl).mint(user, satoshis);
-        } else {
-            // V1 path: Create Bank balance directly
-            bank.increaseBalance(user, satoshis);
-        }
+        // V2 Integration: Use AccountControl for minting
+        AccountControl(accountControl).mint(user, satoshis);
 
         // Update QC minted amount
         _updateQCMintedAmount(qc, amount);
@@ -469,11 +464,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // HYBRID LOGIC: Choose between manual and automated minting
         if (autoMint && autoMintEnabled) {
             // Option 1: Automated minting - create balance and immediately mint tBTC
-            if (v2ModeEnabled && accountControl != address(0)) {
-                AccountControl(accountControl).mint(user, satoshis);
-            } else {
-                bank.increaseBalance(user, satoshis);
-            }
+            AccountControl(accountControl).mint(user, satoshis);
             
             // Execute automated minting directly
             _executeAutoMint(user, satoshis);
@@ -482,11 +473,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             emit QCMintCompleted(user, satoshis, true);
         } else {
             // Option 2: Manual process - just create Bank balance
-            if (v2ModeEnabled && accountControl != address(0)) {
-                AccountControl(accountControl).mint(user, satoshis);
-            } else {
-                bank.increaseBalance(user, satoshis);
-            }
+            AccountControl(accountControl).mint(user, satoshis);
             
             // Emit event for manual completion (user needs to mint separately)
             emit QCMintCompleted(user, satoshis, false);
