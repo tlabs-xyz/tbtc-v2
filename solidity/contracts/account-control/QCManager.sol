@@ -159,11 +159,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
     ReserveOracle public immutable reserveOracle;
 
     // V2 Integration - Account Control
-    /// @dev Address of the Account Control contract for V2 integration
+    /// @dev Address of the Account Control contract
     address public accountControl;
-    
-    /// @dev Flag to enable V2 mode for QC coordination
-    bool public v2ModeEnabled;
     
     // =================== STATE MANAGEMENT STORAGE ===================
     
@@ -369,10 +366,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         address indexed grantedBy
     );
 
-    // V2 Integration Events
-    /// @dev Emitted when V2 mode is toggled
-    event V2ModeToggled(bool enabled, address changedBy, uint256 timestamp);
-    
+    // Account Control Integration Events
     /// @dev Emitted when Account Control address is updated
     event AccountControlUpdated(address indexed oldAddress, address indexed newAddress, address changedBy, uint256 timestamp);
 
@@ -437,8 +431,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
         // Register QC with provided minting capacity
         qcData.registerQC(qc, maxMintingCap);
 
-        // V2 Integration - Authorize QC in Account Control with minting cap
-        if (v2ModeEnabled && accountControl != address(0)) {
+        // Authorize QC in Account Control with minting cap
+        if (accountControl != address(0)) {
             AccountControl(accountControl).authorizeReserve(qc, maxMintingCap);
         }
 
@@ -473,8 +467,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
 
         qcData.updateMaxMintingCapacity(qc, newCap);
 
-        // V2 Integration - Update minting cap in Account Control
-        if (v2ModeEnabled && accountControl != address(0)) {
+        // Update minting cap in Account Control
+        if (accountControl != address(0)) {
             AccountControl(accountControl).setMintingCap(qc, newCap);
         }
 
@@ -1512,17 +1506,9 @@ contract QCManager is AccessControl, ReentrancyGuard {
         emit EarlyResumed(qc, msg.sender);
     }
 
-    // =================== V2 INTEGRATION FUNCTIONS ===================
+    // =================== ACCOUNT CONTROL INTEGRATION ===================
 
-    /// @notice Enable or disable V2 mode for Account Control integration
-    /// @param enabled Whether to enable V2 mode
-    /// @dev Only DEFAULT_ADMIN_ROLE can call this function
-    function setV2ModeEnabled(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        v2ModeEnabled = enabled;
-        emit V2ModeToggled(enabled, msg.sender, block.timestamp);
-    }
-
-    /// @notice Set the Account Control contract address for V2 integration
+    /// @notice Set the Account Control contract address
     /// @param _accountControl The address of the Account Control contract
     /// @dev Only DEFAULT_ADMIN_ROLE can call this function
     function setAccountControl(address _accountControl) external onlyRole(DEFAULT_ADMIN_ROLE) {
