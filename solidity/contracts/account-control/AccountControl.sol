@@ -226,9 +226,20 @@ contract AccountControl is
         external 
         onlyOwner 
     {
+        // Check that reserve is authorized
+        if (!authorized[reserve]) revert NotAuthorized();
+        
         // Prevent reducing cap below current minted amount
         if (newCap < minted[reserve]) {
             revert ExceedsReserveCap(); // Reusing existing error for consistency
+        }
+        
+        // Validate against global cap if set
+        if (globalMintingCap > 0) {
+            uint256 totalOtherCaps = _calculateTotalCapsExcluding(reserve);
+            if (totalOtherCaps + newCap > globalMintingCap) {
+                revert ExceedsGlobalCap();
+            }
         }
         
         uint256 oldCap = reserveInfo[reserve].mintingCap;
@@ -602,6 +613,20 @@ contract AccountControl is
         onlyOwner 
     {
         emitIndividualEvents = enabled;
+    }
+
+    // ========== INTERNAL HELPER FUNCTIONS ==========
+    
+    /// @notice Calculate total minting caps of all authorized reserves excluding the specified reserve
+    /// @param excludeReserve Reserve to exclude from calculation
+    /// @return totalCaps Sum of all other authorized reserves' minting caps
+    function _calculateTotalCapsExcluding(address excludeReserve) internal view returns (uint256 totalCaps) {
+        for (uint256 i = 0; i < reserveList.length; i++) {
+            address reserve = reserveList[i];
+            if (reserve != excludeReserve && authorized[reserve]) {
+                totalCaps += reserveInfo[reserve].mintingCap;
+            }
+        }
     }
 
     // ========== UPGRADEABILITY ==========
