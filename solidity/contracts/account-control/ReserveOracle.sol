@@ -300,7 +300,7 @@ contract ReserveOracle is AccessControl {
         });
 
         // Update backing in Account Control with oracle consensus
-        AccountControl(accountControl).updateBackingFromOracle(qc, balance);
+        AccountControl(accountControl).updateBacking(qc, balance);
 
         // Clear any pending attestations
         _clearPendingAttestations(qc);
@@ -389,7 +389,7 @@ contract ReserveOracle is AccessControl {
         });
 
         // Update backing in Account Control with oracle consensus
-        AccountControl(accountControl).updateBackingFromOracle(qc, consensusBalance);
+        AccountControl(accountControl).updateBacking(qc, consensusBalance);
 
         // Create array of participating attesters for event
         address[] memory participatingAttesters = new address[](validCount);

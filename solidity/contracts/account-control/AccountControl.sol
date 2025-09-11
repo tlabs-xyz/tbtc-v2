@@ -366,7 +366,7 @@ contract AccountControl is
     /// @param qc The QC address to update
     /// @param amount The new backing amount from oracle consensus
     /// @dev Only callable by authorized ReserveOracle
-    function updateBackingFromOracle(address qc, uint256 amount) 
+    function updateBacking(address qc, uint256 amount) 
         external 
         onlyReserveOracle 
     {
