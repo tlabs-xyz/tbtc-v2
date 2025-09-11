@@ -63,8 +63,8 @@ contract ReserveOracle is AccessControl {
     uint256 public attestationTimeout = 6 hours; // Time window for attestations to be considered valid
     uint256 public maxStaleness = 24 hours; // Maximum time before reserve data is considered stale
 
-    // V2 Integration - Account Control
-    /// @dev Address of the Account Control contract for V2 integration
+    // Account Control Integration
+    /// @dev Address of the Account Control contract
     address public accountControl;
 
     // Events
@@ -122,7 +122,7 @@ contract ReserveOracle is AccessControl {
         uint256 newMaxStaleness
     );
 
-    // V2 Integration Events
+    // Account Control Events
     /// @dev Emitted when Account Control address is updated
     event AccountControlUpdated(address indexed oldAddress, address indexed newAddress, address changedBy, uint256 timestamp);
 
@@ -299,7 +299,7 @@ contract ReserveOracle is AccessControl {
             lastUpdateTimestamp: block.timestamp
         });
 
-        // V2 Integration - Update backing in Account Control with oracle consensus
+        // Update backing in Account Control with oracle consensus
         AccountControl(accountControl).updateBackingFromOracle(qc, balance);
 
         // Clear any pending attestations
@@ -388,7 +388,7 @@ contract ReserveOracle is AccessControl {
             lastUpdateTimestamp: block.timestamp
         });
 
-        // V2 Integration - Update backing in Account Control with oracle consensus
+        // Update backing in Account Control with oracle consensus
         AccountControl(accountControl).updateBackingFromOracle(qc, consensusBalance);
 
         // Create array of participating attesters for event
@@ -479,10 +479,10 @@ contract ReserveOracle is AccessControl {
         delete pendingAttesters[qc];
     }
 
-    // =================== V2 INTEGRATION FUNCTIONS ===================
+    // =================== CONFIGURATION FUNCTIONS ===================
 
 
-    /// @notice Set the Account Control contract address for V2 integration
+    /// @notice Set the Account Control contract address
     /// @param _accountControl The address of the Account Control contract
     /// @dev Only DEFAULT_ADMIN_ROLE can call this function
     function setAccountControl(address _accountControl) external onlyRole(DEFAULT_ADMIN_ROLE) {
