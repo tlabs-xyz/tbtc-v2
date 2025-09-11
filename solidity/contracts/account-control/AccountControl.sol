@@ -126,6 +126,7 @@ contract AccountControl is
     error ZeroAddress();
     error InsufficientMinted();
     error ReserveNotFound();
+    error CannotDeauthorizeWithOutstandingBalance();
     error InvalidReserveType();
     error ReserveTypeExists();
 
@@ -202,8 +203,12 @@ contract AccountControl is
     {
         if (!authorized[reserve]) revert ReserveNotFound();
         
+        // Safety check: cannot deauthorize reserves with outstanding minted balances
+        if (minted[reserve] > 0) revert CannotDeauthorizeWithOutstandingBalance();
+        
         authorized[reserve] = false;
         delete reserveInfo[reserve];
+        delete backing[reserve]; // Clear backing to prevent accounting issues
         
         // Remove from reserveList
         for (uint256 i = 0; i < reserveList.length; i++) {
