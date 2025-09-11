@@ -22,7 +22,7 @@ contract MockReserveOracle {
         
         // Call AccountControl as if consensus was reached
         (bool success, ) = accountControl.call(
-            abi.encodeWithSignature("updateBackingFromOracle(address,uint256)", qc, amount)
+            abi.encodeWithSignature("updateBacking(address,uint256)", qc, amount)
         );
         require(success, "Failed to update backing");
     }
@@ -37,7 +37,7 @@ contract MockReserveOracle {
         
         for (uint i = 0; i < qcs.length; i++) {
             (bool success, ) = accountControl.call(
-                abi.encodeWithSignature("updateBackingFromOracle(address,uint256)", qcs[i], amounts[i])
+                abi.encodeWithSignature("updateBacking(address,uint256)", qcs[i], amounts[i])
             );
             require(success, "Failed to update backing");
         }
