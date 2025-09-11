@@ -4,7 +4,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { AccountControl, QCMinter, QCRedeemer, QCManager } from "../../typechain";
 
-describe("V2 Integration Tests", function () {
+describe("AccountControl Integration Tests", function () {
   let accountControl: AccountControl;
   let qcMinter: QCMinter;
   let qcRedeemer: QCRedeemer;
@@ -100,7 +100,7 @@ describe("V2 Integration Tests", function () {
     const MINTER_ROLE = await qcMinter.MINTER_ROLE();
     await qcMinter.connect(owner).grantRole(MINTER_ROLE, minter.address);
 
-    // Enable V2 mode in contracts
+    // Enable AccountControl mode in contracts
     await qcMinter.connect(owner).setV2Mode(true);
     await qcRedeemer.connect(owner).setV2Mode(true);
 
@@ -109,8 +109,8 @@ describe("V2 Integration Tests", function () {
     await mockTbtcToken.connect(user).approve(qcRedeemer.address, MINT_AMOUNT);
   });
 
-  describe("QCMinter V2 Integration", function () {
-    it("should route minting through AccountControl when V2 enabled", async function () {
+  describe("QCMinter Integration", function () {
+    it("should route minting through AccountControl when enabled", async function () {
       const initialMinted = await accountControl.minted(qc.address);
       const initialTotal = await accountControl.totalMinted();
       
@@ -134,8 +134,8 @@ describe("V2 Integration Tests", function () {
       expect(await mockBank.balances(user.address)).to.equal(expectedSatoshis);
     });
 
-    it("should bypass AccountControl when V2 disabled", async function () {
-      // Disable V2 mode
+    it("should bypass AccountControl when disabled", async function () {
+      // Disable AccountControl mode
       await qcMinter.connect(owner).setV2Mode(false);
       
       const initialMinted = await accountControl.minted(qc.address);
@@ -155,7 +155,7 @@ describe("V2 Integration Tests", function () {
       expect(await mockBank.balances(user.address)).to.equal(expectedSatoshis);
     });
 
-    it("should enforce AccountControl backing invariant in V2 mode", async function () {
+    it("should enforce AccountControl backing invariant in AccountControl mode", async function () {
       // Set backing lower than mint amount
       await mockReserveOracle.mockConsensusBackingUpdate(qc.address, 100000); // 0.001 BTC
       
@@ -169,7 +169,7 @@ describe("V2 Integration Tests", function () {
       ).to.be.revertedWith("InsufficientBacking");
     });
 
-    it("should enforce AccountControl minting cap in V2 mode", async function () {
+    it("should enforce AccountControl minting cap in AccountControl mode", async function () {
       // Set a very low minting cap
       await accountControl.connect(owner).setMintingCap(qc.address, 100000); // 0.001 BTC
       
@@ -184,7 +184,7 @@ describe("V2 Integration Tests", function () {
     });
   });
 
-  describe("QCRedeemer V2 Integration", function () {
+  describe("QCRedeemer Integration", function () {
     beforeEach(async function () {
       // First mint some tokens through the system
       const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
@@ -196,7 +196,7 @@ describe("V2 Integration Tests", function () {
       await mockSystemState.setRedemptionTimeout(86400); // 24 hours
     });
 
-    it("should notify AccountControl of redemption when V2 enabled", async function () {
+    it("should notify AccountControl of redemption when enabled", async function () {
       const initialMinted = await accountControl.minted(qc.address);
       const initialTotal = await accountControl.totalMinted();
       
@@ -217,8 +217,8 @@ describe("V2 Integration Tests", function () {
       expect(await mockTbtcToken.balanceOf(user.address)).to.equal(MINT_AMOUNT.sub(redemptionAmount));
     });
 
-    it("should bypass AccountControl when V2 disabled", async function () {
-      // Disable V2 mode
+    it("should bypass AccountControl when disabled", async function () {
+      // Disable AccountControl mode
       await qcRedeemer.connect(owner).setV2Mode(false);
       
       const initialMinted = await accountControl.minted(qc.address);
@@ -238,7 +238,7 @@ describe("V2 Integration Tests", function () {
       expect(await mockTbtcToken.balanceOf(user.address)).to.equal(MINT_AMOUNT.sub(redemptionAmount));
     });
 
-    it("should prevent over-redemption in V2 mode", async function () {
+    it("should prevent over-redemption in AccountControl mode", async function () {
       // Try to redeem more than was minted
       const excessiveAmount = MINT_AMOUNT.mul(2);
       
@@ -255,9 +255,9 @@ describe("V2 Integration Tests", function () {
     });
   });
 
-  describe("V2 Mode Toggle Scenarios", function () {
-    it("should handle V2 mode toggling mid-operation", async function () {
-      // Mint with V2 enabled
+  describe("AccountControl Mode Toggle Scenarios", function () {
+    it("should handle AccountControl mode toggling mid-operation", async function () {
+      // Mint with enabled
       let tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
       let receipt = await tx.wait();
       let mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
@@ -265,35 +265,35 @@ describe("V2 Integration Tests", function () {
       
       const initialMinted = await accountControl.minted(qc.address);
       
-      // Disable V2 mode
+      // Disable AccountControl mode
       await qcMinter.connect(owner).setV2Mode(false);
       
-      // Mint again with V2 disabled
+      // Mint again with disabled
       tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
       receipt = await tx.wait();
       mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       await qcMinter.connect(qc).executeQCMint(mintId, user.address);
       
-      // V2 state should not change
+      // AccountControl state should not change
       expect(await accountControl.minted(qc.address)).to.equal(initialMinted);
       
-      // Re-enable V2 mode  
+      // Re-enable AccountControl mode  
       await qcMinter.connect(owner).setV2Mode(true);
       
-      // Mint again with V2 re-enabled
+      // Mint again with AccountControl re-enabled
       tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
       receipt = await tx.wait();
       mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       await qcMinter.connect(qc).executeQCMint(mintId, user.address);
       
-      // V2 state should update again
+      // AccountControl state should update again
       const expectedSatoshis = MINT_AMOUNT.div(SATOSHI_MULTIPLIER);
       expect(await accountControl.minted(qc.address)).to.equal(initialMinted.add(expectedSatoshis));
     });
   });
 
   describe("Cross-Contract Interaction Validation", function () {
-    it("should maintain consistent state across all V2 contracts", async function () {
+    it("should maintain consistent state across all contracts", async function () {
       const mintAmount = MINT_AMOUNT;
       
       // Execute mint through QCMinter
@@ -351,7 +351,7 @@ describe("V2 Integration Tests", function () {
     });
   });
 
-  describe("End-to-End V2 Workflow", function () {
+  describe("End-to-End Workflow", function () {
     it("should complete full mint-redeem cycle with proper state management", async function () {
       // Initial state
       expect(await accountControl.totalMinted()).to.equal(0);
