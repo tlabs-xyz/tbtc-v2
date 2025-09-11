@@ -9,6 +9,7 @@ import "./SPVState.sol";
 import "../token/TBTC.sol";
 import "../bridge/BitcoinTx.sol";
 import {QCRedeemerSPV} from "./libraries/QCRedeemerSPV.sol";
+import "./AccountControl.sol";
 
 /// @title QCRedeemer
 /// @dev Direct implementation for tBTC redemption with QC backing.
@@ -68,6 +69,9 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
 
     // Role definitions for access control
     bytes32 public constant DISPUTE_ARBITER_ROLE = keccak256("DISPUTE_ARBITER_ROLE");
+
+    // Constants
+    uint256 private constant SATOSHI_MULTIPLIER = 1e10;
 
 
     /// @dev Redemption status enumeration
@@ -130,6 +134,13 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     /// @notice This counter is properly decremented on fulfillment/default,
     ///         providing accurate obligation tracking despite array growth.
     mapping(string => uint256) public walletActiveRedemptionCount;
+    
+    // V2 Integration - Account Control
+    /// @dev Address of the Account Control contract for V2 integration
+    address public accountControl;
+    
+    /// @dev Flag to enable V2 mode for redemption notifications
+    bool public v2ModeEnabled;
 
     // =================== EVENTS ===================
 
@@ -196,6 +207,13 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         string reason,
         address attemptedBy
     );
+
+    // V2 Integration Events
+    /// @dev Emitted when V2 mode is toggled
+    event V2ModeToggled(bool enabled, address changedBy, uint256 timestamp);
+    
+    /// @dev Emitted when Account Control address is updated
+    event AccountControlUpdated(address indexed oldAddress, address indexed newAddress, address changedBy, uint256 timestamp);
 
     constructor(
         address _tbtcToken,
@@ -301,6 +319,13 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Burn the tBTC tokens
         tbtcToken.burnFrom(msg.sender, amount);
 
+        // V2 Integration: Notify AccountControl of redemption
+        if (v2ModeEnabled && accountControl != address(0)) {
+            // Convert tBTC amount to satoshis for AccountControl
+            uint256 satoshis = amount / SATOSHI_MULTIPLIER;
+            AccountControl(accountControl).redeem(satoshis);
+        }
+
         // Calculate deadline
         uint256 redemptionTimeout = systemState.redemptionTimeout();
         uint256 deadline = block.timestamp + redemptionTimeout;
@@ -378,6 +403,11 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
 
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Fulfilled;
+        
+        // V2 Integration - No action needed here
+        // Tokens were already burned during initiation (tbtcToken.burnFrom)
+        // Backing will be updated in ReserveOracle when BTC reserves decrease
+        // This maintains proper V2 invariant: backing >= minted
         
         // Update tracking for QC
         address qc = redemptions[redemptionId].qc;
@@ -938,5 +968,24 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         returns (bytes32[] memory)
     {
         return walletActiveRedemptions[walletAddress];
+    }
+
+    // =================== V2 INTEGRATION FUNCTIONS ===================
+
+    /// @notice Enable or disable V2 mode for Account Control integration
+    /// @param enabled Whether to enable V2 mode
+    /// @dev Only DEFAULT_ADMIN_ROLE can call this function
+    function setV2ModeEnabled(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        v2ModeEnabled = enabled;
+        emit V2ModeToggled(enabled, msg.sender, block.timestamp);
+    }
+
+    /// @notice Set the Account Control contract address for V2 integration
+    /// @param _accountControl The address of the Account Control contract
+    /// @dev Only DEFAULT_ADMIN_ROLE can call this function
+    function setAccountControl(address _accountControl) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address oldAddress = accountControl;
+        accountControl = _accountControl;
+        emit AccountControlUpdated(oldAddress, _accountControl, msg.sender, block.timestamp);
     }
 }
