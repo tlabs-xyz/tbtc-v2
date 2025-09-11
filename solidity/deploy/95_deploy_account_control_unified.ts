@@ -15,24 +15,39 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   // Check for existing tBTC infrastructure
   let bank, tbtcVault, tbtc, lightRelay
   
-  try {
-    // Use the existing Bank contract
-    bank = await get("Bank")
+  // Check if we're on Sepolia and have environment variables configured
+  if (network.name === "sepolia" && process.env.BANK_ADDRESS) {
+    // Use environment variables for Sepolia deployment
+    bank = { address: process.env.BANK_ADDRESS }
+    tbtcVault = { address: process.env.TBTC_VAULT_ADDRESS }
+    tbtc = { address: process.env.TBTC_ADDRESS }
+    lightRelay = { address: process.env.LIGHT_RELAY_ADDRESS }
     
-    tbtcVault = await get("TBTCVault")  
-    tbtc = await get("TBTC")
-    lightRelay = await get("LightRelay")
-    
-    log("Found existing tBTC infrastructure:")
+    log("Using tBTC infrastructure from environment variables:")
     log(`  Bank: ${bank.address}`)
     log(`  TBTCVault: ${tbtcVault.address}`)
     log(`  TBTC: ${tbtc.address}`)
     log(`  LightRelay: ${lightRelay.address}`)
-  } catch (error) {
-    log("WARNING: Some tBTC contracts not found. Deploying mocks for testing...")
-    // For testing, we can deploy mock contracts if needed
-    // But for now, we'll require the core contracts to exist
-    throw new Error("Core tBTC contracts must be deployed first")
+  } else {
+    try {
+      // Try to use the existing contracts from hardhat-deploy cache
+      bank = await get("Bank")
+      
+      tbtcVault = await get("TBTCVault")  
+      tbtc = await get("TBTC")
+      lightRelay = await get("LightRelay")
+      
+      log("Found existing tBTC infrastructure in deployment cache:")
+      log(`  Bank: ${bank.address}`)
+      log(`  TBTCVault: ${tbtcVault.address}`)
+      log(`  TBTC: ${tbtc.address}`)
+      log(`  LightRelay: ${lightRelay.address}`)
+    } catch (error) {
+      log("WARNING: Some tBTC contracts not found. Deploying mocks for testing...")
+      // For testing, we can deploy mock contracts if needed
+      // But for now, we'll require the core contracts to exist
+      throw new Error("Core tBTC contracts must be deployed first. Set environment variables for Sepolia.")
+    }
   }
 
   // Phase 1: Deploy storage contracts (no dependencies)

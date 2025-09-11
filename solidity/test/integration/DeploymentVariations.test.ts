@@ -14,10 +14,10 @@ describe("v1 System Deployment Tests", () => {
     it("should verify account control deployment scripts exist", async () => {
       // Verify the deployment scripts exist and are structured correctly
       const expectedScripts = [
-        "95_deploy_account_control_core.ts",
+        "95_deploy_account_control_unified.ts",
         "96_deploy_account_control_state.ts",
-        "97_deploy_account_control_policies.ts",
-        "98_deploy_reserve_ledger.ts",
+        "97_deploy_reserve_oracle.ts",
+        "98_deploy_watchdog_enforcer.ts",
         "99_configure_account_control_system.ts",
       ]
 
@@ -129,7 +129,7 @@ describe("v1 System Deployment Tests", () => {
       // This is why the deployment fixtures fail in isolated tests
 
       const scriptDependencies = {
-        "95_deploy_account_control_core.ts": ["TBTC"],
+        "95_deploy_account_control_unified.ts": ["TBTC"],
         "96_deploy_account_control_state.ts": ["AccountControlCore"],
         "97_deploy_account_control_policies.ts": [
           "AccountControlState",
@@ -150,7 +150,7 @@ describe("v1 System Deployment Tests", () => {
 
       // The problem: TBTC dependency triggers Bridge deployment
       expect(
-        scriptDependencies["95_deploy_account_control_core.ts"]
+        scriptDependencies["95_deploy_account_control_unified.ts"]
       ).to.include("TBTC")
       expect(
         scriptDependencies["97_deploy_account_control_policies.ts"]
