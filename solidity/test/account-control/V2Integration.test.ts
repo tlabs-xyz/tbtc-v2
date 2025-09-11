@@ -23,6 +23,7 @@ describe("V2 Integration Tests", function () {
   let mockQcData: any;
   let mockQcManager: any;
   let mockRelay: any;
+  let mockReserveOracle: any;
 
   const SATOSHI_MULTIPLIER = ethers.utils.parseEther("0.00000001"); // 1e10
   const QC_BACKING_AMOUNT = 1000000; // 0.01 BTC in satoshis
@@ -41,6 +42,10 @@ describe("V2 Integration Tests", function () {
 
     const MockSystemStateFactory = await ethers.getContractFactory("MockSystemState");
     mockSystemState = await MockSystemStateFactory.deploy();
+
+    // Deploy MockReserveOracle
+    const MockReserveOracleFactory = await ethers.getContractFactory("MockReserveOracle");
+    mockReserveOracle = await MockReserveOracleFactory.deploy();
 
     // Deploy minimal mock contracts for QCMinter requirements
     const MockTBTCVaultFactory = await ethers.getContractFactory("MockTBTCVault");
@@ -80,9 +85,13 @@ describe("V2 Integration Tests", function () {
       100 // txProofDifficultyFactor
     ) as QCRedeemer;
 
+    // Setup ReserveOracle integration
+    await accountControl.connect(owner).setReserveOracle(mockReserveOracle.address);
+    await mockReserveOracle.setAccountControl(accountControl.address);
+
     // Setup AccountControl
     await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP);
-    await accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT);
+    await mockReserveOracle.mockConsensusBackingUpdate(qc.address, QC_BACKING_AMOUNT);
 
     // Grant necessary roles
     const MINTER_ROLE = await qcMinter.MINTER_ROLE();
@@ -145,7 +154,7 @@ describe("V2 Integration Tests", function () {
 
     it("should enforce AccountControl backing invariant in V2 mode", async function () {
       // Set backing lower than mint amount
-      await accountControl.connect(qc).updateBacking(100000); // 0.001 BTC
+      await mockReserveOracle.mockConsensusBackingUpdate(qc.address, 100000); // 0.001 BTC
       
       const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
       const receipt = await tx.wait();
@@ -316,7 +325,7 @@ describe("V2 Integration Tests", function () {
       // Setup second QC
       const qc2 = emergencyCouncil; // Reuse signer
       await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP);
-      await accountControl.connect(qc2).updateBacking(QC_BACKING_AMOUNT);
+      await mockReserveOracle.mockConsensusBackingUpdate(qc2.address, QC_BACKING_AMOUNT);
       
       // Mint from both QCs
       let tx1 = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);

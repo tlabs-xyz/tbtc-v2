@@ -12,6 +12,7 @@ describe("V2 Integration - Core Tests", function () {
   let user: SignerWithAddress;
   
   let mockBank: any;
+  let mockReserveOracle: any;
 
   const QC_BACKING_AMOUNT = 1000000; // 0.01 BTC in satoshis
   const QC_MINTING_CAP = 1000000; // 0.01 BTC in satoshis
@@ -23,6 +24,10 @@ describe("V2 Integration - Core Tests", function () {
     const MockBankFactory = await ethers.getContractFactory("MockBankEnhanced");
     mockBank = await MockBankFactory.deploy();
 
+    // Deploy MockReserveOracle
+    const MockReserveOracleFactory = await ethers.getContractFactory("MockReserveOracle");
+    mockReserveOracle = await MockReserveOracleFactory.deploy();
+
     // Deploy AccountControl
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
     accountControl = await upgrades.deployProxy(
@@ -31,9 +36,13 @@ describe("V2 Integration - Core Tests", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
+    // Setup ReserveOracle integration
+    await accountControl.connect(owner).setReserveOracle(mockReserveOracle.address);
+    await mockReserveOracle.setAccountControl(accountControl.address);
+
     // Setup AccountControl
     await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP);
-    await accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT);
+    await mockReserveOracle.mockConsensusBackingUpdate(qc.address, QC_BACKING_AMOUNT);
   });
 
   describe("Direct V2 Integration Testing", function () {
@@ -87,8 +96,7 @@ describe("V2 Integration - Core Tests", function () {
       
       // Increase backing
       const newBacking = QC_BACKING_AMOUNT + 500000;
-      await ethers.provider.send("evm_increaseTime", [3601]); // Wait for rate limit
-      await accountControl.connect(qc).updateBacking(newBacking);
+      await mockReserveOracle.mockConsensusBackingUpdate(qc.address, newBacking);
       
       // Check final available capacity  
       const finalStats = await accountControl.getReserveStats(qc.address);
@@ -100,7 +108,7 @@ describe("V2 Integration - Core Tests", function () {
       // Setup second QC
       const qc2 = emergencyCouncil; // Reuse signer
       await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP);
-      await accountControl.connect(qc2).updateBacking(QC_BACKING_AMOUNT);
+      await mockReserveOracle.mockConsensusBackingUpdate(qc2.address, QC_BACKING_AMOUNT);
       
       const qc1MintAmount = 300000;
       const qc2MintAmount = 400000;
@@ -126,19 +134,15 @@ describe("V2 Integration - Core Tests", function () {
     it("should enforce invariants across mint/redeem cycles", async function () {
       const mintAmount = 600000;
       
-      // Test backing invariant - need to wait for rate limit from setup
-      await ethers.provider.send("evm_increaseTime", [3601]);
-      await ethers.provider.send("evm_mine");
-      await accountControl.connect(qc).updateBacking(mintAmount - 100000); // Less backing than mint
+      // Test backing invariant
+      await mockReserveOracle.mockConsensusBackingUpdate(qc.address, mintAmount - 100000); // Less backing than mint
       
       await expect(
         accountControl.connect(qc).mint(user.address, mintAmount)
       ).to.be.revertedWith("InsufficientBacking");
       
       // Restore proper backing  
-      await ethers.provider.send("evm_increaseTime", [3601]);
-      await ethers.provider.send("evm_mine"); // Mine a block after time increase
-      await accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT);
+      await mockReserveOracle.mockConsensusBackingUpdate(qc.address, QC_BACKING_AMOUNT);
       
       // Test minting cap invariant
       const lowCap = mintAmount - 100000;
@@ -225,10 +229,10 @@ describe("V2 Integration - Core Tests", function () {
         accountControl.connect(qc).mint(user.address, mintAmount)
       ).to.be.revertedWith("ReserveIsPaused");
       
-      // Should not be able to update backing when paused
-      await expect(
-        accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT + 100000)
-      ).to.be.revertedWith("ReserveIsPaused");
+      // Oracle should still be able to update backing when QC is paused
+      // (Oracle consensus is independent of QC operational status)
+      await mockReserveOracle.mockConsensusBackingUpdate(qc.address, QC_BACKING_AMOUNT + 100000);
+      expect(await accountControl.backing(qc.address)).to.equal(QC_BACKING_AMOUNT + 100000);
       
       // Redemption is also blocked when paused (this is the actual behavior)
       await expect(
