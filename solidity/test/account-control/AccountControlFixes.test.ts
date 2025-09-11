@@ -10,9 +10,14 @@ describe("AccountControl Critical Fixes", function () {
   let emergencyCouncil: SignerWithAddress;
   let mockBank: SignerWithAddress;
   let reserve: SignerWithAddress;
+  let mockReserveOracle: any;
 
   beforeEach(async function () {
     [owner, emergencyCouncil, mockBank, reserve] = await ethers.getSigners();
+
+    // Deploy MockReserveOracle
+    const MockReserveOracleFactory = await ethers.getContractFactory("MockReserveOracle");
+    mockReserveOracle = await MockReserveOracleFactory.deploy();
 
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
     accountControl = await upgrades.deployProxy(
@@ -20,6 +25,10 @@ describe("AccountControl Critical Fixes", function () {
       [owner.address, emergencyCouncil.address, mockBank.address],
       { initializer: "initialize" }
     ) as AccountControl;
+
+    // Setup ReserveOracle integration
+    await accountControl.connect(owner).setReserveOracle(mockReserveOracle.address);
+    await mockReserveOracle.setAccountControl(accountControl.address);
 
     // Authorize a reserve for testing
     await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000); // 0.01 BTC cap in satoshis
@@ -31,8 +40,8 @@ describe("AccountControl Critical Fixes", function () {
     });
 
     it("should track total minted amount efficiently", async function () {
-      // Set backing for reserve
-      await accountControl.connect(reserve).updateBacking(2000000); // 0.02 BTC
+      // Set backing for reserve via oracle consensus
+      await mockReserveOracle.mockConsensusBackingUpdate(reserve.address, 2000000); // 0.02 BTC
 
       // Mock Bank.increaseBalance call (normally would be called)
       const amount = 500000; // 0.005 BTC in satoshis
@@ -72,8 +81,8 @@ describe("AccountControl Critical Fixes", function () {
 
   describe("redeem function", function () {
     beforeEach(async function () {
-      // Set up backing and simulate a previous mint
-      await accountControl.connect(reserve).updateBacking(1000000);
+      // Set up backing via oracle consensus and simulate a previous mint
+      await mockReserveOracle.mockConsensusBackingUpdate(reserve.address, 1000000);
       // We can't actually mint without a proper Bank mock, but we can test the redeem logic
       // by directly setting the minted amount using adjustMinted
       await accountControl.connect(reserve).adjustMinted(500000, true); // Add 0.005 BTC minted
