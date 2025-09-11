@@ -40,9 +40,12 @@ describe("AccountControl Enhancements", function () {
     await accountControl.connect(owner).setReserveOracle(mockReserveOracle.address);
     await mockReserveOracle.setAccountControl(accountControl.address);
 
+    // Initialize reserve types
+    await accountControl.connect(owner).addReserveType("qc");
+    
     // Authorize reserves for testing
-    await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000); // 0.01 BTC cap
-    await accountControl.connect(owner).authorizeReserve(reserve2.address, 2000000); // 0.02 BTC cap
+    await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, "qc"); // 0.01 BTC cap
+    await accountControl.connect(owner).authorizeReserve(reserve2.address, 2000000, "qc"); // 0.02 BTC cap
     
     // Set backing for reserves via oracle consensus
     await mockReserveOracle.mockConsensusBackingUpdate(reserve1.address, 1000000);
@@ -98,19 +101,21 @@ describe("AccountControl Enhancements", function () {
 
     it("should allow reducing cap to exactly current minted amount", async function () {
       await accountControl.connect(owner).setMintingCap(reserve1.address, 500000);
-      expect(await accountControl.mintingCaps(reserve1.address)).to.equal(500000);
+      const reserveInfo = await accountControl.reserveInfo(reserve1.address);
+      expect(reserveInfo.mintingCap).to.equal(500000);
     });
 
     it("should allow increasing cap above current minted amount", async function () {
       await accountControl.connect(owner).setMintingCap(reserve1.address, 1500000);
-      expect(await accountControl.mintingCaps(reserve1.address)).to.equal(1500000);
+      const reserveInfo = await accountControl.reserveInfo(reserve1.address);
+      expect(reserveInfo.mintingCap).to.equal(1500000);
     });
   });
 
   describe("Enhancement 3: Authorization Race Condition Protection", function () {
     it("should prevent double authorization", async function () {
       await expect(
-        accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000)
+        accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, "qc")
       ).to.be.revertedWith("AlreadyAuthorized");
     });
 
@@ -216,7 +221,8 @@ describe("AccountControl Enhancements", function () {
       // Test all state variables are accessible
       expect(await accountControl.backing(reserve1.address)).to.equal(1000000);
       expect(await accountControl.authorized(reserve1.address)).to.be.true;
-      expect(await accountControl.mintingCaps(reserve1.address)).to.equal(1000000);
+      const reserveInfo = await accountControl.reserveInfo(reserve1.address);
+      expect(reserveInfo.mintingCap).to.equal(1000000);
       expect(await accountControl.paused(reserve1.address)).to.be.false;
       expect(await accountControl.systemPaused()).to.be.false;
       expect(await accountControl.emergencyCouncil()).to.equal(emergencyCouncil.address);
