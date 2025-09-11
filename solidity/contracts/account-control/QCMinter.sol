@@ -50,9 +50,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     bool public autoMintEnabled;
 
     // =================== V2 INTEGRATION ===================
-    // Optional AccountControl integration for V2 invariant enforcement
+    // Required AccountControl integration for V2 system
     address public accountControl;
-    bool public v2ModeEnabled;
 
     /// @dev Mapping to track mint requests
     mapping(bytes32 => MintRequest) public mintRequests;
@@ -120,9 +119,6 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @notice Emitted when auto-mint feature is enabled/disabled
     event AutoMintToggled(bool enabled);
 
-    /// @notice Emitted when V2 mode is enabled/disabled
-    event V2ModeToggled(bool enabled);
-
     /// @notice Emitted when AccountControl address is updated
     event AccountControlUpdated(address indexed accountControl);
 
@@ -181,13 +177,6 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     }
 
     // =================== V2 CONFIGURATION ===================
-
-    /// @notice Enable/disable V2 mode integration
-    /// @param enabled Whether to enable V2 AccountControl integration
-    function setV2ModeEnabled(bool enabled) external onlyRole(GOVERNANCE_ROLE) {
-        v2ModeEnabled = enabled;
-        emit V2ModeToggled(enabled);
-    }
 
     /// @notice Set AccountControl address for V2 integration
     /// @param _accountControl Address of the AccountControl contract
