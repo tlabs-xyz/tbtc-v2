@@ -158,7 +158,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
     SystemState public immutable systemState;
     ReserveOracle public immutable reserveOracle;
 
-    // V2 Integration - Account Control
     /// @dev Address of the Account Control contract
     address public accountControl;
     
@@ -366,7 +365,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         address indexed grantedBy
     );
 
-    // Account Control Integration Events
+    // Account Control Events
     /// @dev Emitted when Account Control address is updated
     event AccountControlUpdated(address indexed oldAddress, address indexed newAddress, address changedBy, uint256 timestamp);
 
@@ -1506,7 +1505,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         emit EarlyResumed(qc, msg.sender);
     }
 
-    // =================== ACCOUNT CONTROL INTEGRATION ===================
+    // =================== ACCOUNT CONTROL FUNCTIONS ===================
 
     /// @notice Set the Account Control contract address
     /// @param _accountControl The address of the Account Control contract
