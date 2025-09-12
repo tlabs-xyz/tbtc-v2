@@ -27,13 +27,11 @@ describe("AccountControl Input Validation", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Setup ReserveOracle integration
-    await accountControl.connect(owner).setReserveOracle(owner.address);
+    // Note: No ReserveOracle integration needed in federated model
 
-    // Initialize reserve types and authorize test reserve
-    await accountControl.connect(owner).addReserveType(0); // ReserveType.QC_PERMISSIONED
-    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000, 0);
-    await accountControl.connect(owner).updateBacking(reserve.address, 1000000);
+    // Authorize test reserve (QC_PERMISSIONED is initialized by default)
+    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000);
+    await accountControl.connect(reserve).updateBacking(1000000);
   });
 
   describe("System Pause Enforcement", function () {
@@ -47,7 +45,7 @@ describe("AccountControl Input Validation", function () {
       // Should revert mint operation
       await expect(
         accountControl.connect(reserve).mint(user.address, 100000)
-      ).to.be.revertedWithCustomError(accountControl, "SystemIsPaused");
+      ).to.be.revertedWith("SystemIsPaused");
     });
 
     it("should block all batch minting when system is paused", async function () {
@@ -60,7 +58,7 @@ describe("AccountControl Input Validation", function () {
       // Should revert batch mint operation
       await expect(
         accountControl.connect(reserve).batchMint(recipients, amounts)
-      ).to.be.revertedWithCustomError(accountControl, "SystemIsPaused");
+      ).to.be.revertedWith("SystemIsPaused");
     });
 
     it("should allow emergency council to pause system", async function () {
@@ -93,58 +91,25 @@ describe("AccountControl Input Validation", function () {
       // Should revert redemption operation
       await expect(
         accountControl.connect(reserve).redeem(50000)
-      ).to.be.revertedWithCustomError(accountControl, "SystemIsPaused");
+      ).to.be.revertedWith("SystemIsPaused");
     });
   });
 
-  describe("Address Reuse Prevention", function () {
-    let reserve2: SignerWithAddress;
-
-    beforeEach(async function () {
-      [, , , , reserve2] = await ethers.getSigners();
-    });
-
-    it("should prevent same address being used for different reserve types", async function () {
-      // First deauthorize the existing reserve
-      await accountControl.connect(owner).deauthorizeReserve(reserve.address);
-      
-      // Add a new reserve type (we'll simulate this by using enum value 1, though it would need to be added first in real scenario)
-      // For this test, we'll use the fact that the contract checks reserveAddressType mapping
-      
-      // The address was already used for ReserveType.QC_PERMISSIONED (0)
-      // Trying to reuse it for a different type should fail
-      // Since we only have one reserve type in our setup, we can't fully test this
-      // but we can verify the address type tracking works
-      expect(await accountControl.reserveAddressType(reserve.address)).to.equal(0);
-    });
-
-    it("should allow re-authorization with same reserve type after deauthorization", async function () {
+  describe("Re-authorization", function () {
+    it("should allow re-authorization after deauthorization", async function () {
       // Deauthorize the reserve first
       await accountControl.connect(owner).deauthorizeReserve(reserve.address);
       
       // Verify it's deauthorized
       expect(await accountControl.authorized(reserve.address)).to.be.false;
       
-      // Should be able to re-authorize with same type
-      await accountControl.connect(owner).authorizeReserve(reserve.address, 500000, 0);
+      // Should be able to re-authorize (only one type QC_PERMISSIONED exists)
+      await accountControl.connect(owner).authorizeReserve(reserve.address, 500000);
       
       // Verify re-authorization succeeded
       expect(await accountControl.authorized(reserve.address)).to.be.true;
       const reserveInfo = await accountControl.reserveInfo(reserve.address);
-      expect(reserveInfo.reserveType).to.equal(0);
-    });
-
-    it("should track address type permanently", async function () {
-      // Address should have type recorded even after deauthorization
-      const initialType = await accountControl.reserveAddressType(reserve.address);
-      expect(initialType).to.equal(0);
-      
-      // Deauthorize
-      await accountControl.connect(owner).deauthorizeReserve(reserve.address);
-      
-      // Type should still be recorded
-      const typeAfterDeauth = await accountControl.reserveAddressType(reserve.address);
-      expect(typeAfterDeauth).to.equal(0);
+      expect(reserveInfo.reserveType).to.equal(1); // QC_PERMISSIONED = 1 (UNINITIALIZED = 0)
     });
   });
 
@@ -155,8 +120,7 @@ describe("AccountControl Input Validation", function () {
       
       await expect(
         accountControl.connect(reserve).batchMint(recipients, amounts)
-      ).to.be.revertedWithCustomError(accountControl, "ArrayLengthMismatch")
-        .withArgs(2, 1);
+      ).to.be.revertedWith("ArrayLengthMismatch");
     });
 
     it("should revert when batch size exceeds MAX_BATCH_SIZE", async function () {
@@ -166,8 +130,7 @@ describe("AccountControl Input Validation", function () {
       
       await expect(
         accountControl.connect(reserve).batchMint(recipients, amounts)
-      ).to.be.revertedWithCustomError(accountControl, "BatchSizeExceeded")
-        .withArgs(101, 100);
+      ).to.be.revertedWith("BatchSizeExceeded");
     });
 
     it("should revert mint with amount below MIN_MINT_AMOUNT", async function () {
@@ -175,8 +138,7 @@ describe("AccountControl Input Validation", function () {
       
       await expect(
         accountControl.connect(reserve).mint(user.address, tooSmallAmount)
-      ).to.be.revertedWithCustomError(accountControl, "AmountTooSmall")
-        .withArgs(tooSmallAmount, 10000);
+      ).to.be.revertedWith("AmountTooSmall");
     });
 
     it("should revert mint with amount above MAX_SINGLE_MINT", async function () {
@@ -184,8 +146,7 @@ describe("AccountControl Input Validation", function () {
       
       await expect(
         accountControl.connect(reserve).mint(user.address, tooLargeAmount)
-      ).to.be.revertedWithCustomError(accountControl, "AmountTooLarge")
-        .withArgs(tooLargeAmount, ethers.utils.parseUnits("100", 8));
+      ).to.be.revertedWith("AmountTooLarge");
     });
 
     it("should revert batchMint with individual amounts below MIN_MINT_AMOUNT", async function () {
@@ -194,8 +155,7 @@ describe("AccountControl Input Validation", function () {
       
       await expect(
         accountControl.connect(reserve).batchMint(recipients, amounts)
-      ).to.be.revertedWithCustomError(accountControl, "AmountTooSmall")
-        .withArgs(9999, 10000);
+      ).to.be.revertedWith("AmountTooSmall");
     });
 
     it("should revert batchMint with individual amounts above MAX_SINGLE_MINT", async function () {
@@ -204,8 +164,7 @@ describe("AccountControl Input Validation", function () {
       
       await expect(
         accountControl.connect(reserve).batchMint(recipients, amounts)
-      ).to.be.revertedWithCustomError(accountControl, "AmountTooLarge")
-        .withArgs(ethers.utils.parseUnits("101", 8), ethers.utils.parseUnits("100", 8));
+      ).to.be.revertedWith("AmountTooLarge");
     });
 
     it("should accept valid single mint amounts", async function () {
@@ -218,8 +177,8 @@ describe("AccountControl Input Validation", function () {
         accountControl.connect(reserve).mint(user.address, minValid)
       ).to.not.be.reverted;
       
-      // Should succeed with maximum amount (need more backing first)
-      await accountControl.connect(owner).updateBacking(reserve.address, maxValid.add(1000000));
+      // Should succeed with maximum amount (reserve needs more backing first)
+      await accountControl.connect(reserve).updateBacking(maxValid.add(1000000));
       await accountControl.connect(owner).setMintingCap(reserve.address, maxValid.add(1000000));
       
       await expect(
@@ -239,12 +198,10 @@ describe("AccountControl Input Validation", function () {
 
   describe("Authorization Validation", function () {
     it("should prevent unauthorized reserves from minting", async function () {
-      const unauthorizedReserve = ethers.Wallet.createRandom();
-      
+      // Use the user signer which has ETH but is not authorized as a reserve
       await expect(
-        accountControl.connect(unauthorizedReserve.connect(ethers.provider)).mint(user.address, 100000)
-      ).to.be.revertedWithCustomError(accountControl, "NotAuthorized")
-        .withArgs(unauthorizedReserve.address);
+        accountControl.connect(user).mint(user.address, 100000)
+      ).to.be.revertedWith("NotAuthorized");
     });
 
     it("should prevent paused reserves from minting", async function () {
@@ -253,15 +210,14 @@ describe("AccountControl Input Validation", function () {
       
       await expect(
         accountControl.connect(reserve).mint(user.address, 100000)
-      ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused")
-        .withArgs(reserve.address);
+      ).to.be.revertedWith("ReserveIsPaused");
     });
 
     it("should prevent unauthorized addresses from updating backing", async function () {
+      // User is not an authorized reserve, so should fail
       await expect(
-        accountControl.connect(reserve).updateBacking(reserve.address, 500000)
-      ).to.be.revertedWithCustomError(accountControl, "NotAuthorized")
-        .withArgs(reserve.address);
+        accountControl.connect(user).updateBacking(500000)
+      ).to.be.revertedWith("NotAuthorized");
     });
   });
 });

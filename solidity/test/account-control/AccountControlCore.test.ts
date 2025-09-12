@@ -8,12 +8,16 @@ describe("AccountControl Core Functionality", function () {
   let accountControl: AccountControl;
   let owner: SignerWithAddress;
   let emergencyCouncil: SignerWithAddress;
-  let mockBank: SignerWithAddress;
+  let mockBank: any;
   let reserve: SignerWithAddress;
+  let user: SignerWithAddress;
 
   beforeEach(async function () {
-    [owner, emergencyCouncil, mockBank, reserve] = await ethers.getSigners();
+    [owner, emergencyCouncil, reserve, user] = await ethers.getSigners();
 
+    // Deploy mock Bank
+    const MockBankFactory = await ethers.getContractFactory("MockBank");
+    mockBank = await MockBankFactory.deploy();
 
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
     accountControl = await upgrades.deployProxy(
@@ -22,14 +26,10 @@ describe("AccountControl Core Functionality", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Setup ReserveOracle integration
-    await accountControl.connect(owner).setReserveOracle(owner.address);
+    // Note: No ReserveOracle integration needed in federated model
 
-    // Initialize reserve types
-    await accountControl.connect(owner).addReserveType(0); // ReserveType.QC_PERMISSIONED
-    
-    // Authorize a reserve for testing
-    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000, 0); // 0.01 BTC cap in satoshis, ReserveType.QC_PERMISSIONED
+    // Authorize a reserve for testing (QC_PERMISSIONED is initialized by default)
+    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000); // 0.01 BTC cap in satoshis
   });
 
   describe("Optimized totalMinted calculation", function () {
@@ -38,8 +38,8 @@ describe("AccountControl Core Functionality", function () {
     });
 
     it("should track total minted amount efficiently", async function () {
-      // Set backing for reserve via oracle consensus
-      await accountControl.connect(owner).updateBacking(reserve.address, 2000000); // 0.02 BTC
+      // Reserve updates its own backing (federated model)
+      await accountControl.connect(reserve).updateBacking(2000000); // 0.02 BTC
 
       // Mock Bank.increaseBalance call (normally would be called)
       const amount = 500000; // 0.005 BTC in satoshis
@@ -66,7 +66,7 @@ describe("AccountControl Core Functionality", function () {
       
       await expect(
         accountControl.connect(owner).deauthorizeReserve(nonExistentReserve)
-      ).to.be.revertedWithCustomError(accountControl, "ReserveNotFound");
+      ).to.be.revertedWith("ReserveNotFound");
     });
 
     it("should emit ReserveDeauthorized event", async function () {
@@ -78,18 +78,18 @@ describe("AccountControl Core Functionality", function () {
     });
 
     it("should revert when deauthorizing reserve with outstanding balance", async function () {
-      // Set backing and simulate minted balance
-      await accountControl.connect(owner).updateBacking(reserve.address, 1000000);
-      await accountControl.connect(reserve).adjustMinted(500000, true);
+      // Reserve sets backing and mint some tokens to create outstanding balance
+      await accountControl.connect(reserve).updateBacking(1000000);
+      await accountControl.connect(reserve).mint(user.address, 500000);
       
       await expect(
         accountControl.connect(owner).deauthorizeReserve(reserve.address)
-      ).to.be.revertedWithCustomError(accountControl, "CannotDeauthorizeWithOutstandingBalance");
+      ).to.be.revertedWith("CannotDeauthorizeWithOutstandingBalance");
     });
 
     it("should clear backing when deauthorizing clean reserve", async function () {
-      // Set backing but no minted balance
-      await accountControl.connect(owner).updateBacking(reserve.address, 1000000);
+      // Reserve sets backing but no minted balance
+      await accountControl.connect(reserve).updateBacking(1000000);
       
       expect(await accountControl.backing(reserve.address)).to.equal(1000000);
       
@@ -101,11 +101,10 @@ describe("AccountControl Core Functionality", function () {
 
   describe("redeem function", function () {
     beforeEach(async function () {
-      // Set up backing via oracle consensus and simulate a previous mint
-      await accountControl.connect(owner).updateBacking(reserve.address, 1000000);
-      // We can't actually mint without a proper Bank mock, but we can test the redeem logic
-      // by directly setting the minted amount using adjustMinted
-      await accountControl.connect(reserve).adjustMinted(500000, true); // Add 0.005 BTC minted
+      // Reserve sets up backing and perform a previous mint
+      await accountControl.connect(reserve).updateBacking(1000000);
+      // Mint some tokens to create minted balance for testing redemption
+      await accountControl.connect(reserve).mint(user.address, 500000); // Mint 0.005 BTC
     });
 
     it("should decrease minted amount on redemption", async function () {
@@ -129,7 +128,7 @@ describe("AccountControl Core Functionality", function () {
     it("should revert when redeeming more than minted", async function () {
       await expect(
         accountControl.connect(reserve).redeem(1000000) // More than minted
-      ).to.be.revertedWithCustomError(accountControl, "InsufficientMinted");
+      ).to.be.revertedWith("InsufficientMinted");
     });
   });
 
