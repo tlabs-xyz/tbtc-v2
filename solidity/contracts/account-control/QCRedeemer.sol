@@ -314,9 +314,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         tbtcToken.burnFrom(msg.sender, amount);
 
         // Notify AccountControl of redemption
-        // Convert tBTC amount to satoshis for AccountControl
-        uint256 satoshis = amount / SATOSHI_MULTIPLIER;
-        AccountControl(accountControl).redeem(satoshis);
+        AccountControl(accountControl).redeemTBTC(amount);
 
         // Calculate deadline
         uint256 redemptionTimeout = systemState.redemptionTimeout();
