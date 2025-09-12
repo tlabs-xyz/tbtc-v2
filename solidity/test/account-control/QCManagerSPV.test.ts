@@ -117,7 +117,7 @@ describe("QCManagerSPV Library", () => {
           proof
         )
       )
-        .to.be.revertedWithCustomError(uninitializedContract, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(1) // Relay not set
     })
 
@@ -143,7 +143,7 @@ describe("QCManagerSPV Library", () => {
           proof
         )
       )
-        .to.be.revertedWithCustomError(qcManagerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(2) // Invalid input vector
     })
 
@@ -169,7 +169,7 @@ describe("QCManagerSPV Library", () => {
           proof
         )
       )
-        .to.be.revertedWithCustomError(qcManagerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(3) // Invalid output vector
     })
 
@@ -190,7 +190,7 @@ describe("QCManagerSPV Library", () => {
           proof
         )
       )
-        .to.be.revertedWithCustomError(qcManagerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(4) // Tx not on same level as coinbase
     })
 
@@ -217,7 +217,7 @@ describe("QCManagerSPV Library", () => {
           proof
         )
       )
-        .to.be.revertedWithCustomError(qcManagerSPV, "WalletControlErr")
+        .to.be.revertedWith("WalletControlErr")
         .withArgs(1) // Wallet control proof failed
     })
 
@@ -246,7 +246,7 @@ describe("QCManagerSPV Library", () => {
       await expect(
         qcManagerSPV.testEvaluateProofDifficulty("0x") // Empty headers
       )
-        .to.be.revertedWithCustomError(qcManagerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(7) // Empty headers
     })
 
@@ -257,7 +257,7 @@ describe("QCManagerSPV Library", () => {
       await expect(
         qcManagerSPV.testEvaluateProofDifficulty(wrongDifficultyHeaders)
       )
-        .to.be.revertedWithCustomError(qcManagerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(8) // Not at current or previous difficulty
     })
 
@@ -272,7 +272,7 @@ describe("QCManagerSPV Library", () => {
       const headers = `0x${"00".repeat(80)}` // 1 header
 
       await expect(qcManagerSPV.testEvaluateProofDifficulty(headers))
-        .to.be.revertedWithCustomError(qcManagerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(9) // Invalid length of headers chain
     })
 
@@ -287,7 +287,7 @@ describe("QCManagerSPV Library", () => {
       const headers = `0x${"00".repeat(80)}`
 
       await expect(qcManagerSPV.testEvaluateProofDifficulty(headers))
-        .to.be.revertedWithCustomError(qcManagerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(10) // Invalid headers chain
     })
 
@@ -302,7 +302,7 @@ describe("QCManagerSPV Library", () => {
       const headers = `0x${"00".repeat(80)}`
 
       await expect(qcManagerSPV.testEvaluateProofDifficulty(headers))
-        .to.be.revertedWithCustomError(qcManagerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(11) // Insufficient work in header
     })
 
@@ -315,7 +315,7 @@ describe("QCManagerSPV Library", () => {
       const headers = `0x${"00".repeat(160)}` // 2 headers
 
       await expect(qcManagerSPV.testEvaluateProofDifficulty(headers))
-        .to.be.revertedWithCustomError(qcManagerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(12) // Insufficient accumulated difficulty
     })
   })
@@ -688,7 +688,7 @@ describe("QCManagerSPV Library", () => {
           },
           proof
         )
-      ).to.be.revertedWithCustomError(qcManagerSPV, "SPVErr") // Will fail at proof verification
+      ).to.be.revertedWith("SPVErr") // Will fail at proof verification
     })
 
     it("should use BytesLib for output parsing", async () => {

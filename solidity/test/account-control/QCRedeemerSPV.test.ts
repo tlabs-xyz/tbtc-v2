@@ -83,7 +83,7 @@ describe("QCRedeemerSPV Library", () => {
       }
 
       await expect(uninitializedContract.validateSPVProof(validTxInfo, proof))
-        .to.be.revertedWithCustomError(uninitializedContract, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(1) // Relay not set
     })
 
@@ -102,7 +102,7 @@ describe("QCRedeemerSPV Library", () => {
       }
 
       await expect(qcRedeemerSPV.validateSPVProof(invalidTxInfo, proof))
-        .to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(2) // Invalid input vector
     })
 
@@ -121,7 +121,7 @@ describe("QCRedeemerSPV Library", () => {
       }
 
       await expect(qcRedeemerSPV.validateSPVProof(invalidTxInfo, proof))
-        .to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(3) // Invalid output vector
     })
 
@@ -135,7 +135,7 @@ describe("QCRedeemerSPV Library", () => {
       }
 
       await expect(qcRedeemerSPV.validateSPVProof(validTxInfo, proof))
-        .to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(4) // Tx not on same level as coinbase
     })
 
@@ -149,7 +149,7 @@ describe("QCRedeemerSPV Library", () => {
       }
 
       await expect(qcRedeemerSPV.validateSPVProof(validTxInfo, proof))
-        .to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(7) // Empty headers
     })
   })
@@ -162,7 +162,7 @@ describe("QCRedeemerSPV Library", () => {
       await expect(
         qcRedeemerSPV.testEvaluateProofDifficulty(wrongDifficultyHeaders)
       )
-        .to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(8) // Not at current/previous difficulty
     })
 
@@ -177,7 +177,7 @@ describe("QCRedeemerSPV Library", () => {
       const headers = `0x${"00".repeat(80)}` // 1 header
 
       await expect(qcRedeemerSPV.testEvaluateProofDifficulty(headers))
-        .to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr")
+        .to.be.revertedWith("SPVErr")
         .withArgs(9) // Invalid headers chain length
     })
   })
@@ -561,7 +561,7 @@ describe("QCRedeemerSPV Library", () => {
       // Should fail at SPV validation but hash calculation should work
       await expect(
         qcRedeemerSPV.validateSPVProof(txInfo, proof)
-      ).to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr") // SPV validation fails, but hash works
+      ).to.be.revertedWith("SPVErr") // SPV validation fails, but hash works
     })
 
     it("should use ValidateSPV for merkle proof verification", async () => {
@@ -586,7 +586,7 @@ describe("QCRedeemerSPV Library", () => {
       // Should progress to merkle proof validation (which will fail with test data)
       await expect(
         qcRedeemerSPV.validateSPVProof(txInfo, proof)
-      ).to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr") // Will fail at proof validation
+      ).to.be.revertedWith("SPVErr") // Will fail at proof validation
     })
 
     it("should use BytesLib for output parsing", async () => {

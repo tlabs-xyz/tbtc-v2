@@ -32,19 +32,15 @@ describe("AccountControl Features", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Setup ReserveOracle integration
-    await accountControl.connect(owner).setReserveOracle(owner.address);
+    // Note: No ReserveOracle integration needed in federated model
 
-    // Initialize reserve types
-    await accountControl.connect(owner).addReserveType(0); // ReserveType.QC_PERMISSIONED
+    // Authorize reserves for testing (QC_PERMISSIONED is initialized by default)
+    await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000); // 0.01 BTC cap
+    await accountControl.connect(owner).authorizeReserve(reserve2.address, 2000000); // 0.02 BTC cap
     
-    // Authorize reserves for testing
-    await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, 0); // 0.01 BTC cap, ReserveType.QC_PERMISSIONED
-    await accountControl.connect(owner).authorizeReserve(reserve2.address, 2000000, 0); // 0.02 BTC cap, ReserveType.QC_PERMISSIONED
-    
-    // Set backing for reserves via oracle consensus
-    await accountControl.connect(owner).updateBacking(reserve1.address, 1000000);
-    await accountControl.connect(owner).updateBacking(reserve2.address, 2000000);
+    // Reserves set their own backing (federated model)
+    await accountControl.connect(reserve1).updateBacking(1000000);
+    await accountControl.connect(reserve2).updateBacking(2000000);
   });
 
   describe("Batch Atomicity", function () {
@@ -91,7 +87,7 @@ describe("AccountControl Features", function () {
     it("should prevent reducing cap below current minted amount", async function () {
       await expect(
         accountControl.connect(owner).setMintingCap(reserve1.address, 400000) // Below 500000 minted
-      ).to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
+      ).to.be.revertedWith("ExceedsReserveCap");
     });
 
     it("should allow reducing cap to exactly current minted amount", async function () {
@@ -113,7 +109,7 @@ describe("AccountControl Features", function () {
       
       await expect(
         accountControl.connect(owner).setMintingCap(unauthorizedReserve.address, 1000000)
-      ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
+      ).to.be.revertedWith("NotAuthorized");
     });
 
     it("should enforce global cap validation when setting individual caps", async function () {
@@ -124,7 +120,7 @@ describe("AccountControl Features", function () {
       // Setting Reserve1 to 1M should work (1M + 2M = 3M > 1.5M global, so should fail)
       await expect(
         accountControl.connect(owner).setMintingCap(reserve1.address, 1000000)
-      ).to.be.revertedWithCustomError(accountControl, "ExceedsGlobalCap");
+      ).to.be.revertedWith("ExceedsGlobalCap");
     });
 
     it("should allow setting cap when total doesn't exceed global cap", async function () {
@@ -151,8 +147,8 @@ describe("AccountControl Features", function () {
   describe("Authorization Race Condition Protection", function () {
     it("should prevent double authorization", async function () {
       await expect(
-        accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, 0) // ReserveType.QC_PERMISSIONED
-      ).to.be.revertedWithCustomError(accountControl, "AlreadyAuthorized");
+        accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000)
+      ).to.be.revertedWith("AlreadyAuthorized");
     });
 
     it("should prevent deauthorizing non-existent reserve", async function () {
@@ -160,25 +156,23 @@ describe("AccountControl Features", function () {
       
       await expect(
         accountControl.connect(owner).deauthorizeReserve(nonExistentReserve)
-      ).to.be.revertedWithCustomError(accountControl, "ReserveNotFound");
+      ).to.be.revertedWith("ReserveNotFound");
     });
 
     it("should prevent address reuse across different reserve types", async function () {
-      // First, deauthorize reserve1 (it was authorized as QC_PERMISSIONED = 0)
+      // First, deauthorize reserve1 (it was authorized as QC_PERMISSIONED = 1)
       await accountControl.connect(owner).deauthorizeReserve(reserve1.address);
       
       // Try to re-authorize same address for same type - should work
-      await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, 0); // Same type
+      await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000); // Same type
       
       // Deauthorize again for the next test
       await accountControl.connect(owner).deauthorizeReserve(reserve1.address);
       
-      // Try to authorize same address for different type - should fail
-      // Note: Since we only have QC_PERMISSIONED (0), we can't test different types yet
-      // This test would work once we add more reserve types like VISHWA, etc.
-      
-      // For now, just verify the address type is recorded
-      expect(await accountControl.reserveAddressType(reserve1.address)).to.equal(0); // QC_PERMISSIONED
+      // Only QC_PERMISSIONED type exists in V2, so just verify basic re-authorization works
+      await accountControl.connect(owner).authorizeReserve(reserve1.address, 500000);
+      const reserveInfo = await accountControl.reserveInfo(reserve1.address);
+      expect(reserveInfo.reserveType).to.equal(1); // QC_PERMISSIONED = 1 (UNINITIALIZED = 0)
     });
   });
 
@@ -212,8 +206,9 @@ describe("AccountControl Features", function () {
     });
   });
 
-  describe("Event Emission Control", function () {
-    it("should not emit individual events by default", async function () {
+  describe("Event Emission", function () {
+    it("should only emit batch events for gas efficiency", async function () {
+      // V2 simplified design: always emit batch events only for gas efficiency
       const recipients = [user1.address, user2.address];
       const amounts = [100000, 200000];
 
@@ -225,41 +220,7 @@ describe("AccountControl Features", function () {
       const individualEvents = receipt.events?.filter(e => e.event === "MintExecuted");
 
       expect(batchEvents).to.have.length(1);
-      expect(individualEvents).to.have.length(0);
-    });
-
-    it("should emit individual events when enabled", async function () {
-      // Enable individual event emission
-      await accountControl.connect(owner).setIndividualEventEmission(true);
-
-      const recipients = [user1.address, user2.address];
-      const amounts = [100000, 200000];
-
-      const tx = await accountControl.connect(reserve1).batchMint(recipients, amounts);
-      const receipt = await tx.wait();
-
-      // Should have both BatchMintExecuted and individual MintExecuted events
-      const batchEvents = receipt.events?.filter(e => e.event === "BatchMintExecuted");
-      const individualEvents = receipt.events?.filter(e => e.event === "MintExecuted");
-
-      expect(batchEvents).to.have.length(1);
-      expect(individualEvents).to.have.length(2);
-    });
-
-    it("should toggle individual event emission", async function () {
-      expect(await accountControl.emitIndividualEvents()).to.be.false;
-
-      await accountControl.connect(owner).setIndividualEventEmission(true);
-      expect(await accountControl.emitIndividualEvents()).to.be.true;
-
-      await accountControl.connect(owner).setIndividualEventEmission(false);
-      expect(await accountControl.emitIndividualEvents()).to.be.false;
-    });
-
-    it("should only allow owner to toggle individual event emission", async function () {
-      await expect(
-        accountControl.connect(reserve1).setIndividualEventEmission(true)
-      ).to.be.revertedWith("Ownable: caller is not the owner");
+      expect(individualEvents).to.have.length(0); // Simplified - no individual events
     });
   });
 
@@ -277,20 +238,17 @@ describe("AccountControl Features", function () {
       expect(await accountControl.authorized(reserve1.address)).to.be.true;
       const reserveInfo = await accountControl.reserveInfo(reserve1.address);
       expect(reserveInfo.mintingCap).to.equal(1000000);
-      expect(await accountControl.paused(reserve1.address)).to.be.false;
+      expect(reserveInfo.paused).to.be.false; // Pause state moved to reserveInfo struct
       expect(await accountControl.systemPaused()).to.be.false;
       expect(await accountControl.emergencyCouncil()).to.equal(emergencyCouncil.address);
       expect(await accountControl.bank()).to.equal(mockBankContract.address);
-      expect(await accountControl.emitIndividualEvents()).to.be.false;
+      // emitIndividualEvents removed for simplicity
     });
   });
 
   describe("Integration Testing", function () {
     it("should work with all features together", async function () {
-      // Enable individual events
-      await accountControl.connect(owner).setIndividualEventEmission(true);
-      
-      // Enable batch support
+      // Enable batch support in mock bank
       await mockBankContract.setBatchSupported(true);
 
       const recipients = [user1.address, user2.address];
@@ -303,11 +261,11 @@ describe("AccountControl Features", function () {
       expect(await accountControl.minted(reserve1.address)).to.equal(300000);
       expect(await accountControl.totalMinted()).to.equal(300000);
 
-      // Verify events
+      // Verify events (V2 simplified: only batch events for gas efficiency)
       const batchEvents = receipt.events?.filter(e => e.event === "BatchMintExecuted");
       const individualEvents = receipt.events?.filter(e => e.event === "MintExecuted");
       expect(batchEvents).to.have.length(1);
-      expect(individualEvents).to.have.length(2);
+      expect(individualEvents).to.have.length(0); // No individual events in V2
 
       // Verify batch Bank call was used
       expect(await mockBankContract.batchCallCount()).to.equal(1);
@@ -315,7 +273,7 @@ describe("AccountControl Features", function () {
       // Test cap reduction safety
       await expect(
         accountControl.connect(owner).setMintingCap(reserve1.address, 200000)
-      ).to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
+      ).to.be.revertedWith("ExceedsReserveCap");
     });
   });
 });

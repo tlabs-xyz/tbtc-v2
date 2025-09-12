@@ -431,7 +431,15 @@ contract QCManager is AccessControl, ReentrancyGuard {
         qcData.registerQC(qc, maxMintingCap);
 
         // Authorize QC in Account Control with minting cap and type
-        AccountControl(accountControl).authorizeReserve(qc, maxMintingCap, AccountControl.ReserveType.QC_PERMISSIONED);
+        if (accountControl != address(0)) {
+            try AccountControl(accountControl).authorizeReserve(qc, maxMintingCap) {
+                // Success - QC authorized in Account Control
+            } catch Error(string memory reason) {
+                revert(string(abi.encodePacked("AccountControl authorization failed: ", reason)));
+            } catch (bytes memory) {
+                revert("AccountControl authorization failed: Unknown error");
+            }
+        }
 
         emit QCRegistrationInitiated(qc, msg.sender, block.timestamp);
         emit QCOnboarded(qc, maxMintingCap, msg.sender, block.timestamp);
@@ -465,7 +473,15 @@ contract QCManager is AccessControl, ReentrancyGuard {
         qcData.updateMaxMintingCapacity(qc, newCap);
 
         // Update minting cap in Account Control
-        AccountControl(accountControl).setMintingCap(qc, newCap);
+        if (accountControl != address(0)) {
+            try AccountControl(accountControl).setMintingCap(qc, newCap) {
+                // Success - Minting cap updated in Account Control
+            } catch Error(string memory reason) {
+                revert(string(abi.encodePacked("AccountControl minting cap update failed: ", reason)));
+            } catch (bytes memory) {
+                revert("AccountControl minting cap update failed: Unknown error");
+            }
+        }
 
         emit MintingCapIncreased(
             qc,
@@ -1507,6 +1523,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param _accountControl The address of the Account Control contract
     /// @dev Only DEFAULT_ADMIN_ROLE can call this function
     function setAccountControl(address _accountControl) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_accountControl != address(0), "AccountControl address cannot be zero");
+        
         address oldAddress = accountControl;
         accountControl = _accountControl;
         emit AccountControlUpdated(oldAddress, _accountControl, msg.sender, block.timestamp);
