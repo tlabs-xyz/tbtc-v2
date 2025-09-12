@@ -4,7 +4,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { AccountControl } from "../../typechain";
 
-describe("AccountControl Enhancements", function () {
+describe("AccountControl Features", function () {
   let accountControl: AccountControl;
   let owner: SignerWithAddress;
   let emergencyCouncil: SignerWithAddress;
@@ -47,7 +47,7 @@ describe("AccountControl Enhancements", function () {
     await accountControl.connect(owner).updateBacking(reserve2.address, 2000000);
   });
 
-  describe("Enhancement 1: Batch Atomicity", function () {
+  describe("Batch Atomicity", function () {
     it("should execute Bank calls before state updates in batchMint", async function () {
       const recipients = [user1.address, user2.address];
       const amounts = [100000, 200000]; // 0.001 BTC, 0.002 BTC
@@ -82,7 +82,7 @@ describe("AccountControl Enhancements", function () {
     });
   });
 
-  describe("Enhancement 2: Reserve Cap Reduction Safety", function () {
+  describe("Reserve Cap Reduction Safety", function () {
     beforeEach(async function () {
       // Mint some tokens first
       await accountControl.connect(reserve1).mint(user1.address, 500000); // 0.005 BTC
@@ -107,7 +107,7 @@ describe("AccountControl Enhancements", function () {
     });
   });
 
-  describe("Enhancement 3: setMintingCap Validation Improvements", function () {
+  describe("setMintingCap Validation", function () {
     it("should revert when setting cap for unauthorized reserve", async function () {
       const unauthorizedReserve = ethers.Wallet.createRandom();
       
@@ -148,7 +148,7 @@ describe("AccountControl Enhancements", function () {
     });
   });
 
-  describe("Enhancement 3: Authorization Race Condition Protection", function () {
+  describe("Authorization Race Condition Protection", function () {
     it("should prevent double authorization", async function () {
       await expect(
         accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000, 0) // ReserveType.QC_PERMISSIONED
@@ -182,7 +182,7 @@ describe("AccountControl Enhancements", function () {
     });
   });
 
-  describe("Enhancement 4: Batch Bank Interface Optimization", function () {
+  describe("Batch Bank Interface Optimization", function () {
     it("should use batch interface when available", async function () {
       // Enable batch support in mock Bank
       await mockBankContract.setBatchSupported(true);
@@ -212,7 +212,7 @@ describe("AccountControl Enhancements", function () {
     });
   });
 
-  describe("Enhancement 7: Event Emission Optimization", function () {
+  describe("Event Emission Control", function () {
     it("should not emit individual events by default", async function () {
       const recipients = [user1.address, user2.address];
       const amounts = [100000, 200000];
@@ -263,7 +263,7 @@ describe("AccountControl Enhancements", function () {
     });
   });
 
-  describe("Enhancement 8: Storage Layout Documentation", function () {
+  describe("Storage Layout Compatibility", function () {
     it("should maintain upgrade compatibility", async function () {
       // This test verifies that the storage layout documentation
       // doesn't break existing functionality
@@ -286,7 +286,7 @@ describe("AccountControl Enhancements", function () {
   });
 
   describe("Integration Testing", function () {
-    it("should work with all enhancements together", async function () {
+    it("should work with all features together", async function () {
       // Enable individual events
       await accountControl.connect(owner).setIndividualEventEmission(true);
       
