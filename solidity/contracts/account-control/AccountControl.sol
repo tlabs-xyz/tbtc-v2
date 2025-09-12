@@ -318,7 +318,7 @@ contract AccountControl is
         
         // Execute batch mints first to ensure atomicity
         // If any Bank call fails, entire transaction reverts
-        try IBank(bank).batchIncreaseBalance(recipients, amounts) {
+        try IBank(bank).increaseBalances(recipients, amounts) {
             // Batch call succeeded
         } catch {
             // Fallback to individual calls if batch not supported
@@ -408,7 +408,10 @@ contract AccountControl is
     }
 
     function getTotalSupply() external view returns (uint256) {
-        return IBank(bank).totalSupply();
+        // Bank contract does not have totalSupply()
+        // Return total minted amount as best approximation
+        // Note: For actual tBTC total supply, query TBTCVault directly
+        return totalMintedAmount;
     }
 
     function canOperate(address reserve) external view returns (bool) {
@@ -519,6 +522,6 @@ contract AccountControl is
 
 interface IBank {
     function increaseBalance(address account, uint256 amount) external;
-    function batchIncreaseBalance(address[] calldata accounts, uint256[] calldata amounts) external;
-    function totalSupply() external view returns (uint256);
+    function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external;
+    // Note: Bank contract does not have totalSupply() - this will be handled by TBTCVault
 }

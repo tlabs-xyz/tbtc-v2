@@ -68,7 +68,7 @@ contract MockBank is IBank {
         _totalSupply += amount;
     }
     
-    function batchIncreaseBalance(address[] calldata accounts, uint256[] calldata amounts) external {
+    function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external {
         if (!batchSupported) {
             revert("Mock Bank: Batch not supported");
         }
