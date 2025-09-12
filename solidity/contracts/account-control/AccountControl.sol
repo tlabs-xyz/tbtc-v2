@@ -21,6 +21,7 @@ contract AccountControl is
     uint256 public constant MIN_MINT_AMOUNT = 10**4; // 0.0001 BTC in satoshis
     uint256 public constant MAX_SINGLE_MINT = 100 * 10**8; // 100 BTC in satoshis
     uint256 public constant MAX_BATCH_SIZE = 100;
+    uint256 public constant SATOSHI_MULTIPLIER = 1e10; // Converts tBTC (1e18) to satoshis (1e8)
 
     // ========== ENUMS ==========
     /// @dev Reserve types use enums for type safety and gas efficiency.
@@ -288,6 +289,22 @@ contract AccountControl is
         return true;
     }
 
+    /// @notice Mint tBTC tokens by converting to satoshis internally
+    /// @dev This function accepts tBTC amounts (18 decimals) and converts them to satoshis (8 decimals)
+    /// @param recipient Address to receive the minted tokens
+    /// @param tbtcAmount Amount in tBTC units (1e18 precision)
+    /// @return success True if minting was successful
+    function mintTBTC(address recipient, uint256 tbtcAmount) 
+        external 
+        onlyAuthorizedReserve 
+        nonReentrant 
+        returns (bool success)
+    {
+        // Convert tBTC to satoshis internally
+        uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
+        return this.mint(recipient, satoshis);
+    }
+
     function batchMint(
         address[] calldata recipients,
         uint256[] calldata amounts
@@ -364,6 +381,20 @@ contract AccountControl is
         
         emit RedemptionProcessed(msg.sender, amount);
         return true;
+    }
+
+    /// @notice Redeem tBTC tokens by converting to satoshis internally
+    /// @dev This function accepts tBTC amounts (18 decimals) and converts them to satoshis (8 decimals)
+    /// @param tbtcAmount Amount in tBTC units (1e18 precision)
+    /// @return success True if redemption was successful
+    function redeemTBTC(uint256 tbtcAmount) 
+        external 
+        onlyAuthorizedReserve 
+        returns (bool success)
+    {
+        // Convert tBTC to satoshis internally
+        uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
+        return this.redeem(satoshis);
     }
 
 
