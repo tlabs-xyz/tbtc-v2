@@ -86,14 +86,11 @@ describe("AccountControl Integration Tests", function () {
     // Grant owner oracle role for direct backing updates in tests
     await accountControl.connect(owner).setReserveOracle(owner.address);
 
-    // Initialize reserve types  
-    await accountControl.connect(owner).addReserveType(0); // ReserveType.QC_PERMISSIONED
-    
-    // Setup AccountControl
-    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, 0); // ReserveType.QC_PERMISSIONED
+    // Setup AccountControl (QC_PERMISSIONED is initialized by default)
+    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP); // ReserveType.QC_PERMISSIONED
     
     // Set backing directly (owner has oracle role)
-    await accountControl.connect(owner).updateBacking(qc.address, QC_BACKING_AMOUNT);
+    await accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT);
 
     // Grant necessary roles
     const MINTER_ROLE = await qcMinter.MINTER_ROLE();
@@ -156,7 +153,7 @@ describe("AccountControl Integration Tests", function () {
 
     it("should enforce AccountControl backing invariant in AccountControl mode", async function () {
       // Set backing lower than mint amount
-      await accountControl.connect(owner).updateBacking(qc.address, 100000); // 0.001 BTC
+      await accountControl.connect(qc).updateBacking(100000); // 0.001 BTC
       
       const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
       const receipt = await tx.wait();
@@ -165,7 +162,7 @@ describe("AccountControl Integration Tests", function () {
       // Should revert due to insufficient backing
       await expect(
         qcMinter.connect(qc).executeQCMint(mintId, user.address)
-      ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
+      ).to.be.revertedWith("InsufficientBacking");
     });
 
     it("should enforce AccountControl minting cap in AccountControl mode", async function () {
@@ -179,7 +176,7 @@ describe("AccountControl Integration Tests", function () {
       // Should revert due to cap exceeded
       await expect(
         qcMinter.connect(qc).executeQCMint(mintId, user.address)
-      ).to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
+      ).to.be.revertedWith("ExceedsReserveCap");
     });
   });
 
@@ -250,7 +247,7 @@ describe("AccountControl Integration Tests", function () {
           excessiveAmount,
           "0x1234"
         )
-      ).to.be.revertedWithCustomError(accountControl, "InsufficientMinted");
+      ).to.be.revertedWith("InsufficientMinted");
     });
   });
 
@@ -326,8 +323,8 @@ describe("AccountControl Integration Tests", function () {
     it("should handle multiple QCs operating simultaneously", async function () {
       // Setup second QC
       const qc2 = emergencyCouncil; // Reuse signer
-      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP, 0); // ReserveType.QC_PERMISSIONED
-      await accountControl.connect(owner).updateBacking(qc2.address, QC_BACKING_AMOUNT);
+      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP); // ReserveType.QC_PERMISSIONED
+      await accountControl.connect(qc2).updateBacking(QC_BACKING_AMOUNT);
       
       // Mint from both QCs
       let tx1 = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);

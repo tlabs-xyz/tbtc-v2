@@ -32,15 +32,11 @@ describe("AccountControl Workflows", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Setup ReserveOracle integration
-    await accountControl.connect(owner).setReserveOracle(owner.address);
+    // Note: No ReserveOracle integration needed in federated model
 
-    // Initialize reserve types
-    await accountControl.connect(owner).addReserveType(0); // ReserveType.QC_PERMISSIONED
-    
-    // Setup AccountControl
-    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, 0); // ReserveType.QC_PERMISSIONED
-    await accountControl.connect(owner).updateBacking(qc.address, QC_BACKING_AMOUNT);
+    // Setup AccountControl (QC_PERMISSIONED is initialized by default)
+    await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP);
+    await accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT);
   });
 
   describe("Direct Integration Testing", function () {
@@ -60,7 +56,7 @@ describe("AccountControl Workflows", function () {
       expect(await mockBank.balances(user.address)).to.equal(mintAmount);
     });
 
-    it("should support the complete V2 redemption workflow", async function () {
+    it("should support the complete redemption workflow", async function () {
       const mintAmount = 500000; // 0.005 BTC in satoshis
       const redeemAmount = 300000; // 0.003 BTC in satoshis
       
@@ -92,9 +88,9 @@ describe("AccountControl Workflows", function () {
       const updatedStats = await accountControl.getReserveStats(qc.address);
       expect(updatedStats.availableToMint).to.equal(QC_BACKING_AMOUNT - mintAmount);
       
-      // Increase backing
+      // QC increases backing
       const newBacking = QC_BACKING_AMOUNT + 500000;
-      await accountControl.connect(owner).updateBacking(qc.address, newBacking);
+      await accountControl.connect(qc).updateBacking(newBacking);
       
       // Check final available capacity  
       const finalStats = await accountControl.getReserveStats(qc.address);
@@ -105,8 +101,8 @@ describe("AccountControl Workflows", function () {
     it("should handle multiple QCs with independent accounting", async function () {
       // Setup second QC
       const qc2 = emergencyCouncil; // Reuse signer
-      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP, 0); // ReserveType.QC_PERMISSIONED
-      await accountControl.connect(owner).updateBacking(qc2.address, QC_BACKING_AMOUNT);
+      await accountControl.connect(owner).authorizeReserve(qc2.address, QC_MINTING_CAP);
+      await accountControl.connect(qc2).updateBacking(QC_BACKING_AMOUNT);
       
       const qc1MintAmount = 300000;
       const qc2MintAmount = 400000;
@@ -132,15 +128,15 @@ describe("AccountControl Workflows", function () {
     it("should enforce invariants across mint/redeem cycles", async function () {
       const mintAmount = 600000;
       
-      // Test backing invariant
-      await accountControl.connect(owner).updateBacking(qc.address, mintAmount - 100000); // Less backing than mint
+      // Test backing invariant - QC reduces backing below minted amount
+      await accountControl.connect(qc).updateBacking(mintAmount - 100000); // Less backing than mint
       
       await expect(
         accountControl.connect(qc).mint(user.address, mintAmount)
-      ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
+      ).to.be.revertedWith("InsufficientBacking");
       
-      // Restore proper backing  
-      await accountControl.connect(owner).updateBacking(qc.address, QC_BACKING_AMOUNT);
+      // QC restores proper backing  
+      await accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT);
       
       // Test minting cap invariant
       const lowCap = mintAmount - 100000;
@@ -148,12 +144,12 @@ describe("AccountControl Workflows", function () {
       
       await expect(
         accountControl.connect(qc).mint(user.address, mintAmount)
-      ).to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
+      ).to.be.revertedWith("ExceedsReserveCap");
       
       // Test redemption validation
       await expect(
         accountControl.connect(qc).redeem(100000)
-      ).to.be.revertedWithCustomError(accountControl, "InsufficientMinted");
+      ).to.be.revertedWith("InsufficientMinted");
     });
 
     it("should maintain consistency under batch operations", async function () {
@@ -192,7 +188,7 @@ describe("AccountControl Workflows", function () {
       expect(reserveInfo.mintingCap).to.equal(0);
       
       // Redeem all tokens (still works even when deauthorized)
-      await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP, 0); // Re-authorize for redeem, ReserveType.QC_PERMISSIONED
+      await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP); // Re-authorize for redeem
       await accountControl.connect(qc).redeem(mintAmount);
       expect(await accountControl.minted(qc.address)).to.equal(0);
     });
@@ -226,17 +222,16 @@ describe("AccountControl Workflows", function () {
       // Should not be able to mint when paused
       await expect(
         accountControl.connect(qc).mint(user.address, mintAmount)
-      ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
+      ).to.be.revertedWith("ReserveIsPaused");
       
-      // Oracle should still be able to update backing when QC is paused
-      // (Oracle consensus is independent of QC operational status)
-      await accountControl.connect(owner).updateBacking(qc.address, QC_BACKING_AMOUNT + 100000);
+      // QC can still update backing when paused (backing updates are always allowed)
+      await accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT + 100000);
       expect(await accountControl.backing(qc.address)).to.equal(QC_BACKING_AMOUNT + 100000);
       
       // Redemption is also blocked when paused (this is the actual behavior)
       await expect(
         accountControl.connect(qc).redeem(100000)
-      ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
+      ).to.be.revertedWith("ReserveIsPaused");
       
       // Unpause and then redeem should work
       await accountControl.connect(owner).unpauseReserve(qc.address);

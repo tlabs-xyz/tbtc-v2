@@ -23,12 +23,12 @@ contract AccountControl is
     uint256 public constant MAX_BATCH_SIZE = 100;
 
     // ========== ENUMS ==========
-    /// @dev TODO: We considered using string-based reserve types to avoid requiring 
-    /// contract upgrades when adding new types, but since this contract is upgradeable 
-    /// via UUPS, enums provide better type safety and gas efficiency while still 
-    /// allowing future type additions through upgrades.
+    /// @dev Reserve types use enums for type safety and gas efficiency.
+    /// Since this contract is upgradeable via UUPS, additional types can be 
+    /// added through upgrades while maintaining type safety.
     enum ReserveType {
-        QC_PERMISSIONED  // Qualified Custodian with permissions
+        UNINITIALIZED,   // Default/uninitialized state (0)
+        QC_PERMISSIONED  // Qualified Custodian with permissioned access
     }
 
     // ========== STATE VARIABLES ==========
@@ -38,63 +38,56 @@ contract AccountControl is
      * DO NOT MODIFY THE ORDER OR TYPE OF EXISTING VARIABLES.
      * ONLY ADD NEW VARIABLES AT THE END TO MAINTAIN UPGRADE SAFETY.
      * 
-     * Current storage slots (estimated):
-     * Slots 0-1: Initializable base contract storage
-     * Slots 2-3: UUPSUpgradeable base contract storage  
-     * Slots 4-5: ReentrancyGuardUpgradeable base contract storage
-     * Slots 6-7: OwnableUpgradeable base contract storage
+     * Based on actual OpenZeppelin v4.8.1 upgradeable contracts:
+     * Slot 0: Initializable._initialized (uint8) + Initializable._initializing (bool) + padding
+     * Slot 1: ReentrancyGuardUpgradeable._status (uint256)
+     * Slot 2: OwnableUpgradeable._owner (address) + padding  
+     * Slots 3-52: UUPSUpgradeable.__gap[50] (reserved slots)
+     * Slots 53-101: ReentrancyGuardUpgradeable.__gap[49] (reserved slots)
+     * Slots 102-150: OwnableUpgradeable.__gap[49] (reserved slots)
      * 
-     * AccountControl-specific storage starts around slot 8:
+     * AccountControl-specific storage starts at slot 151:
      */
     
-    // Core accounting (slots ~8-9)
-    mapping(address => uint256) public backing;        // Slot 8: Reserve backing amounts in satoshis
-    mapping(address => uint256) public minted;         // Slot 9: Reserve minted amounts in satoshis
+    // Core accounting (slots 151-152)
+    mapping(address => uint256) public backing;        // Slot 151: Reserve backing amounts in satoshis
+    mapping(address => uint256) public minted;         // Slot 152: Reserve minted amounts in satoshis
     
-    // Authorization and limits (slots ~10-12)
-    mapping(address => bool) public authorized;        // Slot 10: Reserve authorization status
+    // Authorization and limits (slots 153-155)
+    mapping(address => bool) public authorized;        // Slot 153: Reserve authorization status
     
     struct ReserveInfo {
         uint256 mintingCap;
         ReserveType reserveType;
+        bool paused;
     }
-    mapping(address => ReserveInfo) public reserveInfo; // Slot 11: Reserve info with type
-    uint256 public globalMintingCap;                   // Slot 12: Global minting cap
+    mapping(address => ReserveInfo) public reserveInfo; // Slot 154: Reserve info with type and pause status
+    uint256 public globalMintingCap;                   // Slot 155: Global minting cap
     
-    // Reserve tracking (slots ~13-14)
-    address[] public reserveList;                      // Slot 13: Array of authorized reserves
-    uint256 public totalMintedAmount;                  // Slot 14: Optimized total minted tracking
+    // Reserve tracking (slots 156-157)
+    address[] public reserveList;                      // Slot 156: Array of authorized reserves
+    uint256 public totalMintedAmount;                  // Slot 157: Optimized total minted tracking
     
-    // Pause states (slots ~15-16)
-    mapping(address => bool) public paused;           // Slot 15: Per-reserve pause status
-    bool public systemPaused;                         // Slot 16: System-wide pause status
+    // Pause states (slot 158)
+    bool public systemPaused;                         // Slot 158: System-wide pause status
     
-    // Oracle integration (slot ~17)
-    address public reserveOracle;                     // Slot 17: ReserveOracle contract address
+    // Slot 159: Available for future use (previously reserveOracle - removed for V2 minimal design)
     
-    // Governance (slots ~18-20)
-    address public emergencyCouncil;                  // Slot 18: Emergency council address
-    address public bank;                              // Slot 19: Bank contract address  
-    uint256 public deploymentBlock;                   // Slot 20: Deployment block number
+    // Governance (slots 160-162)
+    address public emergencyCouncil;                  // Slot 160: Emergency council address
+    address public bank;                              // Slot 161: Bank contract address  
+    uint256 public deploymentBlock;                   // Slot 162: Deployment block number
     
-    // Slot ~21 available for future use
-    
-    // Event optimization (slot ~22)
-    bool public emitIndividualEvents;                 // Slot 22: Individual event emission toggle
+    // Slot 163: Available for future use (event optimization removed for simplicity)
     
     /*
-     * END OF V1 STORAGE LAYOUT
+     * END OF CORE STORAGE LAYOUT
      * 
-     * ANY NEW VARIABLES MUST BE ADDED BELOW THIS COMMENT
+     * ANY ADDITIONAL VARIABLES MUST BE ADDED BELOW THIS COMMENT
      * TO MAINTAIN UPGRADE COMPATIBILITY
      */
     
-    // Reserve type system (slots ~23-24)
-    mapping(ReserveType => bool) public validReserveTypes;   // Slot 23: Valid reserve types
-    ReserveType[] public reserveTypeList;                   // Slot 24: List of all reserve types
-    
-    // Reserve address tracking (slot ~25)
-    mapping(address => ReserveType) public reserveAddressType; // Slot 25: Track which type each address was assigned
+    // Slots 165-167: Available for future use (reserve type management simplified)
 
     // ========== EVENTS ==========
     event MintExecuted(address indexed reserve, address indexed recipient, uint256 amount);
@@ -106,12 +99,8 @@ contract AccountControl is
     event MintingCapUpdated(address indexed reserve, uint256 oldCap, uint256 newCap);
     event GlobalMintingCapUpdated(uint256 cap);
     event EmergencyCouncilUpdated(address indexed oldCouncil, address indexed newCouncil);
-    event ReserveOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event RedemptionProcessed(address indexed reserve, uint256 amount);
     event ReserveDeauthorized(address indexed reserve);
-    event ReserveTypeAdded(ReserveType indexed reserveType);
-    event ReserveTypeSet(address indexed reserve, ReserveType reserveType);
-    event ReserveTypeChanged(address indexed reserve, ReserveType oldType, ReserveType newType);
 
     // ========== ERRORS ==========
     error InsufficientBacking(uint256 available, uint256 required);
@@ -129,23 +118,15 @@ contract AccountControl is
     error InsufficientMinted(uint256 available, uint256 requested);
     error ReserveNotFound(address reserve);
     error CannotDeauthorizeWithOutstandingBalance(address reserve, uint256 outstandingAmount);
-    error InvalidReserveType(ReserveType reserveType);
-    error ReserveTypeExists(ReserveType reserveType);
-    error EmptyString(string parameter);
-    error AddressAlreadyUsedForDifferentType(address reserve, ReserveType currentType, ReserveType requestedType);
 
     // ========== MODIFIERS ==========
     modifier onlyAuthorizedReserve() {
         if (!authorized[msg.sender]) revert NotAuthorized(msg.sender);
-        if (paused[msg.sender]) revert ReserveIsPaused(msg.sender);
+        if (reserveInfo[msg.sender].paused) revert ReserveIsPaused(msg.sender);
         if (systemPaused) revert SystemIsPaused();
         _;
     }
 
-    modifier onlyReserveOracle() {
-        if (msg.sender != reserveOracle) revert NotAuthorized(msg.sender);
-        _;
-    }
 
     modifier onlyOwnerOrEmergencyCouncil() {
         require(
@@ -179,49 +160,31 @@ contract AccountControl is
         emergencyCouncil = _emergencyCouncil;
         bank = _bank;
         deploymentBlock = block.number;
+        
+        // Reserve types managed through upgrades - QC_PERMISSIONED is default and only type in V2
     }
 
     // ========== RESERVE MANAGEMENT ==========
     
-    /// @notice Authorize a reserve for minting operations
+    /// @notice Authorize a reserve for minting operations (QC_PERMISSIONED type)
     /// @param reserve The address of the reserve to authorize  
     /// @param mintingCap The maximum amount this reserve can mint
-    /// @param reserveType The type of reserve being authorized
-    /// @dev SECURITY: Prevents address reuse across different reserve types to avoid
-    ///      shared state conflicts (backing, minted amounts, etc.)
-    function authorizeReserve(address reserve, uint256 mintingCap, ReserveType reserveType) 
+    function authorizeReserve(address reserve, uint256 mintingCap) 
         external 
         onlyOwner 
     {
         if (authorized[reserve]) revert AlreadyAuthorized(reserve);
-        if (!validReserveTypes[reserveType]) revert InvalidReserveType(reserveType);
         if (mintingCap == 0) revert AmountTooSmall(mintingCap, 1); // Prevent zero caps, use pause instead
-        
-        // Prevent address reuse across different reserve types
-        // Check if this address was ever used for a different reserve type
-        if (reserveAddressType[reserve] != ReserveType(0) && reserveAddressType[reserve] != reserveType) {
-            revert AddressAlreadyUsedForDifferentType(reserve, reserveAddressType[reserve], reserveType);
-        }
         
         authorized[reserve] = true;
         reserveInfo[reserve] = ReserveInfo({
             mintingCap: mintingCap,
-            reserveType: reserveType
+            reserveType: ReserveType.QC_PERMISSIONED,
+            paused: false
         });
         reserveList.push(reserve);
         
-        // Record the reserve type for this address permanently
-        reserveAddressType[reserve] = reserveType;
-        
-        // Initialize totalMintedAmount to include any existing minted amount for this reserve
-        // This handles cases where a reserve is re-authorized after being deauthorized
-        uint256 existingMinted = minted[reserve];
-        if (existingMinted > 0) {
-            totalMintedAmount += existingMinted;
-        }
-        
         emit ReserveAuthorized(reserve, mintingCap);
-        emit ReserveTypeSet(reserve, reserveType);
     }
 
     function deauthorizeReserve(address reserve) 
@@ -231,6 +194,7 @@ contract AccountControl is
         if (!authorized[reserve]) revert ReserveNotFound(reserve);
         
         // Safety check: cannot deauthorize reserves with outstanding minted balances
+        // Reserves must be wound down to zero before deauthorization to prevent accounting inconsistencies
         if (minted[reserve] > 0) revert CannotDeauthorizeWithOutstandingBalance(reserve, minted[reserve]);
         
         authorized[reserve] = false;
@@ -259,9 +223,10 @@ contract AccountControl is
         // Prevent zero caps - use pause functionality instead
         if (newCap == 0) revert AmountTooSmall(newCap, 1);
         
-        // Prevent reducing cap below current minted amount
+        // Prevent reducing cap below current minted amount to maintain system invariant (minted <= cap)
+        // Use pauseReserve() for immediate risk reduction; caps can only be lowered after natural redemptions
         if (newCap < minted[reserve]) {
-            revert ExceedsReserveCap(minted[reserve], newCap); // Current minted exceeds new cap
+            revert ExceedsReserveCap(minted[reserve], newCap); // Minted amount exceeds cap
         }
         
         // Validate against global cap if set
@@ -285,32 +250,6 @@ contract AccountControl is
         emit GlobalMintingCapUpdated(cap);
     }
 
-    // ========== RESERVE TYPE MANAGEMENT ==========
-    
-    function addReserveType(ReserveType reserveType) 
-        external 
-        onlyOwner 
-    {
-        if (validReserveTypes[reserveType]) revert ReserveTypeExists(reserveType);
-        
-        validReserveTypes[reserveType] = true;
-        reserveTypeList.push(reserveType);
-        
-        emit ReserveTypeAdded(reserveType);
-    }
-
-    function setReserveType(address reserve, ReserveType newType) 
-        external 
-        onlyOwner 
-    {
-        if (!authorized[reserve]) revert NotAuthorized(msg.sender);
-        if (!validReserveTypes[newType]) revert InvalidReserveType(newType);
-        
-        ReserveType oldType = reserveInfo[reserve].reserveType;
-        reserveInfo[reserve].reserveType = newType;
-        
-        emit ReserveTypeChanged(reserve, oldType, newType);
-    }
 
     // ========== MINTING OPERATIONS ==========
     
@@ -378,7 +317,7 @@ contract AccountControl is
         }
         
         // Execute batch mints first to ensure atomicity
-        // If any Bank call fails, entire transaction reverts before state changes
+        // If any Bank call fails, entire transaction reverts
         try IBank(bank).batchIncreaseBalance(recipients, amounts) {
             // Batch call succeeded
         } catch {
@@ -395,31 +334,21 @@ contract AccountControl is
         // Emit batch event for gas efficiency
         emit BatchMintExecuted(msg.sender, recipients.length, totalAmount);
         
-        // Individual events for detailed tracking (optional based on monitoring needs)
-        if (emitIndividualEvents) {
-            for (uint256 i = 0; i < recipients.length; i++) {
-                emit MintExecuted(msg.sender, recipients[i], amounts[i]);
-            }
-        }
-        
         return true;
     }
 
     // ========== BACKING MANAGEMENT ==========
     
-    /// @notice Update QC backing amount based on oracle consensus
-    /// @param qc The QC address to update
-    /// @param amount The new backing amount from oracle consensus
-    /// @dev Only callable by authorized ReserveOracle
-    function updateBacking(address qc, uint256 amount) 
+    /// @notice Allow authorized reserves to update their own backing amounts
+    /// @param amount The new backing amount 
+    /// @dev Only callable by the reserve itself (federated architecture)
+    function updateBacking(uint256 amount) 
         external 
-        onlyReserveOracle 
+        onlyAuthorizedReserve 
     {
-        if (!authorized[qc]) revert NotAuthorized(msg.sender);
+        backing[msg.sender] = amount;
         
-        backing[qc] = amount;
-        
-        emit BackingUpdated(qc, amount);
+        emit BackingUpdated(msg.sender, amount);
     }
 
     function redeem(uint256 amount) 
@@ -437,27 +366,15 @@ contract AccountControl is
         return true;
     }
 
-    function adjustMinted(uint256 amount, bool increase) 
-        external 
-        onlyAuthorizedReserve 
-    {
-        if (increase) {
-            minted[msg.sender] += amount;
-            totalMintedAmount += amount;
-        } else {
-            require(minted[msg.sender] >= amount, "Underflow protection");
-            minted[msg.sender] -= amount;
-            totalMintedAmount -= amount;
-        }
-    }
 
     // ========== PAUSE FUNCTIONALITY ==========
+    // Asymmetric security: EmergencyCouncil can pause (fast response), only Owner can unpause (deliberate recovery)
     
     function pauseReserve(address reserve) 
         external 
         onlyOwnerOrEmergencyCouncil 
     {
-        paused[reserve] = true;
+        reserveInfo[reserve].paused = true;
         emit ReservePaused(reserve);
     }
 
@@ -465,7 +382,7 @@ contract AccountControl is
         external 
         onlyOwner 
     {
-        paused[reserve] = false;
+        reserveInfo[reserve].paused = false;
         emit ReserveUnpaused(reserve);
     }
 
@@ -495,7 +412,7 @@ contract AccountControl is
     }
 
     function canOperate(address reserve) external view returns (bool) {
-        return authorized[reserve] && !paused[reserve] && !systemPaused;
+        return authorized[reserve] && !reserveInfo[reserve].paused && !systemPaused;
     }
 
     function getReserveCount() external view returns (uint256) {
@@ -518,7 +435,7 @@ contract AccountControl is
         ReserveInfo memory info = reserveInfo[reserve];
         
         isAuthorized = authorized[reserve];
-        isPaused = paused[reserve];
+        isPaused = info.paused;
         backingAmount = backing[reserve];
         mintedAmount = minted[reserve];
         mintingCap = info.mintingCap;
@@ -538,59 +455,10 @@ contract AccountControl is
         availableToMint = backingAvailable < capAvailable ? backingAvailable : capAvailable;
     }
 
-    function getReservesByType(ReserveType reserveType) 
-        external 
-        view 
-        returns (address[] memory) 
-    {
-        if (!validReserveTypes[reserveType]) revert InvalidReserveType(reserveType);
-        
-        // Count first
-        uint256 count = 0;
-        for (uint256 i = 0; i < reserveList.length; i++) {
-            if (reserveInfo[reserveList[i]].reserveType == reserveType) {
-                count++;
-            }
-        }
-        
-        // Populate array
-        address[] memory typeReserves = new address[](count);
-        uint256 index = 0;
-        for (uint256 i = 0; i < reserveList.length; i++) {
-            if (reserveInfo[reserveList[i]].reserveType == reserveType) {
-                typeReserves[index] = reserveList[i];
-                index++;
-            }
-        }
-        
-        return typeReserves;
-    }
 
-    function getReserveTypeStats() 
-        external 
-        view 
-        returns (ReserveType[] memory types, uint256[] memory counts, uint256[] memory totalMintedByType) 
-    {
-        types = new ReserveType[](reserveTypeList.length);
-        counts = new uint256[](reserveTypeList.length);
-        totalMintedByType = new uint256[](reserveTypeList.length);
-        
-        for (uint256 i = 0; i < reserveTypeList.length; i++) {
-            types[i] = reserveTypeList[i];
-            
-            // Count reserves and total minted for this type
-            for (uint256 j = 0; j < reserveList.length; j++) {
-                if (reserveInfo[reserveList[j]].reserveType == reserveTypeList[i]) {
-                    counts[i]++;
-                    totalMintedByType[i] += minted[reserveList[j]];
-                }
-            }
-        }
-    }
 
-    function getReserveTypeCount() external view returns (uint256) {
-        return reserveTypeList.length;
-    }
+
+
 
     // ========== GOVERNANCE ==========
     
@@ -604,21 +472,6 @@ contract AccountControl is
         emit EmergencyCouncilUpdated(oldCouncil, newCouncil);
     }
 
-    function setReserveOracle(address newReserveOracle) 
-        external 
-        onlyOwner 
-    {
-        if (newReserveOracle == address(0)) revert ZeroAddress("reserveOracle");
-        reserveOracle = newReserveOracle;
-        emit ReserveOracleUpdated(reserveOracle, newReserveOracle);
-    }
-    
-    function setIndividualEventEmission(bool enabled) 
-        external 
-        onlyOwner 
-    {
-        emitIndividualEvents = enabled;
-    }
 
     // ========== INTERNAL HELPER FUNCTIONS ==========
     

@@ -2,7 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./AccountControl.sol";
+// import "./AccountControl.sol"; // Removed: Oracle operates independently of AccountControl
 
 /// @title ReserveOracle
 /// @notice Multi-attester consensus oracle with honest-majority assumption for QC reserve attestation
@@ -299,8 +299,7 @@ contract ReserveOracle is AccessControl {
             lastUpdateTimestamp: block.timestamp
         });
 
-        // Update backing in Account Control with oracle consensus
-        AccountControl(accountControl).updateBacking(qc, balance);
+        // Note: Reserves are responsible for querying Oracle balance and updating AccountControl themselves
 
         // Clear any pending attestations
         _clearPendingAttestations(qc);
@@ -388,8 +387,7 @@ contract ReserveOracle is AccessControl {
             lastUpdateTimestamp: block.timestamp
         });
 
-        // Update backing in Account Control with oracle consensus
-        AccountControl(accountControl).updateBacking(qc, consensusBalance);
+        // Note: Reserves are responsible for querying Oracle balance and updating AccountControl themselves
 
         // Create array of participating attesters for event
         address[] memory participatingAttesters = new address[](validCount);
