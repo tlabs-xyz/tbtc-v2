@@ -377,6 +377,13 @@ contract QCManager is AccessControl, ReentrancyGuard {
         _;
     }
 
+    /// @notice Ensures AccountControl is configured
+    /// @dev Reverts if accountControl is not set (address(0))
+    modifier requiresAccountControl() {
+        require(accountControl != address(0), "AccountControl not configured");
+        _;
+    }
+
     constructor(
         address _qcData,
         address _systemState,
@@ -414,6 +421,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     function registerQC(address qc, uint256 maxMintingCap)
         external
         onlyRole(GOVERNANCE_ROLE)
+        requiresAccountControl
         nonReentrant
     {
         if (qc == address(0)) {
@@ -430,16 +438,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
         // Register QC with provided minting capacity
         qcData.registerQC(qc, maxMintingCap);
 
-        // Authorize QC in Account Control with minting cap and type
-        if (accountControl != address(0)) {
-            try AccountControl(accountControl).authorizeReserve(qc, maxMintingCap) {
-                // Success - QC authorized in Account Control
-            } catch Error(string memory reason) {
-                revert(string(abi.encodePacked("AccountControl authorization failed: ", reason)));
-            } catch (bytes memory) {
-                revert("AccountControl authorization failed: Unknown error");
-            }
-        }
+        // Authorize QC in Account Control with minting cap
+        AccountControl(accountControl).authorizeReserve(qc, maxMintingCap);
 
         emit QCRegistrationInitiated(qc, msg.sender, block.timestamp);
         emit QCOnboarded(qc, maxMintingCap, msg.sender, block.timestamp);
@@ -452,6 +452,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     function increaseMintingCapacity(address qc, uint256 newCap)
         external
         onlyRole(GOVERNANCE_ROLE)
+        requiresAccountControl
         nonReentrant
     {
         if (qc == address(0)) {
@@ -473,15 +474,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         qcData.updateMaxMintingCapacity(qc, newCap);
 
         // Update minting cap in Account Control
-        if (accountControl != address(0)) {
-            try AccountControl(accountControl).setMintingCap(qc, newCap) {
-                // Success - Minting cap updated in Account Control
-            } catch Error(string memory reason) {
-                revert(string(abi.encodePacked("AccountControl minting cap update failed: ", reason)));
-            } catch (bytes memory) {
-                revert("AccountControl minting cap update failed: Unknown error");
-            }
-        }
+        AccountControl(accountControl).setMintingCap(qc, newCap);
 
         emit MintingCapIncreased(
             qc,
@@ -561,7 +554,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         QCData.QCStatus newStatus,
         bytes32 reason,
         string memory /* authority */
-    ) private {
+    ) private requiresAccountControl {
         if (reason == bytes32(0)) {
             revert ReasonRequired();
         }
@@ -579,6 +572,9 @@ contract QCManager is AccessControl, ReentrancyGuard {
 
         qcData.setQCStatus(qc, newStatus, reason);
 
+        // Synchronize AccountControl with QC status changes
+        _syncAccountControlWithStatus(qc, oldStatus, newStatus);
+
         emit QCStatusChanged(
             qc,
             oldStatus,
@@ -588,6 +584,38 @@ contract QCManager is AccessControl, ReentrancyGuard {
             "AUTHORITY",
             block.timestamp
         );
+    }
+
+    /// @notice Synchronizes AccountControl with QC status changes
+    /// @param qc The address of the QC
+    /// @param oldStatus The previous status
+    /// @param newStatus The new status
+    /// @dev Maps QC statuses to AccountControl actions:
+    ///      - Active: Resume/unpause reserve operations
+    ///      - MintingPaused/Paused/UnderReview: Pause reserve operations  
+    ///      - Revoked: Deauthorize reserve completely
+    function _syncAccountControlWithStatus(
+        address qc,
+        QCData.QCStatus oldStatus,
+        QCData.QCStatus newStatus
+    ) private {
+        // Only sync if status actually changed
+        if (oldStatus == newStatus) return;
+
+        if (newStatus == QCData.QCStatus.Active) {
+            // Resume operations - unpause the reserve
+            AccountControl(accountControl).unpauseReserve(qc);
+        } else if (
+            newStatus == QCData.QCStatus.MintingPaused ||
+            newStatus == QCData.QCStatus.Paused ||
+            newStatus == QCData.QCStatus.UnderReview
+        ) {
+            // Suspend operations - pause the reserve
+            AccountControl(accountControl).pauseReserve(qc);
+        } else if (newStatus == QCData.QCStatus.Revoked) {
+            // Terminal state - deauthorize the reserve completely
+            AccountControl(accountControl).deauthorizeReserve(qc);
+        }
     }
 
     /// @notice Register a wallet for a QC using message signature verification
