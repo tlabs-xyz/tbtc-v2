@@ -311,15 +311,14 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             revert NotAuthorizedInBank();
         }
 
-        // Convert tBTC amount to satoshis for Bank balance
-        // 1 tBTC = 1e18 wei, 1 BTC = 1e8 satoshis
+        // Use AccountControl for minting (handles tBTC to satoshi conversion internally)
+        AccountControl(accountControl).mintTBTC(user, amount);
+
+        // Convert to satoshis for event emission and tracking
         uint256 satoshis = amount / SATOSHI_MULTIPLIER;
-
-        // Emit event before Bank interaction for QC attribution
+        
+        // Emit event for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
-
-        // Use AccountControl for minting
-        AccountControl(accountControl).mint(user, satoshis);
 
         // Update QC minted amount
         _updateQCMintedAmount(qc, amount);
@@ -447,13 +446,13 @@ contract QCMinter is AccessControl, ReentrancyGuard {
 
         // No need to check authorization here - Bank will check when we call increaseBalance
 
-        // Convert tBTC amount to satoshis for Bank balance
-        uint256 satoshis = amount / SATOSHI_MULTIPLIER;
-
         // HYBRID LOGIC: Choose between manual and automated minting
         if (autoMint && autoMintEnabled) {
             // Option 1: Automated minting - create balance and immediately mint tBTC
-            AccountControl(accountControl).mint(user, satoshis);
+            AccountControl(accountControl).mintTBTC(user, amount);
+            
+            // Convert to satoshis for further processing
+            uint256 satoshis = amount / SATOSHI_MULTIPLIER;
             
             // Execute automated minting directly
             _executeAutoMint(user, satoshis);
@@ -462,7 +461,10 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             emit QCMintCompleted(user, satoshis, true);
         } else {
             // Option 2: Manual process - just create Bank balance
-            AccountControl(accountControl).mint(user, satoshis);
+            AccountControl(accountControl).mintTBTC(user, amount);
+            
+            // Convert to satoshis for event emission
+            uint256 satoshis = amount / SATOSHI_MULTIPLIER;
             
             // Emit event for manual completion (user needs to mint separately)
             emit QCMintCompleted(user, satoshis, false);
