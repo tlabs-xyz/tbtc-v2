@@ -249,6 +249,8 @@ const config: HardhatUserConfig = {
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
+    // TODO: Re-enable after fixing contract size issues (currently disabled for dev performance)
+    // Multiple contracts exceed 24KB limit: QCManager (27KB), QCRedeemer (25.4KB)
     runOnCompile: false,
     strict: true,
     // WalletRegistry is excluded because it's an external dependency from @keep-network/ecdsa
