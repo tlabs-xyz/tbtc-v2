@@ -2,7 +2,6 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-// import "./AccountControl.sol"; // Removed: Oracle operates independently of AccountControl
 
 /// @title ReserveOracle
 /// @notice Multi-attester consensus oracle with honest-majority assumption for QC reserve attestation
@@ -63,10 +62,6 @@ contract ReserveOracle is AccessControl {
     uint256 public attestationTimeout = 6 hours; // Time window for attestations to be considered valid
     uint256 public maxStaleness = 24 hours; // Maximum time before reserve data is considered stale
 
-    // Account Control Integration
-    /// @dev Address of the Account Control contract
-    address public accountControl;
-
     // Events
     event AttestationSubmitted(
         address indexed qc,
@@ -121,10 +116,6 @@ contract ReserveOracle is AccessControl {
         uint256 oldMaxStaleness,
         uint256 newMaxStaleness
     );
-
-    // Account Control Events
-    /// @dev Emitted when Account Control address is updated
-    event AccountControlUpdated(address indexed oldAddress, address indexed newAddress, address changedBy, uint256 timestamp);
 
     // Custom errors for gas efficiency
     error QCAddressRequired();
@@ -476,17 +467,4 @@ contract ReserveOracle is AccessControl {
 
         delete pendingAttesters[qc];
     }
-
-    // =================== CONFIGURATION FUNCTIONS ===================
-
-
-    /// @notice Set the Account Control contract address
-    /// @param _accountControl The address of the Account Control contract
-    /// @dev Only DEFAULT_ADMIN_ROLE can call this function
-    function setAccountControl(address _accountControl) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        address oldAddress = accountControl;
-        accountControl = _accountControl;
-        emit AccountControlUpdated(oldAddress, _accountControl, msg.sender, block.timestamp);
-    }
-
 }
