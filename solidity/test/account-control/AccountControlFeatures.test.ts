@@ -32,7 +32,7 @@ describe("AccountControl Features", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Note: No ReserveOracle integration needed in federated model
+    // Note: Using direct updateBacking() for unit tests (oracle integration tested separately)
 
     // Authorize reserves for testing (QC_PERMISSIONED is initialized by default)
     await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000); // 0.01 BTC cap
