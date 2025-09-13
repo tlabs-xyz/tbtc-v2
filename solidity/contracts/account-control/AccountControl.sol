@@ -537,5 +537,4 @@ contract AccountControl is
 interface IBank {
     function increaseBalance(address account, uint256 amount) external;
     function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external;
-    // Note: Bank contract does not have totalSupply() - this will be handled by TBTCVault
 }
