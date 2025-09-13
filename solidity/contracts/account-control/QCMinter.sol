@@ -311,11 +311,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             revert NotAuthorizedInBank();
         }
 
-        // Use AccountControl for minting (handles tBTC to satoshi conversion internally)
-        AccountControl(accountControl).mintTBTC(user, amount);
-
-        // Convert to satoshis for event emission and tracking
-        uint256 satoshis = amount / SATOSHI_MULTIPLIER;
+        // Use AccountControl for minting (returns satoshis for event emission)
+        uint256 satoshis = AccountControl(accountControl).mintTBTC(user, amount);
         
         // Emit event for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
@@ -447,12 +444,10 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // No need to check authorization here - Bank will check when we call increaseBalance
 
         // HYBRID LOGIC: Choose between manual and automated minting
+        uint256 satoshis;
         if (autoMint && autoMintEnabled) {
             // Option 1: Automated minting - create balance and immediately mint tBTC
-            AccountControl(accountControl).mintTBTC(user, amount);
-            
-            // Convert to satoshis for further processing
-            uint256 satoshis = amount / SATOSHI_MULTIPLIER;
+            satoshis = AccountControl(accountControl).mintTBTC(user, amount);
             
             // Execute automated minting directly
             _executeAutoMint(user, satoshis);
@@ -461,10 +456,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             emit QCMintCompleted(user, satoshis, true);
         } else {
             // Option 2: Manual process - just create Bank balance
-            AccountControl(accountControl).mintTBTC(user, amount);
-            
-            // Convert to satoshis for event emission
-            uint256 satoshis = amount / SATOSHI_MULTIPLIER;
+            satoshis = AccountControl(accountControl).mintTBTC(user, amount);
             
             // Emit event for manual completion (user needs to mint separately)
             emit QCMintCompleted(user, satoshis, false);
