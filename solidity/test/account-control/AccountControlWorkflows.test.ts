@@ -32,7 +32,7 @@ describe("AccountControl Workflows", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Note: No ReserveOracle integration needed in federated model
+    // Note: Using direct updateBacking() for unit tests (oracle integration tested separately)
 
     // Setup AccountControl (QC_PERMISSIONED is initialized by default)
     await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP);
