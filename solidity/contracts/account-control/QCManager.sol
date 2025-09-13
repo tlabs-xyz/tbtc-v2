@@ -368,6 +368,9 @@ contract QCManager is AccessControl, ReentrancyGuard {
     // Account Control Events
     /// @dev Emitted when Account Control address is updated
     event AccountControlUpdated(address indexed oldAddress, address indexed newAddress, address changedBy, uint256 timestamp);
+    
+    /// @dev Emitted when backing is synced from oracle to AccountControl
+    event BackingSyncedFromOracle(address indexed qc, uint256 balance, bool isStale);
 
     modifier onlyWhenNotPaused(string memory functionName) {
         require(
@@ -440,6 +443,14 @@ contract QCManager is AccessControl, ReentrancyGuard {
 
         // Authorize QC in Account Control with minting cap
         AccountControl(accountControl).authorizeReserve(qc, maxMintingCap);
+
+        // Sync initial backing from oracle if available
+        try this.syncBackingFromOracle(qc) {
+            // Backing synced successfully
+        } catch {
+            // No oracle data yet or oracle not available - backing starts at 0
+            // This is normal for newly registered QCs
+        }
 
         emit QCRegistrationInitiated(qc, msg.sender, block.timestamp);
         emit QCOnboarded(qc, maxMintingCap, msg.sender, block.timestamp);
@@ -602,6 +613,15 @@ contract QCManager is AccessControl, ReentrancyGuard {
     ) private {
         // Only sync if status actually changed
         if (oldStatus == newStatus) return;
+
+        // Always sync backing first when status changes (except for revoked QCs)
+        if (newStatus != QCData.QCStatus.Revoked) {
+            try this.syncBackingFromOracle(qc) {
+                // Backing synced successfully
+            } catch {
+                // Oracle data not available - continue with status sync
+            }
+        }
 
         if (newStatus == QCData.QCStatus.Active) {
             // Resume operations - unpause the reserve
@@ -1547,6 +1567,37 @@ contract QCManager is AccessControl, ReentrancyGuard {
     }
 
     // =================== ACCOUNT CONTROL FUNCTIONS ===================
+
+    /// @notice Sync backing from oracle to AccountControl
+    /// @param qc The QC address to sync backing for
+    /// @dev Updates AccountControl backing with oracle-attested balance
+    function syncBackingFromOracle(address qc) external {
+        require(qc != address(0), "QC address cannot be zero");
+        require(accountControl != address(0), "AccountControl not set");
+        
+        // Get the latest attested balance from oracle
+        (uint256 balance, bool isStale) = reserveOracle.getReserveBalanceAndStaleness(qc);
+        
+        // Optional: could add staleness check here if desired
+        // if (isStale) revert StaleBalance();
+        
+        // Update AccountControl with the oracle-attested balance
+        AccountControl(accountControl).updateBacking(balance);
+        
+        emit BackingSyncedFromOracle(qc, balance, isStale);
+    }
+
+    /// @notice Sync backing for multiple QCs in a single transaction
+    /// @param qcs Array of QC addresses to sync
+    function batchSyncBackingFromOracle(address[] calldata qcs) external {
+        for (uint256 i = 0; i < qcs.length; i++) {
+            if (qcs[i] != address(0) && accountControl != address(0)) {
+                (uint256 balance, bool isStale) = reserveOracle.getReserveBalanceAndStaleness(qcs[i]);
+                AccountControl(accountControl).updateBacking(balance);
+                emit BackingSyncedFromOracle(qcs[i], balance, isStale);
+            }
+        }
+    }
 
     /// @notice Set the Account Control contract address
     /// @param _accountControl The address of the Account Control contract
