@@ -514,25 +514,7 @@ contract AccountControl is
     /// @param excludeReserve Reserve to exclude from calculation
     /// @return totalCaps Sum of all other authorized reserves' minting caps
     function _calculateTotalCapsExcluding(address excludeReserve) internal view returns (uint256 totalCaps) {
-        // OPTIMIZATION PROPOSAL: This function has O(n) gas cost that grows with the number of reserves.
-        // For large numbers of reserves, this could become expensive.
-        //
-        // PROPOSED SOLUTION:
-        // 1. Add cached storage variable: uint256 public totalMintingCapsCache;
-        // 2. Update cache in authorizeReserve(): totalMintingCapsCache += mintingCap;
-        // 3. Update cache in deauthorizeReserve(): totalMintingCapsCache -= reserveInfo[reserve].mintingCap;
-        // 4. Update cache in setMintingCap(): totalMintingCapsCache = totalMintingCapsCache - oldCap + newCap;
-        // 5. Replace this function: return totalMintingCapsCache - reserveInfo[excludeReserve].mintingCap;
-        //
-        // TRADEOFFS:
-        // - PRO: O(1) gas cost, much more predictable
-        // - PRO: Scales to unlimited number of reserves
-        // - CON: Additional storage slot (~20k gas for first write)
-        // - CON: More complex state management across multiple functions
-        // - CON: Risk of cache desync if not maintained carefully
-        //
-        // RECOMMENDATION: Implement if expecting >10 reserves, otherwise current solution acceptable.
-        
+        // NOTE: O(n) gas cost. Could cache total in storage if >10 reserves expected.
         for (uint256 i = 0; i < reserveList.length; i++) {
             address reserve = reserveList[i];
             if (reserve != excludeReserve && authorized[reserve]) {
