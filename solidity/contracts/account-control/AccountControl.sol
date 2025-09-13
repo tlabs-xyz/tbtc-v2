@@ -358,8 +358,9 @@ contract AccountControl is
     // ========== BACKING MANAGEMENT ==========
     
     /// @notice Allow authorized reserves to update their own backing amounts
-    /// @param amount The new backing amount 
-    /// @dev Only callable by the reserve itself (federated architecture)
+    /// @dev TODO: In production, this should integrate with ReserveOracle for attested backing
+    /// @dev Currently used for testing and manual backing updates
+    /// @param amount The new backing amount in satoshis
     function updateBacking(uint256 amount) 
         external 
         onlyAuthorizedReserve 
@@ -368,6 +369,8 @@ contract AccountControl is
         
         emit BackingUpdated(msg.sender, amount);
     }
+
+    // ========== REDEMPTION OPERATIONS ==========
 
     function redeem(uint256 amount) 
         external 
