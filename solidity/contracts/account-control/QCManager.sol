@@ -587,6 +587,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     }
 
     /// @notice Synchronizes AccountControl with QC status changes
+    /// @dev Essential bridge maintaining consistency between QCManager business logic and AccountControl operational controls.
     /// @param qc The address of the QC
     /// @param oldStatus The previous status
     /// @param newStatus The new status

@@ -293,16 +293,17 @@ contract AccountControl is
     /// @dev This function accepts tBTC amounts (18 decimals) and converts them to satoshis (8 decimals)
     /// @param recipient Address to receive the minted tokens
     /// @param tbtcAmount Amount in tBTC units (1e18 precision)
-    /// @return success True if minting was successful
+    /// @return satoshis Amount converted to satoshis for event emission
     function mintTBTC(address recipient, uint256 tbtcAmount) 
         external 
         onlyAuthorizedReserve 
         nonReentrant 
-        returns (bool success)
+        returns (uint256 satoshis)
     {
         // Convert tBTC to satoshis internally
-        uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
-        return this.mint(recipient, satoshis);
+        satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
+        this.mint(recipient, satoshis);
+        return satoshis;
     }
 
     function batchMint(
