@@ -70,10 +70,6 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     // Role definitions for access control
     bytes32 public constant DISPUTE_ARBITER_ROLE = keccak256("DISPUTE_ARBITER_ROLE");
 
-    // Constants
-    uint256 private constant SATOSHI_MULTIPLIER = 1e10;
-
-
     /// @dev Redemption status enumeration
     enum RedemptionStatus {
         NeverInitiated,
