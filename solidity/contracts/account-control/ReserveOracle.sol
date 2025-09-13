@@ -290,8 +290,6 @@ contract ReserveOracle is AccessControl {
             lastUpdateTimestamp: block.timestamp
         });
 
-        // Note: Reserves are responsible for querying Oracle balance and updating AccountControl themselves
-
         // Clear any pending attestations
         _clearPendingAttestations(qc);
 
@@ -377,8 +375,6 @@ contract ReserveOracle is AccessControl {
             balance: consensusBalance,
             lastUpdateTimestamp: block.timestamp
         });
-
-        // Note: Reserves are responsible for querying Oracle balance and updating AccountControl themselves
 
         // Create array of participating attesters for event
         address[] memory participatingAttesters = new address[](validCount);
