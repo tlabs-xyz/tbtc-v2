@@ -1,29 +1,24 @@
 # Reserve Backing Integration Pattern
 
-## Current State (V2 Implementation)
+## Architecture Overview
 
-The V2 Account Control system currently uses a simplified backing update mechanism:
+The V2 Account Control system uses a clean separation of concerns:
+- **AccountControl**: Enforces mathematical invariant (backing >= minted)
+- **ReserveOracle**: Provides attested backing values through consensus
+- **Reserves** (e.g., QCManager): Bridge between oracle and AccountControl
+
+## Current Implementation
 
 ```solidity
 function updateBacking(uint256 amount) external onlyAuthorizedReserve
 ```
 
-Reserves can directly update their own backing amounts. This is suitable for:
-- Testing environments
-- Manual backing updates
-- Initial deployment phase
+This function is essential for reserves to inform AccountControl of their backing, whether from:
+- Oracle-attested values (production)
+- Manual updates (testing)
+- Direct setting (development)
 
-## Future Integration Path (Production)
-
-The system is designed to integrate with the ReserveOracle for attested backing:
-
-### Components
-
-1. **ReserveOracle.sol**: Collects attestations from multiple trusted attesters
-2. **AccountControl.sol**: Enforces backing >= minted invariant
-3. **Reserve Contracts** (e.g., QCManager): Business logic layer
-
-### Proposed Flow
+## Data Flow
 
 ```
 1. Attesters submit balance attestations to ReserveOracle
@@ -31,14 +26,16 @@ The system is designed to integrate with the ReserveOracle for attested backing:
 
 2. Consensus reached when threshold met (e.g., 2/3 attesters agree)
    └─> Median balance calculated
-   └─> Reserve balance updated in oracle
+   └─> Reserve balance stored in oracle
 
-3. Reserve queries oracle for attested balance
-   └─> balance = reserveOracle.getReserveBalance(qc)
+3. Reserve queries oracle for its attested balance
+   └─> balance = reserveOracle.getReserveBalance(address(this))
 
-4. Reserve updates AccountControl backing
+4. Reserve updates AccountControl with this backing
    └─> accountControl.updateBacking(balance)
 ```
+
+**Key Point**: AccountControl doesn't know about ReserveOracle. It only knows that authorized reserves can update their own backing.
 
 ### Implementation Requirements
 
