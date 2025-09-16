@@ -105,6 +105,8 @@ contract AccountControl is
     event SystemPaused();
     event SystemUnpaused();
     event BackingViolationDetected(address indexed reserve, uint256 backing, uint256 minted, uint256 deficit);
+    event GlobalCapBelowMinted(uint256 cap, uint256 totalMinted, uint256 deficit);
+    event ReserveCapBelowMinted(address indexed reserve, uint256 cap, uint256 minted, uint256 deficit);
 
     // ========== ERRORS ==========
     error InsufficientBacking(uint256 available, uint256 required);
@@ -229,10 +231,11 @@ contract AccountControl is
         // Prevent zero caps - use pause functionality instead
         if (newCap == 0) revert AmountTooSmall(newCap, 1);
         
-        // Prevent reducing cap below current minted amount to maintain system invariant (minted <= cap)
-        // Use pauseReserve() for immediate risk reduction; caps can only be lowered after natural redemptions
-        if (newCap < minted[reserve]) {
-            revert ExceedsReserveCap(minted[reserve], newCap); // Minted amount exceeds cap
+        uint256 currentMinted = minted[reserve];
+
+        // Observe and report if cap is below current minted (emergency governance scenario)
+        if (newCap < currentMinted) {
+            emit ReserveCapBelowMinted(reserve, newCap, currentMinted, currentMinted - newCap);
         }
         
         // Validate against global cap if set
@@ -252,8 +255,13 @@ contract AccountControl is
         external
         onlyOwner
     {
-        if (cap > 0 && cap < totalMintedAmount) revert ExceedsGlobalCap(totalMintedAmount, cap);
         globalMintingCap = cap;
+
+        // Observe and report if cap is below current minted (emergency governance scenario)
+        if (cap > 0 && cap < totalMintedAmount) {
+            emit GlobalCapBelowMinted(cap, totalMintedAmount, totalMintedAmount - cap);
+        }
+
         emit GlobalMintingCapUpdated(cap);
     }
 
