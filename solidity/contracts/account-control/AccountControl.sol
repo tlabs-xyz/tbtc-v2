@@ -102,6 +102,8 @@ contract AccountControl is
     event EmergencyCouncilUpdated(address indexed oldCouncil, address indexed newCouncil);
     event RedemptionProcessed(address indexed reserve, uint256 amount);
     event ReserveDeauthorized(address indexed reserve);
+    event SystemPaused();
+    event SystemUnpaused();
 
     // ========== ERRORS ==========
     error InsufficientBacking(uint256 available, uint256 required);
@@ -189,10 +191,11 @@ contract AccountControl is
         emit ReserveAuthorized(reserve, mintingCap);
     }
 
-    function deauthorizeReserve(address reserve) 
-        external 
-        onlyOwner 
+    function deauthorizeReserve(address reserve)
+        external
+        onlyOwner
     {
+        if (reserve == address(0)) revert ZeroAddress("reserve");
         if (!authorized[reserve]) revert ReserveNotFound(reserve);
         
         // Safety check: cannot deauthorize reserves with outstanding minted balances
@@ -244,10 +247,11 @@ contract AccountControl is
         emit MintingCapUpdated(reserve, oldCap, newCap);
     }
 
-    function setGlobalMintingCap(uint256 cap) 
-        external 
-        onlyOwner 
+    function setGlobalMintingCap(uint256 cap)
+        external
+        onlyOwner
     {
+        if (cap > 0 && cap < totalMintedAmount) revert ExceedsGlobalCap(totalMintedAmount, cap);
         globalMintingCap = cap;
         emit GlobalMintingCapUpdated(cap);
     }
@@ -315,10 +319,12 @@ contract AccountControl is
         if (recipients.length > MAX_BATCH_SIZE) revert BatchSizeExceeded(recipients.length, MAX_BATCH_SIZE);
         
         uint256 totalAmount = 0;
-        for (uint256 i = 0; i < amounts.length; i++) {
+        uint256 len = recipients.length; // cache once
+        for (uint256 i = 0; i < len; ) {
             if (amounts[i] < MIN_MINT_AMOUNT) revert AmountTooSmall(amounts[i], MIN_MINT_AMOUNT);
             if (amounts[i] > MAX_SINGLE_MINT) revert AmountTooLarge(amounts[i], MAX_SINGLE_MINT);
             totalAmount += amounts[i];
+            unchecked { ++i; }
         }
         
         // Check backing invariant for total
@@ -341,8 +347,9 @@ contract AccountControl is
             // Batch call succeeded
         } catch {
             // Fallback to individual calls if batch not supported
-            for (uint256 i = 0; i < recipients.length; i++) {
+            for (uint256 i = 0; i < len; ) {
                 IBank(bank).increaseBalance(recipients[i], amounts[i]);
+                unchecked { ++i; }
             }
         }
         
@@ -360,14 +367,14 @@ contract AccountControl is
     
     /// @notice Allow authorized reserves to update their own backing amounts
     /// @dev Reserves are responsible for providing attested backing through their own mechanisms
-    /// @dev AccountControl only enforces the backing >= minted invariant
+    /// @dev Note: backing < minted indicates undercollateralization - watchdog enforcers detect and address this
     /// @param amount The new backing amount in satoshis
-    function updateBacking(uint256 amount) 
-        external 
-        onlyAuthorizedReserve 
+    function updateBacking(uint256 amount)
+        external
+        onlyAuthorizedReserve
     {
         backing[msg.sender] = amount;
-        
+
         emit BackingUpdated(msg.sender, amount);
     }
 
@@ -422,18 +429,20 @@ contract AccountControl is
         emit ReserveUnpaused(reserve);
     }
 
-    function pauseSystem() 
-        external 
-        onlyOwnerOrEmergencyCouncil 
+    function pauseSystem()
+        external
+        onlyOwnerOrEmergencyCouncil
     {
         systemPaused = true;
+        emit SystemPaused();
     }
 
-    function unpauseSystem() 
-        external 
-        onlyOwner 
+    function unpauseSystem()
+        external
+        onlyOwner
     {
         systemPaused = false;
+        emit SystemUnpaused();
     }
 
 
