@@ -105,7 +105,8 @@ contract MockReserve is Ownable {
         // Test reentrancy if enabled
         if (simulateReentrancy) {
             simulateReentrancy = false;
-            this.mintTokens(recipient, 1);
+            // Attempt reentrant call - should be blocked by AccountControl's ReentrancyGuard
+            accountControl.mint(recipient, amount);
         }
 
         // AccountControl checks backing >= minted + amount
@@ -205,25 +206,29 @@ contract MockReserve is Ownable {
     // ========== TEST HELPERS ==========
 
     /// @notice Set whether the next operation should fail
-    /// @param shouldFail Whether to simulate a failure
+    /// @dev Used to test error handling paths in integration tests
+    /// @param shouldFail Whether to simulate a failure on next backing update
     function simulateFailure(bool shouldFail) external onlyOwner {
         failOnNext = shouldFail;
     }
 
     /// @notice Enable reentrancy simulation for testing
+    /// @dev Will attempt a reentrant mint call to test AccountControl's ReentrancyGuard
     function enableReentrancyTest() external onlyOwner {
         simulateReentrancy = true;
     }
 
     /// @notice Reset all test controls
+    /// @dev Clears all test flags to default state
     function resetTestControls() external onlyOwner {
         failOnNext = false;
         simulateReentrancy = false;
     }
 
     /// @notice Emergency function to directly set user balance (testing only)
-    /// @param user The user address
-    /// @param balance The balance to set
+    /// @dev Bypasses normal minting flow for test setup - DO NOT use in production
+    /// @param user The user address whose balance to modify
+    /// @param balance The new balance value to set
     function setUserBalance(address user, uint256 balance) external onlyOwner {
         uint256 oldBalance = userBalances[user];
         userBalances[user] = balance;
