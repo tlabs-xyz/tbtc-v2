@@ -3,6 +3,7 @@ import { ethers, upgrades } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { AccountControl } from "../../typechain";
+import { getContractConstants, expectBalanceChange, getTestAmounts, deployAccountControlForTest } from "../helpers/testing-utils";
 
 describe("AccountControl Input Validation", function () {
   let accountControl: AccountControl;
@@ -11,6 +12,7 @@ describe("AccountControl Input Validation", function () {
   let reserve: SignerWithAddress;
   let user: SignerWithAddress;
   let mockBank: any;
+  let amounts: any;
 
   beforeEach(async function () {
     [owner, emergencyCouncil, reserve, user] = await ethers.getSigners();
@@ -19,19 +21,17 @@ describe("AccountControl Input Validation", function () {
     const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBank = await MockBankFactory.deploy();
 
-    // Deploy AccountControl
-    const AccountControlFactory = await ethers.getContractFactory("AccountControl");
-    accountControl = await upgrades.deployProxy(
-      AccountControlFactory,
-      [owner.address, emergencyCouncil.address, mockBank.address],
-      { initializer: "initialize" }
-    ) as AccountControl;
+    // Deploy AccountControl using helper
+    accountControl = await deployAccountControlForTest(owner, emergencyCouncil, mockBank) as AccountControl;
+
+    // Get dynamic test amounts
+    amounts = await getTestAmounts(accountControl);
 
     // Note: Using direct updateBacking() for unit tests (oracle integration tested separately)
 
     // Authorize test reserve (QC_PERMISSIONED is initialized by default)
-    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000);
-    await accountControl.connect(reserve).updateBacking(1000000);
+    await accountControl.connect(owner).authorizeReserve(reserve.address, amounts.SMALL_CAP);
+    await accountControl.connect(reserve).updateBacking(amounts.SMALL_CAP);
   });
 
   describe("System Pause Enforcement", function () {
@@ -44,7 +44,7 @@ describe("AccountControl Input Validation", function () {
       
       // Should revert mint operation
       await expect(
-        accountControl.connect(reserve).mint(user.address, 100000)
+        accountControl.connect(reserve).mint(user.address, amounts.MEDIUM_MINT)
       ).to.be.revertedWith("SystemIsPaused");
     });
 
