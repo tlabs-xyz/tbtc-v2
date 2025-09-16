@@ -3,11 +3,12 @@
 pragma solidity ^0.8.17;
 
 import "../account-control/AccountControl.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title MockReserve
 /// @notice A mock reserve implementation for testing AccountControl integration
 /// @dev Implements direct backing updates (federated model) without oracle complexity
-contract MockReserve {
+contract MockReserve is Ownable {
     // ========== STATE VARIABLES ==========
 
     AccountControl public immutable accountControl;
@@ -34,12 +35,18 @@ contract MockReserve {
     error SimulatedFailure();
     error InsufficientUserBalance(address user, uint256 requested, uint256 available);
     error InvalidArrayLengths();
+    error InvalidAccountControlAddress();
+    error InsufficientBacking(uint256 current, uint256 required);
+    error InvalidRecipient();
 
     // ========== CONSTRUCTOR ==========
 
     constructor(address _accountControl) {
-        require(_accountControl != address(0), "Invalid AccountControl address");
+        if (_accountControl == address(0)) {
+            revert InvalidAccountControlAddress();
+        }
         accountControl = AccountControl(_accountControl);
+        _transferOwnership(msg.sender);
     }
 
     // ========== BACKING MANAGEMENT ==========
@@ -47,6 +54,29 @@ contract MockReserve {
     /// @notice Update reserve backing directly (federated model)
     /// @param newBacking The new backing amount in satoshis
     function setBacking(uint256 newBacking) external {
+        _setBacking(newBacking);
+    }
+
+    /// @notice Increase backing by a specific amount
+    /// @param amount The amount to increase backing by
+    function increaseBacking(uint256 amount) external {
+        uint256 newBacking = reserveBacking + amount;
+        _setBacking(newBacking);
+    }
+
+    /// @notice Decrease backing by a specific amount
+    /// @param amount The amount to decrease backing by
+    function decreaseBacking(uint256 amount) external {
+        if (reserveBacking < amount) {
+            revert InsufficientBacking(reserveBacking, amount);
+        }
+        uint256 newBacking = reserveBacking - amount;
+        _setBacking(newBacking);
+    }
+
+    /// @notice Internal function to update backing (prevents reentrancy)
+    /// @param newBacking The new backing amount in satoshis
+    function _setBacking(uint256 newBacking) internal {
         if (failOnNext) {
             failOnNext = false;
             revert SimulatedFailure();
@@ -62,28 +92,15 @@ contract MockReserve {
         emit BackingChanged(oldBacking, newBacking);
     }
 
-    /// @notice Increase backing by a specific amount
-    /// @param amount The amount to increase backing by
-    function increaseBacking(uint256 amount) external {
-        uint256 newBacking = reserveBacking + amount;
-        this.setBacking(newBacking);
-    }
-
-    /// @notice Decrease backing by a specific amount
-    /// @param amount The amount to decrease backing by
-    function decreaseBacking(uint256 amount) external {
-        require(reserveBacking >= amount, "Insufficient backing to decrease");
-        uint256 newBacking = reserveBacking - amount;
-        this.setBacking(newBacking);
-    }
-
     // ========== MINTING OPERATIONS ==========
 
     /// @notice Mint tokens to a recipient
     /// @param recipient The address to mint tokens to
     /// @param amount The amount of tokens to mint (in satoshis)
     function mintTokens(address recipient, uint256 amount) external {
-        require(recipient != address(0), "Invalid recipient");
+        if (recipient == address(0)) {
+            revert InvalidRecipient();
+        }
 
         // Test reentrancy if enabled
         if (simulateReentrancy) {
@@ -113,7 +130,9 @@ contract MockReserve {
 
         uint256 total = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
-            require(recipients[i] != address(0), "Invalid recipient");
+            if (recipients[i] == address(0)) {
+                revert InvalidRecipient();
+            }
             total += amounts[i];
             userBalances[recipients[i]] += amounts[i];
         }
@@ -187,17 +206,17 @@ contract MockReserve {
 
     /// @notice Set whether the next operation should fail
     /// @param shouldFail Whether to simulate a failure
-    function simulateFailure(bool shouldFail) external {
+    function simulateFailure(bool shouldFail) external onlyOwner {
         failOnNext = shouldFail;
     }
 
     /// @notice Enable reentrancy simulation for testing
-    function enableReentrancyTest() external {
+    function enableReentrancyTest() external onlyOwner {
         simulateReentrancy = true;
     }
 
     /// @notice Reset all test controls
-    function resetTestControls() external {
+    function resetTestControls() external onlyOwner {
         failOnNext = false;
         simulateReentrancy = false;
     }
@@ -205,7 +224,7 @@ contract MockReserve {
     /// @notice Emergency function to directly set user balance (testing only)
     /// @param user The user address
     /// @param balance The balance to set
-    function setUserBalance(address user, uint256 balance) external {
+    function setUserBalance(address user, uint256 balance) external onlyOwner {
         uint256 oldBalance = userBalances[user];
         userBalances[user] = balance;
 

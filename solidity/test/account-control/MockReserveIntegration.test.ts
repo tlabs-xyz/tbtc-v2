@@ -30,6 +30,9 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
   const HALF_BTC = ONE_BTC.div(2);
   const TEN_BTC = ONE_BTC.mul(10);
 
+  // Reserve type constants (matching AccountControl.sol)
+  const QC_PERMISSIONED = 1;
+
   // Dynamic constants from contract
   let constants: any;
 
@@ -87,7 +90,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       await accountControl.connect(owner).authorizeReserve(mockReserve.address, TEN_BTC);
 
       const reserveInfo = await accountControl.reserveInfo(mockReserve.address);
-      expect(reserveInfo.reserveType).to.equal(1); // QC_PERMISSIONED = 1
+      expect(reserveInfo.reserveType).to.equal(QC_PERMISSIONED);
       expect(reserveInfo.mintingCap).to.equal(TEN_BTC);
     });
 
@@ -833,8 +836,24 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       const singleReceipt = await singleTx.wait();
       const singleGas = singleReceipt.gasUsed;
 
+      // Calculate gas savings
+      const estimatedIndividualGas = singleGas.mul(numOperations);
+      const actualSavings = estimatedIndividualGas.sub(batchGas);
+      const savingsPercent = actualSavings.mul(100).div(estimatedIndividualGas);
+
+      // Log gas comparison for visibility
+      console.log(`\n    Gas Optimization Results:`);
+      console.log(`      Single operation gas: ${singleGas.toString()}`);
+      console.log(`      Batch operation gas: ${batchGas.toString()}`);
+      console.log(`      Gas per operation (batch): ${gasPerOperation.toString()}`);
+      console.log(`      Estimated individual total: ${estimatedIndividualGas.toString()}`);
+      console.log(`      Actual savings: ${actualSavings.toString()} gas (${savingsPercent.toString()}%)`);
+
       // Batch should be significantly more efficient per operation
       expect(gasPerOperation).to.be.lt(singleGas.mul(70).div(100)); // At least 30% savings
+
+      // Additional assertion: total batch gas should be less than individual operations
+      expect(batchGas).to.be.lt(estimatedIndividualGas);
     });
   });
 });
