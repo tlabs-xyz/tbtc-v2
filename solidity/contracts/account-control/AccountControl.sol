@@ -104,6 +104,7 @@ contract AccountControl is
     event ReserveDeauthorized(address indexed reserve);
     event SystemPaused();
     event SystemUnpaused();
+    event BackingViolationDetected(address indexed reserve, uint256 backing, uint256 minted, uint256 deficit);
 
     // ========== ERRORS ==========
     error InsufficientBacking(uint256 available, uint256 required);
@@ -367,13 +368,19 @@ contract AccountControl is
     
     /// @notice Allow authorized reserves to update their own backing amounts
     /// @dev Reserves are responsible for providing attested backing through their own mechanisms
-    /// @dev Note: backing < minted indicates undercollateralization - watchdog enforcers detect and address this
+    /// @dev Note: backing < minted indicates undercollateralization - emits violation for watchdog detection
     /// @param amount The new backing amount in satoshis
     function updateBacking(uint256 amount)
         external
         onlyAuthorizedReserve
     {
+        uint256 currentMinted = minted[msg.sender];
         backing[msg.sender] = amount;
+
+        // Observe and report violations without preventing them
+        if (amount < currentMinted) {
+            emit BackingViolationDetected(msg.sender, amount, currentMinted, currentMinted - amount);
+        }
 
         emit BackingUpdated(msg.sender, amount);
     }
