@@ -119,6 +119,7 @@ contract AccountControl is
     error InsufficientMinted(uint256 available, uint256 requested);
     error ReserveNotFound(address reserve);
     error CannotDeauthorizeWithOutstandingBalance(address reserve, uint256 outstandingAmount);
+    error NotOwnerOrCouncil(address caller);
 
     // ========== MODIFIERS ==========
     modifier onlyAuthorizedReserve() {
@@ -130,10 +131,9 @@ contract AccountControl is
 
 
     modifier onlyOwnerOrEmergencyCouncil() {
-        require(
-            msg.sender == owner() || msg.sender == emergencyCouncil,
-            "Unauthorized"
-        );
+        if (msg.sender != owner() && msg.sender != emergencyCouncil) {
+            revert NotOwnerOrCouncil(msg.sender);
+        }
         _;
     }
 
@@ -170,10 +170,11 @@ contract AccountControl is
     /// @notice Authorize a reserve for minting operations (QC_PERMISSIONED type)
     /// @param reserve The address of the reserve to authorize  
     /// @param mintingCap The maximum amount this reserve can mint
-    function authorizeReserve(address reserve, uint256 mintingCap) 
-        external 
-        onlyOwner 
+    function authorizeReserve(address reserve, uint256 mintingCap)
+        external
+        onlyOwner
     {
+        if (reserve == address(0)) revert ZeroAddress("reserve");
         if (authorized[reserve]) revert AlreadyAuthorized(reserve);
         if (mintingCap == 0) revert AmountTooSmall(mintingCap, 1); // Prevent zero caps, use pause instead
         
