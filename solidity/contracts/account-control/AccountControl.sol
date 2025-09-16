@@ -359,7 +359,7 @@ contract AccountControl is
     // ========== BACKING MANAGEMENT ==========
     
     /// @notice Allow authorized reserves to update their own backing amounts
-    /// @dev Reserves are responsible for fetching attested values from ReserveOracle
+    /// @dev Reserves are responsible for providing attested backing through their own mechanisms
     /// @dev AccountControl only enforces the backing >= minted invariant
     /// @param amount The new backing amount in satoshis
     function updateBacking(uint256 amount) 
