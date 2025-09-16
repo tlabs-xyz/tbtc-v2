@@ -12,7 +12,7 @@ contract QCData is AccessControl {
     bytes32 public constant QC_MANAGER_ROLE = keccak256("QC_MANAGER_ROLE");
 
     /// @dev Maximum number of wallets a QC can register to prevent unbounded array growth
-    uint256 public constant MAX_WALLETS_PER_QC = 100;
+    uint256 public constant MAX_WALLETS_PER_QC = 10;
 
     // Custom errors for gas-efficient reverts
     error InvalidManagerAddress();
