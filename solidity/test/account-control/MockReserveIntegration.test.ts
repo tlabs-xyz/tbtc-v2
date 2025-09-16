@@ -8,6 +8,7 @@ import {
   MockTBTCToken,
   MockTBTCVault
 } from "../../typechain";
+import { getContractConstants, expectBalanceChange } from "../helpers/testing-utils";
 
 describe("MockReserve - AccountControl Direct Backing Integration", () => {
   let accountControl: AccountControl;
@@ -28,7 +29,9 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
   const ONE_BTC = ethers.utils.parseUnits("100000000", 0); // 1 BTC = 100,000,000 satoshis
   const HALF_BTC = ONE_BTC.div(2);
   const TEN_BTC = ONE_BTC.mul(10);
-  const MIN_MINT = ethers.utils.parseUnits("10000", 0); // 0.0001 BTC
+
+  // Dynamic constants from contract
+  let constants: any;
 
   before(async () => {
     [owner, emergencyCouncil, user1, user2, user3, attacker] = await ethers.getSigners();
@@ -56,6 +59,9 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
     // Deploy MockReserve
     const MockReserveFactory = await ethers.getContractFactory("MockReserve");
     mockReserve = await MockReserveFactory.deploy(accountControl.address) as MockReserve;
+
+    // Get dynamic constants from contract
+    constants = await getContractConstants(accountControl);
   });
 
   describe("1. Reserve Authorization & Setup", () => {
@@ -142,7 +148,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
       // Should not be able to mint with zero backing
       await expect(
-        mockReserve.mintTokens(user1.address, MIN_MINT)
+        mockReserve.mintTokens(user1.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("InsufficientBacking");
     });
 
@@ -167,12 +173,16 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
     it("should mint through Bank.increaseBalance() chain", async () => {
       const mintAmount = HALF_BTC;
 
-      await expect(mockReserve.mintTokens(user1.address, mintAmount))
-        .to.emit(accountControl, "MintExecuted")
-        .withArgs(mockReserve.address, user1.address, mintAmount);
-
-      // Verify Bank balance increased
-      expect(await mockBank.balanceAvailable(user1.address)).to.equal(mintAmount);
+      await expectBalanceChange(
+        mockBank,
+        user1.address,
+        mintAmount,
+        async () => {
+          await expect(mockReserve.mintTokens(user1.address, mintAmount))
+            .to.emit(accountControl, "MintExecuted")
+            .withArgs(mockReserve.address, user1.address, mintAmount);
+        }
+      );
     });
 
     it("should enforce backing >= minted + amount invariant", async () => {
@@ -182,27 +192,36 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       // Mint up to backing limit
       await mockReserve.mintTokens(user1.address, backing);
 
-      // Try to mint beyond backing (use MIN_MINT amount)
+      // Try to mint beyond backing (use constants.MIN_MINT_AMOUNT amount)
       await expect(
-        mockReserve.mintTokens(user2.address, MIN_MINT)
+        mockReserve.mintTokens(user2.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("InsufficientBacking");
     });
 
     it("should support minting to different target addresses", async () => {
       const amount = ethers.utils.parseUnits("10000000", 0); // 0.1 BTC
 
-      // Get balances before minting
-      const balanceBefore1 = await mockBank.balanceAvailable(user1.address);
-      const balanceBefore2 = await mockBank.balanceAvailable(user2.address);
-      const balanceBefore3 = await mockBank.balanceAvailable(user3.address);
+      // Use utility to check balance changes for each user
+      await expectBalanceChange(
+        mockBank,
+        user1.address,
+        amount,
+        () => mockReserve.mintTokens(user1.address, amount)
+      );
 
-      await mockReserve.mintTokens(user1.address, amount);
-      await mockReserve.mintTokens(user2.address, amount);
-      await mockReserve.mintTokens(user3.address, amount);
+      await expectBalanceChange(
+        mockBank,
+        user2.address,
+        amount,
+        () => mockReserve.mintTokens(user2.address, amount)
+      );
 
-      expect(await mockBank.balanceAvailable(user1.address)).to.equal(balanceBefore1.add(amount));
-      expect(await mockBank.balanceAvailable(user2.address)).to.equal(balanceBefore2.add(amount));
-      expect(await mockBank.balanceAvailable(user3.address)).to.equal(balanceBefore3.add(amount));
+      await expectBalanceChange(
+        mockBank,
+        user3.address,
+        amount,
+        () => mockReserve.mintTokens(user3.address, amount)
+      );
     });
 
     it("should update both reserve minted and total minted", async () => {
@@ -216,10 +235,10 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
     });
 
     it("should revert on insufficient backing", async () => {
-      await mockReserve.setBacking(MIN_MINT);
+      await mockReserve.setBacking(constants.MIN_MINT_AMOUNT);
 
       await expect(
-        mockReserve.mintTokens(user1.address, MIN_MINT.add(1))
+        mockReserve.mintTokens(user1.address, constants.MIN_MINT_AMOUNT.add(1))
       ).to.be.revertedWith("InsufficientBacking");
     });
 
@@ -240,15 +259,15 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
     it("should process batch mints in single transaction", async () => {
       const recipients = [user1.address, user2.address, user3.address];
-      const amounts = [MIN_MINT, MIN_MINT.mul(2), MIN_MINT.mul(3)];
+      const amounts = [constants.MIN_MINT_AMOUNT, constants.MIN_MINT_AMOUNT.mul(2), constants.MIN_MINT_AMOUNT.mul(3)];
 
       await expect(mockReserve.batchMint(recipients, amounts))
         .to.emit(mockReserve, "BatchMintExecuted")
-        .withArgs(MIN_MINT.mul(6), recipients.length);
+        .withArgs(constants.MIN_MINT_AMOUNT.mul(6), recipients.length);
 
       // Note: Recipients may have previous balances from other tests
       // Verify the batch minting operation succeeded (check total supply increase)
-      const totalMinted = MIN_MINT.add(MIN_MINT.mul(2)).add(MIN_MINT.mul(3));
+      const totalMinted = constants.MIN_MINT_AMOUNT.add(constants.MIN_MINT_AMOUNT.mul(2)).add(constants.MIN_MINT_AMOUNT.mul(3));
       expect(await accountControl.minted(mockReserve.address)).to.be.gte(totalMinted);
     });
 
@@ -268,7 +287,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       const recipients = Array(10).fill(0).map((_, i) =>
         ethers.Wallet.createRandom().address
       );
-      const amounts = Array(10).fill(MIN_MINT);
+      const amounts = Array(10).fill(constants.MIN_MINT_AMOUNT);
 
       // Estimate gas for batch
       const batchTx = await mockReserve.batchMint(recipients, amounts);
@@ -296,7 +315,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
     it("should maintain atomicity (all succeed or all fail)", async () => {
       const recipients = [user1.address, user2.address, ethers.constants.AddressZero];
-      const amounts = [MIN_MINT, MIN_MINT, MIN_MINT];
+      const amounts = [constants.MIN_MINT_AMOUNT, constants.MIN_MINT_AMOUNT, constants.MIN_MINT_AMOUNT];
 
       // Should fail due to invalid recipient
       await expect(
@@ -319,7 +338,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
     });
 
     it("should decrease minted amount on redemption", async () => {
-      const redeemAmount = MIN_MINT.mul(100);
+      const redeemAmount = constants.MIN_MINT_AMOUNT.mul(100);
       const mintedBefore = await accountControl.minted(mockReserve.address);
 
       await mockReserve.redeemTokens(user1.address, redeemAmount);
@@ -339,7 +358,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
     });
 
     it("should emit RedemptionProcessed event", async () => {
-      const redeemAmount = MIN_MINT.mul(100);
+      const redeemAmount = constants.MIN_MINT_AMOUNT.mul(100);
 
       await expect(mockReserve.redeemTokens(user1.address, redeemAmount))
         .to.emit(accountControl, "RedemptionProcessed")
@@ -360,11 +379,11 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
       // Minting should fail
       await expect(
-        mockReserve.mintTokens(user3.address, MIN_MINT)
+        mockReserve.mintTokens(user3.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("ReserveIsPaused");
 
       // Redemption should also fail (reserve is paused)
-      const redeemAmount = MIN_MINT.mul(100);
+      const redeemAmount = constants.MIN_MINT_AMOUNT.mul(100);
       await expect(
         mockReserve.redeemTokens(user1.address, redeemAmount)
       ).to.be.revertedWith("ReserveIsPaused");
@@ -382,9 +401,9 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       // Mint to limit
       await mockReserve.mintTokens(user1.address, ONE_BTC);
 
-      // Try to exceed (use MIN_MINT amount)
+      // Try to exceed (use constants.MIN_MINT_AMOUNT amount)
       await expect(
-        mockReserve.mintTokens(user2.address, MIN_MINT)
+        mockReserve.mintTokens(user2.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("InsufficientBacking");
 
       // Verify invariant holds
@@ -431,10 +450,9 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
     it("should enforce MIN_MINT_AMOUNT", async () => {
       await mockReserve.setBacking(ONE_BTC);
-      const minMint = await accountControl.MIN_MINT_AMOUNT();
 
       await expect(
-        mockReserve.mintTokens(user1.address, minMint.sub(1))
+        mockReserve.mintTokens(user1.address, constants.MIN_MINT_AMOUNT.sub(1))
       ).to.be.revertedWith("AmountTooSmall");
     });
 
@@ -463,12 +481,12 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
       // Minting should fail
       await expect(
-        mockReserve.mintTokens(user2.address, MIN_MINT)
+        mockReserve.mintTokens(user2.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("ReserveIsPaused");
 
       // Redemption should also fail when reserve is paused
       await expect(
-        mockReserve.redeemTokens(user1.address, MIN_MINT)
+        mockReserve.redeemTokens(user1.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("ReserveIsPaused");
     });
 
@@ -480,11 +498,11 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
       // Everything should fail
       await expect(
-        mockReserve.mintTokens(user2.address, MIN_MINT)
+        mockReserve.mintTokens(user2.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("SystemIsPaused");
 
       await expect(
-        mockReserve.redeemTokens(user1.address, MIN_MINT)
+        mockReserve.redeemTokens(user1.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("SystemIsPaused");
 
       // Clean up: unpause for subsequent tests
@@ -503,11 +521,11 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
       // First reserve should fail
       await expect(
-        mockReserve.mintTokens(user1.address, MIN_MINT)
+        mockReserve.mintTokens(user1.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("ReserveIsPaused");
 
       // Second reserve should work
-      await mockReserve2.mintTokens(user1.address, MIN_MINT);
+      await mockReserve2.mintTokens(user1.address, constants.MIN_MINT_AMOUNT);
     });
 
     it("should auto-recover from pause when conditions met", async () => {
@@ -516,7 +534,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       await accountControl.connect(owner).unpauseReserve(mockReserve.address);
 
       // Should work again
-      await mockReserve.mintTokens(user1.address, MIN_MINT);
+      await mockReserve.mintTokens(user1.address, constants.MIN_MINT_AMOUNT);
     });
 
     it("should emit appropriate pause/unpause events", async () => {
@@ -567,7 +585,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       await accountControl.connect(owner).deauthorizeReserve(mockReserve.address);
 
       await expect(
-        mockReserve.mintTokens(user1.address, MIN_MINT)
+        mockReserve.mintTokens(user1.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("NotAuthorized");
     });
   });
@@ -597,7 +615,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
       // First reserve exhausted (backing=ONE_BTC, minted=ONE_BTC, can't mint more)
       await expect(
-        mockReserve.mintTokens(user3.address, MIN_MINT)
+        mockReserve.mintTokens(user3.address, constants.MIN_MINT_AMOUNT)
       ).to.be.revertedWith("InsufficientBacking");
 
       // Second reserve still has capacity
@@ -626,7 +644,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
       // Reserve 1: Incremental updates
       for (let i = 0; i < 5; i++) {
-        await mockReserve.increaseBacking(MIN_MINT.mul(100));
+        await mockReserve.increaseBacking(constants.MIN_MINT_AMOUNT.mul(100));
       }
 
       // Reserve 2: Large single update
@@ -646,15 +664,15 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       const initialMinted2 = await accountControl.minted(mockReserve2.address);
 
       // Interleaved operations
-      await mockReserve.mintTokens(user1.address, MIN_MINT);
-      await mockReserve2.mintTokens(user2.address, MIN_MINT.mul(2));
-      await mockReserve.mintTokens(user3.address, MIN_MINT.mul(3));
-      await mockReserve2.redeemTokens(user2.address, MIN_MINT);
-      await mockReserve.redeemTokens(user1.address, MIN_MINT);
+      await mockReserve.mintTokens(user1.address, constants.MIN_MINT_AMOUNT);
+      await mockReserve2.mintTokens(user2.address, constants.MIN_MINT_AMOUNT.mul(2));
+      await mockReserve.mintTokens(user3.address, constants.MIN_MINT_AMOUNT.mul(3));
+      await mockReserve2.redeemTokens(user2.address, constants.MIN_MINT_AMOUNT);
+      await mockReserve.redeemTokens(user1.address, constants.MIN_MINT_AMOUNT);
 
-      // Calculate the changes: reserve1 mints MIN_MINT + 3*MIN_MINT, redeems MIN_MINT = net +3*MIN_MINT
-      const expectedMinted1 = initialMinted1.add(MIN_MINT).add(MIN_MINT.mul(3)).sub(MIN_MINT);
-      const expectedMinted2 = initialMinted2.add(MIN_MINT.mul(2)).sub(MIN_MINT);
+      // Calculate the changes: reserve1 mints constants.MIN_MINT_AMOUNT + 3*constants.MIN_MINT_AMOUNT, redeems constants.MIN_MINT_AMOUNT = net +3*constants.MIN_MINT_AMOUNT
+      const expectedMinted1 = initialMinted1.add(constants.MIN_MINT_AMOUNT).add(constants.MIN_MINT_AMOUNT.mul(3)).sub(constants.MIN_MINT_AMOUNT);
+      const expectedMinted2 = initialMinted2.add(constants.MIN_MINT_AMOUNT.mul(2)).sub(constants.MIN_MINT_AMOUNT);
 
       expect(await accountControl.minted(mockReserve.address)).to.equal(expectedMinted1);
       expect(await accountControl.minted(mockReserve2.address)).to.equal(expectedMinted2);
@@ -668,10 +686,10 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
     it("should handle rapid backing updates", async () => {
       const updates = 50;
-      let currentBacking = MIN_MINT;
+      let currentBacking = constants.MIN_MINT_AMOUNT;
 
       for (let i = 0; i < updates; i++) {
-        currentBacking = currentBacking.add(MIN_MINT);
+        currentBacking = currentBacking.add(constants.MIN_MINT_AMOUNT);
         await mockReserve.setBacking(currentBacking);
 
         // Verify each update
@@ -734,7 +752,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
     it("should handle zero address checks", async () => {
       const recipients = [ethers.constants.AddressZero];
-      const amounts = [MIN_MINT];
+      const amounts = [constants.MIN_MINT_AMOUNT];
 
       await mockReserve.setBacking(ONE_BTC);
 
@@ -745,7 +763,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
     it("should validate array length mismatches", async () => {
       const recipients = [user1.address, user2.address];
-      const amounts = [MIN_MINT]; // Mismatched length
+      const amounts = [constants.MIN_MINT_AMOUNT]; // Mismatched length
 
       await mockReserve.setBacking(ONE_BTC);
 
@@ -773,7 +791,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       expect(mintReceipt.events?.length).to.be.greaterThan(0);
 
       // Redeem operation
-      const redeemAmount = MIN_MINT.mul(100);
+      const redeemAmount = constants.MIN_MINT_AMOUNT.mul(100);
       const redeemTx = await mockReserve.redeemTokens(user1.address, redeemAmount);
       const redeemReceipt = await redeemTx.wait();
 
@@ -796,7 +814,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
       for (let i = 0; i < numOperations; i++) {
         recipients.push(ethers.Wallet.createRandom().address);
-        amounts.push(MIN_MINT.mul(i + 1));
+        amounts.push(constants.MIN_MINT_AMOUNT.mul(i + 1));
       }
 
       // Measure batch operation
@@ -810,7 +828,7 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       // Single operation for comparison
       const singleTx = await mockReserve.mintTokens(
         ethers.Wallet.createRandom().address,
-        MIN_MINT
+        constants.MIN_MINT_AMOUNT
       );
       const singleReceipt = await singleTx.wait();
       const singleGas = singleReceipt.gasUsed;
