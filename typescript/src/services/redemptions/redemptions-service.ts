@@ -78,10 +78,14 @@ export class RedemptionsService {
       const candidateWallets = await this.fetchWalletsForRedemption()
       const { walletPublicKey, mainUtxo, redeemerOutputScript } =
         await this.determineValidRedemptionWallet(
-          bitcoinRedeemerAddress,
           amountToSatoshi(amount),
-          candidateWallets
+          candidateWallets,
+          bitcoinRedeemerAddress,
         )
+
+      if (!walletPublicKey || !mainUtxo || !redeemerOutputScript) {
+        throw new Error("Could not find a valid redemption wallet with enough funds")
+      }
 
       const txHash = await this.tbtcContracts.tbtcToken.requestRedemption(
         walletPublicKey,
@@ -225,9 +229,12 @@ export class RedemptionsService {
     // The findWalletForRedemption operates on satoshi amount precision (1e8)
     // while the amount parameter is TBTC token precision (1e18). We need to
     // convert the amount to get proper results.
-    const { walletPublicKey, mainUtxo } = await this.findWalletForRedemption(
-      amountToSatoshi(amount)
-    )
+    const candidateWallets = await this.fetchWalletsForRedemption()
+    const { walletPublicKey, mainUtxo } =
+      await this.determineValidRedemptionWallet(
+        amountToSatoshi(amount),
+        candidateWallets
+      )
 
     const txHash =
       await crossChainContracts.l1BitcoinRedeemer.requestRedemption(
@@ -279,14 +286,14 @@ export class RedemptionsService {
 
   /**
    *
-   * @param bitcoinRedeemerAddress Bitcoin address redeemed BTC should be
-   *                               sent to. Only P2PKH, P2WPKH, P2SH, and P2WSH
-   *                               address types are supported.
    * @param amount The amount to be redeemed with the precision of the tBTC
    *                on-chain token contract.
    * @param potentialCandidateWallets Array of wallets that can handle the
    *                                  redemption request. The wallets must
    *                                  be in the Live state.
+   * @param bitcoinRedeemerAddress Bitcoin address redeemed BTC should be
+   *                               sent to. Only P2PKH, P2WPKH, P2SH, and P2WSH
+   *                               address types are supported.
    * @returns Object containing:
    *          - Bitcoin public key of the wallet asked to handle the redemption.
    *           Presented in the compressed form (33 bytes long with 02 or 03 prefix).
@@ -298,15 +305,19 @@ export class RedemptionsService {
    *         input parameters.
    */
   protected async determineValidRedemptionWallet(
-    bitcoinRedeemerAddress: string,
     amount: BigNumber,
-    potentialCandidateWallets: Array<SerializableWallet>
+    potentialCandidateWallets: Array<SerializableWallet>,
+    bitcoinRedeemerAddress?: string,
   ): Promise<RedemptionWallet> {
     let walletPublicKey: Hex | undefined = undefined
     let mainUtxo: BitcoinUtxo | undefined = undefined
-    const redeemerOutputScript = await this.getRedeemerOutputScript(
-      bitcoinRedeemerAddress
-    )
+    let redeemerOutputScript: Hex | undefined = undefined
+
+    if (bitcoinRedeemerAddress) {
+      redeemerOutputScript = await this.getRedeemerOutputScript(
+        bitcoinRedeemerAddress
+      )
+    }
 
     for (let index = 0; index < potentialCandidateWallets.length; index++) {
       const serializableWallet = potentialCandidateWallets[index]
@@ -325,22 +336,24 @@ export class RedemptionsService {
         continue
       }
 
-      const pendingRedemption =
-        await this.tbtcContracts.bridge.pendingRedemptions(
-          candidatePublicKey,
-          redeemerOutputScript
-        )
+      if (redeemerOutputScript) {
+        const pendingRedemption =
+          await this.tbtcContracts.bridge.pendingRedemptions(
+            candidatePublicKey,
+            redeemerOutputScript
+          )
 
-      if (pendingRedemption.requestedAt !== 0) {
-        console.debug(
-          `There is a pending redemption request from this wallet to the ` +
-            `same Bitcoin address. Given wallet public key` +
-            `(${candidatePublicKey.toString()}) and redeemer output script ` +
-            `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
-            `pending request at the same time. ` +
-            `Continue the loop execution to the next wallet...`
-        )
-        continue
+        if (pendingRedemption.requestedAt !== 0) {
+          console.debug(
+            `There is a pending redemption request from this wallet to the ` +
+              `same Bitcoin address. Given wallet public key` +
+              `(${candidatePublicKey.toString()}) and redeemer output script ` +
+              `(${redeemerOutputScript.toString()}) pair can be used for only one ` +
+              `pending request at the same time. ` +
+              `Continue the loop execution to the next wallet...`
+          )
+          continue
+        }
       }
       walletPublicKey = candidatePublicKey
       mainUtxo = candidateMainUtxo
