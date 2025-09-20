@@ -80,11 +80,13 @@ export class RedemptionsService {
         await this.determineValidRedemptionWallet(
           amountToSatoshi(amount),
           candidateWallets,
-          bitcoinRedeemerAddress,
+          bitcoinRedeemerAddress
         )
 
       if (!walletPublicKey || !mainUtxo || !redeemerOutputScript) {
-        throw new Error("Could not find a valid redemption wallet with enough funds")
+        throw new Error(
+          "Could not find a valid redemption wallet with enough funds"
+        )
       }
 
       const txHash = await this.tbtcContracts.tbtcToken.requestRedemption(
@@ -307,7 +309,7 @@ export class RedemptionsService {
   protected async determineValidRedemptionWallet(
     amount: BigNumber,
     potentialCandidateWallets: Array<SerializableWallet>,
-    bitcoinRedeemerAddress?: string,
+    bitcoinRedeemerAddress?: string
   ): Promise<RedemptionWallet> {
     let walletPublicKey: Hex | undefined = undefined
     let mainUtxo: BitcoinUtxo | undefined = undefined
