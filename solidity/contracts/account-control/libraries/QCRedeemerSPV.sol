@@ -79,15 +79,16 @@ library QCRedeemerSPV {
         for (uint256 i = 0; i < outputsCount; i++) {
             // Use Bridge's proven method for extracting outputs
             bytes memory output = outputVector.extractOutputAtIndex(i);
-            
-            if (output.length < 8) continue;
-            
+
+            if (output.length < 9) continue; // Need at least 9 bytes for valid output
+
             // Use Bridge's proven method for value extraction
             uint64 outputValue = output.extractValue();
-            
-            // Use Bridge's proven method for hash extraction  
+
+            // Use Bridge's proven method for hash extraction
             bytes memory outputHash = output.extractHash();
-            
+            if (outputHash.length == 0) continue; // Skip invalid scripts
+
             // Check if this output pays to target address using Bridge patterns
             if (addressMatchesOutputHash(targetAddress, outputHash)) {
                 totalAmount += outputValue;

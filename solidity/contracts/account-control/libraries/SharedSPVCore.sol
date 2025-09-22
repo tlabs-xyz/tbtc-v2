@@ -110,9 +110,29 @@ library SharedSPVCore {
         uint256 currentEpochDifficulty = relay.getCurrentEpochDifficulty();
         uint256 previousEpochDifficulty = relay.getPrevEpochDifficulty();
         
-        // Extract difficulty from first header
-        uint256 firstHeaderDiff = bitcoinHeaders.extractTarget().calculateDifficulty();
-        
+        // Extract and validate target from first header
+        // Need to check header has valid format before extracting
+        if (bitcoinHeaders.length < 80) {
+            revert SPVErr(8); // Invalid header length
+        }
+
+        // Check if the difficulty bits are non-zero to avoid arithmetic errors
+        // Difficulty bits are at bytes 72-75 in the header
+        uint8 exponentByte = uint8(bitcoinHeaders[75]);
+        if (exponentByte < 3) {
+            // Exponent less than 3 would cause underflow in extractTarget
+            revert SPVErr(8); // Invalid target/difficulty
+        }
+
+        uint256 target = bitcoinHeaders.extractTarget();
+
+        // Check if target is valid (non-zero) to avoid division by zero
+        if (target == 0) {
+            revert SPVErr(8); // Invalid target/difficulty
+        }
+
+        uint256 firstHeaderDiff = target.calculateDifficulty();
+
         // Determine which epoch we're validating against
         uint256 requestedDiff;
         if (firstHeaderDiff == currentEpochDifficulty) {
