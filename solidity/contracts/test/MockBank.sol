@@ -16,6 +16,9 @@ contract MockBank is IBank {
     uint256 public individualCallCount = 0;
     uint256 private callCount = 0;
 
+    // Authorization tracking
+    mapping(address => bool) private _authorizedIncreasers;
+
     function balanceAvailable(address account)
         external
         view
@@ -129,5 +132,18 @@ contract MockBank is IBank {
     // Convenience getter for external access to balances
     function balances(address account) external view returns (uint256) {
         return _balances[account];
+    }
+
+    // Authorization functions
+    function authorizedBalanceIncreasers(address account) external view returns (bool) {
+        return _authorizedIncreasers[account];
+    }
+
+    function authorizeBalanceIncreaser(address account) external {
+        _authorizedIncreasers[account] = true;
+    }
+
+    function unauthorizeBalanceIncreaser(address account) external {
+        _authorizedIncreasers[account] = false;
     }
 }
