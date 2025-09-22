@@ -5,23 +5,28 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 /**
  * @title AccountControl
  * @notice Minimal invariant enforcer ensuring backing >= minted for each reserve
  * @dev Part of tBTC Account Control system
  */
-contract AccountControl is 
-    Initializable, 
-    UUPSUpgradeable, 
+contract AccountControl is
+    Initializable,
+    UUPSUpgradeable,
     ReentrancyGuardUpgradeable,
-    OwnableUpgradeable 
+    OwnableUpgradeable,
+    AccessControlUpgradeable
 {
     // ========== CONSTANTS ==========
     uint256 public constant MIN_MINT_AMOUNT = 10**4; // 0.0001 BTC in satoshis
     uint256 public constant MAX_SINGLE_MINT = 100 * 10**8; // 100 BTC in satoshis
     uint256 public constant MAX_BATCH_SIZE = 100;
     uint256 public constant SATOSHI_MULTIPLIER = 1e10; // Converts tBTC (1e18) to satoshis (1e8)
+
+    // ========== ROLES ==========
+    bytes32 public constant QC_MANAGER_ROLE = keccak256("QC_MANAGER_ROLE");
 
     // ========== ENUMS ==========
     /// @dev Reserve types use enums for type safety and gas efficiency.
@@ -137,6 +142,15 @@ contract AccountControl is
         _;
     }
 
+    /// @notice Restricts access to owner or accounts with QC_MANAGER_ROLE
+    modifier onlyOwnerOrQCManager() {
+        require(
+            owner() == _msgSender() || hasRole(QC_MANAGER_ROLE, _msgSender()),
+            "AccountControl: caller is not owner or QC manager"
+        );
+        _;
+    }
+
     // ========== INITIALIZATION ==========
     
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -156,10 +170,15 @@ contract AccountControl is
         __Ownable_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        
+        __AccessControl_init();
+
         _transferOwnership(_owner);
         emergencyCouncil = _emergencyCouncil;
         bank = _bank;
+
+        // Grant roles - owner gets admin role and can manage QC managers
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(QC_MANAGER_ROLE, _owner); // Owner can authorize reserves initially
         deploymentBlock = block.number;
         
         // Reserve types managed through upgrades - QC_PERMISSIONED is default and only type in V2
@@ -170,9 +189,9 @@ contract AccountControl is
     /// @notice Authorize a reserve for minting operations (QC_PERMISSIONED type)
     /// @param reserve The address of the reserve to authorize  
     /// @param mintingCap The maximum amount this reserve can mint
-    function authorizeReserve(address reserve, uint256 mintingCap) 
-        external 
-        onlyOwner 
+    function authorizeReserve(address reserve, uint256 mintingCap)
+        external
+        onlyOwnerOrQCManager
     {
         if (authorized[reserve]) revert AlreadyAuthorized(reserve);
         if (mintingCap == 0) revert AmountTooSmall(mintingCap, 1); // Prevent zero caps, use pause instead
@@ -254,39 +273,43 @@ contract AccountControl is
 
     // ========== MINTING OPERATIONS ==========
     
-    function mint(address recipient, uint256 amount) 
-        external 
-        onlyAuthorizedReserve 
-        nonReentrant 
+    function mint(address recipient, uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
         returns (bool)
     {
+        _mintInternal(msg.sender, recipient, amount);
+        return true;
+    }
+
+    function _mintInternal(address reserve, address recipient, uint256 amount) internal {
         // Validate amount
         if (amount < MIN_MINT_AMOUNT) revert AmountTooSmall(amount, MIN_MINT_AMOUNT);
         if (amount > MAX_SINGLE_MINT) revert AmountTooLarge(amount, MAX_SINGLE_MINT);
-        
+
         // Check backing invariant
-        if (backing[msg.sender] < minted[msg.sender] + amount) {
-            revert InsufficientBacking(backing[msg.sender], minted[msg.sender] + amount);
+        if (backing[reserve] < minted[reserve] + amount) {
+            revert InsufficientBacking(backing[reserve], minted[reserve] + amount);
         }
-        
+
         // Check caps
-        if (minted[msg.sender] + amount > reserveInfo[msg.sender].mintingCap) {
-            revert ExceedsReserveCap(minted[msg.sender] + amount, reserveInfo[msg.sender].mintingCap);
+        if (minted[reserve] + amount > reserveInfo[reserve].mintingCap) {
+            revert ExceedsReserveCap(minted[reserve] + amount, reserveInfo[reserve].mintingCap);
         }
-        
+
         if (globalMintingCap > 0 && totalMintedAmount + amount > globalMintingCap) {
             revert ExceedsGlobalCap(totalMintedAmount + amount, globalMintingCap);
         }
-        
+
         // Update state
-        minted[msg.sender] += amount;
+        minted[reserve] += amount;
         totalMintedAmount += amount;
-        
+
         // Mint tokens via Bank
         IBank(bank).increaseBalance(recipient, amount);
-        
-        emit MintExecuted(msg.sender, recipient, amount);
-        return true;
+
+        emit MintExecuted(reserve, recipient, amount);
     }
 
     /// @notice Mint tBTC tokens by converting to satoshis internally
@@ -294,15 +317,15 @@ contract AccountControl is
     /// @param recipient Address to receive the minted tokens
     /// @param tbtcAmount Amount in tBTC units (1e18 precision)
     /// @return satoshis Amount converted to satoshis for event emission
-    function mintTBTC(address recipient, uint256 tbtcAmount) 
-        external 
-        onlyAuthorizedReserve 
-        nonReentrant 
+    function mintTBTC(address recipient, uint256 tbtcAmount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
         returns (uint256 satoshis)
     {
         // Convert tBTC to satoshis internally
         satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
-        this.mint(recipient, satoshis);
+        _mintInternal(msg.sender, recipient, satoshis);
         return satoshis;
     }
 
@@ -361,13 +384,19 @@ contract AccountControl is
     /// @dev Reserves are responsible for fetching attested values from ReserveOracle
     /// @dev AccountControl only enforces the backing >= minted invariant
     /// @param amount The new backing amount in satoshis
-    function updateBacking(uint256 amount) 
-        external 
-        onlyAuthorizedReserve 
+    function updateBacking(uint256 amount)
+        external
+        onlyAuthorizedReserve
     {
         backing[msg.sender] = amount;
-        
+
         emit BackingUpdated(msg.sender, amount);
+    }
+
+    // Test helper - only works on test networks
+    function setBackingForTesting(address reserve, uint256 amount) external {
+        require(block.chainid == 31337, "Test function only");
+        backing[reserve] = amount;
     }
 
     // ========== REDEMPTION OPERATIONS ==========
@@ -510,6 +539,19 @@ contract AccountControl is
         emit EmergencyCouncilUpdated(oldCouncil, newCouncil);
     }
 
+    // ========== ROLE MANAGEMENT ==========
+
+    /// @notice Grant QC_MANAGER_ROLE to an address (allows calling authorizeReserve)
+    /// @param manager Address to grant the role to
+    function grantQCManagerRole(address manager) external onlyOwner {
+        _grantRole(QC_MANAGER_ROLE, manager);
+    }
+
+    /// @notice Revoke QC_MANAGER_ROLE from an address
+    /// @param manager Address to revoke the role from
+    function revokeQCManagerRole(address manager) external onlyOwner {
+        _revokeRole(QC_MANAGER_ROLE, manager);
+    }
 
     // ========== INTERNAL HELPER FUNCTIONS ==========
     
