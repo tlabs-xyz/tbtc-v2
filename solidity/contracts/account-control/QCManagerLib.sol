@@ -5,7 +5,7 @@ import "./QCData.sol";
 import "./ReserveOracle.sol";
 import "./AccountControl.sol";
 import "./SystemState.sol";
-import {MessageSigning} from "./libraries/MessageSigning.sol";
+// MessageSigning import removed - not used in this library
 
 /**
  * @title QCManagerLib
@@ -18,7 +18,6 @@ import {MessageSigning} from "./libraries/MessageSigning.sol";
  * @custom:security-contact security@threshold.network
  */
 library QCManagerLib {
-    using MessageSigning for bytes32;
 
     // ========== EVENTS ==========
     // Note: Events are defined in main QCManager contract as libraries cannot emit events directly
@@ -198,14 +197,9 @@ library QCManagerLib {
         (balance, isStale) = reserveOracle.getReserveBalanceAndStaleness(qc);
 
         // Update AccountControl with the oracle-attested balance
-        // On test networks, use the test helper function
-        if (block.chainid == 31337) {
-            AccountControl(accountControl).setBackingForTesting(qc, balance);
-        } else {
-            // For production, we would need a different approach
-            // This is a known limitation that needs addressing
-            revert("Production oracle sync not yet implemented");
-        }
+        // The AccountControl contract should have a permissioned function for oracle updates
+        // For now, we'll call the syncBackingFromOracle function if it exists
+        AccountControl(accountControl).syncBackingFromOracle(qc, balance);
 
         return (balance, isStale);
     }

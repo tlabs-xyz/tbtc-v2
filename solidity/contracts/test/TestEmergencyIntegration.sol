@@ -14,6 +14,7 @@ contract TestEmergencyIntegration {
     event ModifierPassed(address qc);
 
     constructor(address _systemState) {
+        require(_systemState != address(0), "SystemState address cannot be zero");
         systemState = SystemState(_systemState);
     }
 

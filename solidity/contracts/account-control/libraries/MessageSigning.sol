@@ -126,26 +126,20 @@ library MessageSigning {
         if (v < 27 || v > 30) {
             return false; // Invalid recovery ID
         }
-        
-        // Try different recovery IDs to find the right public key
-        for (uint8 recoveryId = 0; recoveryId < 4; recoveryId++) {
-            uint8 ethereumV = 27 + recoveryId;
-            
-            // Recover public key using ECDSA
-            address recoveredAddress = ecrecover(messageHash, ethereumV, r, s);
-            if (recoveredAddress == address(0)) continue;
-            
-            // For simplified implementation, we'll derive Bitcoin address from Ethereum address
-            // This is a approximation - real implementation would derive from raw public key
-            string memory derivedAddress = _approximateBitcoinAddress(recoveredAddress, bitcoinAddress);
-            
-            // Compare with provided Bitcoin address
-            if (keccak256(bytes(derivedAddress)) == keccak256(bytes(bitcoinAddress))) {
-                return true;
-            }
+
+        // Use the converted v directly for recovery
+        // Recover public key using ECDSA
+        address recoveredAddress = ecrecover(messageHash, v, r, s);
+        if (recoveredAddress == address(0)) {
+            return false; // Invalid signature
         }
-        
-        return false;
+
+        // For simplified implementation, we'll derive Bitcoin address from Ethereum address
+        // Note: This is a simplified approximation - production would derive from raw public key
+        string memory derivedAddress = _approximateBitcoinAddress(recoveredAddress, bitcoinAddress);
+
+        // Compare with provided Bitcoin address
+        return keccak256(bytes(derivedAddress)) == keccak256(bytes(bitcoinAddress));
     }
 
 
