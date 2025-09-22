@@ -173,6 +173,28 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
 
   // Step 9: Enable auto-minting in QCMinter
   log("Step 9: Enabling auto-minting in QCMinter...")
+
+  // First grant GOVERNANCE_ROLE to deployer for configuration
+  const GOVERNANCE_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("GOVERNANCE_ROLE"))
+  try {
+    await execute(
+      "QCMinter",
+      { from: deployer, log: true },
+      "grantRole",
+      GOVERNANCE_ROLE,
+      deployer
+    )
+    log("✅ GOVERNANCE_ROLE granted to deployer for QCMinter configuration")
+  } catch (error) {
+    // Role might already be granted
+    if (error.message && error.message.includes("already has role")) {
+      log("✅ GOVERNANCE_ROLE already granted to deployer")
+    } else {
+      log("⚠️ Error granting GOVERNANCE_ROLE:", error.message || error)
+    }
+  }
+
+  // Now enable auto-minting
   await execute(
     "QCMinter",
     { from: deployer, log: true },

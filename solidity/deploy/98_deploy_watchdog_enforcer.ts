@@ -20,10 +20,10 @@ const func: DeployFunction = async function DeployWatchdogEnforcer(
   const watchdogEnforcer = await deploy("WatchdogEnforcer", {
     from: deployer,
     args: [
-      reserveOracle.address,
-      qcManager.address,
-      qcData.address,
-      systemState.address,
+      reserveOracle.address,  // _reserveLedger (ReserveOracle)
+      qcManager.address,      // _qcManager
+      qcData.address,         // _qcData
+      systemState.address,    // _systemState
     ],
     log: true,
   })

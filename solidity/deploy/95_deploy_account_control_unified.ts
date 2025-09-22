@@ -8,10 +8,12 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   const { deployer } = await getNamedAccounts()
   const { deploy, log, get } = deployments
 
-  // Skip for test networks
-  if (network.name === "hardhat" || network.name === "localhost") {
-    log("Skipping Account Control Unified deployment for test network")
-    return
+  // Handle test networks with mock deployments
+  const isTestNetwork = network.name === "hardhat" || network.name === "localhost"
+
+  if (isTestNetwork) {
+    log("=== Deploying Account Control for Test Network ===")
+    log("Using mock/minimal infrastructure for testing")
   }
 
   log("=== Starting Account Control Unified Deployment ===")
@@ -20,15 +22,64 @@ const func: DeployFunction = async function DeployAccountControlUnified(
 
   // Check for existing tBTC infrastructure
   let bank, tbtcVault, tbtc, lightRelay
-  
-  // Check if we're on Sepolia and have environment variables configured
-  if (network.name === "sepolia" && process.env.BANK_ADDRESS) {
+
+  if (isTestNetwork) {
+    // For test networks, use mock contracts that should be deployed by test infrastructure
+    try {
+      // Try to use mock contracts first
+      bank = await get("Bank")
+      tbtcVault = await get("TBTCVault")
+      tbtc = await get("TBTC")
+      lightRelay = await get("LightRelay")
+
+      log("Using existing test infrastructure:")
+      log(`  Bank: ${bank.address}`)
+      log(`  TBTCVault: ${tbtcVault.address}`)
+      log(`  TBTC: ${tbtc.address}`)
+      log(`  LightRelay: ${lightRelay.address}`)
+    } catch (error) {
+      // If mocks don't exist, deploy minimal mocks for testing
+      log("WARNING: tBTC contracts not found. Deploying minimal mocks for testing...")
+
+      // Deploy minimal mock contracts
+      bank = await deploy("MockBank", {
+        from: deployer,
+        args: [],
+        log: true,
+      })
+
+      tbtcVault = await deploy("MockTBTCVault", {
+        from: deployer,
+        contract: "contracts/test/MockTBTCVault.sol:MockTBTCVault",
+        args: [],
+        log: true,
+      })
+
+      tbtc = await deploy("MockTBTCToken", {
+        from: deployer,
+        args: [],
+        log: true,
+      })
+
+      lightRelay = await deploy("LightRelayStub", {
+        from: deployer,
+        args: [],
+        log: true,
+      })
+
+      log("Deployed mock infrastructure:")
+      log(`  MockBank: ${bank.address}`)
+      log(`  MockTBTCVault: ${tbtcVault.address}`)
+      log(`  MockTBTCToken: ${tbtc.address}`)
+      log(`  LightRelayStub: ${lightRelay.address}`)
+    }
+  } else if (network.name === "sepolia" && process.env.BANK_ADDRESS) {
     // Use environment variables for Sepolia deployment
     bank = { address: process.env.BANK_ADDRESS }
     tbtcVault = { address: process.env.TBTC_VAULT_ADDRESS }
     tbtc = { address: process.env.TBTC_ADDRESS }
     lightRelay = { address: process.env.LIGHT_RELAY_ADDRESS }
-    
+
     log("Using tBTC infrastructure from environment variables:")
     log(`  Bank: ${bank.address}`)
     log(`  TBTCVault: ${tbtcVault.address}`)
@@ -38,21 +89,18 @@ const func: DeployFunction = async function DeployAccountControlUnified(
     try {
       // Try to use the existing contracts from hardhat-deploy cache
       bank = await get("Bank")
-      
-      tbtcVault = await get("TBTCVault")  
+      tbtcVault = await get("TBTCVault")
       tbtc = await get("TBTC")
       lightRelay = await get("LightRelay")
-      
+
       log("Found existing tBTC infrastructure in deployment cache:")
       log(`  Bank: ${bank.address}`)
       log(`  TBTCVault: ${tbtcVault.address}`)
       log(`  TBTC: ${tbtc.address}`)
       log(`  LightRelay: ${lightRelay.address}`)
     } catch (error) {
-      log("WARNING: Some tBTC contracts not found. Deploying mocks for testing...")
-      // For testing, we can deploy mock contracts if needed
-      // But for now, we'll require the core contracts to exist
-      throw new Error("Core tBTC contracts must be deployed first. Set environment variables for Sepolia.")
+      log("ERROR: tBTC contracts not found and not in test environment.")
+      throw new Error("Core tBTC contracts must be deployed first. Set environment variables for production networks.")
     }
   }
 
@@ -66,15 +114,9 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   })
   log(`QCData deployed at: ${qcData.address}`)
 
-  // Deploy SystemState with initial parameters
+  // Deploy SystemState (no constructor arguments - uses defaults)
   const systemState = await deploy("SystemState", {
     from: deployer,
-    args: [
-      ethers.utils.parseUnits("0.001", 8), // minMintAmount: 0.001 BTC
-      ethers.utils.parseUnits("100", 8),   // maxMintAmount: 100 BTC  
-      259200,                               // redemptionTimeout: 72 hours
-      500,                                  // defaultPenaltyBps: 5%
-    ],
     log: true,
     waitConfirmations: network.live ? 5 : 1,
   })
@@ -96,6 +138,13 @@ const func: DeployFunction = async function DeployAccountControlUnified(
     waitConfirmations: network.live ? 5 : 1,
   })
   log(`BitcoinAddressUtils library deployed at: ${bitcoinAddressUtils.address}`)
+
+  const qcManagerLib = await deploy("QCManagerLib", {
+    from: deployer,
+    log: true,
+    waitConfirmations: network.live ? 5 : 1,
+  })
+  log(`QCManagerLib library deployed at: ${qcManagerLib.address}`)
 
   // Phase 3: Deploy SPV libraries if needed
   log("\n=== Phase 3: SPV Libraries ===")
@@ -122,11 +171,6 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   
   const reserveOracle = await deploy("ReserveOracle", {
     from: deployer,
-    args: [
-      qcData.address,
-      21600, // attestationWindow: 6 hours
-      86400, // stalenessThreshold: 24 hours
-    ],
     log: true,
     waitConfirmations: network.live ? 5 : 1,
   })
@@ -134,21 +178,56 @@ const func: DeployFunction = async function DeployAccountControlUnified(
 
   // Phase 5: Deploy QCManager (depends on QCData, SystemState, ReserveOracle)
   log("\n=== Phase 5: Business Logic (QCManager) ===")
-  
-  const qcManager = await deploy("QCManager", {
-    from: deployer,
-    args: [
+
+  // Ensure MessageSigning library is available
+  if (!messageSigning.address) {
+    throw new Error("MessageSigning library not deployed")
+  }
+  log(`Using MessageSigning library at: ${messageSigning.address}`)
+
+  let qcManager
+  try {
+    qcManager = await deploy("QCManager", {
+      from: deployer,
+      args: [
+        qcData.address,
+        systemState.address,
+        reserveOracle.address,
+      ],
+      libraries: {
+        MessageSigning: messageSigning.address,
+        QCManagerLib: qcManagerLib.address,
+      },
+      log: true,
+      waitConfirmations: network.live ? 5 : 1,
+      skipIfAlreadyDeployed: false,
+    })
+    log(`QCManager deployed at: ${qcManager.address}`)
+  } catch (error: any) {
+    log(`Error deploying QCManager: ${error.message}`)
+    // Try alternative deployment method for large contracts
+    log("Attempting alternative deployment method...")
+    const QCManagerFactory = await ethers.getContractFactory("QCManager", {
+      libraries: {
+        MessageSigning: messageSigning.address,
+        QCManagerLib: qcManagerLib.address,
+      },
+    })
+    const qcManagerContract = await QCManagerFactory.deploy(
       qcData.address,
       systemState.address,
-      reserveOracle.address,
-    ],
-    libraries: {
-      MessageSigning: messageSigning.address,
-    },
-    log: true,
-    waitConfirmations: network.live ? 5 : 1,
-  })
-  log(`QCManager deployed at: ${qcManager.address}`)
+      reserveOracle.address
+    )
+    await qcManagerContract.deployed()
+    log(`QCManager deployed at: ${qcManagerContract.address}`)
+
+    // Save deployment for hardhat-deploy
+    await deployments.save("QCManager", {
+      address: qcManagerContract.address,
+      abi: QCManagerFactory.interface.format("json") as any,
+    })
+    qcManager = { address: qcManagerContract.address }
+  }
 
   // Phase 6: Deploy operational contracts
   log("\n=== Phase 6: Operational Contracts ===")
@@ -202,9 +281,10 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   const watchdogEnforcer = await deploy("WatchdogEnforcer", {
     from: deployer,
     args: [
-      qcManager.address,
-      reserveOracle.address,
-      2700, // violationDelay: 45 minutes
+      reserveOracle.address,  // _reserveLedger (ReserveOracle)
+      qcManager.address,      // _qcManager
+      qcData.address,         // _qcData
+      systemState.address,    // _systemState
     ],
     log: true,
     waitConfirmations: network.live ? 5 : 1,
@@ -231,9 +311,16 @@ const func: DeployFunction = async function DeployAccountControlUnified(
     const GOVERNANCE_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("GOVERNANCE_ROLE"))
     
     // Grant GOVERNANCE_ROLE to deployer temporarily for configuration
-    await qcMinterContract.grantRole(GOVERNANCE_ROLE, deployer)
-    await qcMinterContract.setAutoMintEnabled(true)
-    log(`Enabled auto-minting in QCMinter`)
+    try {
+      await qcMinterContract.grantRole(GOVERNANCE_ROLE, deployer)
+      log(`Granted GOVERNANCE_ROLE to deployer`)
+
+      await qcMinterContract.setAutoMintEnabled(true)
+      log(`Enabled auto-minting in QCMinter`)
+    } catch (roleError) {
+      log(`Warning: Could not configure QCMinter auto-mint: ${roleError.message}`)
+      log(`This can be configured manually later`)
+    }
 
     // Authorize QCMinter in Bank (for testnet only)
     if (network.name !== "mainnet") {
@@ -260,12 +347,12 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   log(`  ReserveOracle:    ${reserveOracle.address}`)
   log(`  QCManager:        ${qcManager.address}`)
   log(`  QCMinter:         ${qcMinter.address}`)
-  log(`  QCMintHelper:     ${qcMintHelper.address}`)
   log(`  QCRedeemer:       ${qcRedeemer.address}`)
   log(`  WatchdogEnforcer: ${watchdogEnforcer.address}`)
   log("\nLibraries:")
   log(`  MessageSigning:      ${messageSigning.address}`)
   log(`  BitcoinAddressUtils: ${bitcoinAddressUtils.address}`)
+  log(`  QCManagerLib:        ${qcManagerLib.address}`)
   log(`  SharedSPVCore:       ${sharedSPVCore.address}`)
   log(`  QCRedeemerSPV:       ${qcRedeemerSPV.address}`)
   
@@ -279,7 +366,8 @@ const func: DeployFunction = async function DeployAccountControlUnified(
 }
 
 export default func
+func.id = "DeployAccountControlUnified"
 func.tags = ["AccountControlUnified"]
-// Dependencies: Requires either BankV2 or Bank, plus other core contracts
-func.dependencies = ["TBTC", "TBTCVault", "LightRelay"]
-// Note: Bank/BankV2 dependency is handled conditionally in the script
+// Dependencies: Optional for test networks, will use mocks if not available
+func.dependencies = []
+// Note: Dependencies are handled conditionally in the script for test networks
