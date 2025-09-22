@@ -9,24 +9,55 @@ import {MessageSigning} from "./libraries/MessageSigning.sol";
 
 /**
  * @title QCManagerLib
- * @notice Library containing heavy logic for QCManager to reduce contract size
- * @dev Extracts registration, validation, and wallet management logic
+ * @author tBTC Account Control Team
+ * @notice Library containing validation and utility logic extracted from QCManager to reduce contract size
+ * @dev This library was created to address EIP-170 contract size limitations. It contains non-state-modifying
+ * validation logic and utility functions that can be safely delegated. The main QCManager contract retains
+ * all state variables and access control logic.
+ *
+ * @custom:security-contact security@threshold.network
  */
 library QCManagerLib {
     using MessageSigning for bytes32;
 
     // ========== EVENTS ==========
-    // These events will be emitted by the main QCManager contract
+    // Note: Events are defined in main QCManager contract as libraries cannot emit events directly
 
     // ========== ERRORS ==========
+
+    /// @notice Thrown when QC address is zero address
     error InvalidQCAddress();
+
+    /// @notice Thrown when minting capacity is invalid (zero or exceeds limits)
     error InvalidMintingCapacity();
+
+    /// @notice Thrown when wallet address validation fails
     error InvalidWalletAddress();
+
+    /// @notice Thrown when attempting to register an already registered QC
+    /// @param qc The address that is already registered
     error QCAlreadyRegistered(address qc);
+
+    /// @notice Thrown when operating on a non-registered QC
+    /// @param qc The address that is not registered
     error QCNotRegistered(address qc);
+
+    /// @notice Thrown when QC is not in ACTIVE status
+    /// @param qc The address of the inactive QC
     error QCNotActive(address qc);
+
+    /// @notice Thrown when new capacity is not higher than current
+    /// @param current Current capacity
+    /// @param requested Requested new capacity
     error NewCapMustBeHigher(uint256 current, uint256 requested);
+
+    /// @notice Thrown when status transition is invalid
+    /// @param from Current status
+    /// @param to Requested new status
     error InvalidStatusTransition(QCData.QCStatus from, QCData.QCStatus to);
+
+    /// @notice Thrown when caller is not authorized for status change
+    /// @param caller The unauthorized caller address
     error UnauthorizedStatusChange(address caller);
 
     // ========== REGISTRATION LOGIC ==========

@@ -1,0 +1,1970 @@
+Starting CodeRabbit review in plain text mode...
+
+Connecting to review service
+Setting up
+Analyzing
+Reviewing
+
+============================================================================
+File: solidity/deploy/00_deploy_test_reimbursement_pool.ts
+Line: 31 to 37
+Type: refactor_suggestion
+
+Comment:
+Consolidate network filtering logic.
+
+The tags are appropriate, but the skip function duplicates the network check logic from the main function. Since hardhat-deploy's skip function is the preferred way to conditionally execute deployments, consider using only this approach.
+
+
+The current implementation works but has redundant logic. The skip function alone is sufficient and more idiomatic for hardhat-deploy.
+
+Prompt for AI Agent:
+In solidity/deploy/00_deploy_test_reimbursement_pool.ts around lines 31 to 37, the network filtering logic is duplicated between the skip function and the main deploy function; remove the redundant network checks from the main deployment routine so the hardhat-deploy skip function is the sole gatekeeper. Keep func.tags = ["TestReimbursementPool"] and the existing skip implementation (return true for non-"hardhat", "localhost", and "development" networks), and simplify the main deploy export to assume it only runs when skip allows execution, removing any conditional early-returns or network checks there.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerWalletDirect.test.ts
+Line: 192 to 207
+Type: potential_issue
+
+Comment:
+Fix duplicate getChainId() usage and improve test efficiency
+
+The same getChainId() issue exists here. Also, the test calculates the same challenge twice unnecessarily - this could be optimized.
+
+
+
+Apply this diff to fix the chain ID issue and improve efficiency:
+
+-      const chainId = await qc1.getChainId()
++      const chainId = (await qc1.provider.getNetwork()).chainId
+
+       // Calculate challenge off-chain (what QC would do)
+       const challenge1 = ethers.utils.keccak256(
+         ethers.utils.solidityPack(
+           ["string", "address", "string", "uint256", "uint256"],
+           [
+             "TBTC_QC_WALLET_DIRECT:",
+             qc1.address,
+             validBitcoinAddress,
+             testNonce,
+             chainId,
+           ]
+         )
+       )
+
+-      // Same inputs should produce same challenge
+-      const challenge2 = ethers.utils.keccak256(
+-        ethers.utils.solidityPack(
+-          ["string", "address", "string", "uint256", "uint256"],
+-          [
+-            "TBTC_QC_WALLET_DIRECT:",
+-            qc1.address,
+-            validBitcoinAddress,
+-            testNonce,
+-            chainId,
+-          ]
+-        )
+-      )
+-
+-      expect(challenge1).to.equal(challenge2)
++      // Same inputs should produce same challenge (duplicate calculation)
++      expect(challenge1).to.equal(challenge1) // This always passes - consider removing or calculating again with same inputs
+
+
+
+Also applies to: 210-221
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerWalletDirect.test.ts around lines 192-207 and 210-221, the test calls getChainId() multiple times and recomputes the same deterministic challenge twice; update the test to call await qc1.getChainId() once and store it in a local variable, then reuse that variable for both off-chain challenge calculation and any subsequent on-chain or repeated calculations so you don't call getChainId() repeatedly or recompute the challenge—use the stored chainId and a single computed challenge value where needed.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManagerLib.sol
+Line: 174 to 177
+Type: potential_issue
+
+Comment:
+Critical: Production oracle sync not implemented.
+
+The function reverts in production with "not yet implemented". This is a blocker for production deployment. The TODO comment indicates this is a known limitation that needs addressing before mainnet deployment.
+
+
+
+Would you like me to help implement the production oracle synchronization logic?
+
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManagerLib.sol
+Line: 8
+Type: refactor_suggestion
+
+Comment:
+Remove unused MessageSigning import and using declaration.
+
+The MessageSigning library is imported and declared with a using statement but is never actually used in the code.
+
+
+-import {MessageSigning} from "./libraries/MessageSigning.sol";
+
+
+ library QCManagerLib {
+-    using MessageSigning for bytes32;
+
+
+
+Also applies to: 16-16
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManagerLib.sol around lines 8 and 16, the MessageSigning library is imported and attached via a using declaration but never referenced; remove the unused import line (line 8) and delete the corresponding using MessageSigning declaration (line 16) so the contract no longer references an unused library import.
+
+
+
+============================================================================
+File: solidity/contracts/test/TestEmergencyIntegration.sol
+Line: 16 to 18
+Type: potential_issue
+
+Comment:
+Add input validation to constructor.
+
+The constructor should validate that _systemState is not the zero address to prevent deployment with invalid SystemState reference.
+
+
+ constructor(address _systemState) {
++    require(_systemState != address(0), "SystemState address cannot be zero");
+     systemState = SystemState(_systemState);
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/test/TestEmergencyIntegration.sol around lines 16 to 18, the constructor currently assigns systemState without validating the input; add an input validation that reverts if _systemState is the zero address (e.g., require(_systemState != address(0), "Invalid systemState address")) before assigning systemState to ensure the contract cannot be deployed with an invalid SystemState reference.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCRedeemerWalletObligations.test.ts
+Line: 221 to 248
+Type: potential_issue
+
+Comment:
+Incomplete test implementation.
+
+The fulfillment test sets up mock SPV data but doesn't actually test the clearing functionality. The test is missing the actual fulfillment call and verification that obligations are cleared.
+
+
+
+This test needs to either:
+1. Implement proper SPV proof mocking and call the actual fulfillment function
+2. Be marked as skipped/pending until SPV infrastructure is ready
+3. Use a different approach to test obligation clearing on fulfillment
+
+Would you like me to help implement a complete version or suggest how to properly structure this test?
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCRedeemerWalletObligations.test.ts around lines 221-248, the test sets up mock SPV data but never invokes the fulfillment path or asserts that wallet obligations are cleared; add either a real fulfillment invocation with a mocked/whitelisted SPV validator or mark the test as skipped. To fix: (1) call the contract function that records fulfillment (e.g., qcRedeemer.fulfillObligation or equivalent) passing the mockTxInfo/mockProof and any required signer, then await the tx and assert qcRedeemer.hasWalletObligations(qcWallet1) is false and getWalletPendingRedemptionCount(qcWallet1) equals 0; ensure the contract’s SPV check is bypassed by deploying a test stub/mock validator or by setting a test flag on the redeemer so the proof is accepted; or (2) if SPV infra isn’t ready, replace the it(...) with it.skip(...) (or use describe.skip) and add a TODO comment referencing implementing SPV mocking later.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/MessageSigning.sol
+Line: 122 to 132
+Type: potential_issue
+
+Comment:
+Recovery ID conversion logic is confusing and potentially incorrect.
+
+The code converts the recovery ID from the signature but then loops through all possible recovery IDs (0-3) anyway. This suggests the initial conversion might be unnecessary or the logic is incorrect. Additionally, the handling of compressed vs uncompressed keys needs clarification.
+
+
+Consider either:
+1. Using the converted v value directly without the loop
+2. Removing the initial conversion and trying all valid recovery IDs
+3. Properly documenting why both conversion and iteration are needed
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/MessageSigning.sol around lines 122-132, the recovery ID conversion is applied then the code still loops over recovery IDs, which is redundant and confusing; replace that pattern by using the converted v directly: if v >= 31 adjust v -= 4 for compressed signatures, validate v is between 27 and 30, then compute the single ethereumV from that converted v and attempt recovery only once (derive recoveryId = ethereumV - 27) so compressed vs uncompressed handling remains correct and you avoid unnecessary repeated recovery attempts.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/MessageSigning.sol
+Line: 43 to 61
+Type: potential_issue
+
+Comment:
+Bitcoin address validation is too basic for production use.
+
+The current validation only checks prefixes and length but doesn't verify checksums. This could allow malformed addresses to pass validation, potentially leading to failed signature verifications or user confusion.
+
+Consider implementing proper checksum validation for Base58Check (P2PKH/P2SH) and Bech32 addresses, or use a battle-tested library.
+
+
+Do you want me to provide a more comprehensive Bitcoin address validation implementation?
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/MessageSigning.sol around lines 43 to 61, the bitcoin address check only inspects prefix and length; replace this with actual checksum validation for both Base58Check (P2PKH/P2SH) and Bech32: for Base58Check decode the address bytes via Base58 alphabet, ensure decoded length >= 5, split payload and 4-byte checksum, compute double SHA256(payload) and compare first 4 bytes to checksum; for Bech32 verify HRP is "bc" or "tb" as appropriate, decode the Bech32 data part, run the Bech32 polymod checksum algorithm and validate it equals 1, and ensure expected witness/program length rules; alternatively, if on-chain cost/size is a concern, replace the inline checks with calls to a vetted library that implements Base58Check and Bech32 decoding/checksum verification and return true only when the checksum validations pass.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerAccountControlIntegration.test.ts
+Line: 172 to 176
+Type: potential_issue
+
+Comment:
+Test contradiction: AccountControl zero address handling inconsistency.
+
+This test expects setting AccountControl to zero address to revert with "AccountControl address cannot be zero". However, line 118 in the "Reserve Authorization Integration" tests successfully sets AccountControl to zero address without reverting. 
+
+Either:
+1. The implementation should consistently prevent or allow zero address
+2. There's a state difference between these tests that changes the behavior
+3. One of these tests has incorrect expectations
+
+Please verify the intended behavior and update the tests accordingly.
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerAccountControlIntegration.test.ts around lines 172-176, the test expects setAccountControl(0x0) to revert but earlier (around line 118 in the Reserve Authorization Integration tests) the suite successfully sets AccountControl to zero, causing a contradiction; verify the intended contract behavior and make tests consistent: if zero address should be rejected, update the Reserve Authorization test to assert revert (or ensure tests run with a fresh qcManager state so prior successful set is impossible); if zero address is allowed, change this test to expect a successful transaction (or emitted event) instead of revert; also ensure isolation by using beforeEach to deploy/reset qcManager so state differences between tests cannot change outcomes.
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlIntegration.test.ts
+Line: 295 to 315
+Type: potential_issue
+
+Comment:
+Test doesn't actually disable AccountControl
+
+Similar to the QCMinter test, this test claims to bypass AccountControl when disabled but doesn't include code to disable it.
+
+
+
+Implement the disable logic or update the test name/description.
+
+Prompt for AI Agent:
+In solidity/test/account-control/AccountControlIntegration.test.ts around lines 295 to 315, the test claims to bypass AccountControl when disabled but never disables it; either add the explicit disable step in the test setup (e.g., call the contract/test helper that turns off AccountControl like await accountControl.setEnabled(false) or await accountControl.disable() / appropriate fixture call) before initiating redemption so the flow actually bypasses AccountControl, or else change the test name/description to reflect reality (e.g., “should perform redemption without updating AccountControl state in mock”) and adjust assertions accordingly.
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlIntegration.test.ts
+Line: 236 to 247
+Type: potential_issue
+
+Comment:
+Incomplete test implementation for minting cap enforcement
+
+Similar to the backing test, this test is incomplete. The minting cap is set but the actual verification is missing.
+
+
+
+
+This test also needs to be rewritten to work with the current implementation where executeQCMint no longer exists.
+
+Prompt for AI Agent:
+In solidity/test/account-control/AccountControlIntegration.test.ts around lines 236 to 247, the test sets a minting cap but does not assert the new behavior where the cap is enforced during requestQCMint; update the test to explicitly verify behavior by (1) setting a very low cap, (2) attempting to call requestQCMint with an amount that exceeds the cap and asserting it reverts with the expected revert message, and (3) optionally also testing a successful request under the cap by calling requestQCMint with a smaller amount and asserting the QCMintRequested event and returned mintId; remove references to executeQCMint and assert using requestQCMint outcomes instead.
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlIntegration.test.ts
+Line: 223 to 234
+Type: potential_issue
+
+Comment:
+Incomplete test implementation for backing enforcement
+
+The test sets up insufficient backing but doesn't complete the verification. The comment indicates that executeQCMint no longer exists and the test needs rewriting.
+
+
+
+
+Would you like me to help rewrite this test to properly verify backing enforcement with the current implementation?
+
+Prompt for AI Agent:
+solidity/test/account-control/AccountControlIntegration.test.ts lines 223-234: the test stops after lowering backing and calling requestQCMint but doesn't assert the new behavior; change it to assert that requestQCMint reverts due to insufficient backing (use await expect(qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT)).to.be.reverted() or .to.be.revertedWith("") if you know the revert string), remove the old executeQCMint-related comments, and additionally assert no QCMintRequested event was emitted (e.g., wrap call in expect and check events on failure) and that backing remains unchanged after the call.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/MessageSigning.sol
+Line: 16 to 19
+Type: potential_issue
+
+Comment:
+Documentation misleads about actual security guarantees.
+
+The documentation claims "Direct Verification" and "Cryptographic Proof" of Bitcoin private key control, but the current implementation doesn't actually verify Bitcoin signatures properly due to the broken _approximateBitcoinAddress function. Update the documentation to reflect the actual implementation status or fix the implementation.
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/MessageSigning.sol around lines 16 to 19, the README-like comment overstates the security guarantee ("Direct Verification" and "Cryptographic Proof") while the implementation currently relies on a broken _approximateBitcoinAddress function; either update the docs to accurately state that signature/address checks are only approximate and not cryptographically binding, or fix the implementation. To fix: implement proper Bitcoin signature recovery (use secp256k1-style ecrecover-compatible recovery of the uncompressed/compressed public key from the signature and recovery ID, normalize v values (27/28 and 31/32 variants), derive the Bitcoin address by performing SHA-256 then RIPEMD-160 on the uncompressed pubkey and applying the correct network/version byte and checksum, and compare that derived address against the provided address); if you choose the doc route, replace the three bullet lines with explicit language that on-chain verification is approximate/incomplete and that off-chain verification with a proper secp256k1 library is required for cryptographic assurances.
+
+
+
+============================================================================
+File: solidity/test/integration/account-control/SPVLibraryIntegration.test.ts
+Line: 489 to 492
+Type: refactor_suggestion
+
+Comment:
+Update remaining ethers.utils.parseEther instances
+
+Complete the migration to ethers v6 by updating all remaining instances.
+
+
+
+-        ethers.utils.parseEther("100"),
++        ethers.parseEther("100"),
+
+
+
+Also applies to: 528-534
+
+Prompt for AI Agent:
+In solidity/test/integration/account-control/SPVLibraryIntegration.test.ts around lines 489-492 (and similarly at 528-534), update the remaining ethers.utils.parseEther calls to the ethers v6 usage: replace ethers.utils.parseEther("...") with parseEther("...") (or ethers.parseEther("...") if you prefer the namespaced import) and add an import for parseEther from 'ethers' at the top if not already present; ensure all occurrences in the file are updated so the tests compile under ethers v6.
+
+
+
+============================================================================
+File: solidity/test/integration/account-control/SPVLibraryIntegration.test.ts
+Line: 265 to 271
+Type: refactor_suggestion
+
+Comment:
+Fix deprecated ethers.utils usage in QC registration
+
+Update all instances of ethers.utils.parseEther to ethers.parseEther.
+
+
+
+-        ethers.utils.parseEther("100"),
++        ethers.parseEther("100"),
+
+
+
+Also applies to: 391-396, 431-436
+
+Prompt for AI Agent:
+In solidity/test/integration/account-control/SPVLibraryIntegration.test.ts around lines 265-271 (and also update occurrences at 391-396 and 431-436), replace deprecated ethers.utils.parseEther calls with the newer ethers.parseEther API; update each call site to use ethers.parseEther("...") and run tests/compilation to ensure there are no type/import issues after the change.
+
+
+
+============================================================================
+File: solidity/test/integration/account-control/SPVLibraryIntegration.test.ts
+Line: 102 to 103
+Type: refactor_suggestion
+
+Comment:
+Replace deprecated ethers.utils usage throughout the file
+
+Multiple instances of deprecated ethers.utils usage need to be updated for ethers v6 compatibility.
+
+
+
+-    await systemState.setMinMintAmount(ethers.utils.parseEther("0.01"))
++    await systemState.setMinMintAmount(ethers.parseEther("0.01"))
+
+
+-        ethers.utils.parseEther("100"),
++        ethers.parseEther("100"),
+
+
+
+Also applies to: 165-166
+
+Prompt for AI Agent:
+In solidity/test/integration/account-control/SPVLibraryIntegration.test.ts around lines 102-103 (and also update lines 165-166), replace deprecated ethers.utils usage with ethers v6 equivalents: change calls like ethers.utils.parseEther(...) to ethers.parseEther(...) (or import parseEther/parseUnits directly from 'ethers' and use parseEther/parseUnits), and similarly replace any ethers.utils.formatEther/formatUnits with ethers.formatEther/formatUnits or the direct imports; ensure imports are updated if you choose top-level imports and run tests to verify no other utils references remain.
+
+
+
+============================================================================
+File: solidity/test/integration/DeploymentVariations.test.ts
+Line: 1 to 229
+Type: potential_issue
+
+Comment:
+Test file needs significant refactoring to provide actual validation.
+
+This test file has good structure but most tests only validate hardcoded data without checking actual deployment state or contract behavior. Key issues:
+
+1. Tests that only check array lengths of hardcoded data (lines 14-26, 52-72)
+2. Documentation disguised as tests (lines 127-161, 163-182, 186-227)  
+3. No actual integration testing of deployed contracts
+
+Consider refactoring to:
+- Use deployment fixtures to test actual deployed contracts
+- Validate contract interactions and relationships
+- Move documentation to appropriate files
+- Add tests that verify deployment scripts can execute successfully
+
+
+
+Would you like assistance creating a comprehensive integration test suite that validates actual deployment behavior?
+
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/MessageSigning.sol
+Line: 175 to 186
+Type: potential_issue
+
+Comment:
+Remove placeholder implementation that breaks security.
+
+This function is documented as "simplified for development/testing" but is used in the main verification logic. It doesn't derive any address - it just returns the expected address if a valid Ethereum address exists, completely breaking the security model.
+
+This must be replaced with proper Bitcoin address derivation from the recovered public key before any deployment.
+
+
+Do you want me to provide a proper implementation that derives Bitcoin addresses from recovered public keys?
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/MessageSigning.sol around lines 175-186, replace the insecure placeholder that returns the expected Bitcoin address when any Ethereum address is present with a real Bitcoin address derivation/verification: accept or recover the raw uncompressed/compressed secp256k1 public key bytes, determine compression form, compute sha256(pubkey) then ripemd160 of that result to get the HASH160, prepend the correct network version byte (e.g. 0x00 for mainnet), compute the double-sha256 checksum and append the first 4 bytes, Base58Check-encode the result and compare it to expectedBitcoinAddress (return the derived address on match or empty string on mismatch); use Solidity’s sha256 and ripemd160 precompiles and either an existing on-chain Base58Check helper library or perform Base58 encoding in contract (or move this verification off-chain and require the caller to provide the public key and a matching proof) and ensure all error cases return "" instead of assuming success.
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlIntegration.test.ts
+Line: 204 to 221
+Type: potential_issue
+
+Comment:
+Test doesn't actually disable AccountControl
+
+The test claims to bypass AccountControl when disabled, but there's no code that actually disables AccountControl mode. The comment on line 206 mentions "Direct minting mode" but this is not implemented.
+
+
+
+Either implement the disable logic or update the test description to reflect what it actually tests.
+
+Prompt for AI Agent:
+In solidity/test/account-control/AccountControlIntegration.test.ts around lines 204 to 221, the test title and comments claim it "should bypass AccountControl when disabled" but no code actually disables AccountControl; either call the appropriate contract/test helper to turn AccountControl off before performing the mint (e.g., use the existing contract method or fixture to set the account control flag to false) and then keep the assertions, or if disabling is not applicable here, change the test name and comments to accurately describe the behavior being tested (e.g., that requestQCMint performs direct minting via qcMinter while MockAccountControl state remains unchanged) and ensure assertions match the updated description.
+
+
+
+============================================================================
+File: solidity/test/helpers/stateManagementHelpers.ts
+Line: 286 to 287
+Type: potential_issue
+
+Comment:
+Fix incorrect Hardhat helper import pattern.
+
+The current import pattern appears incorrect. Hardhat's snapshot helpers are typically accessed differently.
+
+
+-  const { createSnapshot } = await import("hardhat").then(hh => hh.helpers.snapshot);
+-  await createSnapshot();
++  const { network } = await import("hardhat");
++  const snapshotId = await network.provider.send("evm_snapshot", []);
++  // Store snapshotId if needed for restoration
+
+
+Or use the standard Hardhat helpers:
+import { takeSnapshot } from "@nomicfoundation/hardhat-network-helpers";
+const snapshot = await takeSnapshot();
+
+Prompt for AI Agent:
+In solidity/test/helpers/stateManagementHelpers.ts around lines 286-287, the dynamic import of Hardhat helpers using await import("hardhat").then(hh => hh.helpers.snapshot) is incorrect; replace it by importing and using the network helpers directly (e.g., import takeSnapshot from the @nomicfoundation/hardhat-network-helpers package or the correct named export) and call the provided takeSnapshot/takeSnapshot equivalent to create the snapshot; update the import statement at the top of the file and replace the createSnapshot call with the appropriate helper invocation so snapshots are created via the supported API.
+
+
+
+============================================================================
+File: solidity/contracts/test/MockReimbursementPool.sol
+Line: 8 to 14
+Type: potential_issue
+
+Comment:
+Add access control to authorization management functions.
+
+The authorize and unauthorize functions lack access control, allowing any address to modify authorization status. While this might be intentional for testing flexibility, consider adding basic access control to prevent unintended authorization changes during tests.
+
+
+
++    address public owner;
++    
++    constructor() {
++        owner = msg.sender;
++    }
++    
++    modifier onlyOwner() {
++        require(msg.sender == owner, "Not owner");
++        _;
++    }
++
+-    function authorize(address maintainer) external {
++    function authorize(address maintainer) external onlyOwner {
+         isAuthorized[maintainer] = true;
+     }
+
+-    function unauthorize(address maintainer) external {
++    function unauthorize(address maintainer) external onlyOwner {
+         isAuthorized[maintainer] = false;
+     }
+
+
+Alternatively, if unrestricted access is needed for testing, add a comment explaining this design choice.
+
+Prompt for AI Agent:
+In solidity/contracts/test/MockReimbursementPool.sol around lines 8 to 14, the authorize and unauthorize functions currently allow any caller to flip isAuthorized; add basic access control so only a designated admin/owner can call these (e.g., import OpenZeppelin Ownable and add onlyOwner to both functions, or add a private owner state set in the constructor and require(msg.sender == owner) in each function), or if open access is intentional for tests add a clear comment above both functions explaining this design choice and why unrestricted access is required.
+
+
+
+============================================================================
+File: solidity/contracts/test/MockReserve.sol
+Line: 56 to 58
+Type: potential_issue
+
+Comment:
+Consider adding access control to backing management functions.
+
+The setBacking function lacks access control, allowing any address to update the reserve backing. This could be a security risk depending on the intended usage pattern.
+
+
+
+-function setBacking(uint256 newBacking) external {
++function setBacking(uint256 newBacking) external onlyOwner {
+    _setBacking(newBacking);
+}
+
+
+Apply the same pattern to increaseBacking and decreaseBacking functions unless they are intentionally designed to be publicly callable.
+
+Prompt for AI Agent:
+In solidity/contracts/test/MockReserve.sol around lines 56 to 58, the setBacking function is publicly callable and lacks access control; update it to require a restricted caller (e.g., onlyOwner or a specific role) and enforce that check before calling _setBacking, and apply the same access restriction to increaseBacking and decreaseBacking functions so only authorized accounts can modify reserve backing; use the existing ownership/AccessControl pattern in the contract (or add OpenZeppelin Ownable/AccessControl) and replace the public functions with the same visibility plus the chosen access modifier and appropriate constructor/granting logic.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCMinter.sol
+Line: 450
+Type: potential_issue
+
+Comment:
+Critical: Add accountControl validation in hybrid function
+
+Similar to _requestMint, this function uses accountControl without validation at lines 450 and 459.
+
+
+
+Add validation before first use:
++    // Verify AccountControl is configured
++    if (accountControl == address(0)) revert InvalidQCAddress(); // Or create a new error: AccountControlNotSet
++
+     // HYBRID LOGIC: Choose between manual and automated minting
+     uint256 satoshis;
+     if (autoMint && autoMintEnabled) {
+
+
+
+Also applies to: 459-459
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCMinter.sol around lines 450 and 459, the hybrid function calls AccountControl(accountControl) without validating accountControl first; add the same pre-check used in _requestMint (validate accountControl is set/non-zero and matches the expected AccountControl state) before the first use at line 450 and again ensure the same validation covers the usage at line 459 so the function reverts early on invalid accountControl rather than performing calls on an unset/invalid address.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCMinter.sol
+Line: 355 to 443
+Type: refactor_suggestion
+
+Comment:
+Extract common validation logic to reduce duplication
+
+Lines 362-443 in _requestMintHybrid duplicate the validation logic from _requestMint (lines 227-308). This violates DRY principle and makes maintenance error-prone.
+
+
+
+Create a shared validation function:
+function _validateMintRequest(
+    address qc,
+    address user, 
+    uint256 amount
+) internal view {
+    // All validation logic here
+    if (qc == address(0)) revert InvalidQCAddress();
+    if (user == address(0)) revert InvalidUserAddress();
+    if (amount == 0) revert InvalidAmount();
+    // ... rest of validation
+}
+
+
+Then call it from both functions:
+_validateMintRequest(qc, user, amount);
+
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerWalletDirect.test.ts
+Line: 103
+Type: potential_issue
+
+Comment:
+Fix invalid method call on SignerWithAddress
+
+SignerWithAddress doesn't have a getChainId() method. Use (await qc1.provider.getNetwork()).chainId instead.
+
+
+
+Apply this diff to fix the chain ID retrieval:
+
+-        const chainId = await qc1.getChainId()
++        const chainId = (await qc1.provider.getNetwork()).chainId
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerWalletDirect.test.ts around line 103, replace the invalid SignerWithAddress.getChainId() call: SignerWithAddress doesn't expose getChainId(), so retrieve the chain ID from the signer's provider by awaiting provider.getNetwork() and reading .chainId (e.g. const chainId = (await qc1.provider.getNetwork()).chainId); update the assignment accordingly so chainId is a number from the provider network.
+
+
+
+============================================================================
+File: solidity/scripts/grant-bank-role.js
+Line: 10 to 12
+Type: potential_issue
+
+Comment:
+Security risk: hardcoded default addresses and exposed private keys
+
+The script includes a hardcoded default BANK_ADDRESS and expects private keys in environment variables, which poses security risks in production environments.
+
+
+
+Consider these improvements:
+- const BANK_ADDRESS = process.env.BANK_ADDRESS || "0x9b1a7fC43603c5E25B21063e589FaD73B6585ccF";
++ const BANK_ADDRESS = process.env.BANK_ADDRESS;
+- const QC_MINTER_ADDRESS = process.env.QC_MINTER_ADDRESS || ""; 
++ const QC_MINTER_ADDRESS = process.env.QC_MINTER_ADDRESS;
+- const BANK_OWNER_PRIVATE_KEY = process.env.BANK_OWNER_PRIVATE_KEY || "";
++ const BANK_OWNER_PRIVATE_KEY = process.env.BANK_OWNER_PRIVATE_KEY;
+
+
+Add validation for BANK_ADDRESS:
++ if (!BANK_ADDRESS) {
++   console.error("ERROR: BANK_ADDRESS not set in environment.");
++   process.exit(1);
++ }
+
+Prompt for AI Agent:
+In solidity/scripts/grant-bank-role.js around lines 10 to 12, the file currently uses a hardcoded BANK_ADDRESS default and accepts a BANK_OWNER_PRIVATE_KEY (and empty QC_MINTER_ADDRESS) from env which is a security risk; remove the hardcoded fallback for BANK_ADDRESS, require and validate BANK_ADDRESS and QC_MINTER_ADDRESS are provided (use an address validator such as ethers.utils.isAddress or an equivalent regex) and exit with a clear error if invalid or missing, and require BANK_OWNER_PRIVATE_KEY to be present (do not allow empty string), fail fast with a descriptive error if it is missing, and ensure any messaging instructs users to load secrets securely (e.g., from a vault or encrypted env) rather than committing defaults.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCData.test.ts
+Line: 1172 to 1185
+Type: potential_issue
+
+Comment:
+Fix duplicate test names
+
+Two tests have identical names "should return correct capacity for registered QC". The second test should have a different name to clarify its purpose.
+
+
+
+-      it("should return correct capacity for registered QC", async () => {
++      it("should return initial capacity set during registration", async () => {
+         const capacity = await qcData.getMaxMintingCapacity(qcAddress.address)
+         expect(capacity).to.equal(testCapacity)
+       })
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCData.test.ts around lines 1172 to 1185, two tests share the identical description "should return correct capacity for registered QC"; change the second test's description to accurately reflect its purpose (e.g., "should return existing capacity for already-registered QC without update" or similar) so test names are unique and descriptive, keeping the test body unchanged.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCMinter.sol
+Line: 183 to 186
+Type: potential_issue
+
+Comment:
+Add address validation for accountControl
+
+The setAccountControl function doesn't validate that _accountControl is not the zero address. This could break minting functionality if set incorrectly.
+
+
+
+Apply this fix:
+ function setAccountControl(address _accountControl) external onlyRole(GOVERNANCE_ROLE) {
++    require(_accountControl != address(0), "Invalid accountControl address");
+     accountControl = _accountControl;
+     emit AccountControlUpdated(_accountControl);
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCMinter.sol around lines 183 to 186, the setAccountControl function currently assigns _accountControl without validation; add a check that _accountControl != address(0) (revert with a clear error message) before setting accountControl and emitting AccountControlUpdated to prevent accidentally disabling minting by setting the zero address.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerAccountControlIntegration.test.ts
+Line: 316
+Type: potential_issue
+
+Comment:
+Missing await on transaction call.
+
+The transaction needs to be awaited to properly check events. Without await, tx is a Promise, not a transaction response.
+
+
+-      const tx = qcManager.connect(governance).registerQC(newQC, mintingCap);
++      const tx = await qcManager.connect(governance).registerQC(newQC, mintingCap);
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerAccountControlIntegration.test.ts around line 316, the call to qcManager.connect(governance).registerQC(newQC, mintingCap) is not awaited so tx becomes a Promise rather than a TransactionResponse; change the code to await the registerQC call and then await tx.wait() before asserting events (i.e., assign tx = await qcManager.connect(governance).registerQC(...); const receipt = await tx.wait(); then use receipt to check emitted events).
+
+
+
+============================================================================
+File: solidity/contracts/account-control/WatchdogEnforcer.sol
+Line: 99 to 112
+Type: potential_issue
+
+Comment:
+Add zero address validation in constructor.
+
+The constructor does not validate that the provided contract addresses are non-zero. Deploying with zero addresses would render the contract non-functional and require redeployment.
+
+
+Apply this diff to add validation:
+
+ constructor(
+     address _reserveLedger,
+     address _qcManager,
+     address _qcData,
+     address _systemState
+ ) {
++    require(_reserveLedger != address(0), "Invalid reserve ledger");
++    require(_qcManager != address(0), "Invalid QC manager");
++    require(_qcData != address(0), "Invalid QC data");
++    require(_systemState != address(0), "Invalid system state");
+     reserveOracle = ReserveOracle(_reserveLedger);
+     qcManager = QCManager(_qcManager);
+     qcData = QCData(_qcData);
+     systemState = SystemState(_systemState);
+
+     _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+     _grantRole(ENFORCEMENT_ROLE, msg.sender);
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/WatchdogEnforcer.sol around lines 99 to 112, the constructor currently assigns incoming contract addresses without validation; add checks that each provided address (_reserveLedger, _qcManager, _qcData, _systemState) is not the zero address using require(address != address(0), "...") with descriptive error messages before casting and assigning so the contract cannot be deployed with any zero address.
+
+
+
+============================================================================
+File: solidity/scripts/run-integration-tests.ts
+Line: 21 to 24
+Type: potential_issue
+
+Comment:
+Test files don't match CLI help documentation.
+
+The hardcoded test files (SPVIntegrationFlows.test.ts, SPVLibraryIntegration.test.ts) don't match the available tests listed in the CLI help (QCOnboarding, ReserveAttestation, etc.). This inconsistency could confuse users.
+
+
+
+Consider either:
+1. Updating the test file list to match the help documentation
+2. Making the test file list configurable
+3. Updating the help documentation to match actual test files
+
+ const testFiles = [
+-  "SPVIntegrationFlows.test.ts", 
+-  "SPVLibraryIntegration.test.ts",
++  "QCOnboardingIntegration.test.ts",
++  "ReserveAttestationIntegration.test.ts",
++  "QCMintingIntegration.test.ts",
++  "UserRedemptionIntegration.test.ts",
++  "CompleteFlowIntegration.test.ts",
+ ]
+
+Prompt for AI Agent:
+In solidity/scripts/run-integration-tests.ts around lines 21 to 24, the hardcoded testFiles array lists SPVIntegrationFlows.test.ts and SPVLibraryIntegration.test.ts which do not match the tests advertised in the CLI help; update the code so the listed tests and the CLI help are consistent: either replace the hardcoded array with the actual test names from the help (e.g., QCOnboarding, ReserveAttestation, etc.), or make the testFiles configurable via CLI flag/environment variable and wire that into the help text, or (if the hardcoded list is correct) update the CLI help text to reflect these two filenames; implement one of these fixes and ensure help output and default behavior are aligned.
+
+
+
+============================================================================
+File: solidity/test/helpers/testSetupHelpers.ts
+Line: 96 to 121
+Type: potential_issue
+
+Comment:
+Remove or implement the unused reserveOracle parameter
+
+solidity/test/helpers/testSetupHelpers.ts (lines 96–121): setupOracleIntegration declares reserveOracle but never uses it — remove the parameter or add the missing oracle setup/configuration logic.
+
+Prompt for AI Agent:
+In solidity/test/helpers/testSetupHelpers.ts around lines 96 to 121 the function setupOracleIntegration declares an unused reserveOracle parameter; either remove it from the function signature and from all call sites (update imports/uses and run type-check/tests), or implement the missing oracle setup logic (e.g., use reserveOracle to set the oracle address on QCManager or AccountControl via the appropriate setter and grant any needed roles, connecting with owner and logging success). Ensure whichever option you choose keeps the function signature and all callers in sync and that TypeScript compiles cleanly.
+
+
+
+============================================================================
+File: solidity/test/helpers/stateManagementHelpers.ts
+Line: 158 to 162
+Type: refactor_suggestion
+
+Comment:
+Remove unused defaultRoles parameter.
+
+The defaultRoles parameter is never used in the function body.
+
+
+ export async function resetQCManagerState(
+   qcManager: any,
+   owner: SignerWithAddress,
+-  defaultRoles: { [roleName: string]: string }
+ )
+
+Prompt for AI Agent:
+In solidity/test/helpers/stateManagementHelpers.ts around lines 158 to 162, the resetQCManagerState function declares an unused parameter defaultRoles; remove defaultRoles from the function signature and update any local references or JSDoc accordingly, then search and update all call sites to stop passing that argument (or adjust callers to pass only qcManager and owner) so the parameter is fully removed without leaving dangling arguments.
+
+
+
+============================================================================
+File: solidity/deploy/95_deploy_account_control_unified.ts
+Line: 23 to 105
+Type: potential_issue
+
+Comment:
+Infrastructure detection logic is comprehensive but has environment variable validation gaps.
+
+The multi-tiered approach (test mocks → environment variables → deployment cache → error) is well-designed. However, there are some concerns:
+
+
+
+Apply this diff to add validation for environment variables:
+
+  } else if (network.name === "sepolia" && process.env.BANK_ADDRESS) {
+    // Use environment variables for Sepolia deployment
++   if (!process.env.TBTC_VAULT_ADDRESS || !process.env.TBTC_ADDRESS || !process.env.LIGHT_RELAY_ADDRESS) {
++     throw new Error("All tBTC infrastructure environment variables must be set: BANK_ADDRESS, TBTC_VAULT_ADDRESS, TBTC_ADDRESS, LIGHT_RELAY_ADDRESS")
++   }
+    bank = { address: process.env.BANK_ADDRESS }
+    tbtcVault = { address: process.env.TBTC_VAULT_ADDRESS }
+    tbtc = { address: process.env.TBTC_ADDRESS }
+    lightRelay = { address: process.env.LIGHT_RELAY_ADDRESS }
+
+Prompt for AI Agent:
+In solidity/deploy/95_deploy_account_control_unified.ts around lines 23 to 105, the Sepolia branch uses process.env.* addresses without validating them; add checks to ensure BANK_ADDRESS, TBTC_VAULT_ADDRESS, TBTC_ADDRESS and LIGHT_RELAY_ADDRESS are present and look like valid Ethereum addresses (non-empty, start with "0x" and length 42) before assigning to contract variables; if any are missing or invalid, log a clear error listing which env vars are bad and throw (or process.exit(1)) so deployment halts instead of proceeding with undefined addresses.
+
+
+
+============================================================================
+File: solidity/scripts/run-integration-tests.ts
+Line: 49 to 51
+Type: potential_issue
+
+Comment:
+Error detection logic is too restrictive.
+
+The current logic stderr && stderr.includes("Error") && !stderr.includes("Warning") may miss legitimate errors that don't contain "Error" in stderr, and could incorrectly flag warnings as errors.
+
+
+
+Consider a more robust approach:
+
+-if (stderr && stderr.includes("Error") && !stderr.includes("Warning")) {
+-  throw new Error(stderr)
+-}
++// Check for actual test failures in stdout first
++if (stdout.includes("failing") || stderr.includes("Error:")) {
++  throw new Error(stderr || "Test execution failed")
++}
+
+Prompt for AI Agent:
+In solidity/scripts/run-integration-tests.ts around lines 49-51, the current stderr check only looks for the literal "Error" and excludes messages containing "Warning", which misses errors that don't include that exact word and can misclassify warnings; instead, use the process result/exit code (e.g., result.status or result.exitCode) to detect failures and, if you must inspect stderr, perform a case-insensitive check for common error indicators (like /\berror\b/i) while explicitly filtering out lines that match /\bwarning\b/i or prefix patterns, and include the stderr content in the thrown Error so failures are reliably detected and warnings are not treated as fatal.
+
+
+
+============================================================================
+File: solidity/scripts/run-integration-tests.ts
+Line: 147 to 152
+Type: potential_issue
+
+Comment:
+CLI help doesn't match actual implementation.
+
+The available tests listed in the help don't correspond to the actual test files in runAllTests(). This creates confusion for users.
+
+
+
+Update the help text to match the actual test files or implement the described tests:
+
+ Available Tests:
+-  - QCOnboarding: QC onboarding flow with wallet registration
+-  - ReserveAttestation: Reserve attestation and solvency checks
+-  - QCMinting: Complete minting flow from user to tBTC tokens
+-  - UserRedemption: Redemption flow with fulfillment
+-  - CompleteFlow: End-to-end system integration test
++  - SPVIntegrationFlows: SPV integration flow tests
++  - SPVLibraryIntegration: SPV library integration tests
+
+Prompt for AI Agent:
+In solidity/scripts/run-integration-tests.ts around lines 147 to 152, the CLI help text lists Available Tests that do not match the actual tests invoked by runAllTests(); update the help string so it accurately reflects the real test names or alternatively modify runAllTests() to implement the listed tests. Edit the help block to enumerate exactly the test identifiers exported/used by runAllTests() (or add the missing test implementations and wire them into runAllTests()), and ensure the help output and the runtime dispatch stay in sync so users see correct options.
+
+
+
+============================================================================
+File: solidity/scripts/run-integration-tests.ts
+Line: 167
+Type: potential_issue
+
+Comment:
+Test file name construction mismatch.
+
+The logic constructs test files as ${testName}Integration.test.ts but the actual files are named differently (e.g., SPVIntegrationFlows.test.ts). This will cause test execution to fail.
+
+
+
+Fix the test file name construction to match actual file names:
+
+-const testFile = ${testName}Integration.test.ts
++// Map test names to actual file names
++const testFileMap = {
++  'SPVIntegrationFlows': 'SPVIntegrationFlows.test.ts',
++  'SPVLibraryIntegration': 'SPVLibraryIntegration.test.ts'
++}
++const testFile = testFileMap[testName]
++if (!testFile) {
++  console.error(Unknown test: ${testName})
++  return
++}
+
+Prompt for AI Agent:
+In solidity/scripts/run-integration-tests.ts around line 167, the constructed test file name uses ${testName}Integration.test.ts which doesn't match the actual filenames (e.g., SPVIntegrationFlows.test.ts); change the construction to ${testName}IntegrationFlows.test.ts (or otherwise match the real filename pattern used in the repo) so the test runner points to the correct files.
+
+
+
+============================================================================
+File: solidity/test/integration/DeploymentVariations.test.ts
+Line: 14 to 26
+Type: potential_issue
+
+Comment:
+Test doesn't verify deployment scripts actually exist.
+
+This test only checks the length of a hardcoded array without verifying that these deployment scripts exist in the filesystem. Consider actually checking if the files exist or can be loaded.
+
+
+-    it("should verify account control deployment scripts exist", async () => {
+-      // Verify the deployment scripts exist and are structured correctly
+-      const expectedScripts = [
+-        "95_deploy_account_control_unified.ts",
+-        "96_deploy_account_control_state.ts",
+-        "97_deploy_reserve_oracle.ts",
+-        "98_deploy_watchdog_enforcer.ts",
+-        "99_configure_account_control_system.ts",
+-      ]
+-
+-      // This test verifies that the deployment structure makes sense for v1
+-      expect(expectedScripts.length).to.equal(5)
++    it("should verify account control deployment scripts exist", async () => {
++      // Actually verify the deployment scripts can be retrieved
++      const deploymentScripts = await deployments.getDeploymentsFromScripts()
++      
++      const expectedScripts = [
++        "95_deploy_account_control_unified",
++        "96_deploy_account_control_state",
++        "97_deploy_reserve_oracle",
++        "98_deploy_watchdog_enforcer",
++        "99_configure_account_control_system",
++      ]
++
++      for (const scriptName of expectedScripts) {
++        const scriptExists = deploymentScripts.some(script => 
++          script.includes(scriptName)
++        )
++        expect(scriptExists).to.be.true
++      }
+
+Prompt for AI Agent:
+In solidity/test/integration/DeploymentVariations.test.ts around lines 14 to 26, the test currently only asserts the length of a hardcoded expectedScripts array and does not confirm the files exist; update the test to check the filesystem for each expected script (e.g. build the correct path to your migrations/deployments directory and for each filename call fs.existsSync or use fs.promises.access) and assert that each file is present (or require/import it) instead of just checking array length; fail the test with a clear message naming any missing files.
+
+
+
+============================================================================
+File: solidity/test/security/SystemStateSecurityTest.test.ts
+Line: 287 to 307
+Type: potential_issue
+
+Comment:
+Inconsistent signer usage in emergency council test.
+
+Line 290 uses governance to call setEmergencyCouncil, but line 305 expects paramAdmin.address in the event. This creates a mismatch between who makes the call and who's recorded in the event.
+
+
+Clarify the correct flow:
+
+-        systemState
+-          .connect(governance)
+-          .setEmergencyCouncil(emergencyCouncil.address)
++        systemState
++          .connect(paramAdmin)
++          .setEmergencyCouncil(emergencyCouncil.address)
+
+
+Or update the expected event parameters if governance should be the caller.
+
+Prompt for AI Agent:
+In solidity/test/security/SystemStateSecurityTest.test.ts around lines 287 to 307, the test calls setEmergencyCouncil using the governance signer but asserts the event was emitted with paramAdmin.address; fix by making the caller and expected event match: either change the call to systemState.connect(paramAdmin).setEmergencyCouncil(...) if paramAdmin is meant to perform the action, or keep the governance caller and update the expected event third argument to governance.address; ensure the reverted-with test remains unchanged and update only the caller or the expected event argument accordingly.
+
+
+
+============================================================================
+File: solidity/.nvmrc
+Line: 1
+Type: potential_issue
+
+Comment:
+Action required: .nvmrc pins Node 18 (EOL Apr 30, 2025) — update to a supported LTS or document vendor support
+
+- solidity/.nvmrc (line 1): replace 18 with 22 or lts/* and run CI/tests to confirm compatibility.  
+- If you must keep Node 18, add documentation explaining vendor extended/support plan and risk mitigation.
+
+Prompt for AI Agent:
+In solidity/.nvmrc at line 1 the file pins Node version 18 which reaches EOL on 2025-04-30; update the version to a supported runtime by replacing the content with either "22" or "lts/*" and then run CI and the test suite to confirm compatibility, or if you must retain Node 18, add a short docs entry (README or DEPENDENCIES) describing the vendor extended/support plan and risk mitigation steps and reference that document from the repo root.
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlCore.test.ts
+Line: 36 to 52
+Type: potential_issue
+
+Comment:
+Fix method name inconsistency and improve test logic.
+
+Several issues in this test block:
+
+1. Line 38 calls totalMinted() but line 50 calls totalMintedAmount() - these should be consistent
+2. The second test doesn't actually test minting behavior despite its description
+3. The test sets up backing but doesn't verify the minting logic works properly
+
+
+
+Apply this diff to fix the inconsistency and improve the test:
+
+    it("should track total minted amount efficiently", async function () {
+      // Reserve updates its own backing (federated model)
+      await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP); // 0.02 BTC
+
+-      // Mock Bank.increaseBalance call (normally would be called)
+-      const amount = amounts.SMALL_MINT; // 0.005 BTC in satoshis
+-      
+-      // This would normally fail because we can't call mint from non-reserve
+-      // but we're testing the state tracking logic
+-      expect(await accountControl.totalMintedAmount()).to.equal(0);
++      // Actually test minting behavior
++      const amount = amounts.SMALL_MINT; // 0.005 BTC in satoshis
++      await accountControl.connect(reserve).mint(user.address, amount);
++      
++      expect(await accountControl.totalMinted()).to.equal(amount);
+    });
+
+Prompt for AI Agent:
+In solidity/test/account-control/AccountControlCore.test.ts around lines 36 to 52, the test mixes two method names and doesn't actually exercise minting: change all calls to the correct method name (use totalMinted consistently), in the second test perform an authorized mint from the reserve (connect reserve and call the contract's mint function with the SMALL_MINT amount) after setting backing, then assert totalMinted increases by that amount and any relevant balances/backing are updated; ensure the test no longer calls totalMintedAmount and instead verifies state changes produced by an actual mint operation.
+
+
+
+============================================================================
+File: solidity/test/helpers/stateManagementHelpers.ts
+Line: 249
+Type: refactor_suggestion
+
+Comment:
+Remove empty object argument after fixing resetQCManagerState.
+
+Once you remove the unused defaultRoles parameter from resetQCManagerState, update this call accordingly.
+
+
+-      await resetQCManagerState(contracts.qcManager, signers.owner, {});
++      await resetQCManagerState(contracts.qcManager, signers.owner);
+
+Prompt for AI Agent:
+In solidity/test/helpers/stateManagementHelpers.ts around line 249, the call to resetQCManagerState includes an unnecessary empty object argument: await resetQCManagerState(contracts.qcManager, signers.owner, {}); Remove the trailing {} so the call matches the updated function signature (two args) after removing the unused defaultRoles parameter; update any other calls to resetQCManagerState in the repo similarly to pass only the required parameters.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/MessageSigning.sol
+Line: 5
+Type: refactor_suggestion
+
+Comment:
+Remove unused import.
+
+The BitcoinAddressUtils import is not used anywhere in this contract.
+
+
+-import "../BitcoinAddressUtils.sol";
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/MessageSigning.sol around line 5, the import statement for "../BitcoinAddressUtils.sol" is unused; remove that import line to clean up the file and avoid unnecessary dependency references, then run a quick compile to confirm no other references to BitcoinAddressUtils remain.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 907 to 911
+Type: potential_issue
+
+Comment:
+Document staleness tolerance threshold
+
+The function ignores staleness to avoid false triggers, but this creates manipulation potential. Consider implementing a maximum staleness threshold (e.g., 24-48 hours) beyond which reserves are considered invalid, balancing between false positives and security.
+
+
+
+
+============================================================================
+File: solidity/test/integration/DeploymentVariations.test.ts
+Line: 52 to 72
+Type: potential_issue
+
+Comment:
+Test only validates hardcoded data, not actual deployments.
+
+This test checks array lengths and filtering on hardcoded data without verifying these contracts are actually deployed. Consider checking if the contracts can be retrieved from deployments.
+
+
+     it("should verify v1 core contracts structure", async () => {
+       // v1 should include these core contracts (direct integration architecture)
+       const expectedV1Contracts = [
+         "QCMinter", // Direct integration entry point for minting
+         "QCRedeemer", // Direct integration entry point for redemption
+         "QCData", // Storage layer with 5-state models
+         "SystemState", // Global configuration and emergency controls
+         "QCManager", // Business logic controller with direct dependencies
+         "ReserveOracle", // Reserve attestation system
+         "WatchdogEnforcer", // Simplified watchdog enforcement
+       ]
+ 
+-      // Verify the expected contract count for simplified architecture
+-      expect(expectedV1Contracts.length).to.equal(7)
++      // Verify these contracts are actually deployed
++      for (const contractName of expectedV1Contracts) {
++        const deployment = await deployments.get(contractName)
++        expect(deployment).to.not.be.undefined
++        expect(deployment.address).to.be.a("string")
++      }
+ 
+       // Verify WatchdogEnforcer is the only watchdog contract
+       const watchdogContracts = expectedV1Contracts.filter((name) =>
+         name.includes("Watchdog")
+       )
+       expect(watchdogContracts).to.deep.equal(["WatchdogEnforcer"])
+
+Prompt for AI Agent:
+In solidity/test/integration/DeploymentVariations.test.ts around lines 52 to 72, the test only asserts hardcoded contract names and counts rather than verifying actual deployed artifacts; update the test to load the real deployments (e.g., via hre.deployments.get / hre.deployments.all or ethers.getContractFactory + provider) and assert that the deployed contract names include the expected v1 list and that the total count matches the expected simplified architecture, then query/filter the deployed names to ensure only "WatchdogEnforcer" matches the Watchdog pattern; use set/array comparisons (or includes checks) instead of relying solely on hardcoded arrays so the test fails if deployments differ.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCRedeemerSPV.test.ts
+Line: 416 to 420
+Type: potential_issue
+
+Comment:
+Fix missing little-endian conversion for locktime
+
+The comment indicates little-endian conversion is needed, but the code doesn't perform it. Bitcoin uses little-endian for numeric values.
+
+       const futureTime = Math.floor(Date.now() / 1000) + 86400 * 2 // 2 days in future
+-      const futureTimeLittleEndian = ethers.utils.hexZeroPad(
+-        ethers.utils.hexlify(futureTime), // Note: manual little endian conversion needed
+-        4
+-      )
++      // Convert to little-endian bytes
++      const buffer = Buffer.allocUnsafe(4);
++      buffer.writeUInt32LE(futureTime, 0);
++      const futureTimeLittleEndian = '0x' + buffer.toString('hex');
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCRedeemerSPV.test.ts around lines 416-420, the code comments call for a little-endian locktime but the value is written in big-endian; convert the 32-bit locktime to a 4-byte little-endian hex before padding. Compute the hex representation of futureTime as exactly 4 bytes, reverse the byte order to produce little-endian, then prefix 0x (or use ethers utilities to create a byte array and reverse it) and finally hexZeroPad to 4 bytes so the test uses the correct little-endian locktime.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/AccountControl.sol
+Line: 240 to 241
+Type: potential_issue
+
+Comment:
+Incorrect parameter in NotAuthorized error
+
+The function uses msg.sender in the error message but should use the reserve parameter since we're checking if the reserve is authorized, not the caller.
+
+
+         // Check that reserve is authorized
+-        if (!authorized[reserve]) revert NotAuthorized(msg.sender);
++        if (!authorized[reserve]) revert NotAuthorized(reserve);
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/AccountControl.sol around lines 240-241, the revert uses the wrong parameter in NotAuthorized — it passes msg.sender while the check is for the reserve address; update the revert to pass reserve instead of msg.sender so the error reports the un-authorized reserve address (ensure the NotAuthorized error signature accepts an address).
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCMinter.sol
+Line: 608
+Type: potential_issue
+
+Comment:
+Check tBTC transfer return value in _executeAutoMint
+
+Same issue as in manualMint - the transfer return value is not checked.
+
+
+
+Apply the same fix using SafeERC20 or checking the return value:
+-    tbtc.transfer(user, tbtcAmount);
++    require(tbtc.transfer(user, tbtcAmount), "Transfer failed");
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCMinter.sol around line 608, the tbtc.transfer(user, tbtcAmount) call in _executeAutoMint does not check the ERC20 transfer return value; update the call to use OpenZeppelin's SafeERC20 safeTransfer (or explicitly check the returned bool and revert on false) and import/declare IERC20 and SafeERC20 accordingly so failed transfers revert and token safety is ensured.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/WatchdogEnforcer.sol
+Line: 280
+Type: potential_issue
+
+Comment:
+Optimize gas usage by avoiding external call to own contract.
+
+Using this.checkViolation() performs an external call which costs significantly more gas than necessary for a view function. Since you're calling your own contract's view function, this should be an internal call.
+
+
+Apply this diff to optimize:
+
+-        for (uint256 i = 0; i < qcs.length; i++) {
+-            (bool violated, ) = this.checkViolation(qcs[i], reasonCode);
++        for (uint256 i = 0; i < qcs.length; i++) {
++            bool violated;
++            if (reasonCode == INSUFFICIENT_RESERVES) {
++                (violated, ) = _checkReserveViolation(qcs[i]);
++            } else if (reasonCode == STALE_ATTESTATIONS) {
++                (violated, ) = _checkStaleAttestations(qcs[i]);
++            }
+             if (violated) {
+                 temp[count++] = qcs[i];
+             }
+         }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/WatchdogEnforcer.sol around line 280, the code uses an external call this.checkViolation(...) which is gas-inefficient for calling your own view function; remove the external call by invoking checkViolation(...) internally instead, and if the function is currently declared external change its visibility to public or internal so an internal call is allowed (prefer internal or public view), ensuring no change in semantics besides the visibility adjustment.
+
+
+
+============================================================================
+File: solidity/scripts/run-integration-tests.ts
+Line: 54
+Type: potential_issue
+
+Comment:
+Test success detection is fragile.
+
+The success detection stdout.includes("passing") && !stdout.includes("failing") could produce false positives if the output format changes or contains both "passing" and "failing" text in different contexts.
+
+
+
+Consider parsing the actual test results more robustly:
+
+-const passed = stdout.includes("passing") && !stdout.includes("failing")
++// More robust parsing of Mocha/Hardhat test output
++const failingMatch = stdout.match(/(\d+) failing/)
++const passingMatch = stdout.match(/(\d+) passing/)
++const hasFailing = failingMatch && parseInt(failingMatch[1]) > 0
++const passed = passingMatch && !hasFailing
+
+Prompt for AI Agent:
+In solidity/scripts/run-integration-tests.ts around line 54, the current success check using stdout.includes("passing") && !stdout.includes("failing") is fragile; change it to a robust check by either using the test runner's exit code (treat exitCode === 0 as success) or run the tests with a machine-readable reporter (e.g., --reporter json) and parse the JSON output to verify that failures === 0 (or that passed count > 0 and failed count === 0); update the code to capture the child process exit code or parse and validate the JSON structure instead of string-matching "passing"/"failing".
+
+
+
+============================================================================
+File: solidity/contracts/account-control/BitcoinAddressUtils.sol
+Line: 172 to 180
+Type: potential_issue
+
+Comment:
+Potential integer overflow in Base58 decoding.
+
+The Base58 decoding accumulates values in a uint256 variable without checking for overflow. For maliciously crafted long addresses, the multiplication multi = 58 and addition result += digit  multi could overflow, leading to incorrect decoding.
+
+While Solidity 0.8.x has built-in overflow protection that will revert, it's better to validate input length upfront.
+
+
+     function base58Decode(bytes memory source)
+         internal
+         pure
+         returns (bytes memory decoded)
+     {
++        // Reasonable upper bound for Bitcoin addresses
++        if (source.length > 128) revert InvalidAddressLength();
++        
+         uint256 result = 0;
+         uint256 multi = 1;
+
+
+
+
+============================================================================
+File: solidity/test/helpers/stateManagementHelpers.ts
+Line: 196 to 198
+Type: potential_issue
+
+Comment:
+Add await for potentially async reset() calls.
+
+The mock.reset() call might be asynchronous but is not awaited, which could lead to incomplete state resets.
+
+
+       if (mock && typeof mock.reset === 'function') {
+-        mock.reset();
++        await mock.reset();
+         console.log(🔄 Reset mock ${name});
+       }
+
+Prompt for AI Agent:
+In solidity/test/helpers/stateManagementHelpers.ts around lines 196 to 198, the call to mock.reset() may return a Promise but is invoked without awaiting, so asynchronous resets can complete late; update the surrounding function to be async (or ensure it's already async) and change the call to await mock.reset(); if you cannot make the function async, replace the invocation with await Promise.resolve(mock.reset()); ensure any loop over mocks awaits each reset (or use Promise.all to run them concurrently) so state reset completes before proceeding.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/MessageSigning.sol
+Line: 138 to 146
+Type: potential_issue
+
+Comment:
+CRITICAL: Signature verification is completely broken.
+
+The _approximateBitcoinAddress helper doesn't actually derive a Bitcoin address from the recovered public key. It simply returns the expected address if any valid signature is recovered, meaning any valid ECDSA signature will be accepted for any Bitcoin address. This is a severe security vulnerability that allows anyone to impersonate any Bitcoin address.
+
+The verification must properly derive the Bitcoin address from the recovered public key and compare it with the provided address.
+
+
+-            // For simplified implementation, we'll derive Bitcoin address from Ethereum address
+-            // This is a approximation - real implementation would derive from raw public key
+-            string memory derivedAddress = _approximateBitcoinAddress(recoveredAddress, bitcoinAddress);
+-            
+-            // Compare with provided Bitcoin address
+-            if (keccak256(bytes(derivedAddress)) == keccak256(bytes(bitcoinAddress))) {
+-                return true;
+-            }
++            // TODO: Properly derive Bitcoin address from the recovered public key
++            // This requires implementing proper Bitcoin address derivation logic
++            revert("Bitcoin address derivation not implemented");
+
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCMinter.sol
+Line: 552
+Type: potential_issue
+
+Comment:
+Check tBTC transfer return value
+
+The transfer call doesn't check the return value. While most ERC20 implementations revert on failure, some return false. 
+
+
+
+Use SafeERC20 or check the return value:
+-    tbtc.transfer(user, tbtcAmount);
++    require(tbtc.transfer(user, tbtcAmount), "Transfer failed");
+
+
+Or better, use OpenZeppelin's SafeERC20:
++ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
++ using SafeERC20 for TBTC;
+  
+- tbtc.transfer(user, tbtcAmount);
++ tbtc.safeTransfer(user, tbtcAmount);
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCMinter.sol around line 552, the tbtc.transfer(user, tbtcAmount) call does not check the ERC20 return value and may silently fail for tokens that return false; replace this direct transfer with OpenZeppelin's SafeERC20 safeTransfer (import SafeERC20 and use "using SafeERC20 for IERC20") or explicitly capture and require the boolean return from transfer, updating the tbtc variable type to IERC20 if needed and adding the SafeERC20 import and using statement at the top of the contract.
+
+
+
+============================================================================
+File: solidity/test/security/SPVSecurityTests.test.ts
+Line: 541 to 543
+Type: potential_issue
+
+Comment:
+Implement full difficulty validation (security-critical)
+
+- Remove/replace the stubbed difficulty check with a complete production implementation. Location: solidity/test/security/SPVSecurityTests.test.ts (test block ~lines 501–544; comment at 541–543).
+- Update tests to use realistic (non-zero) difficulty header values and add cases for manipulated difficulty bits and insufficient accumulated difficulty.
+- Add an explicit TODO + tracking issue if the stub is temporary and ensure the stubbed path cannot be included in release builds.
+
+
+
+
+============================================================================
+File: solidity/test/helpers/stateManagementHelpers.ts
+Line: 18 to 23
+Type: refactor_suggestion
+
+Comment:
+Replace any types with proper contract interfaces.
+
+Using any defeats TypeScript's type safety. Consider defining proper interfaces or importing contract types from your generated typechain files.
+
+
+-export async function resetAccountControlState(
+-  accountControl: any,
+-  owner: SignerWithAddress,
+-  emergencyCouncil: SignerWithAddress,
+-  mockBank: any
+-)
++import { AccountControl } from "../../typechain-types"; // Adjust import path as needed
++
++export async function resetAccountControlState(
++  accountControl: AccountControl,
++  owner: SignerWithAddress,
++  emergencyCouncil: SignerWithAddress,
++  mockBank?: any // Consider typing this properly too
++)
+
+Prompt for AI Agent:
+In solidity/test/helpers/stateManagementHelpers.ts around lines 18 to 23, the function signature uses broad "any" types for contract parameters which removes TypeScript safety; replace those with the correct generated TypeChain contract/interface types (e.g., MyContract, MockBank, AccountControl) by importing them from the project's typechain artifacts, update the function signature to use these concrete types instead of any, and adjust any callsites or mock/stub creations in tests to satisfy the new types (or cast only at instantiation points) so the file and consumers compile with full type checking.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCMinter.sol
+Line: 314 to 316
+Type: potential_issue
+
+Comment:
+Critical: Add accountControl validation before use
+
+The function calls AccountControl(accountControl).mintTBTC without checking if accountControl is set. This will cause a revert with an unclear error if accountControl is address(0).
+
+
+
+Add validation before line 315:
++    // Verify AccountControl is configured
++    if (accountControl == address(0)) revert InvalidQCAddress(); // Or create a new error: AccountControlNotSet
++
+     // Use AccountControl for minting (returns satoshis for event emission)
+     uint256 satoshis = AccountControl(accountControl).mintTBTC(user, amount);
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCMinter.sol around lines 314 to 316, the code calls AccountControl(accountControl).mintTBTC without validating accountControl; add a check before the call to ensure accountControl is not address(0) (e.g., require(accountControl != address(0), "accountControl not set") or revert with a clear custom error) so the function fails with an explicit message instead of an unclear low-level revert.
+
+
+
+============================================================================
+File: solidity/test/helpers/qcManagerHelpers.ts
+Line: 40
+Type: potential_issue
+
+Comment:
+Replace deprecated ethers.utils.id with ethers.id
+
+File: solidity/test/helpers/qcManagerHelpers.ts (line 40)
+
+-  const reasonBytes32 = ethers.utils.id(reason)
++  const reasonBytes32 = ethers.id(reason)
+
+
+- Critical: ethers v6 removed the utils namespace — use ethers.id(reason) or import { id } from "ethers".
+- Minor: replace magic number 1 with a named constant (e.g., QCStatus.UnderReview).
+- Minor: add transaction failure handling (await tx.wait() in try/catch or check receipt.status).
+
+Prompt for AI Agent:
+In solidity/test/helpers/qcManagerHelpers.ts around line 40, replace the deprecated ethers.utils.id(reason) call with ethers.id(reason) (or import { id } from "ethers" and use id(reason)); replace the magic numeric status value 1 with a descriptive constant (e.g., QCStatus.UnderReview) and import/define that enum or constant where appropriate; and ensure any transaction is awaited and verified by calling await tx.wait() and checking the receipt.status inside a try/catch (or throw a descriptive error on failure) so transaction failures are handled.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCRedeemer.sol
+Line: 310 to 313
+Type: potential_issue
+
+Comment:
+Critical: Potential call to zero address for accountControl.
+
+The function calls AccountControl(accountControl).redeemTBTC(amount) without checking if accountControl is set. This could revert with an unclear error or cause unexpected behavior if accountControl is address(0).
+
+
+
+Add validation before the call:
+
+ // Burn the tBTC tokens
+ tbtcToken.burnFrom(msg.sender, amount);
+
+ // Notify AccountControl of redemption
++if (accountControl != address(0)) {
+     AccountControl(accountControl).redeemTBTC(amount);
++}
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCRedeemer.sol around lines 310 to 313, the code calls AccountControl(accountControl).redeemTBTC(amount) without verifying accountControl is non-zero; add a validation like require(accountControl != address(0), "AccountControl not set") immediately before the call so the function reverts with a clear error instead of calling a zero address, and keep the burnFrom call order unchanged.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 382 to 397
+Type: potential_issue
+
+Comment:
+Add zero address validation in constructor
+
+The constructor should validate that the provided addresses are not zero addresses to prevent deployment issues.
+
+
+
+ constructor(
+     address _qcData,
+     address _systemState,
+     address _reserveOracle
+ ) {
++    require(_qcData != address(0), "Invalid QCData address");
++    require(_systemState != address(0), "Invalid SystemState address");
++    require(_reserveOracle != address(0), "Invalid ReserveOracle address");
+     qcData = QCData(_qcData);
+     systemState = SystemState(_systemState);
+     reserveOracle = ReserveOracle(_reserveOracle);
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 382 to 397, the constructor currently assigns external addresses without validating them; add require checks to ensure _qcData, _systemState, and _reserveOracle are not the zero address (address(0)) before casting/assigning, providing clear revert messages like "QCData address is zero", "SystemState address is zero", and "ReserveOracle address is zero"; keep these checks at the top of the constructor so invalid addresses revert immediately and then proceed with the existing assignments and role grants.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 1492 to 1500
+Type: refactor_suggestion
+
+Comment:
+Refactor syncBackingFromOracle to avoid external self-call
+
+The function is called via this.syncBackingFromOracle() which is inefficient. Consider making it public or creating an internal helper function.
+
+
+
+-function syncBackingFromOracle(address qc) external {
++function syncBackingFromOracle(address qc) public {
+     (uint256 balance, bool isStale) = QCManagerLib.syncBackingFromOracle(
+         reserveOracle,
+         address(accountControl),
+         qc
+     );
+     emit BackingSyncedFromOracle(qc, balance, isStale);
+ }
+
+
+Then update the calls from this.syncBackingFromOracle(qc) to just syncBackingFromOracle(qc).
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 1492 to 1500, the current syncBackingFromOracle function is external and being invoked with this.syncBackingFromOracle(...) which forces an external call; change the function to public (or implement an internal helper that contains the core logic and have a thin external/public wrapper) and then update all call sites to call the function directly (syncBackingFromOracle(qc) or the internal helper) to avoid the external self-call and gas/efficiency overhead.
+
+
+
+============================================================================
+File: solidity/test/security/SPVSecurityTests.test.ts
+Line: 93 to 154
+Type: refactor_suggestion
+
+Comment:
+Remove console.log statements from test code
+
+The numerous console.log statements throughout the setup should be removed as they add noise to test output. If logging is needed for debugging, consider using a debug flag or proper test logging framework.
+
+
+
+-    console.log("Deploying SharedSPVCore...")
+     const SharedSPVCore = await ethers.getContractFactory("SharedSPVCore")
+     const sharedSPVCore = await SharedSPVCore.deploy()
+-    console.log("SharedSPVCore deployed")
+
+-    console.log("Deploying QCRedeemerSPV...")
+     const QCRedeemerSPV = await ethers.getContractFactory("QCRedeemerSPV", {
+       libraries: {
+         SharedSPVCore: sharedSPVCore.address,
+       },
+     })
+     const qcRedeemerSPV = await QCRedeemerSPV.deploy()
+-    console.log("QCRedeemerSPV deployed")
+
+Prompt for AI Agent:
+In solidity/test/security/SPVSecurityTests.test.ts around lines 93 to 154, remove all console.log statements used during contract deployment and setup to eliminate noisy test output; simply delete these console.log calls (or replace them with a conditional/debug-only logging mechanism driven by an environment flag such as DEBUG) while keeping the deployment, await and setup calls intact, then run the test suite to confirm behavior unchanged.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 541 to 576
+Type: potential_issue
+
+Comment:
+Inconsistent authority parameter handling
+
+The function comment mentions removing the authority parameter to fix a docstring error, but the parameter is still present (commented) and "AUTHORITY" is hardcoded in the event emission. Either properly remove the parameter or use the passed value.
+
+
+
+ function _executeStatusChange(
+     address qc,
+     QCData.QCStatus newStatus,
+     bytes32 reason,
+-    string memory / authority /
++    string memory authority
+ ) private requiresAccountControl {
+     // ... validation code ...
+     
+     emit QCStatusChanged(
+         qc,
+         oldStatus,
+         newStatus,
+         reason,
+         msg.sender,
+-        "AUTHORITY",
++        authority,
+         block.timestamp
+     );
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 541-576, the function has a commented-out authority parameter while the event emits a hardcoded "AUTHORITY"; restore the authority handling by reintroducing the string memory authority parameter in the function signature (uncomment and name it), replace the hardcoded "AUTHORITY" in the QCStatusChanged emit with that authority variable, and then update any external/internal call sites and the NatSpec/docstring to accept and forward the authority argument so the function and event consistently use the passed-in authority.
+
+
+
+============================================================================
+File: solidity/contracts/test/MockReserve.sol
+Line: 105 to 110
+Type: potential_issue
+
+Comment:
+Critical reentrancy testing design flaw.
+
+The reentrancy test implementation has a critical flaw: it calls accountControl.mint(recipient, amount) twice in the same transaction (Lines 109 and 113), which means the second call will fail due to insufficient backing, not because of reentrancy protection.
+
+
+
+// Test reentrancy if enabled
+if (simulateReentrancy) {
+    simulateReentrancy = false;
+-    // Attempt reentrant call - should be blocked by AccountControl's ReentrancyGuard
+-    accountControl.mint(recipient, amount);
++    // Attempt reentrant call with small amount to test ReentrancyGuard
++    try accountControl.mint(recipient, 1) {
++        // This should not succeed if reentrancy protection is working
++        revert("Reentrancy protection failed");
++    } catch {
++        // Expected - reentrancy protection is working
++    }
+}
+
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 827 to 839
+Type: potential_issue
+
+Comment:
+Race condition in wallet deregistration needs mitigation
+
+The acknowledged race condition between checking obligations and deregistration could be problematic. Consider implementing a two-phase deregistration with a time lock or using a mutex pattern. Also, use a custom error instead of require.
+
+
+
++error WalletHasPendingRedemptions();
+
+ if (address(qcRedeemer) != address(0)) {
+-    require(
+-        !IQCRedeemer(address(qcRedeemer)).hasWalletObligations(btcAddress),
+-        "Cannot deregister: wallet has pending redemptions"
+-    );
++    if (IQCRedeemer(address(qcRedeemer)).hasWalletObligations(btcAddress)) {
++        revert WalletHasPendingRedemptions();
++    }
+ }
+
+
+Consider implementing a time-locked deregistration process to eliminate the race condition entirely.
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 827 to 839, the current single-transaction check for qcRedeemer obligations creates a race where a redemption can be started after the check and before deregistration; replace the require-based immediate deregistration with a two-phase, time-locked deregistration flow (mark wallet as DEREGISTER_PENDING with a configurable delay, emit an event, and allow a finalizeDeregister function that re-checks IQCRedeemer.hasWalletObligations and only clears the registration after the delay has elapsed), add a custom error (e.g., CannotDeregisterWalletHasObligations()) instead of the require string, and protect state transitions with a simple mutex or reentrancy guard to prevent concurrent deregistration/finalize races; ensure all state flags and timestamps are persisted, events emitted for both pending and finalized steps, and any cancel/rollback path is supported.
+
+
+
+============================================================================
+File: solidity/test/integration/account-control/SPVLibraryIntegration.test.ts
+Line: 49
+Type: refactor_suggestion
+
+Comment:
+Use ethers.parseEther instead of ethers.utils.parseEther
+
+The ethers.utils namespace is deprecated in ethers v6. Use the utility functions directly from the ethers object.
+
+
+
+-  const testAmount = ethers.utils.parseEther("1")
++  const testAmount = ethers.parseEther("1")
+
+Prompt for AI Agent:
+In solidity/test/integration/account-control/SPVLibraryIntegration.test.ts around line 49, the test uses the deprecated ethers.utils.parseEther; replace it with ethers.parseEther to use the v6 API. Update the import usage (no code shown here) and change the call to ethers.parseEther("1") so tests use the current ethers utility function.
+
+
+
+============================================================================
+File: solidity/scripts/verify-roles.ts
+Line: 9 to 18
+Type: potential_issue
+
+Comment:
+Update to ethers v6 compatible syntax.
+
+The ethers.utils path has been deprecated. All references to utility functions should be updated to reflect the new structure, omitting the utils path. For ethers v6, ethers.utils.id() should be replaced with ethers.id().
+
+
+Apply this diff to update to v6 syntax:
+
+const ROLES = {
+  DEFAULT_ADMIN_ROLE:
+    "0x0000000000000000000000000000000000000000000000000000000000000000",
+-  GOVERNANCE_ROLE: ethers.utils.id("GOVERNANCE_ROLE"),
+-  OPERATIONS_ROLE: ethers.utils.id("OPERATIONS_ROLE"),
+-  EMERGENCY_ROLE: ethers.utils.id("EMERGENCY_ROLE"),
+-  MINTER_ROLE: ethers.utils.id("MINTER_ROLE"),
+-  DISPUTE_ARBITER_ROLE: ethers.utils.id("DISPUTE_ARBITER_ROLE"),
+-  ATTESTER_ROLE: ethers.utils.id("ATTESTER_ROLE"),
+-  REGISTRAR_ROLE: ethers.utils.id("REGISTRAR_ROLE"),
+-  MONITOR_ROLE: ethers.utils.id("MONITOR_ROLE"),
+-  QC_MANAGER_ROLE: ethers.utils.id("QC_MANAGER_ROLE"),
+-  ENFORCEMENT_ROLE: ethers.utils.id("ENFORCEMENT_ROLE"),
++  GOVERNANCE_ROLE: ethers.id("GOVERNANCE_ROLE"),
++  OPERATIONS_ROLE: ethers.id("OPERATIONS_ROLE"),
++  EMERGENCY_ROLE: ethers.id("EMERGENCY_ROLE"),
++  MINTER_ROLE: ethers.id("MINTER_ROLE"),
++  DISPUTE_ARBITER_ROLE: ethers.id("DISPUTE_ARBITER_ROLE"),
++  ATTESTER_ROLE: ethers.id("ATTESTER_ROLE"),
++  REGISTRAR_ROLE: ethers.id("REGISTRAR_ROLE"),
++  MONITOR_ROLE: ethers.id("MONITOR_ROLE"),
++  QC_MANAGER_ROLE: ethers.id("QC_MANAGER_ROLE"),
++  ENFORCEMENT_ROLE: ethers.id("ENFORCEMENT_ROLE"),
+}
+
+Prompt for AI Agent:
+In solidity/scripts/verify-roles.ts around lines 9 to 18, update ethers v6 syntax by replacing all uses of ethers.utils.id(...) with ethers.id(...); modify each role assignment (GOVERNANCE_ROLE, OPERATIONS_ROLE, EMERGENCY_ROLE, MINTER_ROLE, DISPUTE_ARBITER_ROLE, ATTESTER_ROLE, REGISTRAR_ROLE, MONITOR_ROLE, QC_MANAGER_ROLE, ENFORCEMENT_ROLE) to call ethers.id instead of ethers.utils.id, and ensure any imports or references to ethers remain correct for v6.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/AccountControl.sol
+Line: 419 to 431
+Type: potential_issue
+
+Comment:
+Avoid external call to self in redeemTBTC
+
+The function uses this.redeem(satoshis) which makes an external call to the same contract. This is inefficient and unnecessary.
+
+
+     function redeemTBTC(uint256 tbtcAmount) 
+         external 
+         onlyAuthorizedReserve 
+         returns (bool success)
+     {
+         // Convert tBTC to satoshis internally
+         uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
+-        return this.redeem(satoshis);
++        
++        if (minted[msg.sender] < satoshis) revert InsufficientMinted(minted[msg.sender], satoshis);
++        
++        // Update state
++        minted[msg.sender] -= satoshis;
++        totalMintedAmount -= satoshis;
++        
++        emit RedemptionProcessed(msg.sender, satoshis);
++        return true;
+     }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/AccountControl.sol around lines 419 to 431, the function redeemTBTC performs an unnecessary external call to itself via this.redeem(satoshis); change it to a direct/internal call by removing the this. qualifier (i.e., call redeem(satoshis)); if redeem is currently declared external, change its visibility to internal or add an internal wrapper that performs the same logic and returns the bool so redeemTBTC can call it directly; keep the satoshi conversion and return value unchanged.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 1115 to 1151
+Type: potential_issue
+
+Comment:
+Don't revert on individual QCs in batch processing
+
+The function reverts if individual QCs are not eligible, causing the entire batch to fail. Continue processing other QCs instead.
+
+
+
+ for (uint256 i = 0; i < qcAddresses.length; i++) {
+     address qc = qcAddresses[i];
+     
+     // Check if QC is eligible for escalation
+     QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+     if (currentStatus != QCData.QCStatus.Paused && currentStatus != QCData.QCStatus.MintingPaused) {
+-        revert QCNotEligibleForEscalation();
++        continue; // Skip non-eligible QCs
+     }
+     
+     // Skip if no pause timestamp
+     if (qcPauseTimestamp[qc] == 0) continue;
+     
+     uint256 timeElapsed = block.timestamp - qcPauseTimestamp[qc];
+     
+     // Check if escalation period has been reached
+     if (timeElapsed < SELF_PAUSE_TIMEOUT) {
+-        revert EscalationPeriodNotReached();
++        continue; // Skip QCs not ready for escalation
+     }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 1115 to 1151, the loop currently reverts on per-QC errors which aborts the whole batch; change the logic to skip invalid QCs and continue processing others. Specifically: replace the revert when QC status is not Paused or MintingPaused with a continue; replace the revert when timeElapsed < SELF_PAUSE_TIMEOUT with a continue so QCs that haven't reached escalation don't abort the batch; keep the timestamp zero check, warning emission, escalationWarningEmitted flag update, and the _performAutoEscalation call as-is so valid QCs proceed; ensure no other state changes occur before the continues so skipping is safe.
+
+
+
+============================================================================
+File: solidity/test/helpers/stateManagementHelpers.ts
+Line: 99 to 102
+Type: refactor_suggestion
+
+Comment:
+Replace magic number with a named constant, swap deprecated ethers helper, fix typing, and remove hardcoded signer cap.
+
+- Replace 4 with a named enum/constant (e.g., QCStatus.Revoked).
+- Replace formatBytes32String(...) with encodeBytes32String(...) (ethers v6 rename).
+- Replace qcData: any with the proper Contract/interface type.
+- Remove the hardcoded 10 signer limit — iterate signers.length or use a configurable limit.
+
+File: solidity/test/helpers/stateManagementHelpers.ts — resetQCDataState (lines ~86–115; change around ~99–102).
+
+
+
+
+============================================================================
+File: solidity/package.json
+Line: 40
+Type: refactor_suggestion
+
+Comment:
+Move @nomicfoundation/hardhat-network-helpers to devDependencies and bump to ^3.0.0.
+
+Testing utility — should be a devDependency; latest published version is 3.0.0 (npm/jsDelivr).
+
+  "dependencies": {
+    "@keep-network/bitcoin-spv-sol": "3.4.0-solc-0.8",
+    "@keep-network/ecdsa": "development",
+    "@keep-network/random-beacon": "development",
+    "@keep-network/tbtc": "development",
+-   "@nomicfoundation/hardhat-network-helpers": "^1.1.0",
+    "@openzeppelin/contracts": "^4.8.1",
+    "@openzeppelin/contracts-upgradeable": "^4.8.1",
+    "@thesis/solidity-contracts": "github:thesis/solidity-contracts#4985bcf"
+  },
+  "devDependencies": {
+    "@defi-wonderland/smock": "^2.3.4",
+    "@keep-network/hardhat-helpers": "0.6.0-pre.18",
+    "@keep-network/hardhat-local-networks-config": "^0.1.0-pre.4",
+    "@nomiclabs/hardhat-ethers": "^2.0.6",
+    "@nomiclabs/hardhat-etherscan": "^3.1.0",
+    "@nomiclabs/hardhat-waffle": "^2.0.2",
++   "@nomicfoundation/hardhat-network-helpers": "^3.0.0",
+    "@openzeppelin/hardhat-upgrades": "1.22.0",
+
+Prompt for AI Agent:
+In solidity/package.json around line 40, the package "@nomicfoundation/hardhat-network-helpers" is listed as a runtime dependency and pinned to "^1.1.0"; move it from "dependencies" to "devDependencies" and update its version to "^3.0.0". Edit package.json to remove the entry under "dependencies" (or change the key) and add it under "devDependencies" with the new version, then run npm install (or yarn) to update lockfile and verify no runtime imports rely on it.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 1502 to 1508
+Type: refactor_suggestion
+
+Comment:
+Improve batch sync implementation
+
+After fixing syncBackingFromOracle to be public, update this function to avoid external self-calls.
+
+
+
+ function batchSyncBackingFromOracle(address[] calldata qcs) external {
+     for (uint256 i = 0; i < qcs.length; i++) {
+         if (qcs[i] != address(0)) {
+-            try this.syncBackingFromOracle(qcs[i]) {} catch {}
++            try syncBackingFromOracle(qcs[i]) {} catch {
++                // Consider logging failed syncs for monitoring
++            }
+         }
+     }
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 1502-1508, replace the external self-call try this.syncBackingFromOracle(qcs[i]) {} catch {} with a direct internal/public invocation by calling syncBackingFromOracle(qcs[i]) (remove the try/catch and the "this." prefix) so the batch loop calls the function internally; if continuation on per-item failure is required, move the logic into an internal helper (e.g., _syncBackingFromOracle) and have both syncBackingFromOracle (public) and batchSyncBackingFromOracle call that internal helper.
+
+
+
+============================================================================
+File: solidity/test/helpers/stateManagementHelpers.ts
+Line: 298 to 301
+Type: potential_issue
+
+Comment:
+Snapshot restoration needs snapshot ID tracking.
+
+The function doesn't track which snapshot to restore. You need to store and use the snapshot ID.
+
+
++let currentSnapshotId: string | null = null;
++
+ export async function createEnhancedSnapshot(
+   contracts: any,
+   signers: any,
+   mocks: any = {},
+   useStateReset: boolean = true
+ ) {
+-  const { createSnapshot } = await import("hardhat").then(hh => hh.helpers.snapshot);
+-  await createSnapshot();
++  const { network } = await import("hardhat");
++  currentSnapshotId = await network.provider.send("evm_snapshot", []);
+   
+   if (useStateReset) {
+     await resetAllTestState(contracts, signers, mocks);
+   }
+ }
+
+ export async function restoreEnhancedSnapshot() {
+-  const { restoreSnapshot } = await import("hardhat").then(hh => hh.helpers.snapshot);
+-  await restoreSnapshot();
++  if (!currentSnapshotId) {
++    throw new Error("No snapshot to restore");
++  }
++  const { network } = await import("hardhat");
++  await network.provider.send("evm_revert", [currentSnapshotId]);
+ }
+
+Prompt for AI Agent:
+In solidity/test/helpers/stateManagementHelpers.ts around lines 298 to 301, restoreEnhancedSnapshot currently calls restoreSnapshot without a snapshot ID; add a module-level variable to store the snapshot ID when a snapshot is created, update the snapshot-creation helper to assign that ID (e.g., lastSnapshotId = createdId), and modify restoreEnhancedSnapshot to read that ID, call restoreSnapshot(lastSnapshotId), and throw a clear error if the ID is undefined so callers know to create a snapshot first.
+
+
+
+Review completed ✔

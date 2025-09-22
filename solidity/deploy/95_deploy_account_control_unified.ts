@@ -9,7 +9,8 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   const { deploy, log, get } = deployments
 
   // Handle test networks with mock deployments
-  const isTestNetwork = network.name === "hardhat" || network.name === "localhost"
+  const TEST_NETWORKS = ["hardhat", "localhost", "sepolia", "goerli", "holesky", "development"]
+  const isTestNetwork = TEST_NETWORKS.includes(network.name)
 
   if (isTestNetwork) {
     log("=== Deploying Account Control for Test Network ===")
@@ -205,6 +206,9 @@ const func: DeployFunction = async function DeployAccountControlUnified(
     log(`QCManager deployed at: ${qcManager.address}`)
   } catch (error: any) {
     log(`Error deploying QCManager: ${error.message}`)
+    if (process.env.DEBUG) {
+      log(`Stack trace: ${error.stack}`)
+    }
     // Try alternative deployment method for large contracts
     log("Attempting alternative deployment method...")
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
