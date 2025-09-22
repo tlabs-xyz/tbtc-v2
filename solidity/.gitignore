@@ -26,3 +26,4 @@ CLAUDE.md
 
 # Ignore symlinked directory
 optimistic-minting
+typechain-types/
