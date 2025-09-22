@@ -119,8 +119,28 @@ describe("QCRedeemer", () => {
     mockQCData.isQCRegistered.returns(true)
     mockQCData.getQCStatus.returns(0) // Active status
 
+    // Setup QCData mocks for wallet registration
+    // Default behavior - any wallet query returns the qcAddress as owner
+    mockQCData.getWalletOwner.returns(qcAddress.address)
+    // Mock wallet status as Active (enum value 1)
+    mockQCData.getWalletStatus.returns(1) // WalletStatus.Active
+
     // Mock tBTC balance to always have enough
     mockTbtc.balanceOf.returns(ethers.utils.parseEther("100")) // 100 tBTC balance for all users
+    mockTbtc.burnFrom.returns(true) // Mock successful burns
+
+    // Deploy a mock AccountControl for redeemTBTC calls
+    const MockAccountControl = await ethers.getContractFactory("MockAccountControl")
+    const mockAccountControl = await MockAccountControl.deploy()
+    await mockAccountControl.deployed()
+
+    // Set the AccountControl address in QCRedeemer
+    await qcRedeemer.setAccountControl(mockAccountControl.address)
+
+    // Set a large totalMinted amount to allow redemptions in tests
+    // 1000 BTC in satoshis should cover all test cases
+    const largeAmount = ethers.BigNumber.from("100000000000") // 1000 BTC * 10^8 satoshis
+    await mockAccountControl.setTotalMintedForTesting(largeAmount)
   })
 
   afterEach(async () => {
@@ -170,7 +190,8 @@ describe("QCRedeemer", () => {
             .initiateRedemption(
               ethers.constants.AddressZero,
               redemptionAmount,
-              validLegacyBtc
+              validLegacyBtc,
+              validLegacyBtc // qcWalletAddress
             )
         ).to.be.revertedWith("InvalidQCAddress")
       })
@@ -179,7 +200,7 @@ describe("QCRedeemer", () => {
         await expect(
           qcRedeemer
             .connect(user)
-            .initiateRedemption(qcAddress.address, 0, validLegacyBtc)
+            .initiateRedemption(qcAddress.address, 0, validLegacyBtc, validLegacyBtc)
         ).to.be.revertedWith("InvalidAmount")
       })
 
@@ -187,7 +208,7 @@ describe("QCRedeemer", () => {
         await expect(
           qcRedeemer
             .connect(user)
-            .initiateRedemption(qcAddress.address, redemptionAmount, "")
+            .initiateRedemption(qcAddress.address, redemptionAmount, "", validLegacyBtc)
         ).to.be.revertedWith("BitcoinAddressRequired")
       })
 
@@ -195,7 +216,7 @@ describe("QCRedeemer", () => {
         await expect(
           qcRedeemer
             .connect(user)
-            .initiateRedemption(qcAddress.address, redemptionAmount, invalidBtc)
+            .initiateRedemption(qcAddress.address, redemptionAmount, invalidBtc, validLegacyBtc)
         ).to.be.revertedWith("InvalidBitcoinAddressFormat")
       })
 
@@ -207,7 +228,8 @@ describe("QCRedeemer", () => {
             .initiateRedemption(
               qcAddress.address,
               redemptionAmount,
-              "2A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
+              "2A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+              validLegacyBtc // qcWalletAddress
             )
         ).to.be.revertedWith("InvalidBitcoinAddressFormat")
       })
@@ -220,7 +242,8 @@ describe("QCRedeemer", () => {
             .initiateRedemption(
               qcAddress.address,
               redemptionAmount,
-              "b1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
+              "b1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080",
+              validLegacyBtc // qcWalletAddress
             )
         ).to.be.revertedWith("InvalidBitcoinAddressFormat")
       })
@@ -235,7 +258,7 @@ describe("QCRedeemer", () => {
         usedBtc = validLegacyBtc
         tx = await qcRedeemer
           .connect(user)
-          .initiateRedemption(qcAddress.address, redemptionAmount, usedBtc)
+          .initiateRedemption(qcAddress.address, redemptionAmount, usedBtc, validLegacyBtc)
         const receipt = await tx.wait()
         const event = receipt.events?.find(
           (e: any) => e.event === "RedemptionRequested" // Event interface
@@ -280,7 +303,8 @@ describe("QCRedeemer", () => {
           .initiateRedemption(
             qcAddress.address,
             redemptionAmount,
-            validBech32Btc
+            validBech32Btc,
+            validBech32Btc // qcWalletAddress
           )
         const receipt2 = await tx2.wait()
         const event2 = receipt2.events?.find(
@@ -297,7 +321,8 @@ describe("QCRedeemer", () => {
             .initiateRedemption(
               qcAddress.address,
               redemptionAmount,
-              "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"
+              "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2",
+              "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2" // qcWalletAddress
             )
         ).to.not.be.reverted
       })
@@ -309,7 +334,8 @@ describe("QCRedeemer", () => {
             .initiateRedemption(
               qcAddress.address,
               redemptionAmount,
-              "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy"
+              "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+              "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy" // qcWalletAddress
             )
         ).to.not.be.reverted
       })
@@ -321,7 +347,8 @@ describe("QCRedeemer", () => {
             .initiateRedemption(
               qcAddress.address,
               redemptionAmount,
-              validBech32Btc
+              validBech32Btc,
+              validBech32Btc // qcWalletAddress
             )
         ).to.not.be.reverted
       })
@@ -339,7 +366,8 @@ describe("QCRedeemer", () => {
         .initiateRedemption(
           qcAddress.address,
           ethers.utils.parseEther("5"),
-          validLegacyBtc
+          validLegacyBtc,
+          validLegacyBtc // qcWalletAddress
         )
       const receipt = await tx.wait()
       const event = receipt.events?.find(
@@ -442,7 +470,8 @@ describe("QCRedeemer", () => {
         .initiateRedemption(
           qcAddress.address,
           ethers.utils.parseEther("5"),
-          validLegacyBtc
+          validLegacyBtc,
+          validLegacyBtc // qcWalletAddress
         )
       const receipt = await tx.wait()
       const event = receipt.events?.find(
@@ -529,7 +558,8 @@ describe("QCRedeemer", () => {
         .initiateRedemption(
           qcAddress.address,
           ethers.utils.parseEther("5"),
-          validLegacyBtc
+          validLegacyBtc,
+          validLegacyBtc // qcWalletAddress
         )
       const receipt = await tx.wait()
       const event = receipt.events?.find(
@@ -581,7 +611,7 @@ describe("QCRedeemer", () => {
       const redemptionAmount = ethers.utils.parseEther("5")
       const tx = await qcRedeemer
         .connect(user)
-        .initiateRedemption(qcAddress.address, redemptionAmount, validLegacyBtc)
+        .initiateRedemption(qcAddress.address, redemptionAmount, validLegacyBtc, validLegacyBtc)
       const receipt = await tx.wait()
       const event = receipt.events?.find(
         (e: any) => e.event === "RedemptionRequested"
@@ -619,7 +649,8 @@ describe("QCRedeemer", () => {
           .initiateRedemption(
             qcAddress.address,
             ethers.utils.parseEther("5"),
-            validLegacyBtc
+            validLegacyBtc,
+            validLegacyBtc // qcWalletAddress
           )
         const receipt = await tx.wait()
         const event = receipt.events?.find(
@@ -691,7 +722,8 @@ describe("QCRedeemer", () => {
           .initiateRedemption(
             qcAddress.address,
             ethers.utils.parseEther("5"),
-            validLegacyBtc
+            validLegacyBtc,
+            validLegacyBtc // qcWalletAddress
           )
         const receipt = await tx.wait()
         const event = receipt.events?.find(
@@ -728,7 +760,8 @@ describe("QCRedeemer", () => {
         .initiateRedemption(
           qcAddress.address,
           ethers.utils.parseEther("5"),
-          validLegacyBtc
+          validLegacyBtc,
+          validLegacyBtc // qcWalletAddress
         )
       const receipt = await tx.wait()
       const event = receipt.events?.find(

@@ -73,9 +73,12 @@ describe("SystemState Security Tests", () => {
         )
 
         // Pauser can pause
-        await expect(systemState.connect(pauser).pauseMinting())
+        const pauseTx = await systemState.connect(pauser).pauseMinting()
+        const receipt = await pauseTx.wait()
+        const block = await ethers.provider.getBlock(receipt.blockNumber)
+        await expect(pauseTx)
           .to.emit(systemState, "MintingPaused")
-          .withArgs(pauser.address)
+          .withArgs(pauser.address, block.timestamp)
       })
 
       it("should only allow EMERGENCY_ROLE to unpause operations", async () => {
@@ -89,9 +92,12 @@ describe("SystemState Security Tests", () => {
         )
 
         // Pauser can unpause
-        await expect(systemState.connect(pauser).unpauseMinting())
+        const unpauseTx = await systemState.connect(pauser).unpauseMinting()
+        const receipt = await unpauseTx.wait()
+        const block = await ethers.provider.getBlock(receipt.blockNumber)
+        await expect(unpauseTx)
           .to.emit(systemState, "MintingUnpaused")
-          .withArgs(pauser.address)
+          .withArgs(pauser.address, block.timestamp)
       })
     })
 
@@ -281,7 +287,7 @@ describe("SystemState Security Tests", () => {
     it("should prevent setting zero address as emergency council", async () => {
       await expect(
         systemState
-          .connect(paramAdmin)
+          .connect(governance)
           .setEmergencyCouncil(ethers.constants.AddressZero)
       ).to.be.revertedWith("InvalidCouncilAddress")
     })
@@ -289,7 +295,7 @@ describe("SystemState Security Tests", () => {
     it("should emit event when setting emergency council", async () => {
       await expect(
         systemState
-          .connect(paramAdmin)
+          .connect(governance)
           .setEmergencyCouncil(emergencyCouncil.address)
       )
         .to.emit(systemState, "EmergencyCouncilUpdated")

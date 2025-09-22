@@ -3,6 +3,7 @@ import { ethers, upgrades } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { AccountControl } from "../../typechain";
+import { setupAccountControlForTesting } from "../helpers/testSetupHelpers";
 
 describe("AccountControl mintTBTC Functionality", function () {
   let accountControl: AccountControl;
@@ -33,10 +34,14 @@ describe("AccountControl mintTBTC Functionality", function () {
     // Authorize a reserve with 10 BTC cap
     const mintingCap = ONE_BTC_IN_SATOSHIS.mul(10); // 10 BTC in satoshis
     await accountControl.connect(owner).authorizeReserve(reserve.address, mintingCap);
-    
+
     // Set backing for the reserve (10 BTC)
     const backing = ONE_BTC_IN_SATOSHIS.mul(10); // 10 BTC in satoshis
     await accountControl.connect(reserve).updateBacking(backing);
+
+    // Setup additional authorization for other test signers in case they're used
+    const allSigners = await ethers.getSigners();
+    await setupAccountControlForTesting(accountControl, allSigners, owner);
   });
 
   describe("mintTBTC return value", function () {

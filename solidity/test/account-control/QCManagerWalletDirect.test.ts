@@ -55,10 +55,16 @@ describe("QCManager - Direct Wallet Registration", () => {
     const messageSigning = await MessageSigningFactory.deploy()
     await messageSigning.deployed()
 
-    // Deploy QCManager with library
+    // Deploy QCManagerLib library
+    const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib")
+    const qcManagerLib = await QCManagerLibFactory.deploy()
+    await qcManagerLib.deployed()
+
+    // Deploy QCManager with both libraries
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
         MessageSigning: messageSigning.address,
+        QCManagerLib: qcManagerLib.address,
       },
     })
     qcManager = await QCManagerFactory.deploy(

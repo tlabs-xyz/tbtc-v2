@@ -225,7 +225,7 @@ describe("L2WormholeGateway", () => {
           await expect(tx)
             .to.emit(
               wormholeBridgeStub,
-              "WormholeBridgeStub_completeTransferWithPayload"
+              "WormholeBridgeStubCompleteTransferWithPayload"
             )
             .withArgs(encodedVm)
         })
@@ -412,7 +412,7 @@ describe("L2WormholeGateway", () => {
 
           it("should sent tokens through the bridge", async () => {
             await expect(tx)
-              .to.emit(wormholeBridgeStub, "WormholeBridgeStub_transferTokens")
+              .to.emit(wormholeBridgeStub, "WormholeBridgeStubTransferTokens")
               .withArgs(
                 wormholeTbtc.address,
                 amount,
@@ -478,7 +478,7 @@ describe("L2WormholeGateway", () => {
             await expect(tx)
               .to.emit(
                 wormholeBridgeStub,
-                "WormholeBridgeStub_transferTokensWithPayload"
+                "WormholeBridgeStubTransferTokensWithPayload"
               )
               .withArgs(
                 wormholeTbtc.address,
@@ -556,7 +556,7 @@ describe("L2WormholeGateway", () => {
 
           it("should sent the entire amount through the bridge", async () => {
             await expect(tx)
-              .to.emit(wormholeBridgeStub, "WormholeBridgeStub_transferTokens")
+              .to.emit(wormholeBridgeStub, "WormholeBridgeStubTransferTokens")
               .withArgs(
                 wormholeTbtc.address,
                 amount,
@@ -603,7 +603,7 @@ describe("L2WormholeGateway", () => {
 
           it("should drop the dust before sending over the bridge", async () => {
             await expect(tx)
-              .to.emit(wormholeBridgeStub, "WormholeBridgeStub_transferTokens")
+              .to.emit(wormholeBridgeStub, "WormholeBridgeStubTransferTokens")
               .withArgs(
                 wormholeTbtc.address,
                 amountToTake,
@@ -650,7 +650,7 @@ describe("L2WormholeGateway", () => {
 
           it("should drop the dust before sending over the bridge", async () => {
             await expect(tx)
-              .to.emit(wormholeBridgeStub, "WormholeBridgeStub_transferTokens")
+              .to.emit(wormholeBridgeStub, "WormholeBridgeStubTransferTokens")
               .withArgs(
                 wormholeTbtc.address,
                 amountToTake,

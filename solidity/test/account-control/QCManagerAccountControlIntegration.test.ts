@@ -52,10 +52,16 @@ describe("QCManager - AccountControl Integration", function () {
     const messageSigning = await MessageSigningFactory.deploy();
     await messageSigning.deployed();
 
-    // Deploy QCManager with MessageSigning library linked
+    // Deploy QCManagerLib library (required for QCManager)
+    const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib");
+    const qcManagerLib = await QCManagerLibFactory.deploy();
+    await qcManagerLib.deployed();
+
+    // Deploy QCManager with both libraries linked
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
         MessageSigning: messageSigning.address,
+        QCManagerLib: qcManagerLib.address,
       },
     });
     qcManager = await QCManagerFactory.deploy(
@@ -66,10 +72,15 @@ describe("QCManager - AccountControl Integration", function () {
 
     // Set up permissions
     const DEFAULT_ADMIN_ROLE = await qcManager.DEFAULT_ADMIN_ROLE();
+    const GOVERNANCE_ROLE = await qcManager.GOVERNANCE_ROLE();
     await qcManager.grantRole(DEFAULT_ADMIN_ROLE, governance.address);
+    await qcManager.grantRole(GOVERNANCE_ROLE, governance.address);
     
     // Connect AccountControl to QCManager
     await qcManager.connect(governance).setAccountControl(accountControl.address);
+
+    // Grant QCManager ownership of AccountControl so it can authorize reserves
+    await accountControl.connect(governance).transferOwnership(qcManager.address);
 
     snapshot = await createSnapshot();
   });

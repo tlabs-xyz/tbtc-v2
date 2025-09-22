@@ -1,14 +1,16 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { deployQCManagerLib, getQCManagerLibraries } from "../helpers/spvLibraryHelpers";
 
-import { 
-  AccountControl, 
-  QCManager, 
+import {
+  AccountControl,
+  QCManager,
   ReserveOracle,
   QCData,
   SystemState
 } from "../../typechain";
+import { setupSystemStateDefaults } from "../helpers/testSetupHelpers";
 
 describe("AccountControl Oracle Integration", function () {
   let accountControl: AccountControl;
@@ -17,6 +19,7 @@ describe("AccountControl Oracle Integration", function () {
   let qcData: QCData;
   let systemState: SystemState;
   let mockBank: any;
+  let messageSigning: any;
   
   let owner: SignerWithAddress;
   let emergencyCouncil: SignerWithAddress;
@@ -47,17 +50,19 @@ describe("AccountControl Oracle Integration", function () {
     const SystemStateFactory = await ethers.getContractFactory("SystemState");
     systemState = await SystemStateFactory.deploy();
 
-    // Deploy ReserveOracle
+    // Deploy ReserveOracle (uses constructor, not upgradeable)
     const ReserveOracleFactory = await ethers.getContractFactory("ReserveOracle");
-    reserveOracle = await upgrades.deployProxy(
-      ReserveOracleFactory,
-      [
-        2, // consensusThreshold
-        3600, // attestationTimeout (1 hour)
-        [attester1.address, attester2.address, attester3.address]
-      ],
-      { initializer: "initialize" }
-    ) as ReserveOracle;
+    reserveOracle = await ReserveOracleFactory.deploy();
+
+    // Configure ReserveOracle after deployment
+    await reserveOracle.setConsensusThreshold(2);
+    await reserveOracle.setAttestationTimeout(3600); // 1 hour
+
+    // Grant attester roles
+    const ATTESTER_ROLE = await reserveOracle.ATTESTER_ROLE();
+    await reserveOracle.grantRole(ATTESTER_ROLE, attester1.address);
+    await reserveOracle.grantRole(ATTESTER_ROLE, attester2.address);
+    await reserveOracle.grantRole(ATTESTER_ROLE, attester3.address);
 
     // Deploy AccountControl
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
@@ -67,8 +72,15 @@ describe("AccountControl Oracle Integration", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Deploy QCManager
-    const QCManagerFactory = await ethers.getContractFactory("QCManager");
+    // Deploy QCManagerLib and MessageSigning libraries
+    const { qcManagerLib, messageSigning: msgSigning } = await deployQCManagerLib();
+    messageSigning = msgSigning;
+
+    // Deploy QCManager with libraries
+    const QCManagerFactory = await ethers.getContractFactory(
+      "QCManager",
+      getQCManagerLibraries({ messageSigning, qcManagerLib })
+    );
     qcManager = await QCManagerFactory.deploy(
       qcData.address,
       systemState.address,
@@ -77,6 +89,23 @@ describe("AccountControl Oracle Integration", function () {
 
     // Set AccountControl in QCManager
     await qcManager.connect(owner).setAccountControl(accountControl.address);
+
+    // Grant QCManager the QC_MANAGER_ROLE in AccountControl (allows authorizeReserve calls)
+    await accountControl.connect(owner).grantQCManagerRole(qcManager.address);
+
+    // Grant QCManager the QC_MANAGER_ROLE in QCData
+    const QC_MANAGER_ROLE = await qcData.QC_MANAGER_ROLE();
+    await qcData.grantRole(QC_MANAGER_ROLE, qcManager.address);
+
+    // Grant GOVERNANCE_ROLE to owner for QCManager operations
+    const GOVERNANCE_ROLE = await qcManager.GOVERNANCE_ROLE();
+    await qcManager.grantRole(GOVERNANCE_ROLE, owner.address);
+
+    // Configure SystemState with test defaults to prevent AmountOutsideAllowedRange errors
+    await setupSystemStateDefaults(systemState, owner);
+
+    // Grant owner authorization in AccountControl to authorize reserves
+    // Note: owner is already set in AccountControl constructor
   });
 
   describe("Oracle-Backing Integration Flow", function () {
@@ -204,8 +233,9 @@ describe("AccountControl Oracle Integration", function () {
       await reserveOracle.connect(attester1).attestBalance(qc.address, qcBalance);
       await reserveOracle.connect(attester2).attestBalance(qc.address, qcBalance);
 
-      // Fast forward time to make data stale (more than attestationTimeout)
-      await ethers.provider.send("evm_increaseTime", [3700]); // 61+ minutes
+      // Consensus should be reached here, updating lastUpdateTimestamp
+      // Now fast forward time to make the consensus data stale
+      await ethers.provider.send("evm_increaseTime", [86500]); // 24+ hours
       await ethers.provider.send("evm_mine", []);
 
       // Sync should still work but report stale data
@@ -279,8 +309,15 @@ describe("AccountControl Oracle Integration", function () {
 
     it("should handle syncBackingFromOracle when AccountControl not set", async function () {
       // Deploy new QCManager without setting AccountControl
-      const freshQCManager = await ethers.getContractFactory("QCManager").then(f => 
-        f.deploy(qcData.address, systemState.address, reserveOracle.address)
+      const { qcManagerLib: freshQCManagerLib } = await deployQCManagerLib();
+      const freshQCManagerFactory = await ethers.getContractFactory(
+        "QCManager",
+        getQCManagerLibraries({ messageSigning, qcManagerLib: freshQCManagerLib })
+      );
+      const freshQCManager = await freshQCManagerFactory.deploy(
+        qcData.address,
+        systemState.address,
+        reserveOracle.address
       );
 
       await expect(

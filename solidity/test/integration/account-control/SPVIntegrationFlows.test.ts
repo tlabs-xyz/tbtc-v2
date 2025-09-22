@@ -53,15 +53,40 @@ describe("Message Signing Integration Flows", () => {
     const SystemState = await ethers.getContractFactory("SystemState")
     systemState = await SystemState.deploy(deployer.address)
 
+    // Deploy MessageSigning library
+    const MessageSigning = await ethers.getContractFactory("MessageSigning")
+    const messageSigning = await MessageSigning.deploy()
+
     // Deploy QC contracts with message signing capabilities
-    const QCManager = await ethers.getContractFactory("QCManager")
+    const QCManager = await ethers.getContractFactory("QCManager", {
+      libraries: {
+        MessageSigning: messageSigning.address,
+      },
+    })
     qcManager = await QCManager.deploy(
       await qcData.getAddress(),
       await systemState.getAddress(),
       ethers.ZeroAddress // No reserve oracle needed for this test
     )
 
-    const QCRedeemer = await ethers.getContractFactory("QCRedeemer")
+    // Deploy SharedSPVCore library for QCRedeemer
+    const SharedSPVCore = await ethers.getContractFactory("SharedSPVCore")
+    const sharedSPVCore = await SharedSPVCore.deploy()
+
+    // Deploy QCRedeemerSPV library with SharedSPVCore linked
+    const QCRedeemerSPV = await ethers.getContractFactory("QCRedeemerSPV", {
+      libraries: {
+        SharedSPVCore: sharedSPVCore.address,
+      },
+    })
+    const qcRedeemerSPV = await QCRedeemerSPV.deploy()
+
+    // Deploy QCRedeemer with proper library linking
+    const QCRedeemer = await ethers.getContractFactory("QCRedeemer", {
+      libraries: {
+        QCRedeemerSPV: qcRedeemerSPV.address,
+      },
+    })
     qcRedeemer = await QCRedeemer.deploy(
       await tbtcToken.getAddress(),
       await qcData.getAddress(),

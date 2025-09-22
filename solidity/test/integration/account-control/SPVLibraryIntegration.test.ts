@@ -19,6 +19,8 @@ import {
   ComplexMultiInputTx,
 } from "../../data/bitcoin/spv/valid-spv-proofs"
 
+import { deploySPVLibraries, getQCManagerLibraries, getQCRedeemerLibraries } from "../../helpers/spvLibraryHelpers"
+
 /**
  * Integration Tests for SPV Library Architecture
  *

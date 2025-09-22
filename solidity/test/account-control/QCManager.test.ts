@@ -1,5 +1,5 @@
 import chai, { expect } from "chai"
-import { ethers, helpers } from "hardhat"
+import { ethers, helpers, upgrades } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 import {
@@ -8,7 +8,9 @@ import {
   SystemState,
   ReserveOracle,
   IQCRedeemer,
+  AccountControl,
 } from "../../typechain"
+import { deployMessageSigning, deployQCManagerLib, getQCManagerLibraries } from "../helpers/spvLibraryHelpers"
 
 chai.use(smock.matchers)
 
@@ -25,6 +27,7 @@ describe("QCManager", () => {
   let user: SignerWithAddress
 
   let qcManager: QCManager
+  let accountControl: AccountControl
   let mockQCData: FakeContract<QCData>
   let mockSystemState: FakeContract<SystemState>
   let mockReserveOracle: FakeContract<ReserveOracle>
@@ -83,14 +86,28 @@ describe("QCManager", () => {
     mockReserveOracle = await smock.fake<ReserveOracle>("ReserveOracle")
     mockQCRedeemer = await smock.fake<IQCRedeemer>("IQCRedeemer")
 
-    // Deploy QCManager with message signing support
-    const QCManagerFactory = await ethers.getContractFactory("QCManager")
+    // Deploy QCManagerLib library (includes MessageSigning)
+    const { qcManagerLib, messageSigning } = await deployQCManagerLib()
+
+    // Deploy QCManager with library support
+    const QCManagerFactory = await ethers.getContractFactory(
+      "QCManager",
+      getQCManagerLibraries({ messageSigning, qcManagerLib })
+    )
     qcManager = await QCManagerFactory.deploy(
       mockQCData.address,
       mockSystemState.address,
       mockReserveOracle.address
     )
     await qcManager.deployed()
+
+    // Deploy AccountControl using upgrades proxy (required for tests that trigger requiresAccountControl modifier)
+    const AccountControlFactory = await ethers.getContractFactory("AccountControl")
+    accountControl = await upgrades.deployProxy(
+      AccountControlFactory,
+      [governance.address, pauser.address, deployer.address], // Use deployer as mock bank
+      { initializer: "initialize" }
+    ) as AccountControl
 
     // Setup default mock behaviors
     mockSystemState.isFunctionPaused.returns(false) // Functions not paused
@@ -111,6 +128,7 @@ describe("QCManager", () => {
     mockQCRedeemer.getEarliestRedemptionDeadline.returns(0)
 
     // Grant roles for testing
+    await qcManager.grantRole(DEFAULT_ADMIN_ROLE, governance.address) // Required for setAccountControl
     await qcManager.grantRole(GOVERNANCE_ROLE, governance.address)
     await qcManager.grantRole(DISPUTE_ARBITER_ROLE, arbiter.address)
     await qcManager.grantRole(ENFORCEMENT_ROLE, watchdog.address)
@@ -120,6 +138,15 @@ describe("QCManager", () => {
 
     // Set QCRedeemer reference for integrated functionality
     await qcManager.setQCRedeemer(mockQCRedeemer.address)
+
+    // Connect AccountControl to QCManager (required for tests that trigger requiresAccountControl modifier)
+    await qcManager.connect(governance).setAccountControl(accountControl.address)
+
+    // Note: QC authorization removed from global setup to avoid conflicts
+    // Individual test suites will authorize QCs as needed for their specific scenarios
+
+    // Grant QCManager ownership of AccountControl so it can authorize reserves
+    await accountControl.connect(governance).transferOwnership(qcManager.address)
   })
 
   afterEach(async () => {
@@ -211,11 +238,27 @@ describe("QCManager", () => {
   })
 
   describe("Minting Capacity Management", () => {
+    let mintingQC: SignerWithAddress
+
     beforeEach(async () => {
-      // Setup registered QC
-      mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
+      // Use a different QC address for minting tests to avoid conflicts with registration tests
+      const signers = await ethers.getSigners()
+      mintingQC = signers[8] // Use a different signer for minting tests
+
+      // Setup QC registration mocks - start with QC not registered
+      mockQCData.isQCRegistered.whenCalledWith(mintingQC.address).returns(false)
+
+      // Register the QC properly first (this will authorize it in AccountControl)
+      // This addresses the NotAuthorized error from AccountControl.setMintingCap
+      await qcManager.connect(governance).registerQC(
+        mintingQC.address,
+        initialMintingCapacity
+      )
+
+      // After registration, mock the QC as registered with the capacity
+      mockQCData.isQCRegistered.whenCalledWith(mintingQC.address).returns(true)
       mockQCData.getMaxMintingCapacity
-        .whenCalledWith(qcAddress.address)
+        .whenCalledWith(mintingQC.address)
         .returns(initialMintingCapacity)
     })
 
@@ -225,10 +268,10 @@ describe("QCManager", () => {
 
         const tx = await qcManager
           .connect(governance)
-          .increaseMintingCapacity(qcAddress.address, newCapacity)
+          .increaseMintingCapacity(mintingQC.address, newCapacity)
 
         expect(mockQCData.updateMaxMintingCapacity).to.have.been.calledWith(
-          qcAddress.address,
+          mintingQC.address,
           newCapacity
         )
 
@@ -241,20 +284,22 @@ describe("QCManager", () => {
         await expect(
           qcManager
             .connect(governance)
-            .increaseMintingCapacity(qcAddress.address, lowerCapacity)
+            .increaseMintingCapacity(mintingQC.address, lowerCapacity)
         ).to.be.revertedWith("NewCapMustBeHigher")
       })
 
       it("should revert for unregistered QC", async () => {
+        // Use a different QC for this negative test
+        const unregisteredQC = user // Use a different address
         mockQCData.isQCRegistered
-          .whenCalledWith(qcAddress.address)
+          .whenCalledWith(unregisteredQC.address)
           .returns(false)
 
         await expect(
           qcManager
             .connect(governance)
             .increaseMintingCapacity(
-              qcAddress.address,
+              unregisteredQC.address,
               initialMintingCapacity.mul(2)
             )
         ).to.be.revertedWith("QCNotRegistered")

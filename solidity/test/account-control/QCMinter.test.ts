@@ -95,6 +95,14 @@ describe("QCMinter", () => {
     // Setup mocks for manualMint
     mockTBTCVault.mint.returns()
     mockTBTC.transfer.returns(true)
+
+    // Deploy and configure AccountControl for QCMinter
+    const MockAccountControl = await ethers.getContractFactory("MockAccountControl")
+    const mockAccountControl = await MockAccountControl.deploy()
+    await mockAccountControl.deployed()
+
+    // Set the AccountControl address in QCMinter
+    await qcMinter.setAccountControl(mockAccountControl.address)
   })
 
   afterEach(async () => {
@@ -148,15 +156,20 @@ describe("QCMinter", () => {
         ).to.have.been.calledWith(qcAddress.address)
       })
 
-      it("should increase balance in Bank", async () => {
-        await qcMinter
+      it("should call AccountControl to mint TBTC", async () => {
+        const MockAccountControl = await ethers.getContractFactory("MockAccountControl")
+        const mockAccountControl = MockAccountControl.attach(
+          await qcMinter.accountControl()
+        )
+
+        const tx = await qcMinter
           .connect(user)
           .requestQCMint(qcAddress.address, mintAmount)
 
-        expect(mockBank.increaseBalance).to.have.been.calledWith(
-          user.address,
-          satoshis
-        )
+        // Verify AccountControl.mintTBTC was called via event
+        await expect(tx)
+          .to.emit(mockAccountControl, "TBTCMinted")
+          .withArgs(user.address, mintAmount, satoshis)
       })
 
       it("should update QC minted amount", async () => {
@@ -556,16 +569,20 @@ describe("QCMinter", () => {
 
       it("should perform auto-mint when enabled and requested", async () => {
         const permitData = "0x" // Empty permit data
-        
-        await qcMinter
+
+        const MockAccountControl = await ethers.getContractFactory("MockAccountControl")
+        const mockAccountControl = MockAccountControl.attach(
+          await qcMinter.accountControl()
+        )
+
+        const tx = await qcMinter
           .connect(user)
           .requestQCMintHybrid(qcAddress.address, mintAmount, true, permitData)
 
-        // Should call the regular mint flow
-        expect(mockBank.increaseBalance).to.have.been.calledWith(
-          user.address,
-          satoshis
-        )
+        // Should call AccountControl.mintTBTC via event
+        await expect(tx)
+          .to.emit(mockAccountControl, "TBTCMinted")
+          .withArgs(user.address, mintAmount, satoshis)
         
         // Should also call auto-mint flow
         expect(mockBank.transferBalanceFrom).to.have.been.calledWith(
@@ -593,16 +610,20 @@ describe("QCMinter", () => {
 
       it("should not auto-mint when autoMint flag is false", async () => {
         const permitData = "0x"
-        
-        await qcMinter
+
+        const MockAccountControl = await ethers.getContractFactory("MockAccountControl")
+        const mockAccountControl = MockAccountControl.attach(
+          await qcMinter.accountControl()
+        )
+
+        const tx = await qcMinter
           .connect(user)
           .requestQCMintHybrid(qcAddress.address, mintAmount, false, permitData)
 
-        // Should call the regular mint flow
-        expect(mockBank.increaseBalance).to.have.been.calledWith(
-          user.address,
-          satoshis
-        )
+        // Should call AccountControl.mintTBTC
+        await expect(tx)
+          .to.emit(mockAccountControl, "TBTCMinted")
+          .withArgs(user.address, mintAmount, satoshis)
         
         // Should NOT call auto-mint flow
         expect(mockBank.transferBalanceFrom).to.not.have.been.called
@@ -613,16 +634,20 @@ describe("QCMinter", () => {
       it("should not auto-mint when auto-minting is disabled", async () => {
         await qcMinter.setAutoMintEnabled(false)
         const permitData = "0x"
-        
-        await qcMinter
+
+        const MockAccountControl = await ethers.getContractFactory("MockAccountControl")
+        const mockAccountControl = MockAccountControl.attach(
+          await qcMinter.accountControl()
+        )
+
+        const tx = await qcMinter
           .connect(user)
           .requestQCMintHybrid(qcAddress.address, mintAmount, true, permitData)
 
-        // Should call the regular mint flow
-        expect(mockBank.increaseBalance).to.have.been.calledWith(
-          user.address,
-          satoshis
-        )
+        // Should call AccountControl.mintTBTC
+        await expect(tx)
+          .to.emit(mockAccountControl, "TBTCMinted")
+          .withArgs(user.address, mintAmount, satoshis)
         
         // Should NOT call auto-mint flow
         expect(mockBank.transferBalanceFrom).to.not.have.been.called

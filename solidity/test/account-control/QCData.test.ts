@@ -216,7 +216,7 @@ describe("QCData", () => {
             .connect(thirdParty)
             .setQCStatus(qcAddress.address, 1, testReason)
         ).to.be.revertedWith(
-          "Caller must have QC_MANAGER_ROLE or STATE_MANAGER_ROLE"
+          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_MANAGER_ROLE}`
         )
       })
     })

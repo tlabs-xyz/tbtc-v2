@@ -411,9 +411,9 @@ describe("ReserveOracle", () => {
     })
 
     describe("setAttestationTimeout", () => {
-      it("should allow admin to update timeout", async () => {
+      it("should allow arbiter to update timeout", async () => {
         await expect(
-          reserveOracle.connect(deployer).setAttestationTimeout(7200)
+          reserveOracle.connect(arbiter).setAttestationTimeout(7200)
         )
           .to.emit(reserveOracle, "AttestationTimeoutUpdated")
           .withArgs(21600, 7200)
@@ -421,25 +421,25 @@ describe("ReserveOracle", () => {
         expect(await reserveOracle.attestationTimeout()).to.equal(7200)
       })
 
-      it("should revert if not admin", async () => {
+      it("should revert if not arbiter", async () => {
         await expect(
           reserveOracle.connect(attester1).setAttestationTimeout(7200)
         ).to.be.revertedWith(
-          `AccessControl: account ${attester1.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
+          `AccessControl: account ${attester1.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
         )
       })
 
       it("should revert if timeout is zero", async () => {
         await expect(
-          reserveOracle.connect(deployer).setAttestationTimeout(0)
+          reserveOracle.connect(arbiter).setAttestationTimeout(0)
         ).to.be.revertedWith("InvalidTimeout")
       })
     })
 
     describe("setMaxStaleness", () => {
-      it("should allow admin to update max staleness", async () => {
+      it("should allow arbiter to update max staleness", async () => {
         await expect(
-          reserveOracle.connect(deployer).setMaxStaleness(172800) // 48 hours
+          reserveOracle.connect(arbiter).setMaxStaleness(172800) // 48 hours
         )
           .to.emit(reserveOracle, "MaxStalenessUpdated")
           .withArgs(86400, 172800)
@@ -449,15 +449,15 @@ describe("ReserveOracle", () => {
 
       it("should revert if staleness is zero", async () => {
         await expect(
-          reserveOracle.connect(deployer).setMaxStaleness(0)
-        ).to.be.revertedWith("InvalidTimeout")
+          reserveOracle.connect(arbiter).setMaxStaleness(0)
+        ).to.be.revertedWith("InvalidStaleness")
       })
 
-      it("should revert if not admin", async () => {
+      it("should revert if not arbiter", async () => {
         await expect(
           reserveOracle.connect(attester1).setMaxStaleness(172800)
         ).to.be.revertedWith(
-          `AccessControl: account ${attester1.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
+          `AccessControl: account ${attester1.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
         )
       })
     })
