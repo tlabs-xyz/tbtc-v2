@@ -75,13 +75,17 @@ describe("SPV Security Tests", () => {
     const ReserveOracle = await ethers.getContractFactory("ReserveOracle")
     reserveOracle = await ReserveOracle.deploy()
 
-    // Deploy MessageSigning library and link it
+    // Deploy MessageSigning library and QCManagerLib and link them
     const MessageSigning = await ethers.getContractFactory("MessageSigning")
     const messageSigning = await MessageSigning.deploy()
+
+    const QCManagerLib = await ethers.getContractFactory("QCManagerLib")
+    const qcManagerLib = await QCManagerLib.deploy()
 
     const QCManager = await ethers.getContractFactory("QCManager", {
       libraries: {
         MessageSigning: messageSigning.address,
+        QCManagerLib: qcManagerLib.address,
       },
     })
     qcManager = await QCManager.deploy(

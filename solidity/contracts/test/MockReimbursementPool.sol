@@ -4,6 +4,11 @@ pragma solidity 0.8.17;
 /// @title Minimal Mock ReimbursementPool for testing
 contract MockReimbursementPool {
     mapping(address => bool) public isAuthorized;
+    address public owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
 
     function authorize(address maintainer) external {
         isAuthorized[maintainer] = true;

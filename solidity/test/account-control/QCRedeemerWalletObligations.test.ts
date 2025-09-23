@@ -9,6 +9,7 @@ import {
   TBTC,
   SPVState,
 } from "../../typechain"
+import { deploySPVLibraries, getQCRedeemerLibraries } from "../helpers/spvLibraryHelpers"
 
 chai.use(smock.matchers)
 
@@ -49,8 +50,11 @@ describe("QCRedeemer - Wallet Obligations", () => {
     mockSystemState = await smock.fake<SystemState>("SystemState")
     mockTBTC = await smock.fake<TBTC>("TBTC")
 
-    // Deploy QCRedeemer with required SPV parameters
-    const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer")
+    // Deploy SPV libraries for QCRedeemer
+    const libraries = await deploySPVLibraries()
+
+    // Deploy QCRedeemer with required SPV parameters and library linking
+    const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer", getQCRedeemerLibraries(libraries))
     qcRedeemer = await QCRedeemerFactory.deploy(
       mockTBTC.address,
       mockQCData.address,

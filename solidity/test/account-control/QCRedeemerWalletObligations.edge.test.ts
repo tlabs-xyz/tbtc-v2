@@ -3,6 +3,7 @@ import { ethers, helpers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 import { QCRedeemer, QCData, SystemState, TBTC } from "../../typechain"
+import { deploySPVLibraries, getQCRedeemerLibraries } from "../helpers/spvLibraryHelpers"
 
 chai.use(smock.matchers)
 
@@ -50,8 +51,11 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
     mockSystemState = await smock.fake<SystemState>("SystemState")
     mockTBTC = await smock.fake<TBTC>("TBTC")
 
-    // Deploy QCRedeemer
-    const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer")
+    // Deploy SPV libraries for QCRedeemer
+    const libraries = await deploySPVLibraries()
+
+    // Deploy QCRedeemer with library linking
+    const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer", getQCRedeemerLibraries(libraries))
     qcRedeemer = await QCRedeemerFactory.deploy(
       mockTBTC.address,
       mockQCData.address,
