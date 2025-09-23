@@ -705,18 +705,18 @@ describe("ReserveOracle", () => {
       expect(indexToAttester).to.equal(attester1.address)
     })
 
-    it("should not re-register existing attesters", async () => {
+    it("should prevent duplicate attestations from same attester", async () => {
       // First attestation registers the attester
       await reserveOracle
         .connect(attester1)
         .attestBalance(qcAddress.address, ethers.utils.parseEther("100"))
 
-      // Second attestation should not register again
-      const tx = await reserveOracle
-        .connect(attester1)
-        .attestBalance(qcAddress.address, ethers.utils.parseEther("200"))
-
-      await expect(tx).to.not.emit(reserveOracle, "AttesterRegistered")
+      // Second attestation from same attester should be rejected
+      await expect(
+        reserveOracle
+          .connect(attester1)
+          .attestBalance(qcAddress.address, ethers.utils.parseEther("200"))
+      ).to.be.revertedWith("AttesterAlreadySubmitted")
 
       // Index should remain the same
       const attesterIndex = await reserveOracle.attesterToIndex(

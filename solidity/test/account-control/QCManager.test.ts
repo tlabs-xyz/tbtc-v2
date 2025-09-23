@@ -318,25 +318,21 @@ describe("QCManager", () => {
     })
 
     context("when called by registrar with verified wallet ownership", () => {
-      it("should register wallet successfully", async () => {
+      it("should fail wallet registration with invalid signature", async () => {
         const challenge = ethers.utils.id("test_challenge")
-        const mockSignature = `0x${"aa".repeat(65)}` // Mock 65-byte signature
+        const mockSignature = `0x${"aa".repeat(65)}` // Mock 65-byte signature (invalid)
 
-        const tx = await qcManager
-          .connect(registrar)
-          .registerWallet(
-            qcAddress.address,
-            validBtcAddress,
-            challenge,
-            mockSignature
-          )
-
-        expect(mockQCData.registerWallet).to.have.been.calledWith(
-          qcAddress.address,
-          validBtcAddress
-        )
-
-        await expect(tx).to.emit(qcManager, "WalletRegistrationRequested")
+        // MessageSigning now validates signatures, so this should fail
+        await expect(
+          qcManager
+            .connect(registrar)
+            .registerWallet(
+              qcAddress.address,
+              validBtcAddress,
+              challenge,
+              mockSignature
+            )
+        ).to.be.revertedWith("MessageSignatureVerificationFailed")
       })
 
       it("should revert for unregistered QC", async () => {
