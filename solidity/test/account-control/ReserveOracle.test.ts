@@ -399,7 +399,7 @@ describe("ReserveOracle", () => {
         await expect(
           reserveOracle.connect(attester1).setConsensusThreshold(5)
         ).to.be.revertedWith(
-          `AccessControl: account ${attester1.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
+          `AccessControl: account ${attester1.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
         )
       })
 

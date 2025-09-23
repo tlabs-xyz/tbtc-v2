@@ -162,7 +162,7 @@ describe("SystemState Security Tests", () => {
 
         // Advance time
         await helpers.time.increaseTime(60 * 60) // 1 hour
-        await helpers.mine()
+        await ethers.provider.send("evm_mine", [])
 
         // Pause timestamp should be accessible for duration calculation
         const mintingPauseKey = ethers.utils.keccak256(
