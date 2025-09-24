@@ -1,5 +1,0 @@
-yarn run v1.22.22
-warning ../../../../../package.json: No license field
-$ USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test
-Error encountered while fetching public networks
-No need to generate any newer typings.
