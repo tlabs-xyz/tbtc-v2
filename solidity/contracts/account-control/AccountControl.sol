@@ -295,7 +295,7 @@ contract AccountControl is
     /// @dev Enforces backing requirements but doesn't update minted[reserve]
     /// @param recipient Address to receive minted tokens
     /// @param amount Amount to mint in satoshis
-    function mint(address recipient, uint256 amount)
+    function mintTokens(address recipient, uint256 amount)
         external
         onlyAuthorizedReserve
         nonReentrant
@@ -311,16 +311,30 @@ contract AccountControl is
         emit PureTokenMint(msg.sender, recipient, amount);
     }
 
+    /// @notice Original mint function for backward compatibility
+    /// @dev Combines token minting and accounting updates
+    /// @param recipient Address to receive minted tokens
+    /// @param amount Amount to mint in satoshis
+    function mint(address recipient, uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+        returns (bool)
+    {
+        _mintInternal(msg.sender, recipient, amount);
+        return true;
+    }
+
     /// @notice Pure token burning without accounting updates
     /// @dev Burns tokens from caller's balance without updating minted[reserve]
     /// @param amount Amount to burn in satoshis
-    function burn(uint256 amount)
+    function burnTokens(uint256 amount)
         external
         onlyAuthorizedReserve
         nonReentrant
     {
-        // Pure token burning via Bank
-        IBank(bank).burn(amount);
+        // Pure token burning via Bank - burn from the caller (reserve)
+        IBank(bank).burnFrom(msg.sender, amount);
 
         emit PureTokenBurn(msg.sender, amount);
     }
@@ -371,14 +385,14 @@ contract AccountControl is
 
     // ========== INTERNAL HELPERS FOR SEPARATED OPERATIONS ==========
 
-    function _mintTokens(address recipient, uint256 amount) internal {
+    function _mintTokensInternal(address recipient, uint256 amount) internal {
         // Pure token minting via Bank
         IBank(bank).mint(recipient, amount);
     }
 
-    function _burnTokens(uint256 amount) internal {
-        // Pure token burning via Bank
-        IBank(bank).burn(amount);
+    function _burnTokensInternal(uint256 amount) internal {
+        // Pure token burning via Bank - burn from the caller (reserve)
+        IBank(bank).burnFrom(msg.sender, amount);
     }
 
     function _creditMintedInternal(address reserve, uint256 amount) internal {
@@ -451,7 +465,7 @@ contract AccountControl is
         satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
 
         // Use separated operations for backward compatibility - internal calls
-        _mintTokens(recipient, satoshis);      // Pure token operation
+        _mintTokensInternal(recipient, satoshis);      // Pure token operation
         _creditMintedInternal(msg.sender, satoshis);         // Pure accounting operation
 
         // Emit original event for backward compatibility
@@ -591,7 +605,7 @@ contract AccountControl is
         uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
 
         // Use separated operations - internal calls
-        _burnTokens(satoshis);           // Pure token operation
+        _burnTokensInternal(satoshis);           // Pure token operation
         _debitMintedInternal(msg.sender, satoshis);    // Pure accounting operation
 
         return true;
@@ -751,4 +765,5 @@ interface IBank {
     function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external;
     function mint(address recipient, uint256 amount) external;
     function burn(uint256 amount) external;
+    function burnFrom(address account, uint256 amount) external;
 }

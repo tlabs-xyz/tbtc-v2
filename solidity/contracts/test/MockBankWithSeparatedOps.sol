@@ -98,6 +98,12 @@ contract MockBankWithSeparatedOps is IBank {
         _totalSupply -= amount;
     }
 
+    function burnFrom(address account, uint256 amount) external {
+        require(_balances[account] >= amount, "MockBank: Insufficient balance to burn");
+        _balances[account] -= amount;
+        _totalSupply -= amount;
+    }
+
     function decreaseBalance(address account, uint256 amount) external {
         require(_balances[account] >= amount, "Insufficient balance");
         _balances[account] -= amount;

@@ -11,9 +11,9 @@ describe("AccountControl Separated Operations - Simple Test", function () {
   let reserve: SignerWithAddress;
   let user: SignerWithAddress;
 
-  // Fixed test amounts
-  const SMALL_CAP = ethers.utils.parseUnits("1000000", 0);   // 1M satoshis = 0.01 BTC
-  const MEDIUM_CAP = ethers.utils.parseUnits("2000000", 0);  // 2M satoshis = 0.02 BTC
+  // Fixed test amounts - increased caps to avoid ExceedsReserveCap errors
+  const SMALL_CAP = ethers.utils.parseUnits("5000000", 0);   // 5M satoshis = 0.05 BTC
+  const MEDIUM_CAP = ethers.utils.parseUnits("10000000", 0); // 10M satoshis = 0.1 BTC
   const SMALL_MINT = ethers.utils.parseUnits("500000", 0);   // 500K satoshis = 0.005 BTC
 
   beforeEach(async function () {
@@ -31,8 +31,8 @@ describe("AccountControl Separated Operations - Simple Test", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Authorize a reserve for testing
-    await accountControl.connect(owner).authorizeReserve(reserve.address, SMALL_CAP);
+    // Authorize a reserve for testing with larger cap
+    await accountControl.connect(owner).authorizeReserve(reserve.address, MEDIUM_CAP);
   });
 
   describe("Core Separated Operations", function () {
@@ -44,7 +44,7 @@ describe("AccountControl Separated Operations - Simple Test", function () {
       const initialMinted = await accountControl.minted(reserve.address);
 
       // Call pure mint
-      await accountControl.connect(reserve).mint(user.address, SMALL_MINT);
+      await accountControl.connect(reserve).mintTokens(user.address, SMALL_MINT);
 
       // Verify: tokens minted via Bank.mint(), minted[reserve] unchanged
       expect(await mockBank.balanceOf(user.address)).to.equal(SMALL_MINT);
@@ -52,16 +52,17 @@ describe("AccountControl Separated Operations - Simple Test", function () {
     });
 
     it("should burn tokens without updating accounting", async function () {
-      // Setup: give reserve some tokens first
-      await mockBank.mint(reserve.address, MEDIUM_CAP);
-      await accountControl.connect(reserve).creditMinted(SMALL_MINT);
+      // Setup: give reserve some tokens to burn
+      await mockBank.setBalance(reserve.address, MEDIUM_CAP); // Direct setup
 
+      // Setup accounting state
+      await accountControl.connect(reserve).creditMinted(SMALL_MINT);
       const initialMinted = await accountControl.minted(reserve.address);
 
-      // Call pure burn
-      await accountControl.connect(reserve).burn(SMALL_MINT);
+      // Call pure burn from reserve (who has the tokens)
+      await accountControl.connect(reserve).burnTokens(SMALL_MINT);
 
-      // Verify: tokens burned, accounting unchanged
+      // Verify: tokens burned from reserve, accounting unchanged
       expect(await mockBank.balanceOf(reserve.address)).to.equal(MEDIUM_CAP.sub(SMALL_MINT));
       expect(await accountControl.minted(reserve.address)).to.equal(initialMinted); // No change
     });
@@ -95,7 +96,7 @@ describe("AccountControl Separated Operations - Simple Test", function () {
 
       // Test pure mint event
       await expect(
-        accountControl.connect(reserve).mint(user.address, SMALL_MINT)
+        accountControl.connect(reserve).mintTokens(user.address, SMALL_MINT)
       ).to.emit(accountControl, "PureTokenMint")
        .withArgs(reserve.address, user.address, SMALL_MINT);
 
@@ -124,10 +125,9 @@ describe("AccountControl Separated Operations - Simple Test", function () {
     });
 
     it("should handle burnTBTC functionality", async function () {
-      // Setup: mint first
-      await accountControl.connect(reserve).updateBacking(MEDIUM_CAP);
-      await mockBank.mint(reserve.address, MEDIUM_CAP);
-      await accountControl.connect(reserve).creditMinted(MEDIUM_CAP);
+      // Setup: give reserve tokens and accounting
+      await mockBank.setBalance(reserve.address, MEDIUM_CAP); // Give tokens to burn
+      await accountControl.connect(reserve).creditMinted(SMALL_MINT); // Setup accounting
 
       const tbtcAmount = ethers.utils.parseEther("0.005");
       const expectedSatoshis = tbtcAmount.div(ethers.utils.parseUnits("1", 10));
@@ -148,11 +148,11 @@ describe("AccountControl Separated Operations - Simple Test", function () {
 
     it("should require authorization for separated operations", async function () {
       await expect(
-        accountControl.connect(user).mint(user.address, SMALL_MINT)
+        accountControl.connect(user).mintTokens(user.address, SMALL_MINT)
       ).to.be.revertedWith("NotAuthorized");
 
       await expect(
-        accountControl.connect(user).burn(SMALL_MINT)
+        accountControl.connect(user).burnTokens(SMALL_MINT)
       ).to.be.revertedWith("NotAuthorized");
 
       await expect(
@@ -168,17 +168,17 @@ describe("AccountControl Separated Operations - Simple Test", function () {
   describe("CEX Vault Loss Scenario", function () {
 
     it("should handle strategy loss through separated operations", async function () {
-      // Setup: Normal mint operation
-      await accountControl.connect(reserve).updateBacking(MEDIUM_CAP.mul(5));
+      // Setup: Normal mint operation with larger backing
+      await accountControl.connect(reserve).updateBacking(MEDIUM_CAP);
       await accountControl.connect(reserve).mintTBTC(user.address, ethers.utils.parseEther("0.01"));
 
-      // Give reserve tokens to burn
-      await mockBank.mint(reserve.address, SMALL_MINT);
+      // Give reserve tokens to burn for loss scenario
+      await mockBank.setBalance(reserve.address, SMALL_MINT);
 
       const initialMinted = await accountControl.minted(reserve.address);
 
       // Simulate strategy loss: burn tokens without accounting update
-      await accountControl.connect(reserve).burn(SMALL_MINT);
+      await accountControl.connect(reserve).burnTokens(SMALL_MINT);
 
       // Verify: tokens burned, accounting unchanged (for loss absorption)
       expect(await mockBank.balanceOf(reserve.address)).to.equal(0);
