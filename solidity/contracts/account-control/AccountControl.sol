@@ -369,6 +369,44 @@ contract AccountControl is
         emit AccountingDebit(msg.sender, amount);
     }
 
+    // ========== INTERNAL HELPERS FOR SEPARATED OPERATIONS ==========
+
+    function _mintTokens(address recipient, uint256 amount) internal {
+        // Pure token minting via Bank
+        IBank(bank).mint(recipient, amount);
+    }
+
+    function _burnTokens(uint256 amount) internal {
+        // Pure token burning via Bank
+        IBank(bank).burn(amount);
+    }
+
+    function _creditMintedInternal(address reserve, uint256 amount) internal {
+        // Check caps
+        if (minted[reserve] + amount > reserveInfo[reserve].mintingCap) {
+            revert ExceedsReserveCap(minted[reserve] + amount, reserveInfo[reserve].mintingCap);
+        }
+
+        if (globalMintingCap > 0 && totalMintedAmount + amount > globalMintingCap) {
+            revert ExceedsGlobalCap(totalMintedAmount + amount, globalMintingCap);
+        }
+
+        // Pure accounting increment
+        minted[reserve] += amount;
+        totalMintedAmount += amount;
+    }
+
+    function _debitMintedInternal(address reserve, uint256 amount) internal {
+        // Validation
+        if (minted[reserve] < amount) {
+            revert InsufficientMinted(minted[reserve], amount);
+        }
+
+        // Pure accounting decrement
+        minted[reserve] -= amount;
+        totalMintedAmount -= amount;
+    }
+
     function _mintInternal(address reserve, address recipient, uint256 amount) internal {
         // Validate amount
         if (amount < MIN_MINT_AMOUNT) revert AmountTooSmall(amount, MIN_MINT_AMOUNT);
@@ -412,9 +450,9 @@ contract AccountControl is
         // Convert tBTC to satoshis internally
         satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
 
-        // Use separated operations for backward compatibility
-        mint(recipient, satoshis);      // Pure token operation
-        creditMinted(satoshis);         // Pure accounting operation
+        // Use separated operations for backward compatibility - internal calls
+        _mintTokens(recipient, satoshis);      // Pure token operation
+        _creditMintedInternal(msg.sender, satoshis);         // Pure accounting operation
 
         // Emit original event for backward compatibility
         emit MintExecuted(msg.sender, recipient, satoshis);
@@ -552,9 +590,9 @@ contract AccountControl is
     {
         uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
 
-        // Use separated operations
-        burn(satoshis);           // Pure token operation
-        debitMinted(satoshis);    // Pure accounting operation
+        // Use separated operations - internal calls
+        _burnTokens(satoshis);           // Pure token operation
+        _debitMintedInternal(msg.sender, satoshis);    // Pure accounting operation
 
         return true;
     }
