@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { ethers, upgrades } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
   QCData,
@@ -65,10 +65,13 @@ describe("QCManagerLib", function () {
       reserveOracle.address
     );
 
-    // Deploy AccountControl
+    // Deploy AccountControl using upgrades proxy
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
-    accountControl = await AccountControlFactory.deploy();
-    await accountControl.initialize(owner.address, owner.address, mockBank.address);
+    accountControl = await upgrades.deployProxy(
+      AccountControlFactory,
+      [owner.address, owner.address, mockBank.address],
+      { initializer: "initialize" }
+    ) as AccountControl;
 
     // Setup roles
     const QC_MANAGER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_MANAGER_ROLE"));

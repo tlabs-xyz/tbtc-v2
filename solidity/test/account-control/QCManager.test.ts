@@ -471,6 +471,14 @@ describe("QCManager", () => {
       // Setup registered QC in Active status
       mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
       mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(0) // Active
+
+      // Authorize QC as a reserve in AccountControl for status change tests
+      // This is needed because revoking a QC will call AccountControl.deauthorizeReserve()
+      await accountControl.authorizeReserve(
+        qcAddress.address,
+        ethers.utils.parseEther("100"), // minting cap
+        0 // QC_RESERVE type
+      )
     })
 
     describe("setQCStatus", () => {
@@ -1017,6 +1025,13 @@ describe("QCManager", () => {
       mockQCRedeemer.hasUnfulfilledRedemptions
         .whenCalledWith(qcAddress.address)
         .returns(false)
+
+      // Authorize QC as a reserve in AccountControl for Revoked status transitions
+      // This is needed because transitioning to Revoked calls AccountControl.deauthorizeReserve()
+      await accountControl.connect(governance).authorizeReserve(
+        qcAddress.address,
+        ethers.utils.parseEther("100") // minting cap
+      )
 
       // Grant initial pause credit (using deployer who has DEFAULT_ADMIN_ROLE)
       await qcManager.connect(deployer).grantInitialCredit(qcAddress.address)

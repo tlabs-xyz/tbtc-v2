@@ -241,8 +241,12 @@ library QCManagerLib {
             (uint256 balance, bool isStale) = reserveOracle
                 .getReserveBalanceAndStaleness(qc);
 
+            // If reserves are stale, return 0 (no capacity available)
+            if (isStale) {
+                return 0;
+            }
 
-            if (!isStale && balance > mintedAmount) {
+            if (balance > mintedAmount) {
                 uint256 reserveBasedCapacity = balance - mintedAmount;
                 // Return minimum of cap-based and reserve-based
                 return capBasedCapacity < reserveBasedCapacity

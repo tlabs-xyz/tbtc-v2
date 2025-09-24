@@ -44,4 +44,21 @@ contract MockQCManager {
         require(qcMintedAmount[qc] >= amount, "Insufficient minted amount");
         qcMintedAmount[qc] -= amount;
     }
+
+    // Alias for setMaxMintingCap to match test expectations
+    function setMintingCapacity(address qc, uint256 capacity) external {
+        maxMintingCaps[qc] = capacity;
+        emit MintingCapUpdated(qc, capacity);
+    }
+
+    function getAvailableMintingCapacity(address qc) external view returns (uint256) {
+        // Simple mock: return max cap minus minted amount
+        uint256 cap = maxMintingCaps[qc];
+        uint256 minted = qcMintedAmount[qc];
+        return cap > minted ? cap - minted : 0;
+    }
+
+    function updateQCMintedAmount(address qc, uint256 newAmount) external {
+        qcMintedAmount[qc] = newAmount;
+    }
 }

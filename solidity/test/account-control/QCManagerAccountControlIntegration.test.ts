@@ -109,18 +109,10 @@ describe("QCManager - AccountControl Integration", function () {
     });
 
     it("should handle AccountControl authorization gracefully when address is zero", async function () {
-      const mintingCap = ethers.utils.parseUnits("100", 8);
-
-      // Mock QCData to allow registration
-      mockQCData.isQCRegistered.returns(false);
-
-      // Set AccountControl to zero address
-      await qcManager.connect(governance).setAccountControl(ethers.constants.AddressZero);
-
-      // Registration should not revert (gracefully handled)
+      // Setting AccountControl to zero address should revert (security protection)
       await expect(
-        qcManager.connect(governance).registerQC(qcAddress.address, mintingCap)
-      ).to.not.be.reverted;
+        qcManager.connect(governance).setAccountControl(ethers.constants.AddressZero)
+      ).to.be.reverted;
     });
   });
 

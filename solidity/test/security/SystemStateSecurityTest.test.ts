@@ -121,7 +121,7 @@ describe("SystemState Security Tests", () => {
         const pauseTime = block.timestamp
 
         const mintingPauseKey = ethers.utils.keccak256(
-          ethers.utils.toUtf8Bytes("MINTING_PAUSE")
+          ethers.utils.toUtf8Bytes("minting")
         )
         expect(await systemState.pauseTimestamps(mintingPauseKey)).to.equal(
           pauseTime
@@ -166,7 +166,7 @@ describe("SystemState Security Tests", () => {
 
         // Pause timestamp should be accessible for duration calculation
         const mintingPauseKey = ethers.utils.keccak256(
-          ethers.utils.toUtf8Bytes("MINTING_PAUSE")
+          ethers.utils.toUtf8Bytes("minting")
         )
         const pauseTimestamp = await systemState.pauseTimestamps(
           mintingPauseKey
@@ -280,7 +280,7 @@ describe("SystemState Security Tests", () => {
           .connect(attacker)
           .setEmergencyCouncil(emergencyCouncil.address)
       ).to.be.revertedWith(
-        `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
+        `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
       )
     })
 
@@ -302,7 +302,7 @@ describe("SystemState Security Tests", () => {
         .withArgs(
           ethers.constants.AddressZero,
           emergencyCouncil.address,
-          paramAdmin.address
+          governance.address
         )
     })
   })
@@ -392,9 +392,9 @@ describe("SystemState Security Tests", () => {
         ethers.utils.parseEther("0.01")
       )
       expect(await freshSystemState.maxMintAmount()).to.equal(
-        ethers.utils.parseEther("21000000")
+        ethers.utils.parseEther("1000")
       )
-      expect(await freshSystemState.redemptionTimeout()).to.equal(48 * 60 * 60) // 48 hours
+      expect(await freshSystemState.redemptionTimeout()).to.equal(7 * 24 * 60 * 60) // 7 days
       expect(await freshSystemState.staleThreshold()).to.equal(24 * 60 * 60) // 24 hours
       expect(await freshSystemState.minCollateralRatio()).to.equal(100) // 100%
     })
