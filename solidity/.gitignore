@@ -27,3 +27,6 @@ CLAUDE.md
 # Ignore symlinked directory
 optimistic-minting
 typechain-types/
+
+# Ignore code review artifacts
+coderabbit.txt

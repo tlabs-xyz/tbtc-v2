@@ -1,8 +1,8 @@
 yarn run v1.22.22
 warning ../../../../../package.json: No license field
 $ USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test
-Error encountered while fetching public networks
 No need to generate any newer typings.
+Error encountered while fetching public networks
 
   Debug MockTBTCToken
 Getting MockTBTCToken factory...
@@ -23,7 +23,6 @@ Warning: Potentially unsafe deployment of BridgeStub
     You are using the `unsafeAllow.external-library-linking` flag to include external libraries.
     Make sure you have manually checked that the linked libraries are upgrade safe.
 
-Initialized Wallet Owner address: 0xA82ED5224ba72f2f776e09B11DC99E30Ee65Da8d in transaction: 0xf581e93d5a41987b70c36d35d3882835af4f4a8377f5d108411d2c36977d00fc
     when upgrading Bridge implementation via Timelock
       ✓ should switch the implementation address
 
@@ -219,8 +218,81 @@ Warning: A proxy admin was previously deployed on this network
     This is not natively used with the current kind of proxy ('uups').
     Changes to the admin will have no effect on this new proxy.
 
+      ✓ should route minting through AccountControl when enabled
+✓ SystemState configured with test defaults
+Warning: A proxy admin was previously deployed on this network
 
-      1) "before each" hook for "should route minting through AccountControl when enabled"
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+      ✓ should bypass AccountControl when disabled
+✓ SystemState configured with test defaults
+Warning: A proxy admin was previously deployed on this network
+
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+      ✓ should enforce AccountControl backing invariant in AccountControl mode
+✓ SystemState configured with test defaults
+Warning: A proxy admin was previously deployed on this network
+
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+      ✓ should enforce AccountControl minting cap in AccountControl mode
+    QCRedeemer Integration
+✓ SystemState configured with test defaults
+Warning: A proxy admin was previously deployed on this network
+
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+      ✓ should notify AccountControl of redemption when enabled
+✓ SystemState configured with test defaults
+Warning: A proxy admin was previously deployed on this network
+
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+      ✓ should bypass AccountControl when disabled
+✓ SystemState configured with test defaults
+Warning: A proxy admin was previously deployed on this network
+
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+      ✓ should prevent over-redemption in AccountControl mode
+    AccountControl Mode Toggle Scenarios
+✓ SystemState configured with test defaults
+Warning: A proxy admin was previously deployed on this network
+
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+      ✓ should handle AccountControl mode toggling mid-operation
+    Cross-Contract Interaction Validation
+✓ SystemState configured with test defaults
+Warning: A proxy admin was previously deployed on this network
+
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+      ✓ should maintain consistent state across all contracts
+✓ SystemState configured with test defaults
+Warning: A proxy admin was previously deployed on this network
+
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+      ✓ should handle multiple QCs operating simultaneously
+    End-to-End Workflow
+✓ SystemState configured with test defaults
+Warning: A proxy admin was previously deployed on this network
+
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+      ✓ should complete full mint-redeem cycle with proper state management
 
   AccountControl mintTBTC Functionality
     mintTBTC return value
@@ -709,11 +781,11 @@ Warning: A proxy admin was previously deployed on this network
     Gas Optimization Verification
 
     Gas Optimization Results:
-      Single operation gas: 134697
-      Batch operation gas: 1198203
-      Gas per operation (batch): 59910
-      Estimated individual total: 2693940
-      Actual savings: 1495737 gas (55%)
+      Single operation gas: 134685
+      Batch operation gas: 1198179
+      Gas per operation (batch): 59908
+      Estimated individual total: 2693700
+      Actual savings: 1495521 gas (55%)
       ✓ should demonstrate gas savings with batch operations
 
   QCData
@@ -925,8 +997,7 @@ Warning: A proxy admin was previously deployed on this network
     This is not natively used with the current kind of proxy ('uups').
     Changes to the admin will have no effect on this new proxy.
 
-
-        2) should register wallet successfully
+        ✓ should fail wallet registration with invalid signature
 Warning: A proxy admin was previously deployed on this network
 
     This is not natively used with the current kind of proxy ('uups').
@@ -988,41 +1059,8 @@ Warning: A proxy admin was previously deployed on this network
     This is not natively used with the current kind of proxy ('uups').
     Changes to the admin will have no effect on this new proxy.
 
-          ✓ should change status to UnderReview
-Warning: A proxy admin was previously deployed on this network
 
-    This is not natively used with the current kind of proxy ('uups').
-    Changes to the admin will have no effect on this new proxy.
-
-
-          3) should change status to Revoked
-Warning: A proxy admin was previously deployed on this network
-
-    This is not natively used with the current kind of proxy ('uups').
-    Changes to the admin will have no effect on this new proxy.
-
-          ✓ should revert with empty reason
-        when called by non-arbiter
-Warning: A proxy admin was previously deployed on this network
-
-    This is not natively used with the current kind of proxy ('uups').
-    Changes to the admin will have no effect on this new proxy.
-
-          ✓ should revert
-      requestStatusChange
-        when called by watchdog enforcer
-Warning: A proxy admin was previously deployed on this network
-
-    This is not natively used with the current kind of proxy ('uups').
-    Changes to the admin will have no effect on this new proxy.
-
-          ✓ should request status change to UnderReview
-Warning: A proxy admin was previously deployed on this network
-
-    This is not natively used with the current kind of proxy ('uups').
-    Changes to the admin will have no effect on this new proxy.
-
-          ✓ should revert when requesting invalid status
+          1) "before each" hook for "should change status to UnderReview"
     Self-Pause System
       canSelfPause
 Warning: A proxy admin was previously deployed on this network
@@ -1185,8 +1223,7 @@ Warning: A proxy admin was previously deployed on this network
     This is not natively used with the current kind of proxy ('uups').
     Changes to the admin will have no effect on this new proxy.
 
-
-      4) should return zero for stale reserves
+      ✓ should return zero for stale reserves
     Auto-Escalation System
       checkEscalation
         when called by watchdog after timeout
@@ -1246,8 +1283,7 @@ Warning: A proxy admin was previously deployed on this network
     This is not natively used with the current kind of proxy ('uups').
     Changes to the admin will have no effect on this new proxy.
 
-
-        5) should allow Active → Revoked
+        ✓ should allow Active → Revoked
       MintingPaused State Transitions
 Warning: A proxy admin was previously deployed on this network
 
@@ -1272,8 +1308,7 @@ Warning: A proxy admin was previously deployed on this network
     This is not natively used with the current kind of proxy ('uups').
     Changes to the admin will have no effect on this new proxy.
 
-
-        6) should allow MintingPaused → Revoked
+        ✓ should allow MintingPaused → Revoked
       Paused State Transitions
 Warning: A proxy admin was previously deployed on this network
 
@@ -1298,8 +1333,7 @@ Warning: A proxy admin was previously deployed on this network
     This is not natively used with the current kind of proxy ('uups').
     Changes to the admin will have no effect on this new proxy.
 
-
-        7) should allow Paused → Revoked
+        ✓ should allow Paused → Revoked
       UnderReview State Transitions
 Warning: A proxy admin was previously deployed on this network
 
@@ -1312,8 +1346,7 @@ Warning: A proxy admin was previously deployed on this network
     This is not natively used with the current kind of proxy ('uups').
     Changes to the admin will have no effect on this new proxy.
 
-
-        8) should allow UnderReview → Revoked
+        ✓ should allow UnderReview → Revoked
 Warning: A proxy admin was previously deployed on this network
 
     This is not natively used with the current kind of proxy ('uups').
@@ -1405,12 +1438,17 @@ Warning: A proxy admin was previously deployed on this network
     Reserve Authorization Integration
       ✓ should authorize QC in AccountControl when registering through QCManager
 
-      9) "before each" hook for "should handle AccountControl authorization gracefully when address is zero"
+      2) "before each" hook for "should handle AccountControl authorization gracefully when address is zero"
 
   QCManagerLib
     Library Error Validation
+Warning: A proxy admin was previously deployed on this network
 
-      10) "before each" hook for "should revert with InvalidQCAddress when registering zero address"
+    This is not natively used with the current kind of proxy ('uups').
+    Changes to the admin will have no effect on this new proxy.
+
+
+      3) "before each" hook for "should revert with InvalidQCAddress when registering zero address"
 
   QCManager - Direct Wallet Registration
     registerWalletDirect
@@ -1532,24 +1570,20 @@ Warning: A proxy admin was previously deployed on this network
       when called by non-arbiter
         ✓ should revert
       when redemption is not pending
-
-        11) "before each" hook for "should revert"
+        ✓ should revert
       when called by arbiter with valid redemption
-
-        12) "before each" hook for "should update redemption status to Fulfilled"
+        ✓ should pass SPV validation but fail on payment verification
     flagDefaultedRedemption
       when called by non-arbiter
         ✓ should revert
       when redemption is not pending
-
-        13) "before each" hook for "should revert"
+        ✓ should revert
       when called by arbiter with valid redemption
         ✓ should update redemption status to Defaulted
         ✓ should emit RedemptionDefaulted event
     isRedemptionTimedOut
       when redemption is not pending
-
-        14) "before each" hook for "should return false"
+        ✓ should return false
       when redemption is pending but not timed out
         ✓ should return false
       when redemption is pending and timed out
@@ -1559,8 +1593,7 @@ Warning: A proxy admin was previously deployed on this network
       ✓ should return empty data for non-existent redemption
     Access Control
       DISPUTE_ARBITER_ROLE functions
-
-        15) should allow arbiter to record fulfillment
+        ✓ should allow arbiter to record fulfillment (fails on SPV validation as expected)
         ✓ should allow arbiter to flag default
         ✓ should prevent non-arbiter from recording fulfillment
         ✓ should prevent non-arbiter from flagging default
@@ -1596,7 +1629,7 @@ Warning: A proxy admin was previously deployed on this network
       ✓ should return false for transaction too large (DoS protection)
       ✓ should return false for excessive output count (DoS protection)
 
-      16) should return false for future locktime (anti-replay protection)
+      4) should return false for future locktime (anti-replay protection)
       ✓ should return false for invalid transaction version
       ✓ should return true for valid transaction
     Bitcoin Address Validation
@@ -1622,12 +1655,12 @@ Warning: A proxy admin was previously deployed on this network
   QCRedeemer - Wallet Obligations Edge Cases
     Edge Case: Bitcoin Address Validation
 
-      17) "before each" hook for "should reject QC wallet with invalid Bitcoin address format"
+      5) "before each" hook for "should reject QC wallet with invalid Bitcoin address format"
 
   QCRedeemer - Wallet Obligations
     Wallet-specific redemption tracking
 
-      18) "before each" hook for "should track redemptions by wallet"
+      6) "before each" hook for "should track redemptions by wallet"
 
   ReserveOracle
     Initialization
@@ -1655,8 +1688,7 @@ Warning: A proxy admin was previously deployed on this network
     Configuration
       setConsensusThreshold
         ✓ should allow admin to update threshold
-
-        19) should revert if not admin
+        ✓ should revert if not admin
         ✓ should revert if threshold is zero
       setAttestationTimeout
         ✓ should allow arbiter to update timeout
@@ -1675,12 +1707,11 @@ Warning: A proxy admin was previously deployed on this network
       ✓ should handle temporary zero balance between operations
     Edge cases
 
-      20) should handle attester updating their attestation
+      7) should handle attester updating their attestation
       ✓ should ignore expired attestations when calculating consensus
     Attester registration
       ✓ should automatically register attesters
-
-      21) should not re-register existing attesters
+      ✓ should prevent duplicate attestations from same attester
       ✓ should assign sequential indices to multiple attesters
     Emergency Functions
       emergencySetReserve
@@ -2286,7 +2317,7 @@ TestRelay           : 325006 gas (1.1% of block limit)
                         ✓ should emit DepositsSwept event
                       when the single input is a revealed unswept deposit with a trusted vault but non-equal to the vault passed via function parameter
                         ✓ should revert
-(node:863512) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 306)
+(node:2168438) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 298)
 (Use `node --trace-warnings ...` to show where the warning was created)
                       when the single input is the expected main UTXO
                         ✓ should revert
@@ -3120,7 +3151,7 @@ Warning: Potentially unsafe deployment of BridgeStub
                           when all target wallets follow the expected order
                             when all target wallets are in the Live state
 
-                              22) "before all" hook for "should store the target wallets commitment for the given wallet"
+                              8) "before all" hook for "should store the target wallets commitment for the given wallet"
                             when one of the target wallets is not in the Live state
                               ✓ should revert
                           when one of the target wallets break the expected order
@@ -3162,7 +3193,8 @@ Warning: Potentially unsafe deployment of BridgeStub
               ✓ should reset the moving funds timeout
               ✓ should emit MovingFundsTimeoutReset event
             when reset delay has not elapsed yet
-              ✓ should revert
+
+              9) should revert
             when one reset occurred and the reset delay has elapsed again
               ✓ should reset the moving funds timeout
               ✓ should emit MovingFundsTimeoutReset event
@@ -3248,7 +3280,6 @@ Warning: Potentially unsafe deployment of BridgeStub
                       ✓ should revert
                   when the output vector contains P2SH output
                     ✓ should revert
-(node:863512) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 311)
                 when the output vector does not only reference 20-byte hashes
                   ✓ should revert
               when the single input doesn't point to the wallet's main UTXO
@@ -3371,9 +3402,9 @@ Warning: Potentially unsafe deployment of BridgeStub
                             ✓ should revert
                           when the first input refers to a Processed sweep request
                             ✓ should revert
+(node:2168438) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 303)
                           when the first input refers to a TimedOut sweep request
                             ✓ should revert
-(node:863512) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 312)
                         when the first input refers to a Pending sweep request that belongs to another wallet and the second input refers to the sweeping wallet main UTXO
                           ✓ should revert
                         when the first input refers to a Pending sweep request and the second input does not refer to the sweeping wallet main UTXO
@@ -3740,6 +3771,7 @@ Warning: Potentially unsafe deployment of BridgeStub
                         ✓ should revert
                       when the single output is a change with a zero as value
                         ✓ should revert
+(node:2168438) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 305)
                       when the single output is a non-requested redemption to an arbitrary script
                         ✓ should revert
                       when the single output is provably unspendable OP_RETURN
@@ -3801,6 +3833,7 @@ Warning: Potentially unsafe deployment of BridgeStub
                         ✓ should revert
                       when output vector contains a non-zero P2SH change output
                         ✓ should revert
+(node:2168438) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 306)
                       when output vector contains multiple non-zero change outputs
                         ✓ should revert
                       when output vector contains one change but with zero as value
@@ -3948,10 +3981,10 @@ Warning: Potentially unsafe deployment of BridgeStub
                     ✓ should call ECDSA Wallet Registry's requestNewWallet function
                 when active wallet is not old enough and its balance is greater or equal the minimum but lesser than the maximum BTC balance threshold
                   ✓ should revert
-(node:863512) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 315)
+(node:2168438) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 308)
                 when active wallet is old enough but its balance is lesser than the minimum BTC balance threshold
                   ✓ should revert
-(node:863512) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 316)
+(node:2168438) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 309)
               when the active wallet main UTXO data are invalid
                 ✓ should revert
             when active wallet has no main UTXO set
@@ -4111,7 +4144,7 @@ Warning: Potentially unsafe deployment of BridgeStub
       ✓ should set owner
     WalletRegistry
 
-      23) should set walletOwner
+      10) should set walletOwner
     Bank
       ✓ should set Bridge reference
       ✓ should set Bank owner
@@ -4126,15 +4159,19 @@ Warning: Potentially unsafe deployment of BridgeStub
     ReimbursementPool
       ✓ should authorize MaintainerProxy in ReimbursementPool
 
-      24) should set ReimbursementPool owner
+      11) should set ReimbursementPool owner
     VendingMachine
       ✓ should set vendingMachineUpgradeInitiator
       ✓ should set unmintFeeUpdateInitiator
       ✓ should set VendingMachine owner
 
   EcdsaLib
-
-    25) "before all" hook in "EcdsaLib"
+    compressPublicKey
+      with valid uncompressed public key
+        ✓ with even Y
+        ✓ with odd Y
+        ✓ with leading zeros
+        ✓ with trailing zeros
 
   Heartbeat
     when the message is empty
@@ -5098,11 +5135,11 @@ Warning: Potentially unsafe deployment of BridgeStub
   StarkNetBitcoinDepositor - deposit() Implementation
     _transferTbtc Implementation
 
-      26) should call deposit() instead of depositWithMessage()
+      12) should call deposit() instead of depositWithMessage()
       ✓ should not create empty message array
     Gas Optimization Verification
 
-      27) should reduce gas usage by ~2000
+      13) should reduce gas usage by ~2000
     Functionality Preservation
       ✓ should maintain same functionality with deposit()
     Direct Contract Testing
@@ -5537,7 +5574,7 @@ Failed to get factory for QCRedeemer: The contract QCRedeemer is missing links f
 Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hardhat-ethers.html#library-linking
 
 
-      28) should be able to get contract factories for v1 contracts
+      14) should be able to get contract factories for v1 contracts
       ✓ should fail to get factories for non-existent automation contracts
     v1 Deployment Script Dependencies
       ✓ should identify problematic TBTC dependencies
@@ -5597,11 +5634,11 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
 
   Message Signing Integration Flows
 
-    29) "before all" hook in "Message Signing Integration Flows"
+    15) "before all" hook in "Message Signing Integration Flows"
 
   SPV Library Integration
 
-    30) "before all" hook in "SPV Library Integration"
+    16) "before all" hook in "SPV Library Integration"
 
   AbstractBTCDepositor
     _initializeDeposit
@@ -5687,7 +5724,7 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
 
   MaintainerProxy
 
-    31) "before all" hook in "MaintainerProxy"
+    17) "before all" hook in "MaintainerProxy"
 
   LightRelay
     genesis
@@ -5864,11 +5901,48 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
 
   LightRelayMaintainerProxy
 
-    32) "before all" hook in "LightRelayMaintainerProxy"
+    18) "before all" hook in "LightRelayMaintainerProxy"
 
   SPV Security Tests
-
-    33) "before all" hook in "SPV Security Tests"
+Deploying SharedSPVCore...
+SharedSPVCore deployed
+Deploying QCRedeemerSPV...
+QCRedeemerSPV deployed
+Deploying QCRedeemer...
+QCRedeemer deployed, waiting for deployment...
+QCRedeemer.deployed() completed
+Deploying MockAccountControl...
+MockAccountControl deployed
+Setting min mint amount...
+Setting redemption timeout...
+System setup completed
+Registering QC...
+QC registered and activated
+Registering wallet with QC...
+Wallet registered
+Setting MockAccountControl for SPV tests...
+MockAccountControl set (tests will focus on SPV validation)
+    Merkle Proof Manipulation Attacks
+      ✓ should reject proofs with mismatched merkle and coinbase proof lengths
+      ✓ should validate coinbase hash correctly to prevent fake coinbase attacks
+    Transaction Replay Attacks
+      ✓ should prevent reuse of same transaction for multiple redemptions
+      ✓ should validate transaction timestamp to prevent old transaction reuse
+    Bitcoin Address Attacks
+      ✓ should prevent address spoofing with similar-looking addresses
+      ✓ should prevent attacks using different address formats for same hash
+      ✓ should reject addresses with invalid character sets
+    Payment Manipulation Attacks
+      ✓ should prevent dust amount attacks
+      ✓ should prevent payment to wrong address attacks
+    Difficulty Manipulation Attacks
+      ✓ should reject proofs with insufficient accumulated difficulty
+    Headers Chain Attacks
+      ✓ should reject invalid header chain structures
+      ✓ should require relay to be properly configured
+    Access Control and SPV Security
+      ✓ should prevent unauthorized SPV parameter changes
+      ✓ should prevent unauthorized relay changes
 
   SystemState Security Tests
     Pause Mechanism Security
@@ -5878,13 +5952,11 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       Pause State Management
         ✓ should prevent double pausing
         ✓ should prevent unpausing when not paused
-
-        34) should track pause timestamps
+        ✓ should track pause timestamps
         ✓ should handle multiple pause types independently
       Emergency Pause Duration
         ✓ should enforce emergency pause duration limits
-
-        35) should track pause duration for monitoring
+        ✓ should track pause duration for monitoring
       Concurrent Pause Attempts
         ✓ should handle concurrent pause attempts safely
     Parameter Validation
@@ -5901,11 +5973,9 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       Collateral Ratio
         ✓ should enforce collateral ratio bounds
     Emergency Council
-
-      36) should only allow PARAMETER_ADMIN to set emergency council
+      ✓ should only allow PARAMETER_ADMIN to set emergency council
       ✓ should prevent setting zero address as emergency council
-
-      37) should emit event when setting emergency council
+      ✓ should emit event when setting emergency council
     Parameter Update Edge Cases
       ✓ should handle parameter updates at boundaries
       ✓ should handle rapid parameter updates
@@ -5915,8 +5985,7 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       ✓ should revert operations when paused
       ✓ should expose all parameters correctly
     Initialization Security
-
-      38) should initialize with secure defaults
+      ✓ should initialize with secure defaults
       ✓ should not be paused on deployment
 
   DonationVault
@@ -6327,55 +6396,57 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [1mContract[22m                                           ·  [1mMethod[22m                                                        ·  [32mMin[39m        ·  [32mMax[39m        ·  [32mAvg[39m         ·  [1m# calls[22m      ·  [1meur (avg)[22m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mAccountControl[39m                                     ·  authorizeReserve                                              ·     [36m124868[39m  ·     [31m141980[39m  ·      129897  ·          [90m225[39m  ·          [32m[90m-[32m[39m  │
+|  [90mAccountControl[39m                                     ·  authorizeReserve                                              ·     [36m124868[39m  ·     [31m144320[39m  ·      131320  ·          [90m286[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mAccountControl[39m                                     ·  batchMint                                                     ·     [36m190103[39m  ·     [31m216959[39m  ·      193106  ·            [90m9[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mAccountControl[39m                                     ·  deauthorizeReserve                                            ·      [36m49217[39m  ·     [31m137461[39m  ·       79868  ·           [90m12[39m  ·          [32m[90m-[32m[39m  │
+|  [90mAccountControl[39m                                     ·  deauthorizeReserve                                            ·      [36m49217[39m  ·     [31m137461[39m  ·       79869  ·           [90m12[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mAccountControl[39m                                     ·  grantQCManagerRole                                            ·      [36m53426[39m  ·      [31m53438[39m  ·       53437  ·           [90m11[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mAccountControl[39m                                     ·  mintTBTC                                                      ·          -  ·          -  ·      185889  ·            [90m3[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mAccountControl[39m                                     ·  pauseReserve                                                  ·      [36m35125[39m  ·      [31m37264[39m  ·       35666  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
+|  [90mAccountControl[39m                                     ·  pauseReserve                                                  ·      [36m35137[39m  ·      [31m37264[39m  ·       35669  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mAccountControl[39m                                     ·  pauseSystem                                                   ·          -  ·          -  ·       33487  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mAccountControl[39m                                     ·  redeem                                                        ·      [36m35971[39m  ·      [31m44963[39m  ·       43839  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
+|  [90mAccountControl[39m                                     ·  setBackingForTesting                                          ·      [36m32001[39m  ·      [31m49101[39m  ·       48358  ·           [90m23[39m  ·          [32m[90m-[32m[39m  │
+······················································|································································|·············|·············|··············|···············|··············
 |  [90mAccountControl[39m                                     ·  setGlobalMintingCap                                           ·      [36m31808[39m  ·      [31m51744[39m  ·       45099  ·            [90m3[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mAccountControl[39m                                     ·  setMintingCap                                                 ·      [36m42478[39m  ·      [31m54511[39m  ·       44207  ·            [90m7[39m  ·          [32m[90m-[32m[39m  │
+|  [90mAccountControl[39m                                     ·  setMintingCap                                                 ·      [36m42478[39m  ·      [31m54511[39m  ·       43991  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mAccountControl[39m                                     ·  unpauseReserve                                                ·      [36m35102[39m  ·      [31m35114[39m  ·       35111  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mAccountControl[39m                                     ·  unpauseSystem                                                 ·          -  ·          -  ·       33416  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mAccountControl[39m                                     ·  updateBacking                                                 ·      [36m39494[39m  ·      [31m56594[39m  ·       55152  ·           [90m83[39m  ·          [32m[90m-[32m[39m  │
+|  [90mAccountControl[39m                                     ·  updateBacking                                                 ·      [36m39494[39m  ·      [31m56594[39m  ·       55169  ·           [90m96[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBank[39m                                               ·  approveBalance                                                ·      [36m24265[39m  ·      [31m46727[39m  ·       39241  ·           [90m21[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBank[39m                                               ·  approveBalance                                                ·      [36m24277[39m  ·      [31m46727[39m  ·       39243  ·           [90m21[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBank[39m                                               ·  approveBalanceAndCall                                         ·      [36m32711[39m  ·     [31m115710[39m  ·       77223  ·           [90m24[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBank[39m                                               ·  approveBalanceAndCall                                         ·      [36m32711[39m  ·     [31m115722[39m  ·       77232  ·           [90m24[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBank[39m                                               ·  decreaseBalance                                               ·          -  ·          -  ·       28127  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBank[39m                                               ·  decreaseBalanceAllowance                                      ·          -  ·          -  ·       29228  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBank[39m                                               ·  increaseBalance                                               ·      [36m47978[39m  ·      [31m48014[39m  ·       47996  ·           [90m13[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBank[39m                                               ·  increaseBalance                                               ·      [36m47978[39m  ·      [31m48014[39m  ·       47997  ·           [90m13[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBank[39m                                               ·  increaseBalanceAllowance                                      ·      [36m29274[39m  ·      [31m46374[39m  ·       42949  ·            [90m5[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBank[39m                                               ·  increaseBalanceAndCall                                        ·      [36m50461[39m  ·     [31m171191[39m  ·      115627  ·           [90m12[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBank[39m                                               ·  increaseBalanceAndCall                                        ·      [36m50461[39m  ·     [31m171203[39m  ·      115633  ·           [90m12[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBank[39m                                               ·  increaseBalances                                              ·          -  ·          -  ·       98805  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBank[39m                                               ·  permit                                                        ·      [36m40316[39m  ·      [31m74835[39m  ·       63166  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBank[39m                                               ·  permit                                                        ·      [36m40311[39m  ·      [31m74864[39m  ·       63170  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBank[39m                                               ·  transferBalance                                               ·      [36m28726[39m  ·      [31m51462[39m  ·       42444  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBank[39m                                               ·  transferBalanceFrom                                           ·      [36m42133[39m  ·      [31m59233[39m  ·       53281  ·            [90m9[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBank[39m                                               ·  updateBridge                                                  ·      [36m21420[39m  ·      [31m47210[39m  ·       34956  ·            [90m7[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBank[39m                                               ·  updateBridge                                                  ·      [36m21432[39m  ·      [31m47210[39m  ·       34957  ·            [90m7[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBankStub[39m                                           ·  approveBalance                                                ·      [36m46391[39m  ·      [31m46427[39m  ·       46412  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6391,15 +6462,15 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBankStub[39m                                           ·  updateBridge                                                  ·      [36m27310[39m  ·      [31m47210[39m  ·       40577  ·            [90m3[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBridge[39m                                             ·  __ecdsaWalletCreatedCallback                                  ·      [36m88512[39m  ·      [31m88546[39m  ·       88540  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBridge[39m                                             ·  __ecdsaWalletCreatedCallback                                  ·      [36m88536[39m  ·      [31m88546[39m  ·       88544  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBridge[39m                                             ·  __ecdsaWalletHeartbeatFailedCallback                          ·      [36m53700[39m  ·      [31m54045[39m  ·       53850  ·           [90m10[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBridge[39m                                             ·  defeatFraudChallenge                                          ·      [36m67305[39m  ·      [31m84375[39m  ·       73255  ·           [90m18[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBridge[39m                                             ·  defeatFraudChallengeWithHeartbeat                             ·          -  ·          -  ·       59314  ·            [90m5[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBridge[39m                                             ·  defeatFraudChallengeWithHeartbeat                             ·          -  ·          -  ·       59336  ·            [90m5[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBridge[39m                                             ·  notifyFraudChallengeDefeatTimeout                             ·      [36m63561[39m  ·      [31m82787[39m  ·       78355  ·           [90m27[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBridge[39m                                             ·  notifyFraudChallengeDefeatTimeout                             ·      [36m63561[39m  ·      [31m82787[39m  ·       78356  ·           [90m27[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBridge[39m                                             ·  notifyMovedFundsSweepTimeout                                  ·      [36m52883[39m  ·      [31m69562[39m  ·       66784  ·           [90m10[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6419,7 +6490,7 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBridge[39m                                             ·  requestRedemption                                             ·     [36m115936[39m  ·     [31m150059[39m  ·      125307  ·          [90m134[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBridge[39m                                             ·  resetMovingFundsTimeout                                       ·          -  ·          -  ·       45576  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBridge[39m                                             ·  resetMovingFundsTimeout                                       ·          -  ·          -  ·       45576  ·            [90m7[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBridge[39m                                             ·  revealDeposit                                                 ·      [36m85270[39m  ·     [31m107966[39m  ·      104809  ·          [90m123[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6431,9 +6502,9 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBridge[39m                                             ·  setVaultStatus                                                ·          -  ·          -  ·       55191  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBridge[39m                                             ·  submitDepositSweepProof                                       ·     [36m201209[39m  ·     [31m359525[39m  ·      273257  ·           [90m33[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBridge[39m                                             ·  submitDepositSweepProof                                       ·     [36m201209[39m  ·     [31m359513[39m  ·      273256  ·           [90m33[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBridge[39m                                             ·  submitFraudChallenge                                          ·     [36m117100[39m  ·     [31m117444[39m  ·      117143  ·           [90m33[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBridge[39m                                             ·  submitFraudChallenge                                          ·     [36m117112[39m  ·     [31m117444[39m  ·      117146  ·           [90m33[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBridge[39m                                             ·  submitMovedFundsSweepProof                                    ·     [36m148329[39m  ·     [31m160285[39m  ·      153119  ·            [90m5[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6587,9 +6658,9 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBridgeGovernance[39m                                   ·  finalizeWalletMaxBtcTransferUpdate                            ·          -  ·          -  ·       64447  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBridgeGovernance[39m                                   ·  setRedemptionWatchtower                                       ·      [36m62254[39m  ·      [31m62266[39m  ·       62263  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBridgeGovernance[39m                                   ·  setRedemptionWatchtower                                       ·          -  ·          -  ·       62266  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mBridgeGovernance[39m                                   ·  setVaultStatus                                                ·      [36m40915[39m  ·      [31m62827[39m  ·       58212  ·           [90m19[39m  ·          [32m[90m-[32m[39m  │
+|  [90mBridgeGovernance[39m                                   ·  setVaultStatus                                                ·      [36m40903[39m  ·      [31m62827[39m  ·       58211  ·           [90m19[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mBridgeGovernance[39m                                   ·  transferOwnership                                             ·          -  ·          -  ·       28708  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6707,11 +6778,15 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mMaintainerProxy[39m                                    ·  transferOwnership                                             ·          -  ·          -  ·       28613  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mMisfundRecovery[39m                                    ·  recoverERC20                                                  ·          -  ·          -  ·       61143  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
+|  [90mMisfundRecovery[39m                                    ·  recoverERC20                                                  ·          -  ·          -  ·       61155  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mMisfundRecovery[39m                                    ·  recoverERC721                                                 ·          -  ·          -  ·       71987  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
+|  [90mMisfundRecovery[39m                                    ·  recoverERC721                                                 ·          -  ·          -  ·       71999  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mMockAccountControl[39m                                 ·  setTotalMintedForTesting                                      ·          -  ·          -  ·       43574  ·           [90m35[39m  ·          [32m[90m-[32m[39m  │
+|  [90mMockAccountControl[39m                                 ·  setAccountControlEnabled                                      ·      [36m21675[39m  ·      [31m43587[39m  ·       32631  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
+······················································|································································|·············|·············|··············|···············|··············
+|  [90mMockAccountControl[39m                                 ·  setTotalMintedForTesting                                      ·      [36m43562[39m  ·      [31m43598[39m  ·       43573  ·           [90m41[39m  ·          [32m[90m-[32m[39m  │
+······················································|································································|·············|·············|··············|···············|··············
+|  [90mMockBank[39m                                           ·  authorizeBalanceIncreaser                                     ·          -  ·          -  ·       43976  ·           [90m11[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mMockBank[39m                                           ·  setBalance                                                    ·      [36m24292[39m  ·      [31m44192[39m  ·       39217  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6733,9 +6808,11 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mMockL1BTCRedeemerWormhole[39m                          ·  setMockRedemptionAmountTBTC                                   ·      [36m28965[39m  ·      [31m33849[39m  ·       32622  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mMockReimbursementPool[39m                              ·  authorize                                                     ·          -  ·          -  ·       43909  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
+|  [90mMockQCManager[39m                                      ·  setMintingCapacity                                            ·      [36m45615[39m  ·      [31m45627[39m  ·       45616  ·           [90m12[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mMockReserve[39m                                        ·  batchMint                                                     ·     [36m225798[39m  ·    [31m1198203[39m  ·      693438  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
+|  [90mMockReimbursementPool[39m                              ·  authorize                                                     ·          -  ·          -  ·       43933  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
+······················································|································································|·············|·············|··············|···············|··············
+|  [90mMockReserve[39m                                        ·  batchMint                                                     ·     [36m225798[39m  ·    [31m1198179[39m  ·      693434  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mMockReserve[39m                                        ·  increaseBacking                                               ·      [36m56449[39m  ·      [31m56461[39m  ·       56451  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6763,25 +6840,25 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mMockTBTCBridgeWithSweep[39m                            ·  sweepDeposit                                                  ·          -  ·          -  ·       29194  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mMockTBTCToken[39m                                      ·  approve                                                       ·          -  ·          -  ·       48458  ·            [90m3[39m  ·          [32m[90m-[32m[39m  │
+|  [90mMockTBTCToken[39m                                      ·  approve                                                       ·      [36m31346[39m  ·      [31m48458[39m  ·       47389  ·           [90m16[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mMockTBTCToken[39m                                      ·  mint                                                          ·      [36m34126[39m  ·      [31m51238[39m  ·       43281  ·           [90m43[39m  ·          [32m[90m-[32m[39m  │
+|  [90mMockTBTCToken[39m                                      ·  mint                                                          ·      [36m34114[39m  ·      [31m51238[39m  ·       44820  ·           [90m56[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCData[39m                                             ·  finalizeWalletDeRegistration                                  ·      [36m43145[39m  ·      [31m53601[39m  ·       46522  ·           [90m16[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCData[39m                                             ·  grantQCManagerRole                                            ·          -  ·          -  ·       50586  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCData[39m                                             ·  grantRole                                                     ·      [36m29216[39m  ·      [31m51453[39m  ·       51231  ·          [90m100[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCData[39m                                             ·  grantRole                                                     ·      [36m29216[39m  ·      [31m51453[39m  ·       49249  ·          [90m111[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCData[39m                                             ·  registerQC                                                    ·     [36m100543[39m  ·     [31m117631[39m  ·      117427  ·           [90m84[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCData[39m                                             ·  registerQC                                                    ·     [36m100519[39m  ·     [31m117631[39m  ·      117272  ·           [90m96[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCData[39m                                             ·  registerWallet                                                ·     [36m147596[39m  ·     [31m210208[39m  ·      159498  ·           [90m80[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCData[39m                                             ·  registerWallet                                                ·     [36m147596[39m  ·     [31m210208[39m  ·      166347  ·           [90m93[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCData[39m                                             ·  requestWalletDeRegistration                                   ·      [36m40968[39m  ·      [31m40980[39m  ·       40969  ·           [90m25[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCData[39m                                             ·  revokeQCManagerRole                                           ·      [36m28089[39m  ·      [31m28600[39m  ·       28405  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCData[39m                                             ·  setQCStatus                                                   ·      [36m32052[39m  ·      [31m52216[39m  ·       48034  ·            [90m9[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCData[39m                                             ·  setQCStatus                                                   ·      [36m32052[39m  ·      [31m52216[39m  ·       39245  ·           [90m20[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCData[39m                                             ·  updateMaxMintingCapacity                                      ·      [36m31469[39m  ·      [31m34269[39m  ·       32269  ·            [90m7[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6795,13 +6872,11 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCManager[39m                                          ·  grantInitialCredit                                            ·      [36m53154[39m  ·      [31m53166[39m  ·       53154  ·           [90m45[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCManager[39m                                          ·  grantRole                                                     ·      [36m29497[39m  ·      [31m51734[39m  ·       51045  ·          [90m595[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCManager[39m                                          ·  grantRole                                                     ·      [36m29497[39m  ·      [31m51734[39m  ·       51005  ·          [90m560[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCManager[39m                                          ·  increaseMintingCapacity                                       ·          -  ·          -  ·       64138  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCManager[39m                                          ·  registerQC                                                    ·     [36m175197[39m  ·     [31m301057[39m  ·      236697  ·           [90m17[39m  ·          [32m[90m-[32m[39m  │
-······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCManager[39m                                          ·  requestStatusChange                                           ·          -  ·          -  ·       89298  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCManager[39m                                          ·  requestWalletOwnershipVerification                            ·          -  ·          -  ·       33447  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6809,33 +6884,33 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCManager[39m                                          ·  selfPause                                                     ·     [36m197871[39m  ·     [31m197893[39m  ·      197881  ·           [90m18[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCManager[39m                                          ·  setAccountControl                                             ·      [36m48617[39m  ·      [31m48629[39m  ·       48629  ·           [90m94[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCManager[39m                                          ·  setAccountControl                                             ·      [36m48617[39m  ·      [31m48629[39m  ·       48629  ·           [90m89[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCManager[39m                                          ·  setQCRedeemer                                                 ·      [36m47147[39m  ·      [31m47159[39m  ·       47158  ·           [90m82[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCManager[39m                                          ·  setQCRedeemer                                                 ·      [36m47147[39m  ·      [31m47159[39m  ·       47158  ·           [90m77[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCManager[39m                                          ·  setQCStatus                                                   ·      [36m42317[39m  ·      [31m87723[39m  ·       79045  ·           [90m15[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCManager[39m                                          ·  setQCStatus                                                   ·      [36m42317[39m  ·      [31m87452[39m  ·       69132  ·           [90m17[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCManager[39m                                          ·  syncBackingFromOracle                                         ·      [36m53383[39m  ·      [31m70483[39m  ·       65353  ·           [90m10[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCMinter[39m                                           ·  grantRole                                                     ·          -  ·          -  ·       51387  ·           [90m99[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCMinter[39m                                           ·  grantRole                                                     ·          -  ·          -  ·       51387  ·          [90m121[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCMinter[39m                                           ·  manualMint                                                    ·          -  ·          -  ·       35180  ·            [90m7[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCMinter[39m                                           ·  requestQCMint                                                 ·          -  ·          -  ·      216421  ·           [90m11[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCMinter[39m                                           ·  requestQCMint                                                 ·     [36m200214[39m  ·     [31m394670[39m  ·      311638  ·           [90m39[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCMinter[39m                                           ·  requestQCMintHybrid                                           ·     [36m215935[39m  ·     [31m227520[39m  ·      221758  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCMinter[39m                                           ·  setAccountControl                                             ·          -  ·          -  ·       47433  ·           [90m48[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCMinter[39m                                           ·  setAccountControl                                             ·      [36m30333[39m  ·      [31m47433[39m  ·       47148  ·           [90m60[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mQCMinter[39m                                           ·  setAutoMintEnabled                                            ·      [36m27228[39m  ·      [31m47140[39m  ·       32655  ·           [90m12[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCRedeemer[39m                                         ·  flagDefaultedRedemption                                       ·          -  ·          -  ·       92285  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCRedeemer[39m                                         ·  flagDefaultedRedemption                                       ·          -  ·          -  ·       92285  ·            [90m7[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCRedeemer[39m                                         ·  grantRole                                                     ·          -  ·          -  ·       51431  ·           [90m35[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCRedeemer[39m                                         ·  grantRole                                                     ·      [36m29194[39m  ·      [31m51431[39m  ·       45963  ·           [90m61[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCRedeemer[39m                                         ·  initiateRedemption                                            ·     [36m456225[39m  ·     [31m507525[39m  ·      502990  ·           [90m56[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCRedeemer[39m                                         ·  initiateRedemption                                            ·     [36m452300[39m  ·     [31m547400[39m  ·      497095  ·           [90m79[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mQCRedeemer[39m                                         ·  setAccountControl                                             ·          -  ·          -  ·       48423  ·           [90m35[39m  ·          [32m[90m-[32m[39m  │
+|  [90mQCRedeemer[39m                                         ·  setAccountControl                                             ·          -  ·          -  ·       48423  ·           [90m47[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mRedemptionWatchtower[39m                               ·  addGuardian                                                   ·      [36m54846[39m  ·      [31m99113[39m  ·       85469  ·           [90m16[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6855,7 +6930,7 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mReimbursementPool[39m                                  ·  authorize                                                     ·          -  ·          -  ·       47212  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mReimbursementPool[39m                                  ·  transferOwnership                                             ·      [36m28597[39m  ·      [31m35954[39m  ·       33122  ·          [90m106[39m  ·          [32m[90m-[32m[39m  │
+|  [90mReimbursementPool[39m                                  ·  transferOwnership                                             ·      [36m28597[39m  ·      [31m35954[39m  ·       33100  ·          [90m101[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mReserveOracle[39m                                      ·  attestBalance                                                 ·      [36m88649[39m  ·     [31m186575[39m  ·      142129  ·          [90m106[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6883,11 +6958,11 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mStarkNetBitcoinDepositor[39m                           ·  updateReimbursementAuthorization                              ·      [36m33280[39m  ·      [31m55236[39m  ·       49244  ·           [90m28[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mSystemState[39m                                        ·  emergencyPauseQC                                              ·      [36m73812[39m  ·      [31m73824[39m  ·       73823  ·           [90m53[39m  ·          [32m[90m-[32m[39m  │
+|  [90mSystemState[39m                                        ·  emergencyPauseQC                                              ·      [36m73812[39m  ·      [31m73824[39m  ·       73824  ·           [90m53[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mSystemState[39m                                        ·  emergencyUnpauseQC                                            ·      [36m30960[39m  ·      [31m30970[39m  ·       30969  ·           [90m22[39m  ·          [32m[90m-[32m[39m  │
+|  [90mSystemState[39m                                        ·  emergencyUnpauseQC                                            ·          -  ·          -  ·       30970  ·           [90m22[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mSystemState[39m                                        ·  grantRole                                                     ·      [36m29173[39m  ·      [31m51410[39m  ·       51079  ·          [90m206[39m  ·          [32m[90m-[32m[39m  │
+|  [90mSystemState[39m                                        ·  grantRole                                                     ·      [36m29173[39m  ·      [31m51410[39m  ·       50071  ·          [90m217[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mSystemState[39m                                        ·  pauseMinting                                                  ·          -  ·          -  ·       69583  ·           [90m22[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6901,13 +6976,13 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mSystemState[39m                                        ·  setEmergencyPauseDuration                                     ·      [36m30879[39m  ·      [31m30903[39m  ·       30895  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mSystemState[39m                                        ·  setMaxMintAmount                                              ·      [36m30209[39m  ·      [31m33309[39m  ·       31071  ·           [90m23[39m  ·          [32m[90m-[32m[39m  │
+|  [90mSystemState[39m                                        ·  setMaxMintAmount                                              ·      [36m30209[39m  ·      [31m33309[39m  ·       30810  ·           [90m33[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mSystemState[39m                                        ·  setMinCollateralRatio                                         ·      [36m28064[39m  ·      [31m30864[39m  ·       29931  ·            [90m9[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mSystemState[39m                                        ·  setMinMintAmount                                              ·      [36m30207[39m  ·      [31m33031[39m  ·       32809  ·           [90m27[39m  ·          [32m[90m-[32m[39m  │
+|  [90mSystemState[39m                                        ·  setMinMintAmount                                              ·      [36m30207[39m  ·      [31m33031[39m  ·       32796  ·           [90m38[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mSystemState[39m                                        ·  setRedemptionTimeout                                          ·      [36m30835[39m  ·      [31m30859[39m  ·       30849  ·           [90m23[39m  ·          [32m[90m-[32m[39m  │
+|  [90mSystemState[39m                                        ·  setRedemptionTimeout                                          ·      [36m30835[39m  ·      [31m30859[39m  ·       30849  ·           [90m37[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mSystemState[39m                                        ·  setStaleThreshold                                             ·      [36m30857[39m  ·      [31m30881[39m  ·       30871  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -6923,13 +6998,13 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mSystemTestRelay[39m                                    ·  setPrevEpochDifficultyFromHeaders                             ·          -  ·          -  ·       52138  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mTBTC[39m                                               ·  approve                                                       ·      [36m46281[39m  ·      [31m46305[39m  ·       46293  ·           [90m21[39m  ·          [32m[90m-[32m[39m  │
+|  [90mTBTC[39m                                               ·  approve                                                       ·      [36m46281[39m  ·      [31m46305[39m  ·       46296  ·           [90m21[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mTBTC[39m                                               ·  approveAndCall                                                ·      [36m67397[39m  ·     [31m175146[39m  ·      142032  ·           [90m16[39m  ·          [32m[90m-[32m[39m  │
+|  [90mTBTC[39m                                               ·  approveAndCall                                                ·      [36m67407[39m  ·     [31m175146[39m  ·      142035  ·           [90m16[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mTBTC[39m                                               ·  mint                                                          ·      [36m36369[39m  ·      [31m70581[39m  ·       58356  ·           [90m14[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mTBTC[39m                                               ·  transferOwnership                                             ·      [36m28598[39m  ·      [31m28610[39m  ·       28609  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
+|  [90mTBTC[39m                                               ·  transferOwnership                                             ·          -  ·          -  ·       28610  ·            [90m8[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mTBTCVault[39m                                          ·  addGuardian                                                   ·          -  ·          -  ·       47548  ·            [90m7[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -7001,21 +7076,21 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mTestERC20[39m                                          ·  mint                                                          ·      [36m53453[39m  ·      [31m70565[39m  ·       67925  ·           [90m13[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mTestERC20[39m                                          ·  transfer                                                      ·      [36m46898[39m  ·      [31m46910[39m  ·       46904  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
+|  [90mTestERC20[39m                                          ·  transfer                                                      ·          -  ·          -  ·       46910  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mTestERC20[39m                                          ·  transferOwnership                                             ·          -  ·          -  ·       28616  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mTestERC721[39m                                         ·  mint                                                          ·      [36m68794[39m  ·      [31m68806[39m  ·       68798  ·            [90m3[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mTestERC721[39m                                         ·  transferFrom                                                  ·      [36m55278[39m  ·      [31m55290[39m  ·       55284  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
+|  [90mTestERC721[39m                                         ·  transferFrom                                                  ·          -  ·          -  ·       55290  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mTestRelay[39m                                          ·  setCurrentEpochDifficulty                                     ·          -  ·          -  ·       43572  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mTestRelay[39m                                          ·  setCurrentEpochDifficultyFromHeaders                          ·          -  ·          -  ·       52094  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
+|  [90mTestRelay[39m                                          ·  setCurrentEpochDifficultyFromHeaders                          ·          -  ·          -  ·       52094  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mTestRelay[39m                                          ·  setPrevEpochDifficulty                                        ·          -  ·          -  ·       43595  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mTestRelay[39m                                          ·  setPrevEpochDifficultyFromHeaders                             ·          -  ·          -  ·       52138  ·            [90m1[39m  ·          [32m[90m-[32m[39m  │
+|  [90mTestRelay[39m                                          ·  setPrevEpochDifficultyFromHeaders                             ·          -  ·          -  ·       52138  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mTestRelay[39m                                          ·  setValidateHeaderChainResult                                  ·      [36m43541[39m  ·      [31m43889[39m  ·       43715  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -7059,7 +7134,7 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mVendingMachineV3[39m                                   ·  exchange                                                      ·      [36m89982[39m  ·      [31m99582[39m  ·       94782  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mVendingMachineV3[39m                                   ·  recoverFunds                                                  ·      [36m55501[39m  ·      [31m55513[39m  ·       55507  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
+|  [90mVendingMachineV3[39m                                   ·  recoverFunds                                                  ·          -  ·          -  ·       55513  ·            [90m4[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mVendingMachineV3[39m                                   ·  transferOwnership                                             ·          -  ·          -  ·       28598  ·            [90m2[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -7067,7 +7142,7 @@ BigNumber { value: "100000000000000000000" }
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mWalletRegistry[39m                                     ·  transferGovernance                                            ·      [36m28462[39m  ·      [31m35813[39m  ·       33340  ·            [90m6[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
-|  [90mWalletRegistry[39m                                     ·  updateReimbursementPool                                       ·      [36m32365[39m  ·      [31m54527[39m  ·       50092  ·           [90m23[39m  ·          [32m[90m-[32m[39m  │
+|  [90mWalletRegistry[39m                                     ·  updateReimbursementPool                                       ·      [36m32365[39m  ·      [31m54539[39m  ·       50096  ·           [90m23[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
 |  [90mWatchdogEnforcer[39m                                   ·  enforceObjectiveViolation                                     ·      [36m36214[39m  ·      [31m66872[39m  ·       48988  ·           [90m12[39m  ·          [32m[90m-[32m[39m  │
 ······················································|································································|·············|·············|··············|···············|··············
@@ -7105,6 +7180,8 @@ BigNumber { value: "100000000000000000000" }
 ·······················································································································|·············|·············|··············|···············|··············
 |  DonationVault                                                                                                       ·          -  ·          -  ·      586461  ·          [90m2 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
+|  EcdsaLibStub                                                                                                        ·          -  ·          -  ·      161119  ·        [90m0.5 %[39m  ·          [32m[90m-[32m[39m  │
+·······················································································································|·············|·············|··············|···············|··············
 |  ERC1967Proxy                                                                                                        ·     [36m451115[39m  ·     [31m451127[39m  ·      451124  ·        [90m1.5 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
 |  Fraud                                                                                                               ·          -  ·          -  ·     1942153  ·        [90m6.5 %[39m  ·          [32m[90m-[32m[39m  │
@@ -7141,7 +7218,9 @@ BigNumber { value: "100000000000000000000" }
 ·······················································································································|·············|·············|··············|···············|··············
 |  MockL1BTCRedeemerWormhole                                                                                           ·          -  ·          -  ·     1572656  ·        [90m5.2 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
-|  MockReimbursementPool                                                                                               ·          -  ·          -  ·      150901  ·        [90m0.5 %[39m  ·          [32m[90m-[32m[39m  │
+|  MockQCManager                                                                                                       ·          -  ·          -  ·      353602  ·        [90m1.2 %[39m  ·          [32m[90m-[32m[39m  │
+·······················································································································|·············|·············|··············|···············|··············
+|  MockReimbursementPool                                                                                               ·          -  ·          -  ·      180194  ·        [90m0.6 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
 |  MockReserve                                                                                                         ·          -  ·          -  ·     1152699  ·        [90m3.8 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
@@ -7153,23 +7232,23 @@ BigNumber { value: "100000000000000000000" }
 ·······················································································································|·············|·············|··············|···············|··············
 |  MockTBTCToken                                                                                                       ·          -  ·          -  ·      847832  ·        [90m2.8 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
-|  MockWalletRegistry                                                                                                  ·          -  ·          -  ·      127537  ·        [90m0.4 %[39m  ·          [32m[90m-[32m[39m  │
+|  MockWalletRegistry                                                                                                  ·          -  ·          -  ·      162680  ·        [90m0.5 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
 |  MovingFunds                                                                                                         ·          -  ·          -  ·     4461137  ·       [90m14.9 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
 |  QCData                                                                                                              ·          -  ·          -  ·     2083099  ·        [90m6.9 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
-|  QCManager                                                                                                           ·    [36m5451983[39m  ·    [31m5452043[39m  ·     5452039  ·       [90m18.2 %[39m  ·          [32m[90m-[32m[39m  │
+|  QCManager                                                                                                           ·    [36m5451791[39m  ·    [31m5452043[39m  ·     5452039  ·       [90m18.2 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
-|  QCManagerLib                                                                                                        ·          -  ·          -  ·      810178  ·        [90m2.7 %[39m  ·          [32m[90m-[32m[39m  │
+|  QCManagerLib                                                                                                        ·          -  ·          -  ·      812326  ·        [90m2.7 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
-|  QCMinter                                                                                                            ·    [36m2845106[39m  ·    [31m2845130[39m  ·     2845125  ·        [90m9.5 %[39m  ·          [32m[90m-[32m[39m  │
+|  QCMinter                                                                                                            ·    [36m2845094[39m  ·    [31m2845118[39m  ·     2845111  ·        [90m9.5 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
-|  QCRedeemer                                                                                                          ·    [36m4469257[39m  ·    [31m4469281[39m  ·     4469278  ·       [90m14.9 %[39m  ·          [32m[90m-[32m[39m  │
+|  QCRedeemer                                                                                                          ·    [36m4469245[39m  ·    [31m4469281[39m  ·     4469276  ·       [90m14.9 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
 |  QCRedeemerSPV                                                                                                       ·    [36m1209098[39m  ·    [31m1209134[39m  ·     1209133  ·          [90m4 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
-|  QCRedeemerSPVTest                                                                                                   ·    [36m1861747[39m  ·    [31m1861783[39m  ·     1861765  ·        [90m6.2 %[39m  ·          [32m[90m-[32m[39m  │
+|  QCRedeemerSPVTest                                                                                                   ·          -  ·          -  ·     1861783  ·        [90m6.2 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
 |  Redemption                                                                                                          ·          -  ·          -  ·     3864267  ·       [90m12.9 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
@@ -7189,7 +7268,7 @@ BigNumber { value: "100000000000000000000" }
 ·······················································································································|·············|·············|··············|···············|··············
 |  TBTC                                                                                                                ·          -  ·          -  ·     1590261  ·        [90m5.3 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
-|  TBTCVault                                                                                                           ·    [36m3125575[39m  ·    [31m3125587[39m  ·     3125586  ·       [90m10.4 %[39m  ·          [32m[90m-[32m[39m  │
+|  TBTCVault                                                                                                           ·    [36m3125575[39m  ·    [31m3125587[39m  ·     3125587  ·       [90m10.4 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
 |  TestBitcoinAddressUtils                                                                                             ·          -  ·          -  ·     1076024  ·        [90m3.6 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
@@ -7221,102 +7300,31 @@ BigNumber { value: "100000000000000000000" }
 ·······················································································································|·············|·············|··············|···············|··············
 |  WalletRegistry                                                                                                      ·          -  ·          -  ·     5302554  ·       [90m17.7 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
-|  WatchdogEnforcer                                                                                                    ·    [36m1745096[39m  ·    [31m1745120[39m  ·     1745117  ·        [90m5.8 %[39m  ·          [32m[90m-[32m[39m  │
+|  WatchdogEnforcer                                                                                                    ·    [36m1745108[39m  ·    [31m1745120[39m  ·     1745117  ·        [90m5.8 %[39m  ·          [32m[90m-[32m[39m  │
 ·······················································································································|·············|·············|··············|···············|··············
-|  WormholeBridgeStub                                                                                                  ·     [36m654109[39m  ·     [31m654121[39m  ·      654115  ·        [90m2.2 %[39m  ·          [32m[90m-[32m[39m  │
+|  WormholeBridgeStub                                                                                                  ·          -  ·          -  ·      654121  ·        [90m2.2 %[39m  ·          [32m[90m-[32m[39m  │
 ·----------------------------------------------------------------------------------------------------------------------|-------------|-------------|--------------|---------------|-------------·
 
-  2816 passing (40m)
+  2857 passing (42m)
   31 pending
-  38 failing
+  18 failing
 
-  1) AccountControl Integration Tests
-       "before each" hook for "should route minting through AccountControl when enabled":
-     HardhatError: HH700: Artifact for contract "MockQCManager" not found. 
-      at Artifacts._handleWrongArtifactForContractName (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/hardhat/src/internal/artifacts.ts:702:11)
-      at Artifacts._getArtifactPathFromFiles (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/hardhat/src/internal/artifacts.ts:827:19)
-      at Artifacts._getArtifactPath (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/hardhat/src/internal/artifacts.ts:507:21)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-      at async Artifacts.readArtifact (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/hardhat/src/internal/artifacts.ts:71:26)
-      at async getContractFactory (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:91:22)
-      at async Context.<anonymous> (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/test/account-control/AccountControlIntegration.test.ts:81:34)
-
-  2) QCManager
-       Wallet Registration
-         when called by registrar with verified wallet ownership
-           should register wallet successfully:
-     Error: VM Exception while processing transaction: reverted with custom error 'MessageSignatureVerificationFailed()'
-      at QCManager.registerWallet (contracts/account-control/QCManager.sol:675)
-      at HardhatNode._gatherTraces (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1690:30)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-      at async HardhatNode._mineBlockWithPendingTxs (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1815:23)
-      at async HardhatNode.mineBlock (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:504:16)
-
-  3) QCManager
+  1) QCManager
        5-State Machine
-         setQCStatus
-           when called by arbiter
-             should change status to Revoked:
-     Error: VM Exception while processing transaction: reverted with custom error 'ReserveNotFound("0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC")'
-      at AccountControl.onlyOwnerOrEmergencyCouncil (contracts/account-control/AccountControl.sol:138)
-      at AccountControl.deauthorizeReserve (contracts/account-control/AccountControl.sol:210)
-      at <UnrecognizedContract>.<unknown> (0xa7240bcff60eef40f31b8ed5d921bad6db13b199)
-      at QCManager._syncAccountControlWithStatus (contracts/account-control/QCManager.sol:606)
-      at QCManager._executeStatusChange (contracts/account-control/QCManager.sol:565)
-      at QCManager.setQCStatus (contracts/account-control/QCManager.sol:497)
-      at HardhatNode._gatherTraces (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1690:30)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-      at async HardhatNode._mineBlockWithPendingTxs (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1815:23)
-      at async HardhatNode.mineBlock (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:504:16)
+         "before each" hook for "should change status to UnderReview":
+     Error: too many arguments: passed to contract (count=3, expectedCount=2, code=UNEXPECTED_ARGUMENT, version=contracts/5.5.0)
+      at Logger.makeError (node_modules/@ethersproject/logger/src.ts/index.ts:225:28)
+      at Logger.throwError (node_modules/@ethersproject/logger/src.ts/index.ts:237:20)
+      at Logger.checkArgumentCount (node_modules/@ethersproject/logger/src.ts/index.ts:303:18)
+      at /home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@ethersproject/contracts/src.ts/index.ts:184:12
+      at step (node_modules/@ethersproject/contracts/lib/index.js:48:23)
+      at Object.next (node_modules/@ethersproject/contracts/lib/index.js:29:53)
+      at /home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@ethersproject/contracts/lib/index.js:23:71
+      at new Promise (<anonymous>)
+      at __awaiter (node_modules/@ethersproject/contracts/lib/index.js:19:12)
+      at populateTransaction (node_modules/@ethersproject/contracts/lib/index.js:151:12)
 
-  4) QCManager
-       Available Minting Capacity
-         should return zero for stale reserves:
-     AssertionError: Expected "70000000000000000000" to be equal 0
-      at Context.<anonymous> (test/account-control/QCManager.test.ts:918:36)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-
-  5) QCManager
-       5-State Model Transitions
-         Active State Transitions
-           should allow Active → Revoked:
-     AssertionError: Expected transaction NOT to be reverted
-  
-
-  6) QCManager
-       5-State Model Transitions
-         MintingPaused State Transitions
-           should allow MintingPaused → Revoked:
-     AssertionError: Expected transaction NOT to be reverted
-  
-
-  7) QCManager
-       5-State Model Transitions
-         Paused State Transitions
-           should allow Paused → Revoked:
-     AssertionError: Expected transaction NOT to be reverted
-  
-
-  8) QCManager
-       5-State Model Transitions
-         UnderReview State Transitions
-           should allow UnderReview → Revoked:
-     AssertionError: Expected transaction NOT to be reverted
-  
-
-  9) QCManager - AccountControl Integration
+  2) QCManager - AccountControl Integration
        "before each" hook for "should handle AccountControl authorization gracefully when address is zero":
      InvalidArgumentsError: Errors encountered in param 0: Invalid value undefined supplied to : QUANTITY
       at validateParams (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/hardhat/src/internal/core/jsonrpc/types/input/validation.ts:64:13)
@@ -7329,99 +7337,16 @@ BigNumber { value: "100000000000000000000" }
       at async restoreSnapshot (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@keep-network/hardhat-helpers/src/snapshot.ts:28:3)
       at async Context.<anonymous> (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/test/account-control/QCManagerAccountControlIntegration.test.ts:89:5)
 
-  10) QCManagerLib
+  3) QCManagerLib
        "before each" hook for "should revert with InvalidQCAddress when registering zero address":
-     Error: VM Exception while processing transaction: reverted with reason string 'Initializable: contract is already initialized'
-      at AccountControl.onlyOwnerOrEmergencyCouncil (contracts/account-control/AccountControl.sol:138)
-      at AccountControl.initialize (contracts/account-control/AccountControl.sol:161)
-      at HardhatNode._gatherTraces (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1690:30)
+     TypeError: systemState.setAccountControl is not a function
+      at Context.<anonymous> (test/account-control/QCManagerLib.test.ts:82:23)
       at processTicksAndRejections (node:internal/process/task_queues:95:5)
       at runNextTicks (node:internal/process/task_queues:64:3)
       at listOnTimeout (node:internal/timers:538:9)
       at processTimers (node:internal/timers:512:7)
-      at async HardhatNode._mineBlockWithPendingTxs (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1815:23)
-      at async HardhatNode.mineBlock (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:504:16)
 
-  11) QCRedeemer
-       recordRedemptionFulfillment
-         when redemption is not pending
-           "before each" hook for "should revert":
-     Error: VM Exception while processing transaction: reverted with custom error 'SPVErr(5)'
-      at SharedSPVCore.validateCoreSPVProof (contracts/account-control/libraries/SharedSPVCore.sol:51)
-      at QCRedeemerSPV.validateSPVProof (contracts/account-control/libraries/QCRedeemerSPV.sol:37)
-      at QCRedeemer._verifySPVProof (contracts/account-control/QCRedeemer.sol:769)
-      at QCRedeemer._recordFulfillment (contracts/account-control/QCRedeemer.sol:679)
-      at QCRedeemer.recordRedemptionFulfillment (contracts/account-control/QCRedeemer.sol:379)
-      at HardhatNode._gatherTraces (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1690:30)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-      at async HardhatNode._mineBlockWithPendingTxs (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1815:23)
-      at async HardhatNode.mineBlock (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:504:16)
-
-  12) QCRedeemer
-       recordRedemptionFulfillment
-         when called by arbiter with valid redemption
-           "before each" hook for "should update redemption status to Fulfilled":
-     Error: VM Exception while processing transaction: reverted with custom error 'SPVErr(5)'
-      at SharedSPVCore.validateCoreSPVProof (contracts/account-control/libraries/SharedSPVCore.sol:51)
-      at QCRedeemerSPV.validateSPVProof (contracts/account-control/libraries/QCRedeemerSPV.sol:37)
-      at QCRedeemer._verifySPVProof (contracts/account-control/QCRedeemer.sol:769)
-      at QCRedeemer._recordFulfillment (contracts/account-control/QCRedeemer.sol:679)
-      at QCRedeemer.recordRedemptionFulfillment (contracts/account-control/QCRedeemer.sol:379)
-      at HardhatNode._gatherTraces (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1690:30)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-      at async HardhatNode._mineBlockWithPendingTxs (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1815:23)
-      at async HardhatNode.mineBlock (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:504:16)
-
-  13) QCRedeemer
-       flagDefaultedRedemption
-         when redemption is not pending
-           "before each" hook for "should revert":
-     Error: VM Exception while processing transaction: reverted with custom error 'SPVErr(5)'
-      at SharedSPVCore.validateCoreSPVProof (contracts/account-control/libraries/SharedSPVCore.sol:51)
-      at QCRedeemerSPV.validateSPVProof (contracts/account-control/libraries/QCRedeemerSPV.sol:37)
-      at QCRedeemer._verifySPVProof (contracts/account-control/QCRedeemer.sol:769)
-      at QCRedeemer._recordFulfillment (contracts/account-control/QCRedeemer.sol:679)
-      at QCRedeemer.recordRedemptionFulfillment (contracts/account-control/QCRedeemer.sol:379)
-      at HardhatNode._gatherTraces (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1690:30)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-      at async HardhatNode._mineBlockWithPendingTxs (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1815:23)
-      at async HardhatNode.mineBlock (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:504:16)
-
-  14) QCRedeemer
-       isRedemptionTimedOut
-         when redemption is not pending
-           "before each" hook for "should return false":
-     Error: VM Exception while processing transaction: reverted with custom error 'SPVErr(5)'
-      at SharedSPVCore.validateCoreSPVProof (contracts/account-control/libraries/SharedSPVCore.sol:51)
-      at QCRedeemerSPV.validateSPVProof (contracts/account-control/libraries/QCRedeemerSPV.sol:37)
-      at QCRedeemer._verifySPVProof (contracts/account-control/QCRedeemer.sol:769)
-      at QCRedeemer._recordFulfillment (contracts/account-control/QCRedeemer.sol:679)
-      at QCRedeemer.recordRedemptionFulfillment (contracts/account-control/QCRedeemer.sol:379)
-      at HardhatNode._gatherTraces (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1690:30)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-      at async HardhatNode._mineBlockWithPendingTxs (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1815:23)
-      at async HardhatNode.mineBlock (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:504:16)
-
-  15) QCRedeemer
-       Access Control
-         DISPUTE_ARBITER_ROLE functions
-           should allow arbiter to record fulfillment:
-     AssertionError: Expected transaction NOT to be reverted
-  
-
-  16) QCRedeemerSPV Library
+  4) QCRedeemerSPV Library
        validateRedemptionTransaction
          should return false for future locktime (anti-replay protection):
 
@@ -7437,38 +7362,33 @@ BigNumber { value: "100000000000000000000" }
       at listOnTimeout (node:internal/timers:538:9)
       at processTimers (node:internal/timers:512:7)
 
-  17) QCRedeemer - Wallet Obligations Edge Cases
+  5) QCRedeemer - Wallet Obligations Edge Cases
        "before each" hook for "should reject QC wallet with invalid Bitcoin address format":
-     NomicLabsHardhatPluginError: The contract QCRedeemer is missing links for the following libraries:
-* contracts/account-control/libraries/QCRedeemerSPV.sol:QCRedeemerSPV
+     Error: VM Exception while processing transaction: reverted with reason string 'SPVState: relay address cannot be zero'
+      at QCRedeemer.constructor (contracts/account-control/QCRedeemer.sol:215)
+      at QCRedeemer.constructor (contracts/account-control/QCRedeemer.sol:224)
+      at HardhatNode.estimateGas (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:810:27)
+      at processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at runNextTicks (node:internal/process/task_queues:64:3)
+      at listOnTimeout (node:internal/timers:538:9)
+      at processTimers (node:internal/timers:512:7)
+      at async EthModule._estimateGasAction (node_modules/hardhat/src/internal/hardhat-network/provider/modules/eth.ts:429:7)
+      at async HardhatNetworkProvider.request (node_modules/hardhat/src/internal/hardhat-network/provider/provider.ts:118:18)
 
-Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hardhat-ethers.html#library-linking
-
-      at collectLibrariesAndLink (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:258:11)
-      at getContractFactoryFromArtifact (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:149:32)
-      at getContractFactory (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:93:12)
-      at async Context.<anonymous> (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/test/account-control/QCRedeemerWalletObligations.edge.test.ts:54:31)
-
-  18) QCRedeemer - Wallet Obligations
+  6) QCRedeemer - Wallet Obligations
        "before each" hook for "should track redemptions by wallet":
-     NomicLabsHardhatPluginError: The contract QCRedeemer is missing links for the following libraries:
-* contracts/account-control/libraries/QCRedeemerSPV.sol:QCRedeemerSPV
+     Error: VM Exception while processing transaction: reverted with reason string 'SPVState: relay address cannot be zero'
+      at QCRedeemer.constructor (contracts/account-control/QCRedeemer.sol:215)
+      at QCRedeemer.constructor (contracts/account-control/QCRedeemer.sol:224)
+      at HardhatNode.estimateGas (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:810:27)
+      at processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at runNextTicks (node:internal/process/task_queues:64:3)
+      at listOnTimeout (node:internal/timers:538:9)
+      at processTimers (node:internal/timers:512:7)
+      at async EthModule._estimateGasAction (node_modules/hardhat/src/internal/hardhat-network/provider/modules/eth.ts:429:7)
+      at async HardhatNetworkProvider.request (node_modules/hardhat/src/internal/hardhat-network/provider/provider.ts:118:18)
 
-Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hardhat-ethers.html#library-linking
-
-      at collectLibrariesAndLink (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:258:11)
-      at getContractFactoryFromArtifact (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:149:32)
-      at getContractFactory (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:93:12)
-      at async Context.<anonymous> (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/test/account-control/QCRedeemerWalletObligations.test.ts:53:31)
-
-  19) ReserveOracle
-       Configuration
-         setConsensusThreshold
-           should revert if not admin:
-     AssertionError: Expected transaction to be reverted with AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0x0000000000000000000000000000000000000000000000000000000000000000, but other exception was thrown: Error: VM Exception while processing transaction: reverted with reason string 'AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xa7017e78e7dd014f69d34dd801ba6409d1430be1bf2b9e5b769a9cb645aeac33'
-  
-
-  20) ReserveOracle
+  7) ReserveOracle
        Edge cases
          should handle attester updating their attestation:
      Error: VM Exception while processing transaction: reverted with custom error 'AttesterAlreadySubmitted()'
@@ -7482,21 +7402,7 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       at async HardhatNode._mineBlockWithPendingTxs (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1815:23)
       at async HardhatNode.mineBlock (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:504:16)
 
-  21) ReserveOracle
-       Attester registration
-         should not re-register existing attesters:
-     Error: VM Exception while processing transaction: reverted with custom error 'AttesterAlreadySubmitted()'
-      at ReserveOracle._attestBalanceInternal (contracts/account-control/ReserveOracle.sol:316)
-      at ReserveOracle.attestBalance (contracts/account-control/ReserveOracle.sol:166)
-      at HardhatNode._gatherTraces (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1690:30)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-      at async HardhatNode._mineBlockWithPendingTxs (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1815:23)
-      at async HardhatNode.mineBlock (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:504:16)
-
-  22) Bridge - Moving funds
+  8) Bridge - Moving funds
        submitMovingFundsCommitment
          when source wallet is in the MovingFunds state
            when source wallet has no pending redemptions
@@ -7521,31 +7427,55 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       at async EthModule._estimateGasAction (node_modules/hardhat/src/internal/hardhat-network/provider/modules/eth.ts:429:7)
       at async HardhatNetworkProvider.request (node_modules/hardhat/src/internal/hardhat-network/provider/provider.ts:118:18)
 
-  23) Deployment
+  9) Bridge - Moving funds
+       resetMovingFundsTimeout
+         when the wallet is in the MovingFunds state
+           when the wallet's commitment is not submitted yet
+             when Live wallets count is zero
+               when reset delay has not elapsed yet
+                 should revert:
+
+      AssertionError: Expected transaction to be reverted
+      + expected - actual
+
+      -Transaction NOT reverted.
+      +Transaction reverted.
+      
+  
+
+  10) Deployment
        WalletRegistry
          should set walletOwner:
-     TypeError: walletRegistry.walletOwner is not a function
-      at Context.<anonymous> (test/bridge/Deployment.test.ts:183:30)
-      at processImmediate (node:internal/timers:476:21)
 
-  24) Deployment
+      invalid walletOwner in WalletRegistry
+      + expected - actual
+
+      -0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+      +0xA82ED5224ba72f2f776e09B11DC99E30Ee65Da8d
+      
+      at Context.<anonymous> (test/bridge/Deployment.test.ts:185:9)
+      at processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at runNextTicks (node:internal/process/task_queues:64:3)
+      at listOnTimeout (node:internal/timers:538:9)
+      at processTimers (node:internal/timers:512:7)
+
+  11) Deployment
        ReimbursementPool
          should set ReimbursementPool owner:
-     TypeError: reimbursementPool.owner is not a function
-      at Context.<anonymous> (test/bridge/Deployment.test.ts:251:33)
-      at processImmediate (node:internal/timers:476:21)
 
-  25) EcdsaLib
-       "before all" hook in "EcdsaLib":
-     HardhatError: HH700: Artifact for contract "EcdsaLibStub" not found. 
-      at Artifacts._handleWrongArtifactForContractName (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/hardhat/src/internal/artifacts.ts:702:11)
-      at Artifacts._getArtifactPathFromFiles (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/hardhat/src/internal/artifacts.ts:827:19)
-      at Artifacts._getArtifactPath (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/hardhat/src/internal/artifacts.ts:507:21)
-      at async Artifacts.readArtifact (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/hardhat/src/internal/artifacts.ts:71:26)
-      at async getContractFactory (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:91:22)
-      at async Context.<anonymous> (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/test/bridge/EcdsaLib.test.ts:9:22)
+      invalid ReimbursementPool owner
+      + expected - actual
 
-  26) StarkNetBitcoinDepositor - deposit() Implementation
+      -0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+      +0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+      
+      at Context.<anonymous> (test/bridge/Deployment.test.ts:253:9)
+      at processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at runNextTicks (node:internal/process/task_queues:64:3)
+      at listOnTimeout (node:internal/timers:538:9)
+      at processTimers (node:internal/timers:512:7)
+
+  12) StarkNetBitcoinDepositor - deposit() Implementation
        _transferTbtc Implementation
          should call deposit() instead of depositWithMessage():
      Error: VM Exception while processing transaction: reverted with reason string 'ERC20: transfer amount exceeds balance'
@@ -7564,7 +7494,7 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       at async HardhatNode._mineBlockWithPendingTxs (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:1815:23)
       at async HardhatNode.mineBlock (node_modules/hardhat/src/internal/hardhat-network/provider/node.ts:504:16)
 
-  27) StarkNetBitcoinDepositor - deposit() Implementation
+  13) StarkNetBitcoinDepositor - deposit() Implementation
        Gas Optimization Verification
          should reduce gas usage by ~2000:
      AssertionError: Expected "335609" to be less than 300000
@@ -7574,7 +7504,7 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       at listOnTimeout (node:internal/timers:538:9)
       at processTimers (node:internal/timers:512:7)
 
-  28) v1 System Deployment Tests
+  14) v1 System Deployment Tests
        v1 Contract Factory Tests
          should be able to get contract factories for v1 contracts:
      NomicLabsHardhatPluginError: The contract QCRedeemer is missing links for the following libraries:
@@ -7587,7 +7517,7 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       at getContractFactory (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:93:12)
       at async Context.<anonymous> (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/test/integration/DeploymentVariations.test.ts:90:27)
 
-  29) Message Signing Integration Flows
+  15) Message Signing Integration Flows
        "before all" hook in "Message Signing Integration Flows":
      Error: too many arguments:  in Contract constructor (count=1, expectedCount=0, code=UNEXPECTED_ARGUMENT, version=contracts/5.5.0)
       at Logger.makeError (node_modules/@ethersproject/logger/src.ts/index.ts:225:28)
@@ -7600,7 +7530,7 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       at fulfilled (node_modules/@ethersproject/contracts/lib/index.js:20:58)
       at processTicksAndRejections (node:internal/process/task_queues:95:5)
 
-  30) SPV Library Integration
+  16) SPV Library Integration
        "before all" hook in "SPV Library Integration":
      Error: too many arguments:  in Contract constructor (count=1, expectedCount=0, code=UNEXPECTED_ARGUMENT, version=contracts/5.5.0)
       at Logger.makeError (node_modules/@ethersproject/logger/src.ts/index.ts:225:28)
@@ -7613,7 +7543,7 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       at fulfilled (node_modules/@ethersproject/contracts/lib/index.js:20:58)
       at processTicksAndRejections (node:internal/process/task_queues:95:5)
 
-  31) MaintainerProxy
+  17) MaintainerProxy
        "before all" hook in "MaintainerProxy":
      Error: Transaction reverted: function selector was not recognized and there's no fallback nor receive function
       at MockReimbursementPool.<unrecognized-selector> (contracts/test/MockReimbursementPool.sol:5)
@@ -7625,7 +7555,7 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       at async EthModule._estimateGasAction (node_modules/hardhat/src/internal/hardhat-network/provider/modules/eth.ts:429:7)
       at async HardhatNetworkProvider.request (node_modules/hardhat/src/internal/hardhat-network/provider/provider.ts:118:18)
 
-  32) LightRelayMaintainerProxy
+  18) LightRelayMaintainerProxy
        "before all" hook in "LightRelayMaintainerProxy":
      Error: Transaction reverted: function selector was not recognized and there's no fallback nor receive function
       at MockReimbursementPool.<unrecognized-selector> (contracts/test/MockReimbursementPool.sol:5)
@@ -7637,85 +7567,7 @@ Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hard
       at async EthModule._estimateGasAction (node_modules/hardhat/src/internal/hardhat-network/provider/modules/eth.ts:429:7)
       at async HardhatNetworkProvider.request (node_modules/hardhat/src/internal/hardhat-network/provider/provider.ts:118:18)
 
-  33) SPV Security Tests
-       "before all" hook in "SPV Security Tests":
-     NomicLabsHardhatPluginError: The contract QCManager is missing links for the following libraries:
-* contracts/account-control/QCManagerLib.sol:QCManagerLib
-
-Learn more about linking contracts at https://hardhat.org/plugins/nomiclabs-hardhat-ethers.html#library-linking
-
-      at collectLibrariesAndLink (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:258:11)
-      at getContractFactoryFromArtifact (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:149:32)
-      at getContractFactory (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@nomiclabs/hardhat-ethers/src/internal/helpers.ts:93:12)
-      at async Context.<anonymous> (/home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/test/security/SPVSecurityTests.test.ts:82:23)
-
-  34) SystemState Security Tests
-       Pause Mechanism Security
-         Pause State Management
-           should track pause timestamps:
-     AssertionError: Expected "0" to be equal 1758606688
-      at Context.<anonymous> (test/security/SystemStateSecurityTest.test.ts:126:71)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-
-  35) SystemState Security Tests
-       Pause Mechanism Security
-         Emergency Pause Duration
-           should track pause duration for monitoring:
-     TypeError: hardhat_1.helpers.mine is not a function
-      at Context.<anonymous> (test/security/SystemStateSecurityTest.test.ts:165:23)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-
-  36) SystemState Security Tests
-       Emergency Council
-         should only allow PARAMETER_ADMIN to set emergency council:
-     AssertionError: Expected transaction to be reverted with AccessControl: account 0x15d34aaf54267db7d7c367839aaf71a00a2c6a65 is missing role 0xe3723f41c074e25ac45636a7cd631386f2e15f8583ade05d0b710b41251f5c7b, but other exception was thrown: Error: VM Exception while processing transaction: reverted with reason string 'AccessControl: account 0x15d34aaf54267db7d7c367839aaf71a00a2c6a65 is missing role 0x0000000000000000000000000000000000000000000000000000000000000000'
-  
-
-  37) SystemState Security Tests
-       Emergency Council
-         should emit event when setting emergency council:
-
-      AssertionError: expected '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' to equal '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
-      + expected - actual
-
-      -0x70997970C51812dc3A010C7d01b50e0d17dc79C8
-      +0x90F79bf6EB2c4f870365E785982E1f101E93b906
-      
-      at assertArgsArraysEqual (node_modules/@ethereum-waffle/chai/dist/cjs/matchers/emit.js:58:54)
-      at tryAssertArgsArraysEqual (node_modules/@ethereum-waffle/chai/dist/cjs/matchers/emit.js:65:20)
-      at /home/piotr/Documents/projects/tLabs/tbtc-v2-ac-v2/solidity/node_modules/@ethereum-waffle/chai/dist/cjs/matchers/emit.js:77:13
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
-      at async Context.<anonymous> (test/security/SystemStateSecurityTest.test.ts:296:7)
-
-  38) SystemState Security Tests
-       Initialization Security
-         should initialize with secure defaults:
-
-      AssertionError: Expected "1000000000000000000000" to be equal 21000000000000000000000000
-      + expected - actual
-
-       {
-      -  "_hex": "0x115eec47f6cf7e35000000"
-      +  "_hex": "0x3635c9adc5dea00000"
-         "_isBigNumber": true
-       }
-      
-      at Context.<anonymous> (test/security/SystemStateSecurityTest.test.ts:394:57)
-      at processTicksAndRejections (node:internal/process/task_queues:95:5)
-      at runNextTicks (node:internal/process/task_queues:64:3)
-      at listOnTimeout (node:internal/timers:538:9)
-      at processTimers (node:internal/timers:512:7)
 
 
-
-error Command failed with exit code 38.
+error Command failed with exit code 18.
 info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.

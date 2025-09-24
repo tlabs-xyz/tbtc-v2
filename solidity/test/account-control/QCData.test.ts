@@ -189,7 +189,7 @@ describe("QCData", () => {
       it("should update status to UnderReview", async () => {
         const tx = await qcData
           .connect(qcManager)
-          .setQCStatus(qcAddress.address, 3, testReason) // UnderReview status
+          .setQCStatus(qcAddress.address, 3, testReason) // Status 3
 
         expect(await qcData.getQCStatus(qcAddress.address)).to.equal(3)
 
@@ -1179,7 +1179,7 @@ describe("QCData", () => {
         expect(capacity).to.equal(testCapacity)
       })
 
-      it("should return correct capacity for registered QC", async () => {
+      it("should return initial capacity set during registration", async () => {
         const capacity = await qcData.getMaxMintingCapacity(qcAddress.address)
         expect(capacity).to.equal(testCapacity)
       })

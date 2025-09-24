@@ -95,9 +95,9 @@ describe("QCManager - Direct Wallet Registration", () => {
 
   describe("registerWalletDirect", () => {
     context("when called by a registered, active QC", () => {
-      it("should successfully register a wallet with valid signature", async () => {
-        // For this test, we'll mock the MessageSigning verification
-        // In production, this would actually verify the Bitcoin signature
+      it("should reject registration with invalid signature", async () => {
+        // For this test, we're using a mock signature that will fail verification
+        // This tests the signature verification rejection path
 
         // Calculate expected challenge
         const chainId = await qc1.getChainId()
@@ -114,16 +114,14 @@ describe("QCManager - Direct Wallet Registration", () => {
           )
         )
 
-        // Note: In a real test, we'd need to generate a valid Bitcoin signature
-        // For now, we'll test the flow assuming signature verification passes
+        // Using a mock signature that will fail verification
         await expect(
           qcManager
             .connect(qc1)
             .registerWalletDirect(validBitcoinAddress, testNonce, mockSignature)
         ).to.be.revertedWith("MessageSignatureVerificationFailed")
-        // This is expected as we're using a mock signature
 
-        // Verify the nonce tracking works
+        // Verify the nonce was not consumed due to failed verification
         const nonceUsed = await qcManager.usedNonces(qc1.address, testNonce)
         expect(nonceUsed).to.be.false // Not used because transaction reverted
       })

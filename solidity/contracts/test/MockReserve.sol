@@ -109,11 +109,12 @@ contract MockReserve is Ownable {
             accountControl.mint(recipient, amount);
         }
 
-        // AccountControl checks backing >= minted + amount
-        accountControl.mint(recipient, amount);
-
+        // Update state before external call (CEI pattern)
         userBalances[recipient] += amount;
         totalUserBalances += amount;
+
+        // AccountControl checks backing >= minted + amount
+        accountControl.mint(recipient, amount);
 
         emit TokensMinted(recipient, amount);
     }
@@ -129,6 +130,7 @@ contract MockReserve is Ownable {
             revert InvalidArrayLengths();
         }
 
+        // Update state before external calls (CEI pattern)
         uint256 total = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
             if (recipients[i] == address(0)) {

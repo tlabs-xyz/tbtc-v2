@@ -11,10 +11,12 @@ contract MockReimbursementPool {
     }
 
     function authorize(address maintainer) external {
+        require(msg.sender == owner, "Only owner can authorize");
         isAuthorized[maintainer] = true;
     }
 
     function unauthorize(address maintainer) external {
+        require(msg.sender == owner, "Only owner can unauthorize");
         isAuthorized[maintainer] = false;
     }
 

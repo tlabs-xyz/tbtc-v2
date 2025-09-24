@@ -159,16 +159,11 @@ describe("QCRedeemer", () => {
         .be.true
       expect(await qcRedeemer.hasRole(DISPUTE_ARBITER_ROLE, deployer.address))
         .to.be.true
-      expect(await qcRedeemer.hasRole(DISPUTE_ARBITER_ROLE, deployer.address))
-        .to.be.true
     })
   })
 
   describe("Role Constants", () => {
     it("should have correct role constants", async () => {
-      expect(await qcRedeemer.DISPUTE_ARBITER_ROLE()).to.equal(
-        DISPUTE_ARBITER_ROLE
-      )
       expect(await qcRedeemer.DISPUTE_ARBITER_ROLE()).to.equal(
         DISPUTE_ARBITER_ROLE
       )

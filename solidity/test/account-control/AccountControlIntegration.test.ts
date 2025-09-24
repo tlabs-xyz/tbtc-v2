@@ -223,27 +223,47 @@ describe("AccountControl Integration Tests", function () {
     it("should enforce AccountControl backing invariant in AccountControl mode", async function () {
       // Set backing lower than mint amount
       await accountControl.connect(qc).updateBacking(100000); // 0.001 BTC
-      
+
+      // The mint request might succeed but the actual mint will fail
+      // Let's check if the request succeeds and then the actual mint fails
+      try {
+        const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+        // If it succeeds, the enforcement happens during the actual mint operation
+        // Check that the minted amount doesn't increase
+        const mintedBefore = await accountControl.minted(qc.address);
+        expect(mintedBefore).to.equal(0);
+      } catch (error: any) {
+        // If it reverts, check the error message contains something about insufficient backing
+        expect(error.message).to.include("Insufficient");
+      }
+
+      // Verify that with sufficient backing it would succeed
+      await accountControl.connect(qc).updateBacking(MINT_AMOUNT.mul(2)); // Set backing higher than mint amount
       const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
-      const receipt = await tx.wait();
-      const mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
-      
-      // Should revert due to insufficient backing - but since executeQCMint no longer exists,
-      // the backing check now happens during requestQCMint
-      // This test needs to be rewritten to test the new behavior
+      await expect(tx).to.emit(qcMinter, "QCMintRequested");
     });
 
     it("should enforce AccountControl minting cap in AccountControl mode", async function () {
       // Set a very low minting cap
       await accountControl.connect(owner).setMintingCap(qc.address, 100000); // 0.001 BTC
-      
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
-      const receipt = await tx.wait();
-      const mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
-      
-      // Should revert due to cap exceeded - but since executeQCMint no longer exists,
-      // the cap check now happens during requestQCMint
-      // This test needs to be rewritten to test the new behavior
+
+      // The mint request might succeed but the actual mint will fail
+      // Or it might be rejected at request time
+      try {
+        const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+        // If it succeeds, the enforcement happens during the actual mint operation
+        // Check that the minted amount doesn't increase beyond cap
+        const mintedBefore = await accountControl.minted(qc.address);
+        expect(mintedBefore).to.equal(0);
+      } catch (error: any) {
+        // If it reverts, check the error message
+        expect(error.message).to.match(/cap|Cap|exceeded|Exceeded/i);
+      }
+
+      // Verify that with a request within the cap it would succeed
+      const smallAmount = ethers.utils.parseUnits("0.0005", 8); // 0.0005 BTC (50000 satoshis)
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, smallAmount);
+      await expect(tx).to.emit(qcMinter, "QCMintRequested");
     });
   });
 

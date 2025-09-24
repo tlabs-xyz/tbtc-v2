@@ -181,6 +181,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @notice Set AccountControl address
     /// @param _accountControl Address of the AccountControl contract
     function setAccountControl(address _accountControl) external onlyRole(GOVERNANCE_ROLE) {
+        require(_accountControl != address(0), "Invalid AccountControl address");
         accountControl = _accountControl;
         emit AccountControlUpdated(_accountControl);
     }
