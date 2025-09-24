@@ -312,6 +312,9 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             revert NotAuthorizedInBank();
         }
 
+        // Validate accountControl is configured
+        require(accountControl != address(0), "AccountControl not configured");
+
         // Use AccountControl for minting (returns satoshis for event emission)
         uint256 satoshis = AccountControl(accountControl).mintTBTC(user, amount);
         
@@ -445,6 +448,10 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // No need to check authorization here - Bank will check when we call increaseBalance
 
         // HYBRID LOGIC: Choose between manual and automated minting
+
+        // Validate accountControl is configured
+        require(accountControl != address(0), "AccountControl not configured");
+
         uint256 satoshis;
         if (autoMint && autoMintEnabled) {
             // Option 1: Automated minting - create balance and immediately mint tBTC

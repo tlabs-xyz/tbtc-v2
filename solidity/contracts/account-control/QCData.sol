@@ -322,6 +322,9 @@ contract QCData is AccessControl {
     {
         if (!isQCRegistered(qc)) revert QCNotRegistered();
 
+        // Validate new amount doesn't exceed capacity
+        require(newAmount <= custodians[qc].maxMintingCapacity, "Exceeds minting capacity");
+
         uint256 oldAmount = custodians[qc].totalMintedAmount;
         custodians[qc].totalMintedAmount = newAmount;
 

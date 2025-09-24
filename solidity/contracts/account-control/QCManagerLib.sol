@@ -79,6 +79,9 @@ library QCManagerLib {
         address qc,
         uint256 maxMintingCap
     ) external {
+        // Validate qcData parameter
+        require(address(qcData) != address(0), "QCData cannot be zero");
+
         // Input validation
         if (qc == address(0)) {
             revert InvalidQCAddress();

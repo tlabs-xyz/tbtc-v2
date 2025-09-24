@@ -108,10 +108,10 @@ contract AccountControl is
      */
 
     // ========== PHASE 1: Reserve Type Registry ==========
-    // Storage slots 165-167: Reserve type management
+    // Storage slots 165-166: Reserve type management
     mapping(address => ReserveType) public reserveTypes;           // Slot 165: Reserve type mapping
     mapping(ReserveType => ReserveTypeInfo) public typeInfo;       // Slot 166: Type information
-    uint256 public constant MIN_VAULT_CAP = 10 * 10**8;           // Slot 167: 10 BTC minimum for vaults
+    uint256 public constant MIN_VAULT_CAP = 10 * 10**8;           // Constant: 10 BTC minimum for vaults (no storage)
 
     // ========== EVENTS ==========
     event MintExecuted(address indexed reserve, address indexed recipient, uint256 amount);
@@ -622,6 +622,9 @@ contract AccountControl is
         nonReentrant
         returns (uint256 satoshis)
     {
+        // Ensure no precision loss
+        require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Amount not divisible by SATOSHI_MULTIPLIER");
+
         // Convert tBTC to satoshis internally
         satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
 
@@ -703,7 +706,7 @@ contract AccountControl is
     /// @dev Should only be used in MockAccountControl in production
     function setBackingForTesting(address reserve, uint256 amount) external {
         require(
-            block.chainid == 31337 || block.chainid == 1337 || block.chainid == 1,
+            block.chainid == 31337 || block.chainid == 1337,
             "Test function restricted to test/dev networks"
         );
         backing[reserve] = amount;
@@ -748,9 +751,12 @@ contract AccountControl is
         onlyAuthorizedReserve
         returns (bool success)
     {
+        // Ensure no precision loss
+        require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Amount not divisible by SATOSHI_MULTIPLIER");
+
         // Convert tBTC to satoshis internally
         uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
-        return this.redeem(satoshis);
+        return redeem(satoshis);
     }
 
     /// @notice Burn tBTC tokens using separated operations
@@ -763,6 +769,9 @@ contract AccountControl is
         nonReentrant
         returns (bool success)
     {
+        // Ensure no precision loss
+        require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Amount not divisible by SATOSHI_MULTIPLIER");
+
         // Validate that this reserve type supports losses/burns
         validateTypeOperation(msg.sender, true);
 

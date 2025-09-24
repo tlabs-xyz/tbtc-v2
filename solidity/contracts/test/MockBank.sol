@@ -59,6 +59,7 @@ contract MockBank is IBank {
 
     // AccountControl integration methods
     function increaseBalance(address account, uint256 amount) external {
+        require(_authorizedIncreasers[msg.sender], "Not authorized to increase balance");
         individualCallCount++;
         callCount++;
         
@@ -72,6 +73,7 @@ contract MockBank is IBank {
     }
     
     function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external {
+        require(_authorizedIncreasers[msg.sender], "Not authorized to increase balances");
         if (!batchSupported) {
             revert("Mock Bank: Batch not supported");
         }
@@ -87,6 +89,7 @@ contract MockBank is IBank {
     }
 
     function decreaseBalance(address account, uint256 amount) external {
+        require(_authorizedIncreasers[msg.sender], "Not authorized to decrease balance");
         require(_balances[account] >= amount, "Insufficient balance");
         _balances[account] -= amount;
         _totalSupply -= amount;

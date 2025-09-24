@@ -1118,9 +1118,9 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
             
             uint256 timeElapsed = block.timestamp - qcPauseTimestamp[qc];
             
-            // Check if escalation period has been reached
+            // Skip if escalation period has not been reached yet
             if (timeElapsed < SELF_PAUSE_TIMEOUT) {
-                revert EscalationPeriodNotReached();
+                continue; // Skip this QC, check others
             }
             
             // Check for warning period (1 hour before escalation) but only if not yet escalated
