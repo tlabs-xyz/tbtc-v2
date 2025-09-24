@@ -30,3 +30,6 @@ typechain-types/
 
 # Ignore code review artifacts
 coderabbit.txt
+
+# Ignore log files
+*.log

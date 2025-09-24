@@ -258,14 +258,15 @@ const config: HardhatUserConfig = {
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
-    // TODO: Re-enable after fixing contract size issues (currently disabled for dev performance)
-    // Multiple contracts exceed 24KB limit: QCManager (27KB), QCRedeemer (25.4KB)
-    runOnCompile: false,
+    // TODO: Re-enable after library extraction reduces contract sizes below 24KB limit
+    // Target: Q1 2025 - Extract QCManagerLib and QCRedeemerSPV logic to reduce contract sizes
+    // Current sizes: QCManager (27KB), QCRedeemer (25.4KB) - both exceed 24KB limit
+    runOnCompile: true,
     strict: true,
     // WalletRegistry is excluded because it's an external dependency from @keep-network/ecdsa
     // that exceeds the 24KB contract size limit (24.142 KB). We don't control this contract.
     // QCRedeemer temporarily exceeds limit (25.391 KB) due to comprehensive SPV implementation.
-    // TODO: Optimize QCRedeemer by extracting SPV logic to a library similar to QCManagerSPV.
+    // TODO: Optimize QCRedeemer by extracting SPV logic to a dedicated library (like QCRedeemerSPV).
     except: ["BridgeStub$", "WalletRegistry$", "QCRedeemer$"],
   },
   mocha: {
