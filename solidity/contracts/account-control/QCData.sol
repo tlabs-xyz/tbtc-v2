@@ -45,6 +45,12 @@ contract QCData is AccessControl {
         Deregistered // Wallet has been permanently deregistered
     }
 
+    /// @dev Pause level enumeration for QC self-pause functionality
+    enum PauseLevel {
+        MintingOnly,    // Pause minting but allow fulfillment
+        Complete        // Pause all operations
+    }
+
     /// @dev Qualified Custodian data structure - optimized for gas efficiency
     struct Custodian {
         uint256 totalMintedAmount; // Total tBTC minted by this QC

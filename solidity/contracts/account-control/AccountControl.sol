@@ -30,11 +30,25 @@ contract AccountControl is
 
     // ========== ENUMS ==========
     /// @dev Reserve types use enums for type safety and gas efficiency.
-    /// Since this contract is upgradeable via UUPS, additional types can be 
+    /// Since this contract is upgradeable via UUPS, additional types can be
     /// added through upgrades while maintaining type safety.
     enum ReserveType {
         UNINITIALIZED,   // Default/uninitialized state (0)
-        QC_PERMISSIONED  // Qualified Custodian with permissioned access
+        QC_PERMISSIONED, // Qualified Custodian with permissioned access
+        QC_BASIC,        // Traditional QC reserves (legacy compatibility)
+        QC_VAULT_STRATEGY, // CEX vault strategies with loss handling
+        QC_RESTAKING,    // Future: restaking protocols
+        QC_BRIDGE        // Future: cross-chain bridges
+    }
+
+    // ========== STRUCTS ==========
+    /// @notice Type information for different reserve categories
+    struct ReserveTypeInfo {
+        string name;                // Human-readable name
+        bool requiresBtcAddress;    // Whether BTC address is required
+        bool supportsLosses;        // Can handle burns/losses
+        bool requiresWrapper;       // Needs delegation layer
+        uint256 maxBackingRatio;    // backing/minted limit (0 = unlimited)
     }
 
     // ========== STATE VARIABLES ==========
@@ -88,12 +102,16 @@ contract AccountControl is
     
     /*
      * END OF CORE STORAGE LAYOUT
-     * 
+     *
      * ANY ADDITIONAL VARIABLES MUST BE ADDED BELOW THIS COMMENT
      * TO MAINTAIN UPGRADE COMPATIBILITY
      */
-    
-    // Slots 165-167: Available for future use (reserve type management simplified)
+
+    // ========== PHASE 1: Reserve Type Registry ==========
+    // Storage slots 165-167: Reserve type management
+    mapping(address => ReserveType) public reserveTypes;           // Slot 165: Reserve type mapping
+    mapping(ReserveType => ReserveTypeInfo) public typeInfo;       // Slot 166: Type information
+    uint256 public constant MIN_VAULT_CAP = 10 * 10**8;           // Slot 167: 10 BTC minimum for vaults
 
     // ========== EVENTS ==========
     event MintExecuted(address indexed reserve, address indexed recipient, uint256 amount);
@@ -107,6 +125,16 @@ contract AccountControl is
     event EmergencyCouncilUpdated(address indexed oldCouncil, address indexed newCouncil);
     event RedemptionProcessed(address indexed reserve, uint256 amount);
     event ReserveDeauthorized(address indexed reserve);
+
+    // Separated operations events
+    event PureTokenMint(address indexed reserve, address indexed recipient, uint256 amount);
+    event PureTokenBurn(address indexed reserve, uint256 amount);
+    event AccountingCredit(address indexed reserve, uint256 amount);
+    event AccountingDebit(address indexed reserve, uint256 amount);
+
+    // Reserve type events
+    event ReserveTypeUpdated(address indexed reserve, ReserveType oldType, ReserveType newType);
+    event ReserveTypeInfoUpdated(ReserveType indexed rType, string name, bool supportsLosses);
 
     // ========== ERRORS ==========
     error InsufficientBacking(uint256 available, uint256 required);
@@ -180,31 +208,64 @@ contract AccountControl is
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(QC_MANAGER_ROLE, _owner); // Owner can authorize reserves initially
         deploymentBlock = block.number;
-        
-        // Reserve types managed through upgrades - QC_PERMISSIONED is default and only type in V2
+
+        // Initialize default type information
+        initializeTypeInfo();
     }
 
     // ========== RESERVE MANAGEMENT ==========
     
-    /// @notice Authorize a reserve for minting operations (QC_PERMISSIONED type)
-    /// @param reserve The address of the reserve to authorize  
+    /// @notice Authorize a new reserve with default type (backward compatibility)
+    /// @param reserve The reserve address
     /// @param mintingCap The maximum amount this reserve can mint
     function authorizeReserve(address reserve, uint256 mintingCap)
         external
         onlyOwnerOrQCManager
     {
+        // Default to QC_BASIC for backward compatibility
+        _authorizeReserveWithType(reserve, mintingCap, ReserveType.QC_BASIC);
+    }
+
+    /// @notice Authorize a new reserve with specific type
+    /// @param reserve The reserve address
+    /// @param mintingCap The maximum amount this reserve can mint
+    /// @param rType The type of reserve
+    function authorizeReserveWithType(
+        address reserve,
+        uint256 mintingCap,
+        ReserveType rType
+    ) external onlyOwnerOrQCManager {
+        _authorizeReserveWithType(reserve, mintingCap, rType);
+    }
+
+    /// @notice Internal function to authorize a reserve with type
+    function _authorizeReserveWithType(
+        address reserve,
+        uint256 mintingCap,
+        ReserveType rType
+    ) internal {
         if (authorized[reserve]) revert AlreadyAuthorized(reserve);
-        if (mintingCap == 0) revert AmountTooSmall(mintingCap, 1); // Prevent zero caps, use pause instead
-        
+        if (mintingCap == 0) revert AmountTooSmall(mintingCap, 1);
+        require(rType != ReserveType.UNINITIALIZED, "Cannot authorize as UNINITIALIZED");
+
+        // Type-specific validation
+        if (rType == ReserveType.QC_VAULT_STRATEGY) {
+            require(mintingCap >= MIN_VAULT_CAP, "Vault cap too low");
+            require(typeInfo[rType].supportsLosses, "Type must support losses");
+        }
+
         authorized[reserve] = true;
         reserveInfo[reserve] = ReserveInfo({
             mintingCap: mintingCap,
-            reserveType: ReserveType.QC_PERMISSIONED,
+            reserveType: rType,
             paused: false
         });
+
+        reserveTypes[reserve] = rType;
         reserveList.push(reserve);
-        
+
         emit ReserveAuthorized(reserve, mintingCap);
+        emit ReserveTypeUpdated(reserve, ReserveType.UNINITIALIZED, rType);
     }
 
     function deauthorizeReserve(address reserve) 
@@ -231,6 +292,109 @@ contract AccountControl is
         }
         
         emit ReserveDeauthorized(reserve);
+    }
+
+    // ========== RESERVE TYPE MANAGEMENT ==========
+
+    /// @notice Initialize type information for a reserve type (governance only)
+    /// @param rType The reserve type to configure
+    /// @param info The type information to set
+    function setReserveTypeInfo(
+        ReserveType rType,
+        ReserveTypeInfo memory info
+    ) external onlyOwner {
+        require(rType != ReserveType.UNINITIALIZED, "Cannot set info for UNINITIALIZED");
+
+        typeInfo[rType] = info;
+
+        emit ReserveTypeInfoUpdated(rType, info.name, info.supportsLosses);
+    }
+
+    /// @notice Update the type of an existing reserve
+    /// @param reserve The reserve address
+    /// @param newType The new type to assign
+    function updateReserveType(
+        address reserve,
+        ReserveType newType
+    ) external onlyOwner {
+        require(authorized[reserve], "Reserve not authorized");
+        require(newType != ReserveType.UNINITIALIZED, "Cannot set to UNINITIALIZED");
+
+        ReserveType oldType = reserveTypes[reserve];
+        reserveTypes[reserve] = newType;
+        reserveInfo[reserve].reserveType = newType;
+
+        // Type-specific validation for vault strategies
+        if (newType == ReserveType.QC_VAULT_STRATEGY) {
+            require(
+                reserveInfo[reserve].mintingCap >= MIN_VAULT_CAP,
+                "Vault cap too low"
+            );
+            require(
+                typeInfo[newType].supportsLosses,
+                "Vault type must support losses"
+            );
+        }
+
+        emit ReserveTypeUpdated(reserve, oldType, newType);
+    }
+
+    /// @notice Get the reserve type for a given reserve
+    /// @param reserve The reserve address to query
+    /// @return The reserve type
+    function getReserveType(address reserve) external view returns (ReserveType) {
+        if (!authorized[reserve]) {
+            return ReserveType.UNINITIALIZED;
+        }
+        return reserveTypes[reserve] == ReserveType.UNINITIALIZED
+            ? ReserveType.QC_BASIC  // Default for backward compatibility
+            : reserveTypes[reserve];
+    }
+
+    /// @notice Initialize default type information (called once during deployment)
+    function initializeTypeInfo() internal {
+        // QC_BASIC - Traditional reserves
+        typeInfo[ReserveType.QC_BASIC] = ReserveTypeInfo({
+            name: "QC Basic Reserve",
+            requiresBtcAddress: true,
+            supportsLosses: false,
+            requiresWrapper: false,
+            maxBackingRatio: 0  // No limit
+        });
+
+        // QC_VAULT_STRATEGY - CEX vaults
+        typeInfo[ReserveType.QC_VAULT_STRATEGY] = ReserveTypeInfo({
+            name: "QC Vault Strategy",
+            requiresBtcAddress: false,
+            supportsLosses: true,
+            requiresWrapper: true,
+            maxBackingRatio: 120 * 10**16  // 120% backing ratio (1.2e18)
+        });
+
+        // QC_PERMISSIONED - Legacy type
+        typeInfo[ReserveType.QC_PERMISSIONED] = ReserveTypeInfo({
+            name: "Permissioned QC",
+            requiresBtcAddress: true,
+            supportsLosses: false,
+            requiresWrapper: false,
+            maxBackingRatio: 0  // No limit
+        });
+    }
+
+    /// @notice Validate if a reserve can perform a specific operation based on its type
+    /// @param reserve The reserve address
+    /// @param isBurnOperation Whether this is a burn/loss operation
+    function validateTypeOperation(address reserve, bool isBurnOperation) internal view {
+        if (isBurnOperation) {
+            ReserveType rType = reserveTypes[reserve] == ReserveType.UNINITIALIZED
+                ? ReserveType.QC_BASIC
+                : reserveTypes[reserve];
+
+            require(
+                typeInfo[rType].supportsLosses,
+                "Reserve type cannot handle losses"
+            );
+        }
     }
 
     function setMintingCap(address reserve, uint256 newCap) 
@@ -273,6 +437,42 @@ contract AccountControl is
 
     // ========== MINTING OPERATIONS ==========
     
+    function mintWithAccounting(address recipient, uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+        returns (bool)
+    {
+        _mintInternal(msg.sender, recipient, amount);
+        return true;
+    }
+
+    // ========== SEPARATED OPERATIONS ==========
+
+    /// @notice Pure token minting without accounting updates
+    /// @dev Enforces backing requirements but doesn't update minted[reserve]
+    /// @param recipient Address to receive minted tokens
+    /// @param amount Amount to mint in satoshis
+    function mintTokens(address recipient, uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+    {
+        // Check backing invariant - CRITICAL for security
+        if (backing[msg.sender] < minted[msg.sender] + amount) {
+            revert InsufficientBacking(backing[msg.sender], minted[msg.sender] + amount);
+        }
+
+        // Pure token minting via Bank
+        IBank(bank).mint(recipient, amount);
+
+        emit PureTokenMint(msg.sender, recipient, amount);
+    }
+
+    /// @notice Original mint function for backward compatibility
+    /// @dev Combines token minting and accounting updates
+    /// @param recipient Address to receive minted tokens
+    /// @param amount Amount to mint in satoshis
     function mint(address recipient, uint256 amount)
         external
         onlyAuthorizedReserve
@@ -281,6 +481,105 @@ contract AccountControl is
     {
         _mintInternal(msg.sender, recipient, amount);
         return true;
+    }
+
+    /// @notice Pure token burning without accounting updates
+    /// @dev Burns tokens from caller's balance without updating minted[reserve]
+    /// @param amount Amount to burn in satoshis
+    function burnTokens(uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+    {
+        // Validate that this reserve type supports losses/burns
+        validateTypeOperation(msg.sender, true);
+
+        // Pure token burning via Bank - burn from the caller (reserve)
+        IBank(bank).burnFrom(msg.sender, amount);
+
+        emit PureTokenBurn(msg.sender, amount);
+    }
+
+    /// @notice Pure accounting credit without token minting
+    /// @dev Updates minted[reserve] without creating tokens
+    /// @param amount Amount to credit in satoshis
+    function creditMinted(uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+    {
+        // Check caps
+        if (minted[msg.sender] + amount > reserveInfo[msg.sender].mintingCap) {
+            revert ExceedsReserveCap(minted[msg.sender] + amount, reserveInfo[msg.sender].mintingCap);
+        }
+
+        if (globalMintingCap > 0 && totalMintedAmount + amount > globalMintingCap) {
+            revert ExceedsGlobalCap(totalMintedAmount + amount, globalMintingCap);
+        }
+
+        // Pure accounting increment
+        minted[msg.sender] += amount;
+        totalMintedAmount += amount;
+
+        emit AccountingCredit(msg.sender, amount);
+    }
+
+    /// @notice Pure accounting debit without token burning
+    /// @dev Updates minted[reserve] without destroying tokens
+    /// @param amount Amount to debit in satoshis
+    function debitMinted(uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+    {
+        // Validation
+        if (minted[msg.sender] < amount) {
+            revert InsufficientMinted(minted[msg.sender], amount);
+        }
+
+        // Pure accounting decrement
+        minted[msg.sender] -= amount;
+        totalMintedAmount -= amount;
+
+        emit AccountingDebit(msg.sender, amount);
+    }
+
+    // ========== INTERNAL HELPERS FOR SEPARATED OPERATIONS ==========
+
+    function _mintTokensInternal(address recipient, uint256 amount) internal {
+        // Pure token minting via Bank
+        IBank(bank).mint(recipient, amount);
+    }
+
+    function _burnTokensInternal(uint256 amount) internal {
+        // Pure token burning via Bank - burn from the caller (reserve)
+        IBank(bank).burnFrom(msg.sender, amount);
+    }
+
+    function _creditMintedInternal(address reserve, uint256 amount) internal {
+        // Check caps
+        if (minted[reserve] + amount > reserveInfo[reserve].mintingCap) {
+            revert ExceedsReserveCap(minted[reserve] + amount, reserveInfo[reserve].mintingCap);
+        }
+
+        if (globalMintingCap > 0 && totalMintedAmount + amount > globalMintingCap) {
+            revert ExceedsGlobalCap(totalMintedAmount + amount, globalMintingCap);
+        }
+
+        // Pure accounting increment
+        minted[reserve] += amount;
+        totalMintedAmount += amount;
+    }
+
+    function _debitMintedInternal(address reserve, uint256 amount) internal {
+        // Validation
+        if (minted[reserve] < amount) {
+            revert InsufficientMinted(minted[reserve], amount);
+        }
+
+        // Pure accounting decrement
+        minted[reserve] -= amount;
+        totalMintedAmount -= amount;
     }
 
     function _mintInternal(address reserve, address recipient, uint256 amount) internal {
@@ -325,7 +624,14 @@ contract AccountControl is
     {
         // Convert tBTC to satoshis internally
         satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
-        _mintInternal(msg.sender, recipient, satoshis);
+
+        // Use separated operations for backward compatibility - internal calls
+        _mintTokensInternal(recipient, satoshis);      // Pure token operation
+        _creditMintedInternal(msg.sender, satoshis);         // Pure accounting operation
+
+        // Emit original event for backward compatibility
+        emit MintExecuted(msg.sender, recipient, satoshis);
+
         return satoshis;
     }
 
@@ -437,14 +743,36 @@ contract AccountControl is
     /// @dev This function accepts tBTC amounts (18 decimals) and converts them to satoshis (8 decimals)
     /// @param tbtcAmount Amount in tBTC units (1e18 precision)
     /// @return success True if redemption was successful
-    function redeemTBTC(uint256 tbtcAmount) 
-        external 
-        onlyAuthorizedReserve 
+    function redeemTBTC(uint256 tbtcAmount)
+        external
+        onlyAuthorizedReserve
         returns (bool success)
     {
         // Convert tBTC to satoshis internally
         uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
         return this.redeem(satoshis);
+    }
+
+    /// @notice Burn tBTC tokens using separated operations
+    /// @dev This function burns actual tokens AND updates accounting
+    /// @param tbtcAmount Amount in tBTC units (1e18 precision)
+    /// @return success True if burn was successful
+    function burnTBTC(uint256 tbtcAmount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+        returns (bool success)
+    {
+        // Validate that this reserve type supports losses/burns
+        validateTypeOperation(msg.sender, true);
+
+        uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
+
+        // Use separated operations - internal calls
+        _burnTokensInternal(satoshis);           // Pure token operation
+        _debitMintedInternal(msg.sender, satoshis);    // Pure accounting operation
+
+        return true;
     }
 
 
@@ -599,4 +927,7 @@ contract AccountControl is
 interface IBank {
     function increaseBalance(address account, uint256 amount) external;
     function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external;
+    function mint(address recipient, uint256 amount) external;
+    function burn(uint256 amount) external;
+    function burnFrom(address account, uint256 amount) external;
 }

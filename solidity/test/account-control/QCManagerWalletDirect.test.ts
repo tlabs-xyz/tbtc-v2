@@ -28,7 +28,12 @@ describe("QCManager - Direct Wallet Registration", () => {
   const validBitcoinAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
   const validBech32Address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
   const testNonce = 12345
-  const mockSignature = ethers.utils.randomBytes(65) // 65-byte signature
+
+  // Mock Bitcoin signature parameters
+  const mockWalletPublicKey = `0x${"aa".repeat(64)}` // 64 bytes uncompressed public key
+  const mockSignatureV = 27
+  const mockSignatureR = ethers.utils.formatBytes32String("mock_r_value")
+  const mockSignatureS = ethers.utils.formatBytes32String("mock_s_value")
 
   before(async () => {
     const [deployerSigner, qc1Signer, qc2Signer, nonQCSigner] =
@@ -109,8 +114,15 @@ describe("QCManager - Direct Wallet Registration", () => {
         await expect(
           qcManager
             .connect(qc1)
-            .registerWalletDirect(validBitcoinAddress, testNonce, mockSignature)
-        ).to.be.revertedWith("MessageSignatureVerificationFailed")
+            .registerWalletDirect(
+              validBitcoinAddress,
+              testNonce,
+              mockWalletPublicKey,
+              mockSignatureV,
+              mockSignatureR,
+              mockSignatureS
+            )
+        ).to.be.revertedWith("SignatureVerificationFailed")
 
         // Verify the nonce was not consumed due to failed verification
         const nonceUsed = await qcManager.usedNonces(qc1.address, testNonce)
@@ -135,7 +147,14 @@ describe("QCManager - Direct Wallet Registration", () => {
         await expect(
           qcManager
             .connect(nonQC)
-            .registerWalletDirect(validBitcoinAddress, testNonce, mockSignature)
+            .registerWalletDirect(
+              validBitcoinAddress,
+              testNonce,
+              mockWalletPublicKey,
+              mockSignatureV,
+              mockSignatureR,
+              mockSignatureS
+            )
         ).to.be.revertedWith("QCNotRegistered")
       })
     })
@@ -145,7 +164,14 @@ describe("QCManager - Direct Wallet Registration", () => {
         await expect(
           qcManager
             .connect(qc2)
-            .registerWalletDirect(validBitcoinAddress, testNonce, mockSignature)
+            .registerWalletDirect(
+              validBitcoinAddress,
+              testNonce,
+              mockWalletPublicKey,
+              mockSignatureV,
+              mockSignatureR,
+              mockSignatureS
+            )
         ).to.be.revertedWith("QCNotActive")
       })
     })
@@ -155,7 +181,14 @@ describe("QCManager - Direct Wallet Registration", () => {
         await expect(
           qcManager
             .connect(qc1)
-            .registerWalletDirect("", testNonce, mockSignature)
+            .registerWalletDirect(
+              "",
+              testNonce,
+              mockWalletPublicKey,
+              mockSignatureV,
+              mockSignatureR,
+              mockSignatureS
+            )
         ).to.be.revertedWith("InvalidWalletAddress")
       })
     })
@@ -171,7 +204,14 @@ describe("QCManager - Direct Wallet Registration", () => {
         await expect(
           qcManager
             .connect(qc1)
-            .registerWalletDirect(validBitcoinAddress, testNonce, mockSignature)
+            .registerWalletDirect(
+              validBitcoinAddress,
+              testNonce,
+              mockWalletPublicKey,
+              mockSignatureV,
+              mockSignatureR,
+              mockSignatureS
+            )
         ).to.be.revertedWith("Function is paused")
       })
     })

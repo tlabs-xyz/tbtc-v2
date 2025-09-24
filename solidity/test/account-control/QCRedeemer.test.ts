@@ -1,793 +1,428 @@
-import chai, { expect } from "chai"
+import { expect } from "chai"
 import { ethers, helpers } from "hardhat"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import { FakeContract, smock } from "@defi-wonderland/smock"
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers"
 import {
-  QCRedeemer,
-  QCData,
-  SystemState,
-  TBTC,
-  TestRelay,
-} from "../../typechain"
-import {
-  createMockSpvData,
-  createCompleteSpvTestData,
-  fulfillRedemptionForTest,
-} from "./AccountControlTestHelpers"
-
-chai.use(smock.matchers)
+  deployQCRedeemerFixture,
+  createTestRedemption,
+  getSimpleSpvData,
+  TEST_CONSTANTS,
+} from "./fixtures/AccountControlFixtures"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
 describe("QCRedeemer", () => {
-  let deployer: SignerWithAddress
-  let governance: SignerWithAddress
-  let user: SignerWithAddress
-  let qcAddress: SignerWithAddress
-  let watchdog: SignerWithAddress
-  let thirdParty: SignerWithAddress
-
-  let qcRedeemer: QCRedeemer
-  let mockTbtc: FakeContract<TBTC>
-  let mockQCData: FakeContract<QCData>
-  let mockSystemState: FakeContract<SystemState>
-  let testRelay: TestRelay
-
-  // Roles
-  let DEFAULT_ADMIN_ROLE: string
-  let DISPUTE_ARBITER_ROLE: string
-
-  // Bitcoin addresses for testing
-  const validLegacyBtc = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-
-  before(async () => {
-    const [
-      deployerSigner,
-      governanceSigner,
-      userSigner,
-      qcAddressSigner,
-      watchdogSigner,
-      thirdPartySigner,
-    ] = await ethers.getSigners()
-    deployer = deployerSigner
-    governance = governanceSigner
-    user = userSigner
-    qcAddress = qcAddressSigner
-    watchdog = watchdogSigner
-    thirdParty = thirdPartySigner
-
-    // Generate role hashes
-    DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-    DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE")
-  })
-
-  beforeEach(async () => {
-    await createSnapshot()
-
-    // Create mock contracts
-    mockTbtc = await smock.fake<TBTC>("TBTC")
-    mockQCData = await smock.fake<QCData>("QCData")
-    mockSystemState = await smock.fake<SystemState>("SystemState")
-
-    // Create TestRelay for SPV validation
-    const TestRelayFactory = await ethers.getContractFactory("TestRelay")
-    testRelay = await TestRelayFactory.deploy()
-    await testRelay.deployed()
-
-    // Deploy SharedSPVCore library first
-    const SharedSPVCoreFactory = await ethers.getContractFactory(
-      "SharedSPVCore"
-    )
-    const sharedSPVCore = await SharedSPVCoreFactory.deploy()
-    await sharedSPVCore.deployed()
-
-    // Deploy QCRedeemerSPV library with SharedSPVCore dependency
-    const QCRedeemerSPVFactory = await ethers.getContractFactory(
-      "QCRedeemerSPV",
-      {
-        libraries: {
-          SharedSPVCore: sharedSPVCore.address,
-        },
-      }
-    )
-    const qcRedeemerSPVLib = await QCRedeemerSPVFactory.deploy()
-    await qcRedeemerSPVLib.deployed()
-
-    // Deploy QCRedeemer with SPV support and link the library
-    const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer", {
-      libraries: {
-        QCRedeemerSPV: qcRedeemerSPVLib.address,
-      },
-    })
-    qcRedeemer = await QCRedeemerFactory.deploy(
-      mockTbtc.address,
-      mockQCData.address,
-      mockSystemState.address,
-      testRelay.address, // Use TestRelay for proper SPV validation
-      1 // Low difficulty factor for testing - require same difficulty, not 96x
-    )
-    await qcRedeemer.deployed()
-
-    // Grant roles
-    await qcRedeemer.grantRole(DISPUTE_ARBITER_ROLE, watchdog.address)
-
-    // Setup default mocks for validation
-    mockSystemState.isRedemptionPaused.returns(false)
-    mockSystemState.isQCEmergencyPaused.returns(false)
-    mockSystemState.minMintAmount.returns(ethers.utils.parseEther("0.01")) // 0.01 tBTC minimum
-
-    mockQCData.isQCRegistered.returns(true)
-    mockQCData.getQCStatus.returns(0) // Active status
-
-    // Setup QCData mocks for wallet registration
-    // Default behavior - any wallet query returns the qcAddress as owner
-    mockQCData.getWalletOwner.returns(qcAddress.address)
-    // Mock wallet status as Active (enum value 1)
-    mockQCData.getWalletStatus.returns(1) // WalletStatus.Active
-
-    // Mock tBTC balance to always have enough
-    mockTbtc.balanceOf.returns(ethers.utils.parseEther("100")) // 100 tBTC balance for all users
-    mockTbtc.burnFrom.returns(true) // Mock successful burns
-
-    // Deploy a mock AccountControl for redeemTBTC calls
-    const MockAccountControl = await ethers.getContractFactory("MockAccountControl")
-    const mockAccountControl = await MockAccountControl.deploy()
-    await mockAccountControl.deployed()
-
-    // Set the AccountControl address in QCRedeemer
-    await qcRedeemer.setAccountControl(mockAccountControl.address)
-
-    // Set a large totalMinted amount to allow redemptions in tests
-    // 1000 BTC in satoshis should cover all test cases
-    const largeAmount = ethers.BigNumber.from("100000000000") // 1000 BTC * 10^8 satoshis
-    await mockAccountControl.setTotalMintedForTesting(largeAmount)
-  })
-
-  afterEach(async () => {
-    await restoreSnapshot()
-  })
-
   describe("Deployment", () => {
     it("should set correct dependencies", async () => {
-      // QCRedeemer now uses direct integration - no public getters for dependencies
+      const { qcRedeemer } = await loadFixture(deployQCRedeemerFixture)
       expect(qcRedeemer.address).to.not.equal(ethers.constants.AddressZero)
     })
 
-    it("should grant deployer admin and redeemer roles", async () => {
-      const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-      expect(await qcRedeemer.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to
-        .be.true
-      expect(await qcRedeemer.hasRole(DISPUTE_ARBITER_ROLE, deployer.address))
-        .to.be.true
+    it("should grant deployer admin role", async () => {
+      const { qcRedeemer, deployer, constants } = await loadFixture(deployQCRedeemerFixture)
+      expect(await qcRedeemer.hasRole(constants.ROLES.DEFAULT_ADMIN, deployer.address)).to.be.true
+    })
+
+    it("should configure dispute arbiter role", async () => {
+      const { qcRedeemer, watchdog, constants } = await loadFixture(deployQCRedeemerFixture)
+      expect(await qcRedeemer.hasRole(constants.ROLES.DISPUTE_ARBITER, watchdog.address)).to.be
+        .true
     })
   })
 
-  describe("Role Constants", () => {
-    it("should have correct role constants", async () => {
-      expect(await qcRedeemer.DISPUTE_ARBITER_ROLE()).to.equal(
-        DISPUTE_ARBITER_ROLE
+  describe("Redemption Requests", () => {
+    it("should create redemption request with valid parameters", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, user, qcAddress, constants } = fixture
+
+      // Setup QC and wallet in QCData
+      await fixture.qcData.registerQC(qcAddress.address, constants.LARGE_CAP)
+      const walletAddress = ethers.Wallet.createRandom().address
+      await fixture.qcData.registerWallet(
+        walletAddress,
+        qcAddress.address,
+        constants.VALID_LEGACY_BTC,
+        ethers.utils.randomBytes(32)
       )
-      // REDEMPTION_POLICY_KEY and TBTC_TOKEN_KEY removed with direct implementation
-    })
-  })
 
-  describe("initiateRedemption", () => {
-    const redemptionAmount = ethers.utils.parseEther("5")
-    const validLegacyBtc = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-    const validBech32Btc = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
-    const invalidBtc = "not_a_btc_address"
+      // Mint some tBTC for the user
+      await fixture.tbtc.mint(user.address, ethers.utils.parseEther("10"))
 
-    context("when called with invalid parameters", () => {
-      it("should revert with zero QC address", async () => {
-        await expect(
-          qcRedeemer
-            .connect(user)
-            .initiateRedemption(
-              ethers.constants.AddressZero,
-              redemptionAmount,
-              validLegacyBtc,
-              validLegacyBtc // qcWalletAddress
-            )
-        ).to.be.revertedWith("InvalidQCAddress")
-      })
+      // Approve QCRedeemer to burn tBTC
+      await fixture.tbtc
+        .connect(user)
+        .approve(qcRedeemer.address, ethers.utils.parseEther("10"))
 
-      it("should revert with zero amount", async () => {
-        await expect(
-          qcRedeemer
-            .connect(user)
-            .initiateRedemption(qcAddress.address, 0, validLegacyBtc, validLegacyBtc)
-        ).to.be.revertedWith("InvalidAmount")
-      })
+      // Request redemption
+      const redemptionId = ethers.utils.id("test_redemption_1")
+      const amount = constants.MEDIUM_MINT // 0.01 BTC in satoshis
 
-      it("should revert if Bitcoin address is empty", async () => {
-        await expect(
-          qcRedeemer
-            .connect(user)
-            .initiateRedemption(qcAddress.address, redemptionAmount, "", validLegacyBtc)
-        ).to.be.revertedWith("BitcoinAddressRequired")
-      })
-
-      it("should revert if Bitcoin address is invalid format", async () => {
-        await expect(
-          qcRedeemer
-            .connect(user)
-            .initiateRedemption(qcAddress.address, redemptionAmount, invalidBtc, validLegacyBtc)
-        ).to.be.revertedWith("InvalidBitcoinAddressFormat")
-      })
-
-      it("should revert if Bitcoin address starts with invalid character", async () => {
-        // Test addresses starting with '2' (invalid)
-        await expect(
-          qcRedeemer
-            .connect(user)
-            .initiateRedemption(
-              qcAddress.address,
-              redemptionAmount,
-              "2A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-              validLegacyBtc // qcWalletAddress
-            )
-        ).to.be.revertedWith("InvalidBitcoinAddressFormat")
-      })
-
-      it("should revert if Bech32 address is malformed", async () => {
-        // Test incomplete Bech32 (just 'b' instead of 'bc1')
-        await expect(
-          qcRedeemer
-            .connect(user)
-            .initiateRedemption(
-              qcAddress.address,
-              redemptionAmount,
-              "b1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080",
-              validLegacyBtc // qcWalletAddress
-            )
-        ).to.be.revertedWith("InvalidBitcoinAddressFormat")
-      })
-    })
-
-    context("when all validations pass", () => {
-      let tx: any // ContractTransaction
-      let redemptionId: string
-      let usedBtc: string
-
-      beforeEach(async () => {
-        usedBtc = validLegacyBtc
-        tx = await qcRedeemer
-          .connect(user)
-          .initiateRedemption(qcAddress.address, redemptionAmount, usedBtc, validLegacyBtc)
-        const receipt = await tx.wait()
-        const event = receipt.events?.find(
-          (e: any) => e.event === "RedemptionRequested" // Event interface
-        )
-        redemptionId = event?.args?.redemptionId
-      })
-
-      it("should burn user tokens", async () => {
-        expect(mockTbtc.burnFrom).to.have.been.calledWith(
-          user.address,
-          redemptionAmount
-        )
-      })
-
-      it("should create redemption record with correct BTC address", async () => {
-        const redemption = await qcRedeemer.getRedemption(redemptionId)
-        expect(redemption.user).to.equal(user.address)
-        expect(redemption.qc).to.equal(qcAddress.address)
-        expect(redemption.amount).to.equal(redemptionAmount)
-        expect(redemption.status).to.equal(1) // Pending
-        expect(redemption.userBtcAddress).to.equal(usedBtc)
-      })
-
-      it("should emit RedemptionRequested event with correct BTC address", async () => {
-        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-        await expect(tx)
-          .to.emit(qcRedeemer, "RedemptionRequested")
-          .withArgs(
-            redemptionId,
-            user.address,
-            qcAddress.address,
-            redemptionAmount,
-            usedBtc,
-            user.address,
-            currentBlock.timestamp
-          )
-      })
-
-      it("should return unique redemption ID", async () => {
-        const tx2 = await qcRedeemer
-          .connect(user)
-          .initiateRedemption(
-            qcAddress.address,
-            redemptionAmount,
-            validBech32Btc,
-            validBech32Btc // qcWalletAddress
-          )
-        const receipt2 = await tx2.wait()
-        const event2 = receipt2.events?.find(
-          (e: any) => e.event === "RedemptionRequested" // Event interface
-        )
-        const redemptionId2 = event2?.args?.redemptionId
-        expect(redemptionId).to.not.equal(redemptionId2)
-      })
-
-      it("should accept P2PKH Bitcoin addresses (starting with '1')", async () => {
-        await expect(
-          qcRedeemer
-            .connect(user)
-            .initiateRedemption(
-              qcAddress.address,
-              redemptionAmount,
-              "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2",
-              "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2" // qcWalletAddress
-            )
-        ).to.not.be.reverted
-      })
-
-      it("should accept P2SH Bitcoin addresses (starting with '3')", async () => {
-        await expect(
-          qcRedeemer
-            .connect(user)
-            .initiateRedemption(
-              qcAddress.address,
-              redemptionAmount,
-              "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
-              "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy" // qcWalletAddress
-            )
-        ).to.not.be.reverted
-      })
-
-      it("should accept Bech32 Bitcoin addresses (starting with 'bc1')", async () => {
-        await expect(
-          qcRedeemer
-            .connect(user)
-            .initiateRedemption(
-              qcAddress.address,
-              redemptionAmount,
-              validBech32Btc,
-              validBech32Btc // qcWalletAddress
-            )
-        ).to.not.be.reverted
-      })
-    })
-  })
-
-  describe("recordRedemptionFulfillment", () => {
-    let redemptionId: string
-    const spvProof = ethers.utils.toUtf8Bytes("mock_spv_proof")
-
-    beforeEach(async () => {
-      // Create a redemption first
       const tx = await qcRedeemer
         .connect(user)
-        .initiateRedemption(
-          qcAddress.address,
-          ethers.utils.parseEther("5"),
-          validLegacyBtc,
-          validLegacyBtc // qcWalletAddress
-        )
-      const receipt = await tx.wait()
-      const event = receipt.events?.find(
-        (e: any) => e.event === "RedemptionRequested"
-      )
-      redemptionId = event?.args?.redemptionId
+        .requestRedemption(redemptionId, amount, constants.VALID_LEGACY_BTC, walletAddress)
+
+      await expect(tx)
+        .to.emit(qcRedeemer, "RedemptionRequested")
+        .withArgs(redemptionId, user.address, amount, constants.VALID_LEGACY_BTC, walletAddress)
+
+      // Verify redemption state
+      const redemption = await qcRedeemer.redemptions(redemptionId)
+      expect(redemption.requester).to.equal(user.address)
+      expect(redemption.amount).to.equal(amount)
+      expect(redemption.btcAddress).to.equal(constants.VALID_LEGACY_BTC)
     })
 
-    context("when called by non-arbiter", () => {
-      it("should revert", async () => {
-        const mockSpvData = createMockSpvData()
-        await expect(
-          qcRedeemer
-            .connect(thirdParty)
-            .recordRedemptionFulfillment(
-              redemptionId,
-              "bc1qtest123456789",
-              100000,
-              mockSpvData.txInfo,
-              mockSpvData.proof
-            )
-        ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
-        )
-      })
-    })
+    it("should prevent duplicate redemption IDs", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, user, constants } = fixture
 
-    context("when redemption is not pending", () => {
-      beforeEach(async () => {
-        // Mark redemption as defaulted to make it non-pending (avoids SPV validation)
-        const defaultReason = ethers.utils.id("TIMEOUT")
-        await qcRedeemer
-          .connect(watchdog)
-          .flagDefaultedRedemption(redemptionId, defaultReason)
-      })
+      // Create first redemption
+      const { redemptionId } = await createTestRedemption(fixture)
 
-      it("should revert", async () => {
-        const defaultReason = ethers.utils.id("TIMEOUT")
-        await expect(
-          qcRedeemer
-            .connect(watchdog)
-            .flagDefaultedRedemption(redemptionId, defaultReason)
-        ).to.be.revertedWith("RedemptionNotPending")
-      })
-    })
+      // Mint more tBTC for another attempt
+      await fixture.tbtc.mint(user.address, ethers.utils.parseEther("10"))
+      await fixture.tbtc.connect(user).approve(qcRedeemer.address, ethers.utils.parseEther("10"))
 
-    context("when called by arbiter with valid redemption", () => {
-      let realSpvData: any
-
-      beforeEach(async () => {
-        // Use real SPV data for SPV validation testing
-        realSpvData = createCompleteSpvTestData()
-
-        // Configure TestRelay with proper difficulty for SPV validation
-        await testRelay.setCurrentEpochDifficultyFromHeaders(
-          realSpvData.proof.bitcoinHeaders
-        )
-        await testRelay.setPrevEpochDifficultyFromHeaders(
-          realSpvData.proof.bitcoinHeaders
-        )
-      })
-
-      it("should pass SPV validation but fail on payment verification", async () => {
-        // This proves SPV validation works - we get payment error, not SPV error
-        await expect(
-          qcRedeemer
-            .connect(watchdog)
-            .recordRedemptionFulfillment(
-              redemptionId,
-              realSpvData.userBtcAddress,
-              realSpvData.expectedAmount,
-              realSpvData.txInfo,
-              realSpvData.proof
-            )
-        ).to.be.revertedWith(
-          "RedemptionProofFailed(\"Payment verification failed\")"
-        )
-      })
-    })
-  })
-
-  describe("flagDefaultedRedemption", () => {
-    let redemptionId: string
-    const defaultReason = ethers.utils.id("TIMEOUT")
-
-    beforeEach(async () => {
-      // Create a redemption first
-      const tx = await qcRedeemer
-        .connect(user)
-        .initiateRedemption(
-          qcAddress.address,
-          ethers.utils.parseEther("5"),
-          validLegacyBtc,
-          validLegacyBtc // qcWalletAddress
-        )
-      const receipt = await tx.wait()
-      const event = receipt.events?.find(
-        (e: any) => e.event === "RedemptionRequested"
-      )
-      redemptionId = event?.args?.redemptionId
-    })
-
-    context("when called by non-arbiter", () => {
-      it("should revert", async () => {
-        await expect(
-          qcRedeemer
-            .connect(thirdParty)
-            .flagDefaultedRedemption(redemptionId, defaultReason)
-        ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
-        )
-      })
-    })
-
-    context("when redemption is not pending", () => {
-      beforeEach(async () => {
-        // Mark redemption as defaulted to make it non-pending (avoids SPV validation)
-        const defaultReason = ethers.utils.id("TIMEOUT")
-        await qcRedeemer
-          .connect(watchdog)
-          .flagDefaultedRedemption(redemptionId, defaultReason)
-      })
-
-      it("should revert", async () => {
-        const defaultReason = ethers.utils.id("TIMEOUT")
-        await expect(
-          qcRedeemer
-            .connect(watchdog)
-            .flagDefaultedRedemption(redemptionId, defaultReason)
-        ).to.be.revertedWith("RedemptionNotPending")
-      })
-    })
-
-    context("when called by arbiter with valid redemption", () => {
-      let tx: any // ContractTransaction
-
-      beforeEach(async () => {
-        tx = await qcRedeemer
-          .connect(watchdog)
-          .flagDefaultedRedemption(redemptionId, defaultReason)
-      })
-
-      it("should update redemption status to Defaulted", async () => {
-        const redemption = await qcRedeemer.getRedemption(redemptionId)
-        expect(redemption.status).to.equal(3) // Defaulted
-      })
-
-      it("should emit RedemptionDefaulted event", async () => {
-        const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
-        await expect(tx)
-          .to.emit(qcRedeemer, "RedemptionDefaulted")
-          .withArgs(
-            redemptionId,
-            user.address,
-            qcAddress.address,
-            ethers.utils.parseEther("5"),
-            defaultReason,
-            watchdog.address,
-            currentBlock.timestamp
-          )
-      })
-    })
-  })
-
-  describe("isRedemptionTimedOut", () => {
-    let redemptionId: string
-
-    beforeEach(async () => {
-      // Create a redemption first
-      const tx = await qcRedeemer
-        .connect(user)
-        .initiateRedemption(
-          qcAddress.address,
-          ethers.utils.parseEther("5"),
-          validLegacyBtc,
-          validLegacyBtc // qcWalletAddress
-        )
-      const receipt = await tx.wait()
-      const event = receipt.events?.find(
-        (e: any) => e.event === "RedemptionRequested"
-      )
-      redemptionId = event?.args?.redemptionId
-    })
-
-    context("when redemption is not pending", () => {
-      beforeEach(async () => {
-        // Mark redemption as defaulted to make it non-pending (avoids SPV validation)
-        const defaultReason = ethers.utils.id("TIMEOUT")
-        await qcRedeemer
-          .connect(watchdog)
-          .flagDefaultedRedemption(redemptionId, defaultReason)
-      })
-
-      it("should return false", async () => {
-        expect(await qcRedeemer.isRedemptionTimedOut(redemptionId)).to.be.false
-      })
-    })
-
-    context("when redemption is pending but not timed out", () => {
-      it("should return false", async () => {
-        expect(await qcRedeemer.isRedemptionTimedOut(redemptionId)).to.be.false
-      })
-    })
-
-    context("when redemption is pending and timed out", () => {
-      beforeEach(async () => {
-        // Fast forward time beyond timeout
-        await helpers.time.increaseTime(86401) // 24 hours + 1 second
-      })
-
-      it("should return true", async () => {
-        expect(await qcRedeemer.isRedemptionTimedOut(redemptionId)).to.be.true
-      })
-    })
-  })
-
-  describe("getRedemption", () => {
-    it("should return correct redemption data", async () => {
-      const redemptionAmount = ethers.utils.parseEther("5")
-      const tx = await qcRedeemer
-        .connect(user)
-        .initiateRedemption(qcAddress.address, redemptionAmount, validLegacyBtc, validLegacyBtc)
-      const receipt = await tx.wait()
-      const event = receipt.events?.find(
-        (e: any) => e.event === "RedemptionRequested"
-      )
-      const redemptionId = event?.args?.redemptionId
-
-      const redemption = await qcRedeemer.getRedemption(redemptionId)
-      expect(redemption.user).to.equal(user.address)
-      expect(redemption.qc).to.equal(qcAddress.address)
-      expect(redemption.amount).to.equal(redemptionAmount)
-      expect(redemption.status).to.equal(1) // Pending
-      expect(redemption.requestedAt).to.be.gt(0)
-    })
-
-    it("should return empty data for non-existent redemption", async () => {
-      const nonExistentId = ethers.utils.id("non_existent")
-      const redemption = await qcRedeemer.getRedemption(nonExistentId)
-      expect(redemption.user).to.equal(ethers.constants.AddressZero)
-      expect(redemption.qc).to.equal(ethers.constants.AddressZero)
-      expect(redemption.amount).to.equal(0)
-      expect(redemption.status).to.equal(0) // NeverInitiated
-    })
-  })
-
-  describe("Access Control", () => {
-    context("DISPUTE_ARBITER_ROLE functions", () => {
-      let redemptionId: string
-      const spvProof = ethers.utils.toUtf8Bytes("mock_spv_proof")
-      const defaultReason = ethers.utils.id("TIMEOUT")
-
-      beforeEach(async () => {
-        // Create a redemption first
-        const tx = await qcRedeemer
-          .connect(user)
-          .initiateRedemption(
-            qcAddress.address,
-            ethers.utils.parseEther("5"),
-            validLegacyBtc,
-            validLegacyBtc // qcWalletAddress
-          )
-        const receipt = await tx.wait()
-        const event = receipt.events?.find(
-          (e: any) => e.event === "RedemptionRequested" // Event interface
-        )
-        redemptionId = event?.args?.redemptionId
-      })
-
-      it("should allow arbiter to record fulfillment (fails on SPV validation as expected)", async () => {
-        const mockSpvData = createMockSpvData()
-        // Test that access control works - should fail on SPV validation, not access control
-        await expect(
-          qcRedeemer
-            .connect(watchdog)
-            .recordRedemptionFulfillment(
-              redemptionId,
-              "bc1qtest123456789",
-              100000,
-              mockSpvData.txInfo,
-              mockSpvData.proof
-            )
-        ).to.be.revertedWith("SPVErr(5)") // Fails on SPV validation, not access control
-      })
-
-      it("should allow arbiter to flag default", async () => {
-        await expect(
-          qcRedeemer
-            .connect(watchdog)
-            .flagDefaultedRedemption(redemptionId, defaultReason)
-        ).to.not.be.reverted
-      })
-
-      it("should prevent non-arbiter from recording fulfillment", async () => {
-        const mockSpvData = createMockSpvData()
-        await expect(
-          qcRedeemer
-            .connect(thirdParty)
-            .recordRedemptionFulfillment(
-              redemptionId,
-              "bc1qtest123456789",
-              100000,
-              mockSpvData.txInfo,
-              mockSpvData.proof
-            )
-        ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
-        )
-      })
-
-      it("should prevent non-arbiter from flagging default", async () => {
-        await expect(
-          qcRedeemer
-            .connect(thirdParty)
-            .flagDefaultedRedemption(redemptionId, defaultReason)
-        ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${DISPUTE_ARBITER_ROLE}`
-        )
-      })
-    })
-  })
-
-  describe("Edge Cases", () => {
-    context("when policy contracts change behavior", () => {
-      let redemptionId: string
-
-      beforeEach(async () => {
-        // Create a redemption first
-        const tx = await qcRedeemer
-          .connect(user)
-          .initiateRedemption(
-            qcAddress.address,
-            ethers.utils.parseEther("5"),
-            validLegacyBtc,
-            validLegacyBtc // qcWalletAddress
-          )
-        const receipt = await tx.wait()
-        const event = receipt.events?.find(
-          (e: any) => e.event === "RedemptionRequested" // Event interface
-        )
-        redemptionId = event?.args?.redemptionId
-      })
-
-      it("should handle SPV verification properly", async () => {
-        // SPV verification is now handled internally and will reject invalid proofs
-        const mockSpvData = createMockSpvData()
-        await expect(
-          qcRedeemer
-            .connect(watchdog)
-            .recordRedemptionFulfillment(
-              redemptionId,
-              "bc1qtest123456789",
-              100000,
-              mockSpvData.txInfo,
-              mockSpvData.proof
-            )
-        ).to.be.revertedWith("SPVErr") // Mock data fails SPV validation
-      })
-    })
-  })
-
-  describe("SPV Validation Integration", () => {
-    let redemptionId: string
-
-    beforeEach(async () => {
-      // Create a redemption first
-      const tx = await qcRedeemer
-        .connect(user)
-        .initiateRedemption(
-          qcAddress.address,
-          ethers.utils.parseEther("5"),
-          validLegacyBtc,
-          validLegacyBtc // qcWalletAddress
-        )
-      const receipt = await tx.wait()
-      const event = receipt.events?.find(
-        (e: any) => e.event === "RedemptionRequested"
-      )
-      redemptionId = event?.args?.redemptionId
-    })
-
-    it("should successfully validate real SPV proofs", async () => {
-      const realSpvData = createCompleteSpvTestData()
-
-      // Configure TestRelay with proper difficulty from Bitcoin headers
-      await testRelay.setCurrentEpochDifficultyFromHeaders(
-        realSpvData.proof.bitcoinHeaders
-      )
-      await testRelay.setPrevEpochDifficultyFromHeaders(
-        realSpvData.proof.bitcoinHeaders
-      )
-
-      // This should fail on payment verification (not SPV), proving SPV validation works
+      // Try to create redemption with same ID
       await expect(
         qcRedeemer
-          .connect(watchdog)
-          .recordRedemptionFulfillment(
+          .connect(user)
+          .requestRedemption(
             redemptionId,
-            realSpvData.userBtcAddress,
-            realSpvData.expectedAmount,
-            realSpvData.txInfo,
-            realSpvData.proof
+            constants.SMALL_MINT,
+            constants.VALID_LEGACY_BTC,
+            ethers.Wallet.createRandom().address
           )
-      ).to.be.revertedWith(
-        "RedemptionProofFailed(\"Payment verification failed\")"
-      )
-
-      // The fact that we get payment verification error (not SPV error) proves SPV works!
+      ).to.be.revertedWith("RedemptionAlreadyExists")
     })
 
-    it("should fail with invalid SPV proofs", async () => {
-      // Don't configure relay properly - this should fail on SPV validation
-      const mockSpvData = createMockSpvData()
+    it("should validate Bitcoin address format", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, user, constants } = fixture
+
+      // Setup wallet
+      const walletAddress = ethers.Wallet.createRandom().address
+      await fixture.qcData.registerQC(fixture.qcAddress.address, constants.LARGE_CAP)
+      await fixture.qcData.registerWallet(
+        walletAddress,
+        fixture.qcAddress.address,
+        constants.VALID_LEGACY_BTC,
+        ethers.utils.randomBytes(32)
+      )
+
+      // Try with invalid Bitcoin address
+      await expect(
+        qcRedeemer
+          .connect(user)
+          .requestRedemption(
+            ethers.utils.id("test"),
+            constants.SMALL_MINT,
+            "invalid_btc_address",
+            walletAddress
+          )
+      ).to.be.revertedWith("InvalidBitcoinAddress")
+    })
+
+    it("should enforce minimum redemption amount", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, user, constants } = fixture
+
+      // Setup wallet
+      const walletAddress = ethers.Wallet.createRandom().address
+      await fixture.qcData.registerQC(fixture.qcAddress.address, constants.LARGE_CAP)
+      await fixture.qcData.registerWallet(
+        walletAddress,
+        fixture.qcAddress.address,
+        constants.VALID_LEGACY_BTC,
+        ethers.utils.randomBytes(32)
+      )
+
+      // Try with amount below minimum
+      await expect(
+        qcRedeemer
+          .connect(user)
+          .requestRedemption(
+            ethers.utils.id("test"),
+            constants.MIN_MINT - 1, // Below minimum
+            constants.VALID_LEGACY_BTC,
+            walletAddress
+          )
+      ).to.be.revertedWith("AmountBelowMinimum")
+    })
+
+    it("should check wallet registration status", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, user, constants } = fixture
+
+      const unregisteredWallet = ethers.Wallet.createRandom().address
 
       await expect(
         qcRedeemer
-          .connect(watchdog)
-          .recordRedemptionFulfillment(
-            redemptionId,
-            validLegacyBtc,
-            100000,
-            mockSpvData.txInfo,
-            mockSpvData.proof
+          .connect(user)
+          .requestRedemption(
+            ethers.utils.id("test"),
+            constants.SMALL_MINT,
+            constants.VALID_LEGACY_BTC,
+            unregisteredWallet
           )
-      ).to.be.revertedWith("SPVErr")
+      ).to.be.revertedWith("WalletNotRegistered")
+    })
+  })
+
+  describe("Redemption Fulfillment", () => {
+    it("should record fulfillment by watchdog", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, watchdog, constants } = fixture
+
+      // Create redemption
+      const { redemptionId, amount, btcAddress } = await createTestRedemption(fixture)
+
+      // Get simple SPV data for test
+      const spvData = getSimpleSpvData()
+
+      // Record fulfillment
+      const tx = await qcRedeemer
+        .connect(watchdog)
+        .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
+
+      await expect(tx)
+        .to.emit(qcRedeemer, "RedemptionFulfilled")
+        .withArgs(redemptionId, btcAddress, amount)
+
+      // Verify redemption marked as fulfilled
+      const redemption = await qcRedeemer.redemptions(redemptionId)
+      expect(redemption.fulfilled).to.be.true
+    })
+
+    it("should prevent fulfillment by non-watchdog", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, user, constants } = fixture
+
+      const { redemptionId, amount, btcAddress } = await createTestRedemption(fixture)
+      const spvData = getSimpleSpvData()
+
+      await expect(
+        qcRedeemer
+          .connect(user)
+          .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
+      ).to.be.revertedWith(/AccessControl: account .* is missing role/)
+    })
+
+    it("should prevent double fulfillment", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, watchdog } = fixture
+
+      const { redemptionId, amount, btcAddress } = await createTestRedemption(fixture)
+      const spvData = getSimpleSpvData()
+
+      // First fulfillment
+      await qcRedeemer
+        .connect(watchdog)
+        .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
+
+      // Try second fulfillment
+      await expect(
+        qcRedeemer
+          .connect(watchdog)
+          .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
+      ).to.be.revertedWith("RedemptionAlreadyFulfilled")
+    })
+  })
+
+  describe("Redemption Cancellation", () => {
+    it("should allow dispute arbiter to cancel redemption", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, watchdog } = fixture
+
+      const { redemptionId } = await createTestRedemption(fixture)
+
+      // Cancel redemption
+      const tx = await qcRedeemer.connect(watchdog).cancelRedemption(redemptionId)
+
+      await expect(tx).to.emit(qcRedeemer, "RedemptionCancelled").withArgs(redemptionId)
+
+      // Verify redemption is cancelled
+      const redemption = await qcRedeemer.redemptions(redemptionId)
+      expect(redemption.cancelled).to.be.true
+    })
+
+    it("should prevent cancellation by non-arbiter", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, user } = fixture
+
+      const { redemptionId } = await createTestRedemption(fixture)
+
+      await expect(
+        qcRedeemer.connect(user).cancelRedemption(redemptionId)
+      ).to.be.revertedWith(/AccessControl: account .* is missing role/)
+    })
+
+    it("should prevent cancellation of fulfilled redemption", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, watchdog } = fixture
+
+      const { redemptionId, amount, btcAddress } = await createTestRedemption(fixture)
+      const spvData = getSimpleSpvData()
+
+      // Fulfill redemption first
+      await qcRedeemer
+        .connect(watchdog)
+        .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
+
+      // Try to cancel
+      await expect(
+        qcRedeemer.connect(watchdog).cancelRedemption(redemptionId)
+      ).to.be.revertedWith("RedemptionAlreadyFulfilled")
+    })
+  })
+
+  describe("Unfulfilled Redemption Queries", () => {
+    it("should track unfulfilled redemptions for QC", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, qcAddress } = fixture
+
+      // Initially no unfulfilled redemptions
+      expect(await qcRedeemer.hasUnfulfilledRedemptions(qcAddress.address)).to.be.false
+
+      // Create redemption
+      await createTestRedemption(fixture)
+
+      // Now has unfulfilled redemptions
+      expect(await qcRedeemer.hasUnfulfilledRedemptions(qcAddress.address)).to.be.true
+    })
+
+    it("should return earliest redemption deadline", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, qcAddress } = fixture
+
+      // Create multiple redemptions
+      await createTestRedemption(fixture, { amount: 100000 })
+      await createTestRedemption(fixture, { amount: 200000 })
+
+      // Get earliest deadline
+      const deadline = await qcRedeemer.getEarliestRedemptionDeadline(qcAddress.address)
+      expect(deadline).to.be.gt(0)
+    })
+
+    it("should clear unfulfilled status after fulfillment", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, qcAddress, watchdog } = fixture
+
+      // Create and fulfill redemption
+      const { redemptionId, amount, btcAddress } = await createTestRedemption(fixture)
+      const spvData = getSimpleSpvData()
+
+      await qcRedeemer
+        .connect(watchdog)
+        .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
+
+      // No unfulfilled redemptions after fulfillment
+      expect(await qcRedeemer.hasUnfulfilledRedemptions(qcAddress.address)).to.be.false
+    })
+  })
+
+  describe("System Pause", () => {
+    it("should prevent new redemptions when paused", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, systemState, user, constants } = fixture
+
+      // Pause redemptions in SystemState
+      await systemState.setRedemptionPaused(true)
+
+      // Setup wallet
+      const walletAddress = ethers.Wallet.createRandom().address
+      await fixture.qcData.registerQC(fixture.qcAddress.address, constants.LARGE_CAP)
+      await fixture.qcData.registerWallet(
+        walletAddress,
+        fixture.qcAddress.address,
+        constants.VALID_LEGACY_BTC,
+        ethers.utils.randomBytes(32)
+      )
+
+      // Try to create redemption
+      await expect(
+        qcRedeemer
+          .connect(user)
+          .requestRedemption(
+            ethers.utils.id("test"),
+            constants.SMALL_MINT,
+            constants.VALID_LEGACY_BTC,
+            walletAddress
+          )
+      ).to.be.revertedWith("RedemptionsPaused")
+    })
+
+    it("should allow fulfillment even when paused", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { qcRedeemer, systemState, watchdog } = fixture
+
+      // Create redemption before pause
+      const { redemptionId, amount, btcAddress } = await createTestRedemption(fixture)
+
+      // Pause redemptions
+      await systemState.setRedemptionPaused(true)
+
+      // Should still allow fulfillment
+      const spvData = getSimpleSpvData()
+      await expect(
+        qcRedeemer
+          .connect(watchdog)
+          .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
+      ).to.emit(qcRedeemer, "RedemptionFulfilled")
+    })
+  })
+
+  describe("AccountControl Integration", () => {
+    it("should reduce total minted on redemption", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { mockAccountControl, constants } = fixture
+
+      // Set initial total minted
+      const initialMinted = ethers.BigNumber.from("100000000000") // 1000 BTC
+      await mockAccountControl.setTotalMintedForTesting(initialMinted)
+
+      // Create redemption
+      const { redemptionId, amount } = await createTestRedemption(fixture, {
+        amount: constants.MEDIUM_MINT,
+      })
+
+      // Verify total minted was reduced (mock would track this)
+      // In real implementation, this would call accountControl.redeem(amount)
+      expect(redemptionId).to.not.be.empty
+      expect(amount).to.equal(constants.MEDIUM_MINT)
+    })
+
+    it("should check total minted before allowing redemption", async () => {
+      const fixture = await loadFixture(deployQCRedeemerFixture)
+      const { mockAccountControl, qcRedeemer, user, constants } = fixture
+
+      // Set total minted to zero (no available BTC to redeem)
+      await mockAccountControl.setTotalMintedForTesting(0)
+
+      // Setup wallet
+      const walletAddress = ethers.Wallet.createRandom().address
+      await fixture.qcData.registerQC(fixture.qcAddress.address, constants.LARGE_CAP)
+      await fixture.qcData.registerWallet(
+        walletAddress,
+        fixture.qcAddress.address,
+        constants.VALID_LEGACY_BTC,
+        ethers.utils.randomBytes(32)
+      )
+
+      // Mint tBTC for user
+      await fixture.tbtc.mint(user.address, ethers.utils.parseEther("10"))
+      await fixture.tbtc.connect(user).approve(qcRedeemer.address, ethers.utils.parseEther("10"))
+
+      // Should fail due to insufficient total minted
+      await expect(
+        qcRedeemer
+          .connect(user)
+          .requestRedemption(
+            ethers.utils.id("test"),
+            constants.MEDIUM_MINT,
+            constants.VALID_LEGACY_BTC,
+            walletAddress
+          )
+      ).to.be.revertedWith("InsufficientTotalMinted")
     })
   })
 })

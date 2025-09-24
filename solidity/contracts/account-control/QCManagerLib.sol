@@ -5,6 +5,8 @@ import "./QCData.sol";
 import "./ReserveOracle.sol";
 import "./AccountControl.sol";
 import "./SystemState.sol";
+import {BitcoinAddressUtils} from "./BitcoinAddressUtils.sol";
+import {CheckBitcoinSigs} from "@keep-network/bitcoin-spv-sol/contracts/CheckBitcoinSigs.sol";
 // MessageSigning import removed - not used in this library
 
 /**
@@ -32,6 +34,9 @@ library QCManagerLib {
 
     /// @notice Thrown when wallet address validation fails
     error InvalidWalletAddress();
+
+    /// @notice Thrown when Bitcoin signature verification fails
+    error SignatureVerificationFailed();
 
     /// @notice Thrown when attempting to register an already registered QC
     /// @param qc The address that is already registered
@@ -178,12 +183,16 @@ library QCManagerLib {
     }
 
     /**
-     * @notice Sync backing from oracle to AccountControl
-     * @param reserveOracle ReserveOracle contract instance
-     * @param accountControl AccountControl address
-     * @param qc The QC address to sync backing for
-     * @return balance The synced balance
-     * @return isStale Whether the balance is stale
+     * @notice Sync reserve backing from oracle to AccountControl
+     * @dev Fetches the latest attested reserve balance from the oracle and updates AccountControl.
+     *      This ensures AccountControl has the most recent backing information for solvency checks.
+     *      Critical for maintaining consistency between oracle attestations and operational controls.
+     *      Should be called when QC status changes or before critical operations.
+     * @param reserveOracle ReserveOracle contract providing reserve attestations
+     * @param accountControl AccountControl contract to update with backing information
+     * @param qc QC address whose backing to sync
+     * @return balance The synced reserve balance in satoshis
+     * @return isStale True if balance is older than 6 hours, may affect minting capacity
      */
     function syncBackingFromOracle(
         ReserveOracle reserveOracle,
@@ -197,20 +206,371 @@ library QCManagerLib {
         (balance, isStale) = reserveOracle.getReserveBalanceAndStaleness(qc);
 
         // Update AccountControl with the oracle-attested balance
-        // TODO: Implement automatic AccountControl backing sync after oracle verification
-        // Requirements: Add access controls, staleness validation, and error handling
-        // Timeline: Q1 2025 after oracle attestation system is fully tested
-        // For now, this function only reads from the oracle and returns the data
+        AccountControl(accountControl).setBacking(qc, balance);
 
         return (balance, isStale);
     }
 
+    // =================== VALIDATION FUNCTIONS ===================
+
+    /**
+     * @notice Validate Bitcoin address format using BitcoinAddressUtils
+     * @dev Validates Bitcoin addresses for supported formats:
+     *      - P2PKH (Pay-to-PubKey-Hash): Starts with '1', 26-35 chars
+     *      - P2SH (Pay-to-Script-Hash): Starts with '3', 26-35 chars
+     *      - Bech32 (SegWit): Starts with 'bc1', 42-62 chars
+     *      This validation is critical for wallet registration security.
+     * @param bitcoinAddress The Bitcoin address string to validate
+     * @return valid True if address matches a valid Bitcoin format, false otherwise
+     */
+    function isValidBitcoinAddress(string memory bitcoinAddress)
+        external
+        pure
+        returns (bool valid)
+    {
+        if (bytes(bitcoinAddress).length == 0) return false;
+
+        // Basic Bitcoin address format validation (matching original QCManager logic)
+        bytes memory addr = bytes(bitcoinAddress);
+        if (addr.length < 25 || addr.length > 62) {
+            return false;
+        }
+
+        // Basic validation: P2PKH starts with '1', P2SH with '3', Bech32 with 'bc1'
+        if (addr[0] == 0x31) return true; // '1' - P2PKH
+        if (addr[0] == 0x33) return true; // '3' - P2SH
+        if (addr.length >= 3 && addr[0] == 0x62 && addr[1] == 0x63 && addr[2] == 0x31) {
+            return true; // 'bc1' - Bech32
+        }
+
+        return false;
+    }
+
+    /**
+     * @notice Verify Bitcoin signature using CheckBitcoinSigs library
+     * @dev Uses the same ECDSA verification logic as Bridge contracts (Fraud.sol).
+     *      This function is critical for proving wallet ownership during registration.
+     *      The signature must be created with the Bitcoin private key corresponding to the public key.
+     * @param walletPublicKey The Bitcoin public key in uncompressed format (64 bytes, no 0x04 prefix)
+     * @param messageHash The keccak256 hash of the message that was signed
+     * @param v Recovery ID from the ECDSA signature (typically 27 or 28)
+     * @param r First 32 bytes of the ECDSA signature
+     * @param s Last 32 bytes of the ECDSA signature
+     * @return valid True if signature is valid and matches the public key, false otherwise
+     */
+    function verifyBitcoinSignature(
+        bytes memory walletPublicKey,
+        bytes32 messageHash,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external pure returns (bool valid) {
+        // Validate public key length (64 bytes for uncompressed key without prefix)
+        if (walletPublicKey.length != 64) {
+            return false;
+        }
+
+        // Use CheckBitcoinSigs library for signature verification
+        return CheckBitcoinSigs.checkSig(
+            walletPublicKey,
+            messageHash,
+            v,
+            r,
+            s
+        );
+    }
+
+    /**
+     * @notice Enhanced status transition validation with detailed reasoning
+     * @param from Current QC status
+     * @param to Target QC status
+     * @param hasUnfulfilledRedemptions Whether QC has pending redemptions
+     * @return valid Whether transition is allowed
+     * @return reason Detailed reason if transition is invalid
+     */
+    function validateStatusTransitionDetailed(
+        QCData.QCStatus from,
+        QCData.QCStatus to,
+        bool hasUnfulfilledRedemptions
+    ) external pure returns (bool valid, string memory reason) {
+        // Self-transitions always allowed
+        if (from == to) return (true, "");
+
+        // Cannot transition from Revoked (terminal state)
+        if (from == QCData.QCStatus.Revoked) {
+            return (false, "Cannot transition from Revoked status");
+        }
+
+        // Check redemption constraints
+        if (hasUnfulfilledRedemptions && to == QCData.QCStatus.Revoked) {
+            return (false, "Cannot revoke QC with unfulfilled redemptions");
+        }
+
+        // Active can transition to any state except itself
+        if (from == QCData.QCStatus.Active) {
+            return (true, "");
+        }
+
+        // MintingPaused transitions
+        if (from == QCData.QCStatus.MintingPaused) {
+            if (to == QCData.QCStatus.Active ||
+                to == QCData.QCStatus.Paused ||
+                to == QCData.QCStatus.UnderReview ||
+                to == QCData.QCStatus.Revoked) {
+                return (true, "");
+            }
+            return (false, "Invalid transition from MintingPaused");
+        }
+
+        // Paused transitions
+        if (from == QCData.QCStatus.Paused) {
+            if (to == QCData.QCStatus.Active ||
+                to == QCData.QCStatus.MintingPaused ||
+                to == QCData.QCStatus.UnderReview ||
+                to == QCData.QCStatus.Revoked) {
+                return (true, "");
+            }
+            return (false, "Invalid transition from Paused");
+        }
+
+        // UnderReview transitions (only to Active or Revoked)
+        if (from == QCData.QCStatus.UnderReview) {
+            if (to == QCData.QCStatus.Active || to == QCData.QCStatus.Revoked) {
+                return (true, "");
+            }
+            return (false, "UnderReview can only transition to Active or Revoked");
+        }
+
+        return (false, "Invalid status transition");
+    }
+
+    // =================== BUSINESS LOGIC FUNCTIONS ===================
+
+    /**
+     * @notice Perform auto-escalation logic for QC status management
+     * @param qc The QC address
+     * @param qcData QCData storage reference
+     * @param currentStatus Current QC status
+     * @return newStatus The escalated status
+     * @return escalated Whether escalation occurred
+     */
+    function performAutoEscalation(
+        address qc,
+        QCData qcData,
+        QCData.QCStatus currentStatus
+    ) external returns (QCData.QCStatus newStatus, bool escalated) {
+        // Auto-escalate based on current state
+        if (currentStatus == QCData.QCStatus.MintingPaused ||
+            currentStatus == QCData.QCStatus.Paused) {
+
+            // Escalate to UnderReview
+            newStatus = QCData.QCStatus.UnderReview;
+            escalated = true;
+
+            // Update QCData status
+            qcData.setQCStatus(qc, newStatus, "AUTO_ESCALATION");
+            qcData.setQCSelfPaused(qc, false);
+
+            return (newStatus, escalated);
+        }
+
+        return (currentStatus, false);
+    }
+
+    /**
+     * @notice Check if QC can use self-pause based on credit availability
+     * @param hasCredit Whether QC has available pause credit
+     * @param lastUsed Timestamp of last pause credit usage
+     * @param creditRenewTime When credit becomes available again
+     * @return canPause Whether QC can self-pause
+     * @return reason Reason if pause is not allowed
+     */
+    function checkPauseEligibility(
+        bool hasCredit,
+        uint256 lastUsed,
+        uint256 creditRenewTime
+    ) internal view returns (bool canPause, string memory reason) {
+        if (hasCredit) {
+            return (true, "");
+        }
+
+        if (lastUsed == 0) {
+            return (true, "Initial credit available");
+        }
+
+        if (block.timestamp >= creditRenewTime) {
+            return (true, "Credit renewed");
+        }
+
+        return (false, "Credit exhausted - wait for renewal");
+    }
+
+    /**
+     * @notice Update pause credit after usage
+     * @param hasCredit Current credit status
+     * @param level Pause level being used
+     * @return newHasCredit Updated credit status
+     * @return newLastUsed Updated last used timestamp
+     * @return newCreditRenewTime Updated renewal time
+     */
+    function updatePauseCredit(
+        bool hasCredit,
+        QCData.PauseLevel level
+    ) external view returns (bool newHasCredit, uint256 newLastUsed, uint256 newCreditRenewTime) {
+        // Complete pause consumes more credit than partial
+        if (level == QCData.PauseLevel.Complete) {
+            newHasCredit = false;
+            newLastUsed = block.timestamp;
+            newCreditRenewTime = block.timestamp + 90 days; // 90-day renewal period
+        } else {
+            // Self pause doesn't consume credit
+            newHasCredit = hasCredit;
+            newLastUsed = block.timestamp;
+            newCreditRenewTime = block.timestamp + 48 hours; // 48-hour pause duration
+        }
+
+        return (newHasCredit, newLastUsed, newCreditRenewTime);
+    }
+
+    /**
+     * @notice Calculate time until pause credit renewal
+     * @param hasCredit Whether QC has available pause credit
+     * @param lastUsed Timestamp of last pause credit usage
+     * @param creditRenewTime When credit becomes available again
+     * @return timeUntilRenewal Time in seconds until credit renewal (0 if available)
+     */
+    function calculateTimeUntilRenewal(
+        bool hasCredit,
+        uint256 lastUsed,
+        uint256 creditRenewTime
+    ) external view returns (uint256 timeUntilRenewal) {
+        if (hasCredit || lastUsed == 0) {
+            return 0;
+        }
+
+        if (block.timestamp >= creditRenewTime) {
+            return 0;
+        }
+
+        return creditRenewTime - block.timestamp;
+    }
+
+    /**
+     * @notice Get reserve balance and staleness from oracle
+     * @dev Retrieves the most recent attested reserve balance for a QC.
+     *      Balance is considered stale if older than 6 hours (STALENESS_THRESHOLD).
+     *      Stale balances may affect minting capacity and require fresh attestations.
+     * @param reserveOracle ReserveOracle contract providing reserve attestations
+     * @param qc QC address to query balance for
+     * @return balance Current reserve balance in satoshis
+     * @return isStale True if balance is older than 6 hours, false if fresh
+     */
+    function getReserveBalanceAndStaleness(
+        ReserveOracle reserveOracle,
+        address qc
+    ) external view returns (uint256 balance, bool isStale) {
+        return reserveOracle.getReserveBalanceAndStaleness(qc);
+    }
+
+    /**
+     * @notice Verify QC solvency by comparing backing to obligations
+     * @dev Performs critical solvency check by comparing attested reserves to minted tBTC.
+     *      A QC is considered solvent if reserves >= minted amount.
+     *      This function ignores staleness - solvency is based on last known balance.
+     *      Used by DISPUTE_ARBITER_ROLE to detect undercollateralization.
+     * @param qc QC address to verify solvency for
+     * @param qcData QCData contract for minted amount information
+     * @param reserveOracle ReserveOracle contract for reserve attestations
+     * @return isSolvent True if reserves cover minted amount, false if undercollateralized
+     * @return backing Current attested backing amount in satoshis
+     * @return obligations Total minted tBTC amount in satoshis
+     * @return deficit Undercollateralization amount if insolvent, 0 if solvent
+     */
+    function verifyQCSolvency(
+        address qc,
+        QCData qcData,
+        ReserveOracle reserveOracle
+    ) external view returns (
+        bool isSolvent,
+        uint256 backing,
+        uint256 obligations,
+        uint256 deficit
+    ) {
+        // Get current backing from oracle
+        (backing,) = reserveOracle.getReserveBalanceAndStaleness(qc);
+
+        // Get obligations (minted amount)
+        obligations = qcData.getQCMintedAmount(qc);
+
+        // Calculate solvency
+        if (backing >= obligations) {
+            isSolvent = true;
+            deficit = 0;
+        } else {
+            isSolvent = false;
+            deficit = obligations - backing;
+        }
+
+        return (isSolvent, backing, obligations, deficit);
+    }
+
+    // =================== VIEW FUNCTIONS ===================
+
+    /**
+     * @notice Get comprehensive pause information for a QC
+     * @param qc QC address
+     * @param qcData QCData contract instance
+     * @param hasCredit Whether QC has pause credit
+     * @param lastUsed Last pause credit usage timestamp
+     * @param creditRenewTime Credit renewal timestamp
+     * @param pauseReason Current pause reason
+     * @return canPause Whether QC can self-pause
+     * @return timeUntilRenewal Time until credit renewal (0 if available)
+     * @return currentStatus Current QC status
+     * @return reason Current pause reason
+     */
+    function getPauseInfoDetailed(
+        address qc,
+        QCData qcData,
+        bool hasCredit,
+        uint256 lastUsed,
+        uint256 creditRenewTime,
+        string memory pauseReason
+    ) external view returns (
+        bool canPause,
+        uint256 timeUntilRenewal,
+        QCData.QCStatus currentStatus,
+        string memory reason
+    ) {
+        // Get current status
+        currentStatus = qcData.getQCStatus(qc);
+
+        // Check pause eligibility
+        (canPause, reason) = checkPauseEligibility(hasCredit, lastUsed, creditRenewTime);
+
+        // Calculate time until renewal
+        if (hasCredit || lastUsed == 0) {
+            timeUntilRenewal = 0;
+        } else if (block.timestamp >= creditRenewTime) {
+            timeUntilRenewal = 0;
+        } else {
+            timeUntilRenewal = creditRenewTime - block.timestamp;
+        }
+
+        return (canPause, timeUntilRenewal, currentStatus, pauseReason);
+    }
+
     /**
      * @notice Calculate available minting capacity for a QC
-     * @param qcData QCData contract instance
-     * @param reserveOracle ReserveOracle contract instance
-     * @param qc QC address
-     * @return availableCapacity Available minting capacity in satoshis
+     * @dev Determines how much more tBTC a QC can mint based on:
+     *      1. Governance-set minting cap minus already minted amount
+     *      2. Attested reserve balance minus already minted amount
+     *      Returns the minimum of these two values.
+     *      Returns 0 if QC is not active or reserves are stale (>6 hours old).
+     * @param qcData QCData contract instance for QC information
+     * @param reserveOracle ReserveOracle contract for reserve attestations
+     * @param qc QC address to calculate capacity for
+     * @return availableCapacity Available minting capacity in satoshis (0 if unavailable)
      */
     function calculateAvailableMintingCapacity(
         QCData qcData,
