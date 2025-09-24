@@ -134,7 +134,7 @@ contract AccountControl is
 
     // Reserve type events
     event ReserveTypeUpdated(address indexed reserve, ReserveType oldType, ReserveType newType);
-    event ReserveTypeInfoUpdated(ReserveType indexed rType, string name, bool supportsLosses);
+    event ReserveTypeInfoUpdated(ReserveType indexed rType, string name);
 
     // ========== ERRORS ==========
     error InsufficientBacking(uint256 available, uint256 required);
@@ -307,7 +307,7 @@ contract AccountControl is
 
         typeInfo[rType] = info;
 
-        emit ReserveTypeInfoUpdated(rType, info.name, info.supportsLosses);
+        emit ReserveTypeInfoUpdated(rType, info.name);
     }
 
     /// @notice Update the type of an existing reserve

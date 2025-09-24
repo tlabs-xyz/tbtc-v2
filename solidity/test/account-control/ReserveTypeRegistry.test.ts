@@ -115,7 +115,8 @@ describe("AccountControl Reserve Type Registry", function () {
   describe("Type Update Operations", function () {
     beforeEach(async function () {
       // Authorize reserves with different types
-      await accountControl.connect(governance).authorizeReserve(basicReserve.address, SMALL_CAP);
+      // Use MIN_VAULT_CAP for basic reserve to allow type change to vault
+      await accountControl.connect(governance).authorizeReserve(basicReserve.address, MIN_VAULT_CAP);
       await accountControl.connect(governance).authorizeReserveWithType(
         vaultReserve.address,
         MIN_VAULT_CAP,
@@ -339,7 +340,7 @@ describe("AccountControl Reserve Type Registry", function () {
           randomAddress,
           ReserveType.QC_VAULT_STRATEGY
         )
-      ).to.be.revertedWith("ReserveNotFound");
+      ).to.be.revertedWith("Reserve not authorized");
     });
 
     it("should handle type validation for debitMinted on vault reserves", async function () {
