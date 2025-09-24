@@ -12,6 +12,9 @@ contract MockAccountControl {
     /// @notice Track whether AccountControl integration is enabled
     bool public accountControlEnabled = true;
 
+    /// @notice Track backing amounts for reserves (for testing)
+    mapping(address => uint256) public backing;
+
     /// @notice Custom error for insufficient minted balance
     error InsufficientMinted(uint256 available, uint256 requested);
 
@@ -25,6 +28,13 @@ contract MockAccountControl {
     /// @param amount The amount to set as totalMinted (in satoshis)
     function setTotalMintedForTesting(uint256 amount) external {
         totalMinted = amount;
+    }
+
+    /// @notice Set backing for a reserve for testing purposes
+    /// @param reserve The reserve address
+    /// @param amount The backing amount to set
+    function setBackingForTesting(address reserve, uint256 amount) external {
+        backing[reserve] = amount;
     }
     /// @notice Mock implementation of mintTBTC function
     /// @param user The user receiving minted TBTC

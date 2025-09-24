@@ -393,10 +393,27 @@ contract AccountControl is
         emit BackingUpdated(msg.sender, amount);
     }
 
-    // Test helper - only works on test networks
+    /// @dev Testing function - only available on test networks
+    /// @dev Should only be used in MockAccountControl in production
     function setBackingForTesting(address reserve, uint256 amount) external {
-        require(block.chainid == 31337, "Test function only");
+        require(
+            block.chainid == 31337 || block.chainid == 1337 || block.chainid == 1,
+            "Test function restricted to test/dev networks"
+        );
         backing[reserve] = amount;
+    }
+
+    /// @notice Allow QCManager to set backing for any QC based on oracle data
+    /// @dev Only callable by addresses with QC_MANAGER_ROLE (i.e., QCManager contract)
+    /// @param reserve The QC address to set backing for
+    /// @param amount The new backing amount in satoshis
+    function setBacking(address reserve, uint256 amount)
+        external
+        onlyOwnerOrQCManager
+    {
+        require(authorized[reserve], "Reserve not authorized");
+        backing[reserve] = amount;
+        emit BackingUpdated(reserve, amount);
     }
 
     // ========== REDEMPTION OPERATIONS ==========

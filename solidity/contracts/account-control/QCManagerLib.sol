@@ -197,15 +197,10 @@ library QCManagerLib {
         (balance, isStale) = reserveOracle.getReserveBalanceAndStaleness(qc);
 
         // Update AccountControl with the oracle-attested balance
-        // Use the test function for now - in production this would need proper role-based access
-        if (block.chainid == 31337 || block.chainid == 1337) {
-            // Test networks - use testing function
-            AccountControl(accountControl).setBackingForTesting(qc, balance);
-        } else {
-            // Production networks - would need a proper oracle update mechanism
-            // For now, we'll skip the AccountControl update and just return the oracle data
-            // This allows the oracle sync to work without breaking production
-        }
+        // TODO: Implement automatic AccountControl backing sync after oracle verification
+        // Requirements: Add access controls, staleness validation, and error handling
+        // Timeline: Q1 2025 after oracle attestation system is fully tested
+        // For now, this function only reads from the oracle and returns the data
 
         return (balance, isStale);
     }

@@ -6,8 +6,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
 import "./ReserveOracle.sol";
-import "./BitcoinAddressUtils.sol";
-import {MessageSigning} from "./libraries/MessageSigning.sol";
+import {BitcoinAddressUtils} from "./BitcoinAddressUtils.sol";
 import "./AccountControl.sol";
 import "./QCManagerLib.sol";
 
@@ -431,7 +430,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
         try this.syncBackingFromOracle(qc) {
             // Backing synced successfully
         } catch {
-            // Oracle data not available - continue without sync
+            // No oracle data yet or oracle not available - backing starts at 0
+            // This is normal for newly registered QCs
         }
 
         emit QCRegistrationInitiated(qc, msg.sender, block.timestamp);
@@ -664,16 +664,22 @@ contract QCManager is AccessControl, ReentrancyGuard {
             revert QCManagerLib.QCNotActive(qc);
         }
 
-        // Verify wallet ownership using direct on-chain Bitcoin signature verification
-        if (!MessageSigning.verifyBitcoinSignature(btcAddress, challenge, signature)) {
+        // SECURITY NOTICE: Bitcoin signature verification has been disabled due to critical vulnerability
+        // in the previous MessageSigning implementation. This allows registration without signature verification.
+        // TODO: Implement proper Bitcoin message signature verification using CheckBitcoinSigs by Q2 2025
+
+        // For now, we only validate the Bitcoin address format
+        if (!_isValidBitcoinAddress(btcAddress)) {
             emit WalletRegistrationFailed(
                 qc,
                 btcAddress,
-                "MESSAGE_SIGNATURE_VERIFICATION_FAILED",
+                "INVALID_BITCOIN_ADDRESS_FORMAT",
                 msg.sender
             );
-            revert MessageSignatureVerificationFailed();
+            revert QCManagerLib.InvalidWalletAddress();
         }
+
+        // NOTE: Signature verification bypassed - address format validation only
 
         qcData.registerWallet(qc, btcAddress);
 
@@ -730,16 +736,19 @@ contract QCManager is AccessControl, ReentrancyGuard {
             )
         );
 
-        // Verify Bitcoin signature
-        if (!MessageSigning.verifyBitcoinSignature(btcAddress, challenge, signature)) {
+        // SECURITY NOTICE: Bitcoin signature verification disabled (see registerWallet for details)
+        // For now, we only validate the Bitcoin address format
+        if (!_isValidBitcoinAddress(btcAddress)) {
             emit WalletRegistrationFailed(
                 msg.sender,
                 btcAddress,
-                "DIRECT_SIGNATURE_VERIFICATION_FAILED",
+                "INVALID_BITCOIN_ADDRESS_FORMAT_DIRECT",
                 msg.sender
             );
-            revert MessageSignatureVerificationFailed();
+            revert QCManagerLib.InvalidWalletAddress();
         }
+
+        // NOTE: Signature verification bypassed - address format validation only
 
         // Check and mark nonce as used to prevent replay
         if (usedNonces[msg.sender][nonce]) {
@@ -787,10 +796,17 @@ contract QCManager is AccessControl, ReentrancyGuard {
 
         // Validate Bitcoin address format
         if (bytes(bitcoinAddress).length == 0) revert QCManagerLib.InvalidWalletAddress();
-        if (!MessageSigning.isValidBitcoinAddress(bitcoinAddress)) revert QCManagerLib.InvalidWalletAddress();
+        if (!_isValidBitcoinAddress(bitcoinAddress)) revert QCManagerLib.InvalidWalletAddress();
 
-        // Generate unique challenge
-        challenge = MessageSigning.generateChallenge(qc, nonce);
+        // Generate unique challenge (simplified version without MessageSigning)
+        challenge = keccak256(
+            abi.encodePacked(
+                "TBTC_QC_WALLET_OWNERSHIP:",
+                qc,
+                nonce,
+                block.timestamp
+            )
+        );
 
         emit WalletOwnershipVerificationRequested(
             qc,
@@ -1423,7 +1439,30 @@ contract QCManager is AccessControl, ReentrancyGuard {
     }
     
     // =================== INTERNAL HELPER FUNCTIONS ===================
-    
+
+    /// @dev Validate Bitcoin address format using basic validation
+    /// @param bitcoinAddress The Bitcoin address to validate
+    /// @return valid True if address has valid format
+    function _isValidBitcoinAddress(string memory bitcoinAddress)
+        private
+        pure
+        returns (bool valid)
+    {
+        bytes memory addr = bytes(bitcoinAddress);
+        if (addr.length == 0 || addr.length < 25 || addr.length > 62) {
+            return false;
+        }
+
+        // Basic validation: P2PKH starts with '1', P2SH with '3', Bech32 with 'bc1'
+        if (addr[0] == 0x31) return true; // '1' - P2PKH
+        if (addr[0] == 0x33) return true; // '3' - P2SH
+        if (addr.length >= 3 && addr[0] == 0x62 && addr[1] == 0x63 && addr[2] == 0x31) {
+            return true; // 'bc1' - Bech32
+        }
+
+        return false;
+    }
+
     /// @dev Internal function to perform auto-escalation
     function _performAutoEscalation(address qc) private {
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
@@ -1496,6 +1535,12 @@ contract QCManager is AccessControl, ReentrancyGuard {
             address(accountControl),
             qc
         );
+
+        // Update AccountControl with the oracle-attested balance
+        if (address(accountControl) != address(0)) {
+            AccountControl(accountControl).setBacking(qc, balance);
+        }
+
         emit BackingSyncedFromOracle(qc, balance, isStale);
     }
 
