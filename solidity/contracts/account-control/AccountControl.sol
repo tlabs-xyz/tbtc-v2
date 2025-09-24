@@ -108,6 +108,12 @@ contract AccountControl is
     event RedemptionProcessed(address indexed reserve, uint256 amount);
     event ReserveDeauthorized(address indexed reserve);
 
+    // Separated operations events
+    event PureTokenMint(address indexed reserve, address indexed recipient, uint256 amount);
+    event PureTokenBurn(address indexed reserve, uint256 amount);
+    event AccountingCredit(address indexed reserve, uint256 amount);
+    event AccountingDebit(address indexed reserve, uint256 amount);
+
     // ========== ERRORS ==========
     error InsufficientBacking(uint256 available, uint256 required);
     error ExceedsReserveCap(uint256 requested, uint256 available);
@@ -273,7 +279,7 @@ contract AccountControl is
 
     // ========== MINTING OPERATIONS ==========
     
-    function mint(address recipient, uint256 amount)
+    function mintWithAccounting(address recipient, uint256 amount)
         external
         onlyAuthorizedReserve
         nonReentrant
@@ -281,6 +287,86 @@ contract AccountControl is
     {
         _mintInternal(msg.sender, recipient, amount);
         return true;
+    }
+
+    // ========== SEPARATED OPERATIONS ==========
+
+    /// @notice Pure token minting without accounting updates
+    /// @dev Enforces backing requirements but doesn't update minted[reserve]
+    /// @param recipient Address to receive minted tokens
+    /// @param amount Amount to mint in satoshis
+    function mint(address recipient, uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+    {
+        // Check backing invariant - CRITICAL for security
+        if (backing[msg.sender] < minted[msg.sender] + amount) {
+            revert InsufficientBacking(backing[msg.sender], minted[msg.sender] + amount);
+        }
+
+        // Pure token minting via Bank
+        IBank(bank).mint(recipient, amount);
+
+        emit PureTokenMint(msg.sender, recipient, amount);
+    }
+
+    /// @notice Pure token burning without accounting updates
+    /// @dev Burns tokens from caller's balance without updating minted[reserve]
+    /// @param amount Amount to burn in satoshis
+    function burn(uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+    {
+        // Pure token burning via Bank
+        IBank(bank).burn(amount);
+
+        emit PureTokenBurn(msg.sender, amount);
+    }
+
+    /// @notice Pure accounting credit without token minting
+    /// @dev Updates minted[reserve] without creating tokens
+    /// @param amount Amount to credit in satoshis
+    function creditMinted(uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+    {
+        // Check caps
+        if (minted[msg.sender] + amount > reserveInfo[msg.sender].mintingCap) {
+            revert ExceedsReserveCap(minted[msg.sender] + amount, reserveInfo[msg.sender].mintingCap);
+        }
+
+        if (globalMintingCap > 0 && totalMintedAmount + amount > globalMintingCap) {
+            revert ExceedsGlobalCap(totalMintedAmount + amount, globalMintingCap);
+        }
+
+        // Pure accounting increment
+        minted[msg.sender] += amount;
+        totalMintedAmount += amount;
+
+        emit AccountingCredit(msg.sender, amount);
+    }
+
+    /// @notice Pure accounting debit without token burning
+    /// @dev Updates minted[reserve] without destroying tokens
+    /// @param amount Amount to debit in satoshis
+    function debitMinted(uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+    {
+        // Validation
+        if (minted[msg.sender] < amount) {
+            revert InsufficientMinted(minted[msg.sender], amount);
+        }
+
+        // Pure accounting decrement
+        minted[msg.sender] -= amount;
+        totalMintedAmount -= amount;
+
+        emit AccountingDebit(msg.sender, amount);
     }
 
     function _mintInternal(address reserve, address recipient, uint256 amount) internal {
@@ -325,7 +411,14 @@ contract AccountControl is
     {
         // Convert tBTC to satoshis internally
         satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
-        _mintInternal(msg.sender, recipient, satoshis);
+
+        // Use separated operations for backward compatibility
+        mint(recipient, satoshis);      // Pure token operation
+        creditMinted(satoshis);         // Pure accounting operation
+
+        // Emit original event for backward compatibility
+        emit MintExecuted(msg.sender, recipient, satoshis);
+
         return satoshis;
     }
 
@@ -437,14 +530,33 @@ contract AccountControl is
     /// @dev This function accepts tBTC amounts (18 decimals) and converts them to satoshis (8 decimals)
     /// @param tbtcAmount Amount in tBTC units (1e18 precision)
     /// @return success True if redemption was successful
-    function redeemTBTC(uint256 tbtcAmount) 
-        external 
-        onlyAuthorizedReserve 
+    function redeemTBTC(uint256 tbtcAmount)
+        external
+        onlyAuthorizedReserve
         returns (bool success)
     {
         // Convert tBTC to satoshis internally
         uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
         return this.redeem(satoshis);
+    }
+
+    /// @notice Burn tBTC tokens using separated operations
+    /// @dev This function burns actual tokens AND updates accounting
+    /// @param tbtcAmount Amount in tBTC units (1e18 precision)
+    /// @return success True if burn was successful
+    function burnTBTC(uint256 tbtcAmount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+        returns (bool success)
+    {
+        uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
+
+        // Use separated operations
+        burn(satoshis);           // Pure token operation
+        debitMinted(satoshis);    // Pure accounting operation
+
+        return true;
     }
 
 
@@ -599,4 +711,6 @@ contract AccountControl is
 interface IBank {
     function increaseBalance(address account, uint256 amount) external;
     function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external;
+    function mint(address recipient, uint256 amount) external;
+    function burn(uint256 amount) external;
 }
