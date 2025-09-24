@@ -19,8 +19,7 @@ export async function deploySPVLibraries() {
   const qcRedeemerSPV = await QCRedeemerSPVFactory.deploy()
   await qcRedeemerSPV.deployed()
 
-  // Note: QCManagerSPV library doesn't exist in this codebase
-  // Only QCRedeemerSPV is available
+  // QCRedeemerSPV library for SPV verification logic
 
   // Deploy BitcoinAddressUtils (utility library)
   const BitcoinAddressUtilsFactory = await ethers.getContractFactory("BitcoinAddressUtils")
@@ -37,26 +36,27 @@ export async function deploySPVLibraries() {
 /**
  * Helper function to deploy MessageSigning library
  */
+/**
+ * Helper function to deploy MessageSigning library
+ * @deprecated MessageSigning library has been removed for security reasons
+ */
 export async function deployMessageSigning() {
-  const MessageSigningFactory = await ethers.getContractFactory("MessageSigning")
-  const messageSigning = await MessageSigningFactory.deploy()
-  await messageSigning.deployed()
-  return messageSigning
+  throw new Error("MessageSigning library has been removed for security reasons. Use BitcoinAddressUtils for address validation instead.")
 }
 
 /**
  * Helper function to deploy QCManagerLib library
  */
+/**
+ * Helper function to deploy QCManagerLib library
+ */
 export async function deployQCManagerLib() {
-  // Deploy MessageSigning separately as QCManager needs it
-  const messageSigning = await deployMessageSigning()
-
   // Deploy QCManagerLib (no linking needed - it's a library)
   const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib")
   const qcManagerLib = await QCManagerLibFactory.deploy()
   await qcManagerLib.deployed()
 
-  return { qcManagerLib, messageSigning }
+  return { qcManagerLib }
 }
 
 /**
@@ -75,19 +75,15 @@ export function getQCRedeemerLibraries(libraries: {
 /**
  * Helper function to get library linking configuration for QCManager
  */
+/**
+ * Helper function to get library linking configuration for QCManager
+ */
 export function getQCManagerLibraries(libraries: {
-  messageSigning: any
-  qcManagerLib?: any
+  qcManagerLib: any
 }) {
-  const libs: any = {
-    MessageSigning: libraries.messageSigning.address,
-  }
-
-  if (libraries.qcManagerLib) {
-    libs.QCManagerLib = libraries.qcManagerLib.address
-  }
-
   return {
-    libraries: libs,
+    libraries: {
+      QCManagerLib: libraries.qcManagerLib.address,
+    },
   }
 }

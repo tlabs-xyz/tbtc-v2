@@ -7,7 +7,6 @@ import {
   QCData,
   SystemState,
   ReserveOracle,
-  MessageSigning,
 } from "../../typechain"
 
 chai.use(smock.matchers)
@@ -48,22 +47,14 @@ describe("QCManager - Direct Wallet Registration", () => {
     mockSystemState = await smock.fake<SystemState>("SystemState")
     mockReserveOracle = await smock.fake<ReserveOracle>("ReserveOracle")
 
-    // Deploy MessageSigning library
-    const MessageSigningFactory = await ethers.getContractFactory(
-      "MessageSigning"
-    )
-    const messageSigning = await MessageSigningFactory.deploy()
-    await messageSigning.deployed()
-
     // Deploy QCManagerLib library
     const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib")
     const qcManagerLib = await QCManagerLibFactory.deploy()
     await qcManagerLib.deployed()
 
-    // Deploy QCManager with both libraries
+    // Deploy QCManager with libraries
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
-        MessageSigning: messageSigning.address,
         QCManagerLib: qcManagerLib.address,
       },
     })

@@ -25,6 +25,8 @@ describe("AccountControl Integration Tests", function () {
   let mockQcData: QCData;
   let mockQcManager: any;
   let mockRelay: any;
+  let mockAccountControlForMinter: any;
+  let mockAccountControlForRedeemer: any;
 
   const SATOSHI_MULTIPLIER = ethers.utils.parseEther("0.00000001"); // 1e10
   const QC_BACKING_AMOUNT = 1000000; // 0.01 BTC in satoshis
@@ -127,14 +129,6 @@ describe("AccountControl Integration Tests", function () {
     // Set backing for QC's own reserve
     await accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT);
 
-    // Set backing for QCMinter using test helper
-    // In production, this backing would come from actual QC deposits
-    // Need 3x backing for toggle test that mints 3 times
-    await accountControl.setBackingForTesting(qcMinter.address, QC_BACKING_AMOUNT * 3);
-
-    // Set backing for QCRedeemer using test helper
-    await accountControl.setBackingForTesting(qcRedeemer.address, QC_BACKING_AMOUNT);
-
     // Grant comprehensive roles for proper test operation
     const MINTER_ROLE = await qcMinter.MINTER_ROLE();
     await qcMinter.connect(owner).grantRole(MINTER_ROLE, minter.address);
@@ -150,13 +144,24 @@ describe("AccountControl Integration Tests", function () {
     // Set AccountControl address in QCMinter (critical for integration!)
     await qcMinter.connect(owner).setAccountControl(accountControl.address);
 
+    // Deploy MockAccountControl for backing functionality in QCMinter
+    const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
+    mockAccountControlForMinter = await MockAccountControlFactory.deploy();
+
     // For integration tests, use MockAccountControl for QCRedeemer to avoid minted balance tracking issues
     // The real AccountControl integration will be tested separately for complex cross-contract scenarios
-    const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
-    const mockAccountControlForRedeemer = await MockAccountControlFactory.deploy();
+    mockAccountControlForRedeemer = await MockAccountControlFactory.deploy();
 
     // Set MockAccountControl address in QCRedeemer (allows simple integration testing)
     await qcRedeemer.connect(owner).setAccountControl(mockAccountControlForRedeemer.address);
+
+    // Set backing for QCMinter using real AccountControl (with test function)
+    // In production, this backing would come from actual QC deposits
+    // Need 3x backing for toggle test that mints 3 times
+    await accountControl.setBackingForTesting(qcMinter.address, QC_BACKING_AMOUNT * 3);
+
+    // Set backing for QCRedeemer using MockAccountControl
+    await mockAccountControlForRedeemer.setBackingForTesting(qcRedeemer.address, QC_BACKING_AMOUNT);
 
     // Grant registrar role for reserve authorization
     const REGISTRAR_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("REGISTRAR_ROLE"));

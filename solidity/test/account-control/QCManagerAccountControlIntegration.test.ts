@@ -8,8 +8,7 @@ import {
   QCData,
   SystemState,
   ReserveOracle,
-  Bank,
-  MessageSigning
+  Bank
 } from "../../typechain";
 
 chai.use(smock.matchers);
@@ -47,20 +46,14 @@ describe("QCManager - AccountControl Integration", function () {
     mockReserveOracle = await smock.fake<ReserveOracle>("ReserveOracle");
     mockBank = await smock.fake<Bank>("Bank");
 
-    // Deploy MessageSigning library (required for QCManager)
-    const MessageSigningFactory = await ethers.getContractFactory("MessageSigning");
-    const messageSigning = await MessageSigningFactory.deploy();
-    await messageSigning.deployed();
-
     // Deploy QCManagerLib library (required for QCManager)
     const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib");
     const qcManagerLib = await QCManagerLibFactory.deploy();
     await qcManagerLib.deployed();
 
-    // Deploy QCManager with both libraries linked
+    // Deploy QCManager with libraries linked
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
-        MessageSigning: messageSigning.address,
         QCManagerLib: qcManagerLib.address,
       },
     });

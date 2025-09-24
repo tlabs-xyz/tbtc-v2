@@ -53,14 +53,14 @@ describe("Message Signing Integration Flows", () => {
     const SystemState = await ethers.getContractFactory("SystemState")
     systemState = await SystemState.deploy(deployer.address)
 
-    // Deploy MessageSigning library
-    const MessageSigning = await ethers.getContractFactory("MessageSigning")
-    const messageSigning = await MessageSigning.deploy()
+    // Deploy QCManagerLib library
+    const QCManagerLib = await ethers.getContractFactory("QCManagerLib")
+    const qcManagerLib = await QCManagerLib.deploy()
 
-    // Deploy QC contracts with message signing capabilities
+    // Deploy QC contracts with QCManagerLib
     const QCManager = await ethers.getContractFactory("QCManager", {
       libraries: {
-        MessageSigning: messageSigning.address,
+        QCManagerLib: qcManagerLib.address,
       },
     })
     qcManager = await QCManager.deploy(

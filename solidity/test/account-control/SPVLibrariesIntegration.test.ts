@@ -98,8 +98,7 @@ describe("SPV Libraries Integration", () => {
     const spvLibraries = await deploySPVLibraries()
     sharedSPVCore = spvLibraries.sharedSPVCore
 
-    // Note: QCManagerSPV doesn't exist in this codebase, skip QCManagerSPV test contract
-    // Only deploy QCRedeemerSPV test contract
+    // Deploy QCRedeemerSPV test contract
 
     const QCRedeemerSPVTest = await ethers.getContractFactory(
       "QCRedeemerSPVTest",

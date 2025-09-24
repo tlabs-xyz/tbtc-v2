@@ -44,10 +44,6 @@ describe("QCManagerLib", function () {
     const ReserveOracleFactory = await ethers.getContractFactory("ReserveOracle");
     reserveOracle = await ReserveOracleFactory.deploy();
 
-    // Deploy MessageSigning library
-    const MessageSigningFactory = await ethers.getContractFactory("MessageSigning");
-    const messageSigning = await MessageSigningFactory.deploy();
-
     // Deploy QCManagerLib library
     const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib");
     const qcManagerLib = await QCManagerLibFactory.deploy();
@@ -55,7 +51,6 @@ describe("QCManagerLib", function () {
     // Deploy QCManager with libraries linked
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
-        MessageSigning: messageSigning.address,
         QCManagerLib: qcManagerLib.address,
       },
     });

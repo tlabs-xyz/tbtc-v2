@@ -10,7 +10,7 @@ import {
   IQCRedeemer,
   AccountControl,
 } from "../../typechain"
-import { deployMessageSigning, deployQCManagerLib, getQCManagerLibraries } from "../helpers/spvLibraryHelpers"
+import { deployQCManagerLib, getQCManagerLibraries } from "../helpers/spvLibraryHelpers"
 
 chai.use(smock.matchers)
 
@@ -86,13 +86,13 @@ describe("QCManager", () => {
     mockReserveOracle = await smock.fake<ReserveOracle>("ReserveOracle")
     mockQCRedeemer = await smock.fake<IQCRedeemer>("IQCRedeemer")
 
-    // Deploy QCManagerLib library (includes MessageSigning)
-    const { qcManagerLib, messageSigning } = await deployQCManagerLib()
+    // Deploy QCManagerLib library
+    const { qcManagerLib } = await deployQCManagerLib()
 
     // Deploy QCManager with library support
     const QCManagerFactory = await ethers.getContractFactory(
       "QCManager",
-      getQCManagerLibraries({ messageSigning, qcManagerLib })
+      getQCManagerLibraries({ qcManagerLib })
     )
     qcManager = await QCManagerFactory.deploy(
       mockQCData.address,
@@ -313,26 +313,27 @@ describe("QCManager", () => {
       mockQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
       mockQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(0) // Active
 
-      // Note: Wallet ownership verification now happens on-chain via MessageSigning.verifyBitcoinSignature()
-      // No mocking needed - the library will validate signature format and return true for valid signatures
+      // Note: Bitcoin signature verification has been disabled for security reasons
+      // Only Bitcoin address format validation is performed using BitcoinAddressUtils
     })
 
     context("when called by registrar with verified wallet ownership", () => {
-      it("should fail wallet registration with invalid signature", async () => {
+      it("should fail wallet registration with invalid Bitcoin address", async () => {
         const challenge = ethers.utils.id("test_challenge")
-        const mockSignature = `0x${"aa".repeat(65)}` // Mock 65-byte signature (invalid)
+        const mockSignature = `0x${"aa".repeat(65)}`
+        const invalidBtcAddress = "invalid_bitcoin_address" // Invalid Bitcoin address format
 
-        // MessageSigning now validates signatures, so this should fail
+        // Address validation should reject invalid Bitcoin address formats
         await expect(
           qcManager
             .connect(registrar)
             .registerWallet(
               qcAddress.address,
-              validBtcAddress,
+              invalidBtcAddress,
               challenge,
               mockSignature
             )
-        ).to.be.revertedWith("MessageSignatureVerificationFailed")
+        ).to.be.revertedWith("InvalidWalletAddress")
       })
 
       it("should revert for unregistered QC", async () => {
@@ -366,20 +367,21 @@ describe("QCManager", () => {
         ).to.be.revertedWith("InvalidWalletAddress")
       })
 
-      it("should revert with invalid signature format", async () => {
+      it("should revert with malformed Bitcoin address", async () => {
         const challenge = ethers.utils.id("test_challenge")
-        const invalidSignature = `0x${"aa".repeat(32)}` // Invalid length (32 bytes instead of 65)
+        const mockSignature = `0x${"aa".repeat(65)}`
+        const malformedBtcAddress = "4InvalidBitcoinAddressFormat" // Invalid prefix '4'
 
         await expect(
           qcManager
             .connect(registrar)
             .registerWallet(
               qcAddress.address,
-              validBtcAddress,
+              malformedBtcAddress,
               challenge,
-              invalidSignature
+              mockSignature
             )
-        ).to.be.revertedWith("MessageSignatureVerificationFailed")
+        ).to.be.revertedWith("InvalidWalletAddress")
       })
     })
 

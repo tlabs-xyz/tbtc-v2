@@ -383,7 +383,6 @@ describe("ReserveOracle", () => {
     })
   })
 
-  // updateReserveBalance function doesn't exist in current contract
 
   describe("Configuration", () => {
     describe("setConsensusThreshold", () => {
@@ -464,7 +463,7 @@ describe("ReserveOracle", () => {
   })
 
   describe("Staleness Tracking", () => {
-    // isReserveStale function doesn't exist in current contract
+    // Note: Staleness is tracked via getReserveBalanceAndStaleness()
     /* it("should detect stale reserve data", async () => {
       // Initially stale (never updated)
       let [isStale, timeSinceUpdate] = await reserveOracle.isReserveStale(qcAddress.address)
