@@ -54,6 +54,9 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       [owner.address, emergencyCouncil.address, mockBank.address],
       { initializer: "initialize" }
     ) as AccountControl;
+
+    // Authorize AccountControl to call MockBank functions
+    await mockBank.authorizeBalanceIncreaser(accountControl.address);
   });
 
   beforeEach(async () => {

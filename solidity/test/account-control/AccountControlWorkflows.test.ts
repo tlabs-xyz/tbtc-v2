@@ -32,6 +32,9 @@ describe("AccountControl Workflows", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
+    // Authorize AccountControl to call MockBank functions
+    await mockBank.authorizeBalanceIncreaser(accountControl.address);
+
     // Note: Using direct updateBacking() for unit tests (oracle integration tested separately)
 
     // Setup AccountControl (QC_PERMISSIONED is initialized by default)
