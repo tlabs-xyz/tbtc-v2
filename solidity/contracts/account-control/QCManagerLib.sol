@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.17;
 
 import "./QCData.sol";
 import "./ReserveOracle.sol";
@@ -227,7 +227,7 @@ library QCManagerLib {
      * @return valid True if address matches a valid Bitcoin format, false otherwise
      */
     function isValidBitcoinAddress(string memory bitcoinAddress)
-        external
+        internal
         pure
         returns (bool valid)
     {
@@ -267,7 +267,7 @@ library QCManagerLib {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external pure returns (bool valid) {
+    ) internal pure returns (bool valid) {
         // Validate public key length (64 bytes for uncompressed key without prefix)
         if (walletPublicKey.length != 64) {
             return false;
@@ -614,6 +614,122 @@ library QCManagerLib {
         }
 
         return capBasedCapacity;
+    }
+
+    /**
+     * @notice Comprehensive wallet registration validation
+     * @dev Performs all validation checks for wallet registration
+     * @param qcData QCData contract instance
+     * @param qc The QC address
+     * @param btcAddress The Bitcoin address to register
+     * @param challenge The challenge that was signed
+     * @param walletPublicKey The Bitcoin public key
+     * @param v Recovery ID from signature
+     * @param r First 32 bytes of signature
+     * @param s Last 32 bytes of signature
+     * @return success True if all validations pass
+     * @return errorCode Error code if validation fails (for event emission)
+     */
+    function validateWalletRegistrationFull(
+        QCData qcData,
+        address qc,
+        string calldata btcAddress,
+        bytes32 challenge,
+        bytes calldata walletPublicKey,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external view returns (bool success, string memory errorCode) {
+        // Check address length
+        if (bytes(btcAddress).length == 0) {
+            return (false, "INVALID_ADDR");
+        }
+
+        // Check QC registration
+        if (!qcData.isQCRegistered(qc)) {
+            return (false, "QC_NOT_REG");
+        }
+
+        // Check QC status
+        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
+            return (false, "QC_INACTIVE");
+        }
+
+        // Validate Bitcoin address format
+        if (!isValidBitcoinAddress(btcAddress)) {
+            return (false, "BAD_ADDR");
+        }
+
+        // Verify Bitcoin signature
+        if (!verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
+            return (false, "SIG_FAIL");
+        }
+
+        return (true, "");
+    }
+
+    /**
+     * @notice Validate direct wallet registration by QC
+     * @dev Validates direct registration with challenge generation
+     * @param qcData QCData contract instance
+     * @param qc The QC address (msg.sender)
+     * @param btcAddress The Bitcoin address to register
+     * @param nonce The nonce for challenge generation
+     * @param walletPublicKey The Bitcoin public key
+     * @param v Recovery ID from signature
+     * @param r First 32 bytes of signature
+     * @param s Last 32 bytes of signature
+     * @param chainId The current chain ID
+     * @return success True if all validations pass
+     * @return challenge The generated challenge
+     * @return errorCode Error code if validation fails
+     */
+    function validateDirectWalletRegistration(
+        QCData qcData,
+        address qc,
+        string calldata btcAddress,
+        uint256 nonce,
+        bytes calldata walletPublicKey,
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        uint256 chainId
+    ) external view returns (bool success, bytes32 challenge, string memory errorCode) {
+        // Check QC registration and status
+        if (!qcData.isQCRegistered(qc)) {
+            return (false, bytes32(0), "QC_NOT_REG");
+        }
+        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
+            return (false, bytes32(0), "QC_INACTIVE");
+        }
+
+        // Check address length
+        if (bytes(btcAddress).length == 0) {
+            return (false, bytes32(0), "INVALID_ADDR");
+        }
+
+        // Generate deterministic challenge
+        challenge = keccak256(
+            abi.encodePacked(
+                "TBTC_QC_WALLET_DIRECT:",
+                qc,
+                btcAddress,
+                nonce,
+                chainId
+            )
+        );
+
+        // Validate Bitcoin address format
+        if (!isValidBitcoinAddress(btcAddress)) {
+            return (false, challenge, "BAD_ADDR_DIRECT");
+        }
+
+        // Verify Bitcoin signature
+        if (!verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
+            return (false, challenge, "SIG_FAIL_DIRECT");
+        }
+
+        return (true, challenge, "");
     }
 
 }

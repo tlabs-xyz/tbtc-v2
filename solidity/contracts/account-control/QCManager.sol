@@ -331,7 +331,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     /// @notice Ensures AccountControl is configured
     /// @dev Reverts if accountControl is not set (address(0))
     modifier requiresAccountControl() {
-        require(accountControl != address(0), "AccountControl not configured");
+        require(accountControl != address(0), "AccountControl not set");
         _;
     }
 
@@ -340,6 +340,10 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         address _systemState,
         address _reserveOracle
     ) {
+        require(_qcData != address(0), "Invalid QCData address");
+        require(_systemState != address(0), "Invalid SystemState address");
+        require(_reserveOracle != address(0), "Invalid ReserveOracle address");
+
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
         reserveOracle = ReserveOracle(_reserveOracle);
@@ -477,7 +481,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         // AUTHORITY VALIDATION: WatchdogEnforcer can only set QCs to UnderReview
         require(
             newStatus == QCData.QCStatus.UnderReview,
-            "WatchdogEnforcer can only set UnderReview status"
+            "WatchdogEnforcer: UnderReview only"
         );
 
         emit QCStatusChangeRequested(
@@ -606,59 +610,41 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     )
         external
         onlyRole(REGISTRAR_ROLE)
-        onlyWhenNotPaused("wallet_registration")
+        onlyWhenNotPaused("wallet_reg")
         nonReentrant
     {
-        if (bytes(btcAddress).length == 0) {
-            emit WalletRegistrationFailed(
-                qc,
-                btcAddress,
-                "INVALID_WALLET_ADDRESS",
-                msg.sender
-            );
-            revert QCManagerLib.InvalidWalletAddress();
-        }
+        // Use library for comprehensive validation
+        (bool success, string memory errorCode) = QCManagerLib.validateWalletRegistrationFull(
+            qcData,
+            qc,
+            btcAddress,
+            challenge,
+            walletPublicKey,
+            v,
+            r,
+            s
+        );
 
-        // Cache QCData service to avoid redundant SLOAD operations
-        if (!qcData.isQCRegistered(qc)) {
+        if (!success) {
             emit WalletRegistrationFailed(
                 qc,
                 btcAddress,
-                "QC_NOT_REGISTERED",
+                errorCode,
                 msg.sender
             );
-            revert QCManagerLib.QCNotRegistered(qc);
-        }
-        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
-            emit WalletRegistrationFailed(
-                qc,
-                btcAddress,
-                "QC_NOT_ACTIVE",
-                msg.sender
-            );
-            revert QCManagerLib.QCNotActive(qc);
-        }
-
-        // Validate Bitcoin address format first
-        if (!QCManagerLib.isValidBitcoinAddress(btcAddress)) {
-            emit WalletRegistrationFailed(
-                qc,
-                btcAddress,
-                "INVALID_ADDRESS",
-                msg.sender
-            );
-            revert QCManagerLib.InvalidWalletAddress();
-        }
-
-        // Verify Bitcoin signature to prove wallet ownership
-        if (!QCManagerLib.verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
-            emit WalletRegistrationFailed(
-                qc,
-                btcAddress,
-                "SIGNATURE_FAILED",
-                msg.sender
-            );
-            revert QCManagerLib.SignatureVerificationFailed();
+            // Convert error code to appropriate revert
+            if (keccak256(bytes(errorCode)) == keccak256("INVALID_ADDR") ||
+                keccak256(bytes(errorCode)) == keccak256("BAD_ADDR")) {
+                revert QCManagerLib.InvalidWalletAddress();
+            } else if (keccak256(bytes(errorCode)) == keccak256("QC_NOT_REG")) {
+                revert QCManagerLib.QCNotRegistered(qc);
+            } else if (keccak256(bytes(errorCode)) == keccak256("QC_INACTIVE")) {
+                revert QCManagerLib.QCNotActive(qc);
+            } else if (keccak256(bytes(errorCode)) == keccak256("SIG_FAIL")) {
+                revert QCManagerLib.SignatureVerificationFailed();
+            } else {
+                revert("Validation failed");
+            }
         }
 
         qcData.registerWallet(qc, btcAddress);
@@ -694,54 +680,42 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         bytes32 s
     )
         external
-        onlyWhenNotPaused("wallet_registration")
+        onlyWhenNotPaused("wallet_reg")
         nonReentrant
     {
-        // Gate: Only registered, active QCs can register their own wallets
-        if (!qcData.isQCRegistered(msg.sender)) {
-            revert QCManagerLib.QCNotRegistered(msg.sender);
-        }
-        if (qcData.getQCStatus(msg.sender) != QCData.QCStatus.Active) {
-            revert QCManagerLib.QCNotActive(msg.sender);
-        }
-
-        // Validate Bitcoin address
-        if (bytes(btcAddress).length == 0) {
-            revert QCManagerLib.InvalidWalletAddress();
-        }
-
-        // Generate deterministic challenge on-chain
-        // QCs can compute this same challenge off-chain before signing
-        bytes32 challenge = keccak256(
-            abi.encodePacked(
-                "TBTC_QC_WALLET_DIRECT:",
-                msg.sender,
-                btcAddress,
-                nonce,
-                block.chainid  // Prevent cross-chain replay
-            )
+        // Use library for comprehensive validation and challenge generation
+        (bool success, bytes32 challenge, string memory errorCode) = QCManagerLib.validateDirectWalletRegistration(
+            qcData,
+            msg.sender,
+            btcAddress,
+            nonce,
+            walletPublicKey,
+            v,
+            r,
+            s,
+            block.chainid
         );
 
-        // Validate Bitcoin address format first
-        if (!QCManagerLib.isValidBitcoinAddress(btcAddress)) {
+        if (!success) {
             emit WalletRegistrationFailed(
                 msg.sender,
                 btcAddress,
-                "INVALID_ADDRESS_DIRECT",
+                errorCode,
                 msg.sender
             );
-            revert QCManagerLib.InvalidWalletAddress();
-        }
-
-        // Verify Bitcoin signature to prove wallet ownership
-        if (!QCManagerLib.verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
-            emit WalletRegistrationFailed(
-                msg.sender,
-                btcAddress,
-                "SIGNATURE_FAILED_DIRECT",
-                msg.sender
-            );
-            revert QCManagerLib.SignatureVerificationFailed();
+            // Convert error code to appropriate revert
+            if (keccak256(bytes(errorCode)) == keccak256("INVALID_ADDR") ||
+                keccak256(bytes(errorCode)) == keccak256("BAD_ADDR_DIRECT")) {
+                revert QCManagerLib.InvalidWalletAddress();
+            } else if (keccak256(bytes(errorCode)) == keccak256("QC_NOT_REG")) {
+                revert QCManagerLib.QCNotRegistered(msg.sender);
+            } else if (keccak256(bytes(errorCode)) == keccak256("QC_INACTIVE")) {
+                revert QCManagerLib.QCNotActive(msg.sender);
+            } else if (keccak256(bytes(errorCode)) == keccak256("SIG_FAIL_DIRECT")) {
+                revert QCManagerLib.SignatureVerificationFailed();
+            } else {
+                revert("Validation failed");
+            }
         }
 
         // Check and mark nonce as used to prevent replay
@@ -782,10 +756,10 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         else if (hasRole(REGISTRAR_ROLE, msg.sender)) {
             // For registrars, the QC address should be derived from context or passed separately
             // For now, revert with clear message
-            revert("REGISTRAR_MUST_USE_REGISTER_WALLET");
+            revert("Use registerWallet");
         }
         else {
-            revert("UNAUTHORIZED_WALLET_VERIFICATION");
+            revert("Unauthorized");
         }
 
         // Validate Bitcoin address format
@@ -818,10 +792,9 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     /// @param btcAddress The Bitcoin address to deregister
     function requestWalletDeRegistration(string calldata btcAddress)
         external
-        onlyWhenNotPaused("wallet_registration")
+        onlyWhenNotPaused("wallet_reg")
         nonReentrant
     {
-        // Cache QCData service to avoid redundant SLOAD operations
         address qc = qcData.getWalletOwner(btcAddress);
 
         if (qc == address(0)) {
@@ -844,7 +817,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         if (address(qcRedeemer) != address(0)) {
             require(
                 !IQCRedeemer(address(qcRedeemer)).hasWalletObligations(btcAddress),
-                "Cannot deregister: wallet has pending redemptions"
+                "Wallet has pending redemptions"
             );
         }
 
@@ -861,10 +834,9 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     )
         external
         onlyRole(REGISTRAR_ROLE)
-        onlyWhenNotPaused("wallet_registration")
+        onlyWhenNotPaused("wallet_reg")
         nonReentrant
     {
-        // Cache QCData service to avoid redundant SLOAD operations
         address qc = qcData.getWalletOwner(btcAddress);
 
         if (qc == address(0)) {

@@ -64,7 +64,7 @@ describe("AccountControl Reserve Type Registry", function () {
       expect(vaultInfo.requiresBtcAddress).to.be.false;
       expect(vaultInfo.supportsLosses).to.be.true;
       expect(vaultInfo.requiresWrapper).to.be.true;
-      expect(vaultInfo.maxBackingRatio).to.equal(ethers.utils.parseUnits("120", 16)); // 120%
+      expect(vaultInfo.maxBackingRatio).to.equal(ethers.parseUnits("120", 16)); // 120%
     });
   });
 
@@ -191,7 +191,7 @@ describe("AccountControl Reserve Type Registry", function () {
     });
 
     it("should prevent QC_BASIC reserves from using burnTBTC", async function () {
-      const tbtcAmount = ethers.utils.parseEther("0.005"); // 0.005 tBTC
+      const tbtcAmount = ethers.parseEther("0.005"); // 0.005 tBTC
 
       await expect(
         accountControl.connect(basicReserve).burnTBTC(tbtcAmount)
@@ -202,8 +202,8 @@ describe("AccountControl Reserve Type Registry", function () {
       // First credit minted to have something to debit
       await accountControl.connect(vaultReserve).creditMinted(SMALL_MINT);
 
-      const tbtcAmount = ethers.utils.parseEther("0.005");
-      const expectedSatoshis = tbtcAmount.div(ethers.utils.parseUnits("1", 10));
+      const tbtcAmount = ethers.parseEther("0.005");
+      const expectedSatoshis = tbtcAmount.div(ethers.parseUnits("1", 10));
 
       const initialBalance = await mockBank.balanceOf(vaultReserve.address);
       const initialMinted = await accountControl.minted(vaultReserve.address);
@@ -239,7 +239,7 @@ describe("AccountControl Reserve Type Registry", function () {
         requiresBtcAddress: true,
         supportsLosses: true,
         requiresWrapper: false,
-        maxBackingRatio: ethers.utils.parseUnits("150", 16) // 150%
+        maxBackingRatio: ethers.parseUnits("150", 16) // 150%
       };
 
       await accountControl.connect(governance).setReserveTypeInfo(
@@ -250,7 +250,7 @@ describe("AccountControl Reserve Type Registry", function () {
       const updatedInfo = await accountControl.typeInfo(ReserveType.QC_VAULT_STRATEGY);
       expect(updatedInfo.name).to.equal("Updated Vault Strategy");
       expect(updatedInfo.requiresBtcAddress).to.be.true;
-      expect(updatedInfo.maxBackingRatio).to.equal(ethers.utils.parseUnits("150", 16));
+      expect(updatedInfo.maxBackingRatio).to.equal(ethers.parseUnits("150", 16));
     });
 
     it("should emit ReserveTypeInfoUpdated event", async function () {
@@ -314,8 +314,8 @@ describe("AccountControl Reserve Type Registry", function () {
       await accountControl.connect(governance).authorizeReserve(basicReserve.address, MEDIUM_CAP);
       await accountControl.connect(basicReserve).updateBacking(MEDIUM_CAP);
 
-      const tbtcAmount = ethers.utils.parseEther("0.005");
-      const expectedSatoshis = tbtcAmount.div(ethers.utils.parseUnits("1", 10));
+      const tbtcAmount = ethers.parseEther("0.005");
+      const expectedSatoshis = tbtcAmount.div(ethers.parseUnits("1", 10));
 
       await accountControl.connect(basicReserve).mintTBTC(user.address, tbtcAmount);
 
