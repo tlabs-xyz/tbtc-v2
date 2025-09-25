@@ -529,7 +529,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         );
 
         if (!isValid) {
-            revert QCManagerLib.InvalidStatusTransition(oldStatus, newStatus);
+            revert InvalidStatusTransition(uint8(oldStatus), uint8(newStatus));
         }
 
         qcData.setQCStatus(qc, newStatus, reason);
@@ -635,13 +635,13 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
             // Convert error code to appropriate revert
             if (keccak256(bytes(errorCode)) == keccak256("INVALID_ADDR") ||
                 keccak256(bytes(errorCode)) == keccak256("BAD_ADDR")) {
-                revert QCManagerLib.InvalidWalletAddress();
+                revert InvalidWalletAddress();
             } else if (keccak256(bytes(errorCode)) == keccak256("QC_NOT_REG")) {
-                revert QCManagerLib.QCNotRegistered(qc);
+                revert QCNotRegistered(qc);
             } else if (keccak256(bytes(errorCode)) == keccak256("QC_INACTIVE")) {
-                revert QCManagerLib.QCNotActive(qc);
+                revert QCNotActive(qc);
             } else if (keccak256(bytes(errorCode)) == keccak256("SIG_FAIL")) {
-                revert QCManagerLib.SignatureVerificationFailed();
+                revert SignatureVerificationFailed();
             } else {
                 revert("Validation failed");
             }
@@ -706,13 +706,13 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
             // Convert error code to appropriate revert
             if (keccak256(bytes(errorCode)) == keccak256("INVALID_ADDR") ||
                 keccak256(bytes(errorCode)) == keccak256("BAD_ADDR_DIRECT")) {
-                revert QCManagerLib.InvalidWalletAddress();
+                revert InvalidWalletAddress();
             } else if (keccak256(bytes(errorCode)) == keccak256("QC_NOT_REG")) {
-                revert QCManagerLib.QCNotRegistered(msg.sender);
+                revert QCNotRegistered(msg.sender);
             } else if (keccak256(bytes(errorCode)) == keccak256("QC_INACTIVE")) {
-                revert QCManagerLib.QCNotActive(msg.sender);
+                revert QCNotActive(msg.sender);
             } else if (keccak256(bytes(errorCode)) == keccak256("SIG_FAIL_DIRECT")) {
-                revert QCManagerLib.SignatureVerificationFailed();
+                revert SignatureVerificationFailed();
             } else {
                 revert("Validation failed");
             }

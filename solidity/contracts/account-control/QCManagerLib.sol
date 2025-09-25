@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "./QCData.sol";
+import "./QCManagerErrors.sol";
 import "./ReserveOracle.sol";
 import "./AccountControl.sol";
 import "./SystemState.sol";
@@ -25,6 +26,8 @@ library QCManagerLib {
     // Note: Events are defined in main QCManager contract as libraries cannot emit events directly
 
     // ========== ERRORS ==========
+    // Note: These are library-specific error definitions for functions that need them
+    // Main contract errors are in QCManagerErrors.sol
 
     /// @notice Thrown when QC address is zero address
     error InvalidQCAddress();
@@ -34,9 +37,6 @@ library QCManagerLib {
 
     /// @notice Thrown when wallet address validation fails
     error InvalidWalletAddress();
-
-    /// @notice Thrown when Bitcoin signature verification fails
-    error SignatureVerificationFailed();
 
     /// @notice Thrown when attempting to register an already registered QC
     /// @param qc The address that is already registered
@@ -56,13 +56,9 @@ library QCManagerLib {
     error NewCapMustBeHigher(uint256 current, uint256 requested);
 
     /// @notice Thrown when status transition is invalid
-    /// @param from Current status
-    /// @param to Requested new status
-    error InvalidStatusTransition(QCData.QCStatus from, QCData.QCStatus to);
-
-    /// @notice Thrown when caller is not authorized for status change
-    /// @param caller The unauthorized caller address
-    error UnauthorizedStatusChange(address caller);
+    /// @param from Current status (uint8 to avoid circular dependency)
+    /// @param to Requested new status (uint8 to avoid circular dependency)
+    error InvalidStatusTransition(uint8 from, uint8 to);
 
     // ========== REGISTRATION LOGIC ==========
 
