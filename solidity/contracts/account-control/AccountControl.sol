@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "./AccountControlLib.sol";
 
 /**
  * @title AccountControl
@@ -20,10 +21,10 @@ contract AccountControl is
     AccessControlUpgradeable
 {
     // ========== CONSTANTS ==========
-    uint256 public constant MIN_MINT_AMOUNT = 10**4; // 0.0001 BTC in satoshis
-    uint256 public constant MAX_SINGLE_MINT = 100 * 10**8; // 100 BTC in satoshis
+    uint256 public constant MIN_MINT_AMOUNT = 10**4; /// @dev 0.0001 BTC in satoshis
+    uint256 public constant MAX_SINGLE_MINT = 100 * 10**8; /// @dev 100 BTC in satoshis
     uint256 public constant MAX_BATCH_SIZE = 100;
-    uint256 public constant SATOSHI_MULTIPLIER = 1e10; // Converts tBTC (1e18) to satoshis (1e8)
+    uint256 public constant SATOSHI_MULTIPLIER = 1e10; /// @dev Converts tBTC (1e18) to satoshis (1e8)
 
     // ========== ROLES ==========
     bytes32 public constant QC_MANAGER_ROLE = keccak256("QC_MANAGER_ROLE");
@@ -108,10 +109,12 @@ contract AccountControl is
      */
 
     // ========== PHASE 1: Reserve Type Registry ==========
-    // Storage slots 165-166: Reserve type management
-    mapping(address => ReserveType) public reserveTypes;           // Slot 165: Reserve type mapping
-    mapping(ReserveType => ReserveTypeInfo) public typeInfo;       // Slot 166: Type information
-    uint256 public constant MIN_VAULT_CAP = 10 * 10**8;           // Constant: 10 BTC minimum for vaults (no storage)
+    // Storage slots 165-167: Reserve type management and operation validation
+    mapping(address => ReserveType) public reserveTypes;           /// @dev Slot 165: Reserve type mapping
+    mapping(ReserveType => ReserveTypeInfo) public typeInfo;       /// @dev Slot 166: Type information
+    mapping(address => uint256) public lastOperationTimestamp;     /// @dev Slot 167: Last operation timestamp per reserve
+    uint256 public constant MIN_VAULT_CAP = 10 * 10**8;           /// @dev 10 BTC minimum for vaults (no storage)
+    uint256 public constant OPERATION_COOLDOWN = 1;               /// @dev Minimum blocks between operations (prevents sequence abuse)
 
     // ========== EVENTS ==========
     event MintExecuted(address indexed reserve, address indexed recipient, uint256 amount);
@@ -152,6 +155,8 @@ contract AccountControl is
     error InsufficientMinted(uint256 available, uint256 requested);
     error ReserveNotFound(address reserve);
     error CannotDeauthorizeWithOutstandingBalance(address reserve, uint256 outstandingAmount);
+    error OperationTooFrequent(uint256 lastOperation, uint256 currentBlock);
+    error UnsafeOperationSequence(string operation);
 
     // ========== MODIFIERS ==========
     modifier onlyAuthorizedReserve() {
@@ -174,9 +179,20 @@ contract AccountControl is
     modifier onlyOwnerOrQCManager() {
         require(
             owner() == _msgSender() || hasRole(QC_MANAGER_ROLE, _msgSender()),
-            "AccountControl: caller is not owner or QC manager"
+            "Unauthorized"
         );
         _;
+    }
+
+    /// @notice Validates safe operation sequencing to prevent abuse
+    modifier validateSequence() {
+        // Prevent rapid sequential operations that could bypass safeguards
+        if (lastOperationTimestamp[msg.sender] != 0 &&
+            block.number < lastOperationTimestamp[msg.sender] + OPERATION_COOLDOWN) {
+            revert OperationTooFrequent(lastOperationTimestamp[msg.sender], block.number);
+        }
+        _;
+        lastOperationTimestamp[msg.sender] = block.number;
     }
 
     // ========== INITIALIZATION ==========
@@ -246,12 +262,12 @@ contract AccountControl is
     ) internal {
         if (authorized[reserve]) revert AlreadyAuthorized(reserve);
         if (mintingCap == 0) revert AmountTooSmall(mintingCap, 1);
-        require(rType != ReserveType.UNINITIALIZED, "Cannot authorize as UNINITIALIZED");
+        require(rType != ReserveType.UNINITIALIZED, "Invalid type");
 
         // Type-specific validation
         if (rType == ReserveType.QC_VAULT_STRATEGY) {
             require(mintingCap >= MIN_VAULT_CAP, "Vault cap too low");
-            require(typeInfo[rType].supportsLosses, "Type must support losses");
+            require(typeInfo[rType].supportsLosses, "No loss support");
         }
 
         authorized[reserve] = true;
@@ -303,7 +319,7 @@ contract AccountControl is
         ReserveType rType,
         ReserveTypeInfo memory info
     ) external onlyOwner {
-        require(rType != ReserveType.UNINITIALIZED, "Cannot set info for UNINITIALIZED");
+        require(rType != ReserveType.UNINITIALIZED, "Invalid type");
 
         typeInfo[rType] = info;
 
@@ -317,8 +333,8 @@ contract AccountControl is
         address reserve,
         ReserveType newType
     ) external onlyOwner {
-        require(authorized[reserve], "Reserve not authorized");
-        require(newType != ReserveType.UNINITIALIZED, "Cannot set to UNINITIALIZED");
+        require(authorized[reserve], "Not authorized");
+        require(newType != ReserveType.UNINITIALIZED, "Invalid type");
 
         ReserveType oldType = reserveTypes[reserve];
         reserveTypes[reserve] = newType;
@@ -332,7 +348,7 @@ contract AccountControl is
             );
             require(
                 typeInfo[newType].supportsLosses,
-                "Vault type must support losses"
+                "No loss support"
             );
         }
 
@@ -392,7 +408,7 @@ contract AccountControl is
 
             require(
                 typeInfo[rType].supportsLosses,
-                "Reserve type cannot handle losses"
+                "No loss support"
             );
         }
     }
@@ -457,6 +473,7 @@ contract AccountControl is
         external
         onlyAuthorizedReserve
         nonReentrant
+        validateSequence
     {
         // Check backing invariant - CRITICAL for security
         if (backing[msg.sender] < minted[msg.sender] + amount) {
@@ -490,6 +507,7 @@ contract AccountControl is
         external
         onlyAuthorizedReserve
         nonReentrant
+        validateSequence
     {
         // Validate that this reserve type supports losses/burns
         validateTypeOperation(msg.sender, true);
@@ -507,6 +525,7 @@ contract AccountControl is
         external
         onlyAuthorizedReserve
         nonReentrant
+        validateSequence
     {
         // Check caps
         if (minted[msg.sender] + amount > reserveInfo[msg.sender].mintingCap) {
@@ -531,6 +550,7 @@ contract AccountControl is
         external
         onlyAuthorizedReserve
         nonReentrant
+        validateSequence
     {
         // Validation
         if (minted[msg.sender] < amount) {
@@ -542,6 +562,51 @@ contract AccountControl is
         totalMintedAmount -= amount;
 
         emit AccountingDebit(msg.sender, amount);
+    }
+
+    /// @notice Atomic mint operation (tokens + accounting) - safer than separated operations
+    /// @dev Combines token minting and accounting in single transaction
+    /// @param recipient Address to receive minted tokens
+    /// @param amount Amount to mint in satoshis
+    function atomicMint(address recipient, uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+        returns (bool)
+    {
+        // Perform atomic mint operation without sequence validation
+        // as this is the safe alternative to separated operations
+        _mintInternal(msg.sender, recipient, amount);
+        return true;
+    }
+
+    /// @notice Atomic burn operation (tokens + accounting) - safer than separated operations
+    /// @dev Combines token burning and accounting in single transaction
+    /// @param amount Amount to burn in satoshis
+    function atomicBurn(uint256 amount)
+        external
+        onlyAuthorizedReserve
+        nonReentrant
+        returns (bool)
+    {
+        // Validate that this reserve type supports losses/burns
+        validateTypeOperation(msg.sender, true);
+
+        // Validation
+        if (minted[msg.sender] < amount) {
+            revert InsufficientMinted(minted[msg.sender], amount);
+        }
+
+        // Atomic burn operation: burn tokens and update accounting
+        IBank(bank).burnFrom(msg.sender, amount);
+
+        minted[msg.sender] -= amount;
+        totalMintedAmount -= amount;
+
+        emit PureTokenBurn(msg.sender, amount);
+        emit AccountingDebit(msg.sender, amount);
+
+        return true;
     }
 
     // ========== INTERNAL HELPERS FOR SEPARATED OPERATIONS ==========
@@ -623,10 +688,10 @@ contract AccountControl is
         returns (uint256 satoshis)
     {
         // Ensure no precision loss
-        require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Amount not divisible by SATOSHI_MULTIPLIER");
+        require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Bad precision");
 
         // Convert tBTC to satoshis internally
-        satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
+        satoshis = AccountControlLib.tbtcToSatoshis(tbtcAmount);
 
         // Use separated operations for backward compatibility - internal calls
         _mintTokensInternal(recipient, satoshis);      // Pure token operation
@@ -642,15 +707,7 @@ contract AccountControl is
         address[] calldata recipients,
         uint256[] calldata amounts
     ) external onlyAuthorizedReserve nonReentrant returns (bool) {
-        if (recipients.length != amounts.length) revert ArrayLengthMismatch(recipients.length, amounts.length);
-        if (recipients.length > MAX_BATCH_SIZE) revert BatchSizeExceeded(recipients.length, MAX_BATCH_SIZE);
-        
-        uint256 totalAmount = 0;
-        for (uint256 i = 0; i < amounts.length; i++) {
-            if (amounts[i] < MIN_MINT_AMOUNT) revert AmountTooSmall(amounts[i], MIN_MINT_AMOUNT);
-            if (amounts[i] > MAX_SINGLE_MINT) revert AmountTooLarge(amounts[i], MAX_SINGLE_MINT);
-            totalAmount += amounts[i];
-        }
+        uint256 totalAmount = AccountControlLib.validateBatchMint(recipients, amounts);
         
         // Check backing invariant for total
         if (backing[msg.sender] < minted[msg.sender] + totalAmount) {
@@ -707,7 +764,7 @@ contract AccountControl is
     function setBackingForTesting(address reserve, uint256 amount) external {
         require(
             block.chainid == 31337 || block.chainid == 1337,
-            "Test function restricted to test/dev networks"
+            "Test only"
         );
         backing[reserve] = amount;
     }
@@ -720,7 +777,7 @@ contract AccountControl is
         external
         onlyOwnerOrQCManager
     {
-        require(authorized[reserve], "Reserve not authorized");
+        require(authorized[reserve], "Not authorized");
         backing[reserve] = amount;
         emit BackingUpdated(reserve, amount);
     }
@@ -752,11 +809,11 @@ contract AccountControl is
         returns (bool success)
     {
         // Ensure no precision loss
-        require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Amount not divisible by SATOSHI_MULTIPLIER");
+        require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Bad precision");
 
         // Convert tBTC to satoshis internally
-        uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
-        return redeem(satoshis);
+        uint256 satoshis = AccountControlLib.tbtcToSatoshis(tbtcAmount);
+        return this.redeem(satoshis);
     }
 
     /// @notice Burn tBTC tokens using separated operations
@@ -770,12 +827,12 @@ contract AccountControl is
         returns (bool success)
     {
         // Ensure no precision loss
-        require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Amount not divisible by SATOSHI_MULTIPLIER");
+        require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Bad precision");
 
         // Validate that this reserve type supports losses/burns
         validateTypeOperation(msg.sender, true);
 
-        uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
+        uint256 satoshis = AccountControlLib.tbtcToSatoshis(tbtcAmount);
 
         // Use separated operations - internal calls
         _burnTokensInternal(satoshis);           // Pure token operation
