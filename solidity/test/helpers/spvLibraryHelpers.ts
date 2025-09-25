@@ -34,20 +34,6 @@ export async function deploySPVLibraries() {
 }
 
 /**
- * Helper function to deploy MessageSigning library
- */
-/**
- * Helper function to deploy MessageSigning library
- * @deprecated MessageSigning library has been removed for security reasons
- */
-export async function deployMessageSigning() {
-  throw new Error("MessageSigning library has been removed for security reasons. Use BitcoinAddressUtils for address validation instead.")
-}
-
-/**
- * Helper function to deploy QCManagerLib library
- */
-/**
  * Helper function to deploy QCManagerLib library
  */
 export async function deployQCManagerLib() {
@@ -72,9 +58,6 @@ export function getQCRedeemerLibraries(libraries: {
   }
 }
 
-/**
- * Helper function to get library linking configuration for QCManager
- */
 /**
  * Helper function to get library linking configuration for QCManager
  */

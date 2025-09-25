@@ -258,9 +258,6 @@ const config: HardhatUserConfig = {
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
-    // Library extraction successful: QCManager reduced from 27KB to 24.077KB (only 77 bytes over limit)
-    // QCRedeemer optimization not needed - size acceptable for current deployment
-    // Keep disabled for development performance until final 77 bytes are optimized
     runOnCompile: true,
     strict: true,
     // WalletRegistry is excluded because it's an external dependency from @keep-network/ecdsa
