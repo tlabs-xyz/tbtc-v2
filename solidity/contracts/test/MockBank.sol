@@ -159,6 +159,11 @@ contract MockBank is IBank {
         return _balances[account];
     }
 
+    // ERC20-compatible balanceOf function
+    function balanceOf(address account) external view returns (uint256) {
+        return _balances[account];
+    }
+
     // Authorization functions
     function authorizedBalanceIncreasers(address account) external view returns (bool) {
         return _authorizedIncreasers[account];

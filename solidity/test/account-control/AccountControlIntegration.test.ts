@@ -116,6 +116,9 @@ describe("AccountControl Integration Tests", function () {
       100 // txProofDifficultyFactor
     ) as QCRedeemer;
 
+    // Authorize AccountControl to call MockBank functions
+    await mockBank.authorizeBalanceIncreaser(accountControl.address);
+
     // Setup AccountControl (QC_PERMISSIONED is initialized by default)
     await accountControl.connect(owner).authorizeReserve(qc.address, QC_BACKING_AMOUNT); // ReserveType.QC_PERMISSIONED (backing in satoshis)
 

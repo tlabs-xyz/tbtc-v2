@@ -31,6 +31,9 @@ describe("AccountControl mintTBTC Functionality", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
+    // Authorize AccountControl to call MockBank functions
+    await mockBank.authorizeBalanceIncreaser(accountControl.address);
+
     // Authorize a reserve with 10 BTC cap
     const mintingCap = ONE_BTC_IN_SATOSHIS.mul(10); // 10 BTC in satoshis
     await accountControl.connect(owner).authorizeReserve(reserve.address, mintingCap);

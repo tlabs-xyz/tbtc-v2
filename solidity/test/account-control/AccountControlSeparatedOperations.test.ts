@@ -33,11 +33,10 @@ describe("AccountControl Separated Operations", function () {
         // Use MEDIUM_CAP for testing since LARGE_CAP isn't defined in testing utils
         const testCap = amounts.MEDIUM_CAP.mul(5); // 5x medium cap for testing
 
-        // Authorize a reserve for testing with vault strategy type (supports burns)
-        await accountControl.connect(owner).authorizeReserveWithType(
+        // Authorize a reserve for testing
+        await accountControl.connect(owner).authorizeReserve(
             reserve.address,
-            testCap,
-            2 // QC_VAULT_STRATEGY type
+            testCap
         );
 
         // Set up backing
