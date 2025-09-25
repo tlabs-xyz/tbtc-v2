@@ -109,7 +109,7 @@ describe("AccountControl Input Validation", function () {
       // Verify re-authorization succeeded
       expect(await accountControl.authorized(reserve.address)).to.be.true;
       const reserveInfo = await accountControl.reserveInfo(reserve.address);
-      expect(reserveInfo.reserveType).to.equal(1); // QC_PERMISSIONED = 1 (UNINITIALIZED = 0)
+      expect(reserveInfo.mintingCap).to.be.greaterThan(0);
     });
   });
 

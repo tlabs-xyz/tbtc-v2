@@ -94,6 +94,28 @@ contract MockBank is IBank {
         _balances[account] -= amount;
         _totalSupply -= amount;
     }
+
+    // Missing mint function that AccountControl IBank interface expects
+    function mint(address recipient, uint256 amount) external {
+        require(_authorizedIncreasers[msg.sender], "Not authorized to mint");
+        _balances[recipient] += amount;
+        _totalSupply += amount;
+    }
+
+    // Missing burn functions that AccountControl IBank interface expects
+    function burn(uint256 amount) external {
+        require(_authorizedIncreasers[msg.sender], "Not authorized to burn");
+        require(_balances[msg.sender] >= amount, "Insufficient balance to burn");
+        _balances[msg.sender] -= amount;
+        _totalSupply -= amount;
+    }
+
+    function burnFrom(address account, uint256 amount) external {
+        require(_authorizedIncreasers[msg.sender], "Not authorized to burn");
+        require(_balances[account] >= amount, "Insufficient balance to burn");
+        _balances[account] -= amount;
+        _totalSupply -= amount;
+    }
     
     function totalSupply() external view returns (uint256) {
         return _totalSupply;

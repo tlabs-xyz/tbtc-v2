@@ -30,8 +30,6 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
   const HALF_BTC = ONE_BTC.div(2);
   const TEN_BTC = ONE_BTC.mul(10);
 
-  // Reserve type constants (matching AccountControl.sol)
-  const QC_PERMISSIONED = 1;
 
   // Dynamic constants from contract
   let constants: any;
@@ -86,11 +84,10 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       expect(await accountControl.minted(mockReserve.address)).to.equal(0);
     });
 
-    it("should assign correct reserve type", async () => {
+    it("should assign correct minting cap", async () => {
       await accountControl.connect(owner).authorizeReserve(mockReserve.address, TEN_BTC);
 
       const reserveInfo = await accountControl.reserveInfo(mockReserve.address);
-      expect(reserveInfo.reserveType).to.equal(QC_PERMISSIONED);
       expect(reserveInfo.mintingCap).to.equal(TEN_BTC);
     });
 

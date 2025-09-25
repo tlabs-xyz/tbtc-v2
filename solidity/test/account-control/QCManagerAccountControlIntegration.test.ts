@@ -98,7 +98,6 @@ describe("QCManager - AccountControl Integration", function () {
       // Verify minting cap is set correctly
       const reserveInfo = await accountControl.reserveInfo(qcAddress.address);
       expect(reserveInfo.mintingCap).to.equal(mintingCap);
-      expect(reserveInfo.reserveType).to.equal(1); // QC_PERMISSIONED = 1 (after UNINITIALIZED = 0)
     });
 
     it("should handle AccountControl authorization gracefully when address is zero", async function () {

@@ -6,7 +6,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "./AccountControlLib.sol";
 
 /**
  * @title AccountControl
@@ -691,7 +690,7 @@ contract AccountControl is
         require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Bad precision");
 
         // Convert tBTC to satoshis internally
-        satoshis = AccountControlLib.tbtcToSatoshis(tbtcAmount);
+        satoshis = _tbtcToSatoshis(tbtcAmount);
 
         // Use separated operations for backward compatibility - internal calls
         _mintTokensInternal(recipient, satoshis);      // Pure token operation
@@ -707,7 +706,7 @@ contract AccountControl is
         address[] calldata recipients,
         uint256[] calldata amounts
     ) external onlyAuthorizedReserve nonReentrant returns (bool) {
-        uint256 totalAmount = AccountControlLib.validateBatchMint(recipients, amounts);
+        uint256 totalAmount = _validateBatchMint(recipients, amounts);
         
         // Check backing invariant for total
         if (backing[msg.sender] < minted[msg.sender] + totalAmount) {
@@ -812,7 +811,7 @@ contract AccountControl is
         require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Bad precision");
 
         // Convert tBTC to satoshis internally
-        uint256 satoshis = AccountControlLib.tbtcToSatoshis(tbtcAmount);
+        uint256 satoshis = _tbtcToSatoshis(tbtcAmount);
         return this.redeem(satoshis);
     }
 
@@ -832,7 +831,7 @@ contract AccountControl is
         // Validate that this reserve type supports losses/burns
         validateTypeOperation(msg.sender, true);
 
-        uint256 satoshis = AccountControlLib.tbtcToSatoshis(tbtcAmount);
+        uint256 satoshis = _tbtcToSatoshis(tbtcAmount);
 
         // Use separated operations - internal calls
         _burnTokensInternal(satoshis);           // Pure token operation
@@ -983,9 +982,50 @@ contract AccountControl is
     
     function _authorizeUpgrade(address newImplementation) 
         internal 
-        override 
-        onlyOwner 
+        override
+        onlyOwner
     {}
+
+    // ========== INTERNAL UTILITIES ==========
+
+    /**
+     * @notice Validates batch mint parameters
+     * @param recipients Array of recipient addresses
+     * @param amounts Array of amounts to mint
+     * @return totalAmount Sum of all amounts
+     */
+    function _validateBatchMint(
+        address[] calldata recipients,
+        uint256[] calldata amounts
+    ) internal pure returns (uint256 totalAmount) {
+        require(recipients.length == amounts.length, "Array length mismatch");
+        require(recipients.length <= MAX_BATCH_SIZE, "Batch size exceeded");
+
+        for (uint256 i = 0; i < amounts.length; i++) {
+            require(amounts[i] >= MIN_MINT_AMOUNT, "Amount too small");
+            require(amounts[i] <= MAX_SINGLE_MINT, "Amount too large");
+            totalAmount += amounts[i];
+        }
+    }
+
+    /**
+     * @notice Converts tBTC amount to satoshis
+     * @param tbtcAmount Amount in tBTC (18 decimals)
+     * @return Amount in satoshis (no decimals)
+     */
+    function _tbtcToSatoshis(uint256 tbtcAmount) internal pure returns (uint256) {
+        return tbtcAmount / SATOSHI_MULTIPLIER;
+    }
+
+    /**
+     * @notice Converts satoshis to tBTC amount
+     * @param satoshis Amount in satoshis (no decimals)
+     * @return Amount in tBTC (18 decimals)
+     */
+    function _satoshisToTbtc(uint256 satoshis) internal pure returns (uint256) {
+        return satoshis * SATOSHI_MULTIPLIER;
+    }
+
 }
 
 // ========== INTERFACES ==========

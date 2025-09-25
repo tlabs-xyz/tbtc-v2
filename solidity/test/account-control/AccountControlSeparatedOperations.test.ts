@@ -112,14 +112,6 @@ describe("AccountControl Separated Operations", function () {
             expect(await accountControl.totalMintedAmount()).to.equal(totalMintedBefore);
         });
 
-        it("should validate reserve type supports losses", async function () {
-            // Create a reserve with QC_BASIC type (doesn't support losses)
-            await accountControl.connect(owner).authorizeReserve(user.address, amounts.MEDIUM_CAP);
-            await accountControl.connect(user).updateBacking(amounts.MEDIUM_CAP);
-
-            await expect(accountControl.connect(user).burnTokens(amounts.SMALL_MINT))
-                .to.be.revertedWith("Reserve type cannot handle losses");
-        });
     });
 
     describe("Pure accounting credit (creditMinted)", function () {

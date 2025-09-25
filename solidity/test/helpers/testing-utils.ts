@@ -90,9 +90,14 @@ export const deployAccountControlForTest = async (
   mockBank: Contract
 ): Promise<AccountControl> => {
   const AccountControlFactory = await ethers.getContractFactory("AccountControl");
-  return await upgrades.deployProxy(
+  const accountControl = await upgrades.deployProxy(
     AccountControlFactory,
     [owner.address, emergencyCouncil.address, mockBank.address],
     { initializer: "initialize" }
   ) as AccountControl;
+
+  // Authorize AccountControl to call MockBank functions
+  await mockBank.authorizeBalanceIncreaser(accountControl.address);
+
+  return accountControl;
 };
