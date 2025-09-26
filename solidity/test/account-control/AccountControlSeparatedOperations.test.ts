@@ -72,43 +72,8 @@ describe("AccountControl Separated Operations", function () {
                 .to.be.revertedWith("InsufficientBacking");
         });
 
-        it.skip("should enforce sequence validation cooldown - skipped: Hardhat auto-mines blocks", async function () {
-            // This test cannot work properly in Hardhat as it automatically mines a block per transaction
-            // The validateSequence modifier only blocks operations in the same block
-            // In production, multiple transactions in the same block would be blocked
-        });
     });
 
-    describe.skip("Pure token burning (burnTokens) - skipped: requires ReserveType with loss support", function () {
-        beforeEach(async function () {
-            // Authorize owner to mint tokens for testing
-            await mockBank.authorizeBalanceIncreaser(owner.address);
-            // Give reserve some tokens to burn
-            await mockBank.connect(owner).mint(reserve.address, amounts.MEDIUM_MINT);
-        });
-
-        it("should burn tokens without updating accounting", async function () {
-            const amount = amounts.SMALL_MINT;
-
-            // Track state before
-            const mintedBefore = await accountControl.minted(reserve.address);
-            const totalMintedBefore = await accountControl.totalMintedAmount();
-            const reserveBalanceBefore = await mockBank.balanceOf(reserve.address);
-
-            // Burn tokens only
-            await expect(accountControl.connect(reserve).burnTokens(amount))
-                .to.emit(accountControl, "PureTokenBurn")
-                .withArgs(reserve.address, amount);
-
-            // Check tokens were burned
-            expect(await mockBank.balanceOf(reserve.address)).to.equal(reserveBalanceBefore.sub(amount));
-
-            // Check accounting was NOT updated
-            expect(await accountControl.minted(reserve.address)).to.equal(mintedBefore);
-            expect(await accountControl.totalMintedAmount()).to.equal(totalMintedBefore);
-        });
-
-    });
 
     describe("Pure accounting credit (creditMinted)", function () {
         it("should update accounting without minting tokens", async function () {
@@ -192,25 +157,6 @@ describe("AccountControl Separated Operations", function () {
             expect(await accountControl.minted(reserve.address)).to.equal(amount);
         });
 
-        it.skip("atomicBurn should combine token burning and accounting - skipped: requires ReserveType with loss support", async function () {
-            // Set up: mint some tokens first
-            await accountControl.connect(reserve).atomicMint(reserve.address, amounts.MEDIUM_MINT);
-
-            const amount = amounts.SMALL_MINT;
-            const mintedBefore = await accountControl.minted(reserve.address);
-            const balanceBefore = await mockBank.balanceOf(reserve.address);
-
-            // Atomic burn
-            await expect(accountControl.connect(reserve).atomicBurn(amount))
-                .to.emit(accountControl, "PureTokenBurn")
-                .withArgs(reserve.address, amount)
-                .and.to.emit(accountControl, "AccountingDebit")
-                .withArgs(reserve.address, amount);
-
-            // Check both tokens and accounting were updated
-            expect(await mockBank.balanceOf(reserve.address)).to.equal(balanceBefore.sub(amount));
-            expect(await accountControl.minted(reserve.address)).to.equal(mintedBefore.sub(amount));
-        });
 
         it("atomic operations should not have sequence validation", async function () {
             const amount = amounts.SMALL_MINT;

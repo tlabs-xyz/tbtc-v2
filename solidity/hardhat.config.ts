@@ -262,9 +262,7 @@ const config: HardhatUserConfig = {
     strict: true,
     // WalletRegistry is excluded because it's an external dependency from @keep-network/ecdsa
     // that exceeds the 24KB contract size limit (24.142 KB). We don't control this contract.
-    // QCManager: 24.077KB (77 bytes over limit) - needs minor optimization
-    // QCRedeemer: Size optimized, no longer needs exclusion
-    except: ["BridgeStub$", "WalletRegistry$", "QCManager$"],
+    except: ["BridgeStub$", "WalletRegistry$"],
   },
   mocha: {
     timeout: 60_000,

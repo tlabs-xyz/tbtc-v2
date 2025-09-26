@@ -94,4 +94,5 @@ contract QCRedeemerSPVTest {
         (relay, difficultyFactor) = spvState.getParameters();
         isInitialized = spvState.isInitialized();
     }
+
 }
