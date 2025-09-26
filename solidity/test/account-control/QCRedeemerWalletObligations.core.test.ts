@@ -15,7 +15,7 @@ chai.use(smock.matchers)
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
-describe("QCRedeemer - Wallet Obligations", () => {
+describe("QCRedeemer - Wallet Obligations (Core Functionality)", () => {
   let deployer: SignerWithAddress
   let user1: SignerWithAddress
   let user2: SignerWithAddress

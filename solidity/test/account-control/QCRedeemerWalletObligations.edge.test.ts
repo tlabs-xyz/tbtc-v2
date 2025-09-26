@@ -9,7 +9,7 @@ chai.use(smock.matchers)
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
-describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
+describe("QCRedeemer - Wallet Obligations (Edge Cases)", () => {
   let deployer: SignerWithAddress
   let user1: SignerWithAddress
   let user2: SignerWithAddress
