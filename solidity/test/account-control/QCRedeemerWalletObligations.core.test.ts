@@ -8,6 +8,7 @@ import {
   SystemState,
   TBTC,
   SPVState,
+  TestRelay,
 } from "../../typechain"
 import { deploySPVLibraries, getQCRedeemerLibraries } from "../helpers/spvLibraryHelpers"
 
@@ -25,6 +26,7 @@ describe("QCRedeemer - Wallet Obligations (Core Functionality)", () => {
   let mockQCData: FakeContract<QCData>
   let mockSystemState: FakeContract<SystemState>
   let mockTBTC: FakeContract<TBTC>
+  let testRelay: TestRelay
 
   // Test data
   const qcAddress = "0x1234567890123456789012345678901234567890"
@@ -50,6 +52,11 @@ describe("QCRedeemer - Wallet Obligations (Core Functionality)", () => {
     mockSystemState = await smock.fake<SystemState>("SystemState")
     mockTBTC = await smock.fake<TBTC>("TBTC")
 
+    // Deploy test relay (required by SPVState)
+    const TestRelayFactory = await ethers.getContractFactory("TestRelay")
+    testRelay = await TestRelayFactory.deploy()
+    await testRelay.deployed()
+
     // Deploy SPV libraries for QCRedeemer
     const libraries = await deploySPVLibraries()
 
@@ -59,8 +66,8 @@ describe("QCRedeemer - Wallet Obligations (Core Functionality)", () => {
       mockTBTC.address,
       mockQCData.address,
       mockSystemState.address,
-      ethers.constants.AddressZero, // relay address (not used in tests)
-      0 // txProofDifficultyFactor (not used in tests)
+      testRelay.address,
+      1 // txProofDifficultyFactor
     )
     await qcRedeemer.deployed()
 

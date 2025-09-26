@@ -414,10 +414,11 @@ describe("QCRedeemerSPV Library", () => {
 
     it("should return false for future locktime (anti-replay protection)", async () => {
       const futureTime = Math.floor(Date.now() / 1000) + 86400 * 2 // 2 days in future
-      const futureTimeLittleEndian = ethers.utils.hexZeroPad(
-        ethers.utils.hexlify(futureTime), // Note: manual little endian conversion needed
-        4
-      )
+
+      // Convert to little-endian bytes32 (Bitcoin format)
+      const futureTimeHex = futureTime.toString(16).padStart(8, '0')
+      const futureTimeLittleEndian = '0x' +
+        futureTimeHex.match(/../g).reverse().join('')
 
       const txInfo = {
         version: "0x01000000",

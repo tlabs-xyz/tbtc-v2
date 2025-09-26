@@ -637,23 +637,25 @@ describe("ReserveOracle", () => {
   })
 
   describe("Edge cases", () => {
-    it("should handle attester updating their attestation", async () => {
+    it("should prevent attester from updating their attestation", async () => {
       // First attestation
       await reserveOracle
         .connect(attester1)
         .attestBalance(qcAddress.address, ethers.utils.parseEther("100"))
 
-      // Update attestation
-      await reserveOracle
-        .connect(attester1)
-        .attestBalance(qcAddress.address, ethers.utils.parseEther("150"))
+      // Attempt to update attestation - should revert
+      await expect(
+        reserveOracle
+          .connect(attester1)
+          .attestBalance(qcAddress.address, ethers.utils.parseEther("150"))
+      ).to.be.revertedWithCustomError(reserveOracle, "AttesterAlreadySubmitted")
 
-      // Check that attestation was updated
+      // Check that attestation was NOT updated
       const attestation = await reserveOracle.pendingAttestations(
         qcAddress.address,
         attester1.address
       )
-      expect(attestation.balance).to.equal(ethers.utils.parseEther("150"))
+      expect(attestation.balance).to.equal(ethers.utils.parseEther("100"))
     })
 
     it("should ignore expired attestations when calculating consensus", async () => {
