@@ -223,7 +223,7 @@ library QCManagerLib {
      * @return valid True if address matches a valid Bitcoin format, false otherwise
      */
     function isValidBitcoinAddress(string memory bitcoinAddress)
-        internal
+        public
         pure
         returns (bool valid)
     {
@@ -728,4 +728,51 @@ library QCManagerLib {
         return (true, challenge, "");
     }
 
+    function syncAccountControlWithStatus(
+        address accountControl,
+        address qc,
+        QCData.QCStatus oldStatus,
+        QCData.QCStatus newStatus
+    ) external {
+        if (oldStatus == newStatus) return;
+
+        IAccountControl ac = IAccountControl(accountControl);
+
+        if (newStatus == QCData.QCStatus.Active) {
+            ac.unpauseReserve(qc);
+        } else if (
+            newStatus == QCData.QCStatus.MintingPaused ||
+            newStatus == QCData.QCStatus.Paused ||
+            newStatus == QCData.QCStatus.UnderReview
+        ) {
+            ac.pauseReserve(qc);
+        } else if (newStatus == QCData.QCStatus.Revoked) {
+            ac.deauthorizeReserve(qc);
+        }
+    }
+
+    function performAutoEscalationLogic(
+        QCData qcData,
+        address qc,
+        bytes32 autoEscalationReason
+    ) external returns (QCData.QCStatus newStatus) {
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+
+        if (currentStatus == QCData.QCStatus.MintingPaused ||
+            currentStatus == QCData.QCStatus.Paused) {
+
+            newStatus = QCData.QCStatus.UnderReview;
+            qcData.setQCStatus(qc, newStatus, autoEscalationReason);
+
+            return newStatus;
+        }
+
+        return currentStatus;
+    }
+}
+
+interface IAccountControl {
+    function pauseReserve(address reserve) external;
+    function unpauseReserve(address reserve) external;
+    function deauthorizeReserve(address reserve) external;
 }

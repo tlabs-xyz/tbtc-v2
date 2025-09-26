@@ -16,12 +16,11 @@ chai.use(smock.matchers);
 const { createSnapshot, restoreSnapshot } = helpers.snapshot;
 
 describe("QCManager - AccountControl Integration", function () {
-  let snapshot: string;
   let deployer: SignerWithAddress;
   let governance: SignerWithAddress;
   let qcAddress: SignerWithAddress;
   let emergencyCouncil: SignerWithAddress;
-  
+
   let accountControl: AccountControl;
   let qcManager: QCManager;
   let mockQCData: FakeContract<QCData>;
@@ -29,7 +28,7 @@ describe("QCManager - AccountControl Integration", function () {
   let mockReserveOracle: FakeContract<ReserveOracle>;
   let mockBank: FakeContract<Bank>;
 
-  before(async function () {
+  beforeEach(async function () {
     [deployer, governance, qcAddress, emergencyCouncil] = await ethers.getSigners();
 
     // Deploy AccountControl using upgrades proxy
@@ -74,12 +73,6 @@ describe("QCManager - AccountControl Integration", function () {
 
     // Grant QCManager ownership of AccountControl so it can authorize reserves
     await accountControl.connect(governance).transferOwnership(qcManager.address);
-
-    snapshot = await createSnapshot();
-  });
-
-  beforeEach(async function () {
-    await restoreSnapshot(snapshot);
   });
 
   describe("Reserve Authorization Integration", function () {
@@ -112,6 +105,14 @@ describe("QCManager - AccountControl Integration", function () {
     beforeEach(async function () {
       const mintingCap = ethers.utils.parseUnits("100", 8);
       mockQCData.isQCRegistered.returns(false);
+      mockQCData.registerQC.returns();
+      mockQCData.getQCInfo.returns({
+        status: 0,
+        totalMinted: 0,
+        maxCapacity: mintingCap,
+        registeredAt: 1,
+        selfPaused: false
+      });
       await qcManager.connect(governance).registerQC(qcAddress.address, mintingCap);
     });
 

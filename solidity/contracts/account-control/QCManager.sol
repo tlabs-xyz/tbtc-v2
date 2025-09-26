@@ -562,32 +562,20 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         QCData.QCStatus oldStatus,
         QCData.QCStatus newStatus
     ) private {
-        // Only sync if status actually changed
         if (oldStatus == newStatus) return;
 
-        // Always sync backing first when status changes (except for revoked QCs)
         if (newStatus != QCData.QCStatus.Revoked) {
             try this.syncBackingFromOracle(qc) {
-                // Backing synced successfully
             } catch {
-                // Oracle data not available - continue with status sync
             }
         }
 
-        if (newStatus == QCData.QCStatus.Active) {
-            // Resume operations - unpause the reserve
-            AccountControl(accountControl).unpauseReserve(qc);
-        } else if (
-            newStatus == QCData.QCStatus.MintingPaused ||
-            newStatus == QCData.QCStatus.Paused ||
-            newStatus == QCData.QCStatus.UnderReview
-        ) {
-            // Suspend operations - pause the reserve
-            AccountControl(accountControl).pauseReserve(qc);
-        } else if (newStatus == QCData.QCStatus.Revoked) {
-            // Terminal state - deauthorize the reserve completely
-            AccountControl(accountControl).deauthorizeReserve(qc);
-        }
+        QCManagerLib.syncAccountControlWithStatus(
+            accountControl,
+            qc,
+            oldStatus,
+            newStatus
+        );
     }
 
     /// @notice Register a wallet for a QC using Bitcoin signature verification
@@ -1383,20 +1371,19 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     /// @dev Internal function to perform auto-escalation
     function _performAutoEscalation(address qc) private {
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
-        
-        // Auto-escalate based on current state
-        if (currentStatus == QCData.QCStatus.MintingPaused || 
-            currentStatus == QCData.QCStatus.Paused) {
-            
-            // Escalate to UnderReview
-            qcData.setQCStatus(qc, QCData.QCStatus.UnderReview, AUTO_ESCALATION);
-            
-            // Clear early resume capability
+
+        QCData.QCStatus newStatus = QCManagerLib.performAutoEscalationLogic(
+            qcData,
+            qc,
+            AUTO_ESCALATION
+        );
+
+        if (newStatus != currentStatus) {
             delete qcCanEarlyResume[qc];
             delete qcPauseTimestamp[qc];
             qcData.setQCSelfPaused(qc, false);
-            
-            emit AutoEscalated(qc, currentStatus, QCData.QCStatus.UnderReview);
+
+            emit AutoEscalated(qc, currentStatus, newStatus);
         }
     }
     

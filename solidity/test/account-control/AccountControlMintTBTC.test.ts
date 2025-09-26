@@ -147,17 +147,16 @@ describe("AccountControl mintTBTC Functionality", function () {
       ).to.be.revertedWith("InsufficientBacking");
     });
 
-    it("should handle precision correctly for fractional tBTC amounts", async function () {
+    it("should reject amounts with precision loss", async function () {
       // Test with 0.123456789 tBTC (has 9 decimal places in satoshi terms)
+      // This should revert because it's not divisible by SATOSHI_MULTIPLIER (10^10)
       const fractionalTBTC = ethers.BigNumber.from("123456789000000000"); // 0.123456789 tBTC
-      const expectedSatoshis = ethers.BigNumber.from("12345678"); // 0.12345678 BTC in satoshis (truncated)
-      
-      const returnedSatoshis = await accountControl
-        .connect(reserve)
-        .callStatic
-        .mintTBTC(user.address, fractionalTBTC);
-      
-      expect(returnedSatoshis).to.equal(expectedSatoshis);
+
+      await expect(
+        accountControl
+          .connect(reserve)
+          .mintTBTC(user.address, fractionalTBTC)
+      ).to.be.revertedWith("Bad precision");
     });
   });
 

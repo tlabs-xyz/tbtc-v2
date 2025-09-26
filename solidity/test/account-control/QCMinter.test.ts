@@ -490,11 +490,17 @@ describe("QCMinter", () => {
         ).to.be.revertedWith("ZeroAmount")
       })
 
-      // Note: This test is challenging to implement with current mock setup
-      // The allowance check is implicitly done by transferBalanceFrom in real contracts
-      it.skip("should revert when user has insufficient allowance", async () => {
-        // Mock configuration for reverts is complex with smock
-        // In practice, transferBalanceFrom would revert if allowance is insufficient
+      it("should revert when user has insufficient allowance", async () => {
+        // Set up: user has balance but insufficient allowance
+        mockBank.balanceOf.returns(satoshis)
+        mockBank.allowance.returns(satoshis.sub(1)) // Allowance less than required amount
+
+        // Configure transferBalanceFrom to revert when allowance is insufficient
+        mockBank.transferBalanceFrom.reverts()
+
+        await expect(
+          qcMinter.connect(user).manualMint(user.address)
+        ).to.be.reverted
       })
     })
 

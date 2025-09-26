@@ -251,7 +251,7 @@ describe("QCManager - Direct Wallet Registration", () => {
     context("when function is paused", () => {
       beforeEach(async () => {
         mockSystemState.isFunctionPaused
-          .whenCalledWith("wallet_registration")
+          .whenCalledWith("wallet_reg")
           .returns(true)
       })
 

@@ -120,6 +120,9 @@ describe("AccountControl Oracle Integration", function () {
       // Register QC - should automatically sync backing
       await qcManager.connect(owner).registerQC(qc.address, QC_MINTING_CAP);
 
+      // Authorize AccountControl in MockBank (required for minting)
+      await mockBank.authorizeBalanceIncreaser(accountControl.address);
+
       // Verify backing was synced to AccountControl
       const backingAmount = await accountControl.backing(qc.address);
       expect(backingAmount).to.equal(qcBalance);
@@ -250,6 +253,9 @@ describe("AccountControl Oracle Integration", function () {
 
     it("should enforce backing >= minted invariant with oracle data", async function () {
       await qcManager.connect(owner).registerQC(qc.address, QC_MINTING_CAP);
+
+      // Authorize AccountControl in MockBank (required for minting)
+      await mockBank.authorizeBalanceIncreaser(accountControl.address);
 
       // Set backing to 2 BTC via oracle
       const backing = ONE_BTC_IN_SATOSHIS.mul(2);

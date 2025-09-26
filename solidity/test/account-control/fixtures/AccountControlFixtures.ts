@@ -100,6 +100,7 @@ export async function deployQCManagerFixture() {
   await qcManager.grantRole(TEST_CONSTANTS.ROLES.GOVERNANCE, governance.address)
   await qcManager.grantRole(TEST_CONSTANTS.ROLES.REGISTRAR, registrar.address)
   await qcManager.grantRole(TEST_CONSTANTS.ROLES.DISPUTE_ARBITER, arbiter.address)
+  await qcManager.grantRole(TEST_CONSTANTS.ROLES.DISPUTE_ARBITER, governance.address) // Allow governance to set status in tests
   await qcManager.grantRole(TEST_CONSTANTS.ROLES.ENFORCEMENT, watchdog.address)
 
   // Transfer ownership of AccountControl to QCManager so it can authorize QCs
@@ -272,13 +273,10 @@ export async function setupTestQC(
   const { qcManager, governance, qcAddress, constants } = fixture
   const mintingCap = options.mintingCap || constants.MEDIUM_CAP
 
-  // Register QC
+  // Register QC (automatically sets status to Active)
   await qcManager.connect(governance).registerQC(qcAddress.address, mintingCap)
 
-  // Activate if requested
-  if (options.activate) {
-    await qcManager.connect(governance).updateQCStatus(qcAddress.address, 1) // Active status
-  }
+  // Note: QC is already Active after registration, no need to set status again
 
   return qcAddress
 }
@@ -294,28 +292,41 @@ export async function createTestRedemption(
     walletAddress?: string
   } = {}
 ) {
-  const { qcRedeemer, qcAddress, user, constants } = fixture
-  const amount = options.amount || constants.SMALL_MINT
+  const { qcRedeemer, qcAddress, user, constants, tbtc } = fixture
+  const amountSatoshis = options.amount || constants.MEDIUM_MINT // Use MEDIUM_MINT as default (meets minimum requirement)
+  const amount = ethers.BigNumber.from(amountSatoshis).mul(ethers.BigNumber.from(10).pow(10)) // Convert to tBTC Wei
   const btcAddress = options.btcAddress || constants.VALID_LEGACY_BTC
   const walletAddress = options.walletAddress || ethers.Wallet.createRandom().address
 
   // Setup QC and wallet in QCData
-  await fixture.qcData.registerQC(qcAddress.address, constants.LARGE_CAP)
-  await fixture.qcData.registerWallet(
-    walletAddress,
-    qcAddress.address,
-    btcAddress,
-    ethers.utils.randomBytes(32)
-  )
+  const qcInfo = await fixture.qcData.getQCInfo(qcAddress.address)
+  if (qcInfo.registeredAt.eq(0)) {
+    await fixture.qcData.registerQC(qcAddress.address, constants.LARGE_CAP)
+  }
+  const qcWalletAddress = btcAddress
+  const isWalletRegistered = await fixture.qcData.isWalletRegistered(btcAddress)
+  if (!isWalletRegistered) {
+    await fixture.qcData.registerWallet(
+      qcAddress.address,
+      btcAddress
+    )
+  }
 
-  // Create redemption
-  const redemptionId = ethers.utils.id(`redemption_${Date.now()}`)
-  await qcRedeemer.connect(user).requestRedemption(
-    redemptionId,
+  // Always mint tBTC for user (each test has fresh state via loadFixture)
+  await tbtc.mint(user.address, amount.mul(2)) // Mint 2x to ensure sufficient balance
+  await tbtc.connect(user).approve(qcRedeemer.address, amount.mul(2))
+
+  // Create redemption (new API)
+  const tx = await qcRedeemer.connect(user).initiateRedemption(
+    qcAddress.address,
     amount,
     btcAddress,
-    walletAddress
+    qcWalletAddress
   )
 
-  return { redemptionId, amount, btcAddress, walletAddress }
+  const receipt = await tx.wait()
+  const event = receipt.events?.find(e => e.event === "RedemptionRequested")
+  const redemptionId = event?.args?.[0]
+
+  return { redemptionId, amount, btcAddress, walletAddress: qcWalletAddress }
 }

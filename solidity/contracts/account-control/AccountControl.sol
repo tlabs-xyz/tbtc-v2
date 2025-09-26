@@ -692,6 +692,19 @@ contract AccountControl is
         // Convert tBTC to satoshis internally
         satoshis = _tbtcToSatoshis(tbtcAmount);
 
+        // Validate minimum and maximum amounts
+        if (satoshis < MIN_MINT_AMOUNT) {
+            revert AmountTooSmall(satoshis, MIN_MINT_AMOUNT);
+        }
+        if (satoshis > MAX_SINGLE_MINT) {
+            revert AmountTooLarge(satoshis, MAX_SINGLE_MINT);
+        }
+
+        // Check backing requirement
+        if (backing[msg.sender] < minted[msg.sender] + satoshis) {
+            revert InsufficientBacking(backing[msg.sender], minted[msg.sender] + satoshis);
+        }
+
         // Use separated operations for backward compatibility - internal calls
         _mintTokensInternal(recipient, satoshis);      // Pure token operation
         _creditMintedInternal(msg.sender, satoshis);         // Pure accounting operation

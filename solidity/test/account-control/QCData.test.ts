@@ -267,6 +267,9 @@ describe("QCData", () => {
         const largeAmount = ethers.utils.parseEther("1000000")
         await qcData
           .connect(qcManager)
+          .updateMaxMintingCapacity(qcAddress.address, largeAmount)
+        await qcData
+          .connect(qcManager)
           .updateQCMintedAmount(qcAddress.address, largeAmount)
 
         expect(await qcData.getQCMintedAmount(qcAddress.address)).to.equal(
@@ -735,6 +738,9 @@ describe("QCData", () => {
           .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
 
         const maxAmount = ethers.constants.MaxUint256
+        await qcData
+          .connect(qcManager)
+          .updateMaxMintingCapacity(qcAddress.address, maxAmount)
         await qcData
           .connect(qcManager)
           .updateQCMintedAmount(qcAddress.address, maxAmount)
