@@ -656,6 +656,14 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             revert InvalidBitcoinAddress(userBtcAddress);
         }
 
+        // Validate BTC address matches the originally requested address
+        if (
+            keccak256(bytes(userBtcAddress)) !=
+            keccak256(bytes(redemptions[redemptionId].userBtcAddress))
+        ) {
+            revert RedemptionProofFailed("USER_ADDRESS_MISMATCH");
+        }
+
         if (expectedAmount == 0) {
             revert InvalidAmount();
         }

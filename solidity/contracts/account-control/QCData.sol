@@ -505,6 +505,11 @@ contract QCData is AccessControl {
     /// @param qc QC address
     /// @return canMint True if QC can mint new tokens
     function canQCMint(address qc) external view returns (bool canMint) {
+        // Unregistered QCs cannot mint
+        if (!isQCRegistered(qc)) {
+            return false;
+        }
+
         QCStatus status = custodians[qc].status;
         return status == QCStatus.Active;
     }
@@ -513,9 +518,14 @@ contract QCData is AccessControl {
     /// @param qc QC address  
     /// @return canFulfill True if QC can fulfill redemptions
     function canQCFulfill(address qc) external view returns (bool canFulfill) {
+        // Unregistered QCs cannot fulfill
+        if (!isQCRegistered(qc)) {
+            return false;
+        }
+
         QCStatus status = custodians[qc].status;
-        return status == QCStatus.Active || 
-               status == QCStatus.MintingPaused || 
+        return status == QCStatus.Active ||
+               status == QCStatus.MintingPaused ||
                status == QCStatus.UnderReview;
     }
 

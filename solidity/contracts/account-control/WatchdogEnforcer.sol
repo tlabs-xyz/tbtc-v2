@@ -179,10 +179,12 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         }
 
         uint256 minted = qcData.getQCMintedAmount(qc);
-        uint256 requiredReserves = (minted * systemState.minCollateralRatio()) /
-            100;
+        uint256 collateralRatio = systemState.minCollateralRatio();
 
-        if (reserves < requiredReserves) {
+        // Use cross-multiplication to avoid precision loss from division
+        // Check if: reserves < (minted * collateralRatio) / 100
+        // Equivalent to: reserves * 100 < minted * collateralRatio
+        if (reserves * 100 < minted * collateralRatio) {
             return (true, "");
         }
 

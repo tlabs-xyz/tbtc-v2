@@ -165,10 +165,13 @@ const func: DeployFunction = async function ConfigureAccountControlSystem(
     "ReserveOracle",
     { from: deployer, log: true },
     "setConsensusThreshold",
-    3 // Require 3 attester confirmations for reserve balance attestations
+    1 // Start with 1 attester until full attester set is granted ATTESTER_ROLE
   )
   log(
-    "✅ Reserve attestation consensus parameters configured (threshold: 3 attesters)"
+    "✅ Reserve attestation consensus parameters configured (threshold: 1 attester)"
+  )
+  log(
+    "⚠️  IMPORTANT: Increase threshold to 3 after granting ATTESTER_ROLE to all attesters"
   )
 
   // Step 9: Enable auto-minting in QCMinter

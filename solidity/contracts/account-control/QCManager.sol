@@ -1048,11 +1048,9 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         // Return to Active status
         qcData.setQCStatus(qc, QCData.QCStatus.Active, EARLY_RESUME);
         qcData.setQCSelfPaused(qc, false);
-        
-        // Notify pause credit system
+
+        // Notify pause credit system (emits EarlyResumed event)
         _resumeEarly(qc);
-        
-        emit EarlyResumed(qc, qc);
     }
     
     // =================== WATCHDOG INTEGRATION ===================

@@ -9,7 +9,8 @@ const func: DeployFunction = async function DeployAccountControl(
   const { deploy, log, get } = deployments
 
   // Handle test networks with mock deployments
-  const TEST_NETWORKS = ["hardhat", "localhost", "sepolia", "goerli", "holesky", "development"]
+  // Note: sepolia removed from TEST_NETWORKS to allow environment variable configuration
+  const TEST_NETWORKS = ["hardhat", "localhost", "goerli", "holesky", "development"]
   const isTestNetwork = TEST_NETWORKS.includes(network.name)
 
   if (isTestNetwork) {
