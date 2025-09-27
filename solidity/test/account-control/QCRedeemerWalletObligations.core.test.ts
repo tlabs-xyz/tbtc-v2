@@ -90,8 +90,8 @@ describe("QCRedeemer - Wallet Obligations (Core Functionality)", () => {
     // Setup wallets as registered to QC
     mockQCData.getWalletOwner.whenCalledWith(qcWallet1).returns(qcAddress)
     mockQCData.getWalletOwner.whenCalledWith(qcWallet2).returns(qcAddress)
-    mockQCData.getWalletStatus.whenCalledWith(qcWallet1).returns(0) // Active
-    mockQCData.getWalletStatus.whenCalledWith(qcWallet2).returns(0) // Active
+    mockQCData.getWalletStatus.whenCalledWith(qcWallet1).returns(1) // Active
+    mockQCData.getWalletStatus.whenCalledWith(qcWallet2).returns(1) // Active
 
     // Setup TBTC mock
     mockTBTC.balanceOf.returns(ethers.utils.parseEther("100"))
