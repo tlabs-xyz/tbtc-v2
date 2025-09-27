@@ -64,12 +64,12 @@ describe("AccountControl Separated Operations", function () {
             expect(await accountControl.totalMintedAmount()).to.equal(totalMintedBefore.add(amount));
         });
 
-        it("should enforce backing requirements", async function () {
+        it("should enforce cap requirements", async function () {
             const testCap = amounts.MEDIUM_CAP.mul(5);
             const excessAmount = testCap.add(amounts.SMALL_MINT);
 
             await expect(accountControl.connect(reserve).mintTokens(user.address, excessAmount))
-                .to.be.revertedWith("InsufficientBacking");
+                .to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
         });
 
     });
@@ -179,10 +179,10 @@ describe("AccountControl Separated Operations", function () {
             // Mine a block to pass cooldown
             await ethers.provider.send("evm_mine", []);
 
-            // Second operation should now succeed
-            await accountControl.connect(reserve).creditMinted(amount);
+            // Second operation should now succeed (mintTokens includes both token and accounting)
+            await accountControl.connect(reserve).mintTokens(user.address, amount);
 
-            expect(await accountControl.minted(reserve.address)).to.equal(amount);
+            expect(await accountControl.minted(reserve.address)).to.equal(amount.mul(2));
         });
 
         it("should track last operation timestamp per reserve", async function () {
