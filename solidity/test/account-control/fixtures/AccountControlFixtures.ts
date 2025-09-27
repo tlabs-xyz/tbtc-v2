@@ -12,6 +12,7 @@ import {
   MockBank,
   MockAccountControl,
 } from "../../../typechain"
+import { ValidMainnetProof } from "../../data/bitcoin/spv/valid-spv-proofs"
 
 /**
  * Common test constants
@@ -163,6 +164,7 @@ export async function deployQCRedeemerFixture() {
   const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer", {
     libraries: {
       QCRedeemerSPV: qcRedeemerSPVLib.address,
+      SharedSPVCore: sharedSPVCore.address,
     },
   })
   const qcRedeemer = await QCRedeemerFactory.deploy(
@@ -261,6 +263,28 @@ export function getSimpleSpvData() {
 }
 
 /**
+ * Get valid SPV data from tBTC v2 test suite for QCRedeemer tests
+ * This adapts the ValidMainnetProof to the format expected by QCRedeemer
+ */
+export function getValidSpvData() {
+  return {
+    txInfo: {
+      version: ValidMainnetProof.txInfo.version,
+      inputVector: ValidMainnetProof.txInfo.inputVector,
+      outputVector: ValidMainnetProof.txInfo.outputVector,
+      locktime: ValidMainnetProof.txInfo.locktime,
+    },
+    proof: {
+      merkleProof: ValidMainnetProof.proof.merkleProof,
+      txIndexInBlock: ValidMainnetProof.proof.txIndexInBlock,
+      bitcoinHeaders: ValidMainnetProof.proof.bitcoinHeaders,
+      coinbasePreimage: ValidMainnetProof.proof.coinbasePreimage,
+      coinbaseProof: ValidMainnetProof.proof.coinbaseProof,
+    },
+  }
+}
+
+/**
  * Helper to setup a QC for testing
  */
 export async function setupTestQC(
@@ -299,8 +323,8 @@ export async function createTestRedemption(
   const walletAddress = options.walletAddress || ethers.Wallet.createRandom().address
 
   // Setup QC and wallet in QCData
-  const qcInfo = await fixture.qcData.getQCInfo(qcAddress.address)
-  if (qcInfo.registeredAt.eq(0)) {
+  const isRegistered = await fixture.qcData.isQCRegistered(qcAddress.address)
+  if (!isRegistered) {
     await fixture.qcData.registerQC(qcAddress.address, constants.LARGE_CAP)
   }
   const qcWalletAddress = btcAddress

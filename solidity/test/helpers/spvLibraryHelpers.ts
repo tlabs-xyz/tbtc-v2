@@ -50,10 +50,12 @@ export async function deployQCManagerLib() {
  */
 export function getQCRedeemerLibraries(libraries: {
   qcRedeemerSPV: any
+  sharedSPVCore: any
 }) {
   return {
     libraries: {
       QCRedeemerSPV: libraries.qcRedeemerSPV.address,
+      SharedSPVCore: libraries.sharedSPVCore.address,
     },
   }
 }
