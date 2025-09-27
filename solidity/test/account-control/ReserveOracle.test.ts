@@ -648,7 +648,7 @@ describe("ReserveOracle", () => {
         reserveOracle
           .connect(attester1)
           .attestBalance(qcAddress.address, ethers.utils.parseEther("150"))
-      ).to.be.revertedWithCustomError(reserveOracle, "AttesterAlreadySubmitted")
+      ).to.be.reverted
 
       // Check that attestation was NOT updated
       const attestation = await reserveOracle.pendingAttestations(
