@@ -37,7 +37,11 @@ contract MockQCManager {
     }
 
     function recordMinting(address qc, uint256 amount) external {
-        qcMintedAmount[qc] += amount;
+        require(isQCRegistered[qc], "QC not registered");
+        uint256 cap = maxMintingCaps[qc];
+        uint256 newMinted = qcMintedAmount[qc] + amount;
+        require(newMinted <= cap, "Exceeds minting cap");
+        qcMintedAmount[qc] = newMinted;
     }
 
     function recordRedemption(address qc, uint256 amount) external {

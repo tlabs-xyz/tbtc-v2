@@ -474,10 +474,8 @@ contract AccountControl is
         nonReentrant
         validateSequence
     {
-        // Check backing invariant - CRITICAL for security
-        if (backing[msg.sender] < minted[msg.sender] + amount) {
-            revert InsufficientBacking(backing[msg.sender], minted[msg.sender] + amount);
-        }
+        // Update accounting to enforce caps and track minted amount
+        _creditMintedInternal(msg.sender, amount);
 
         // Pure token minting via Bank
         IBank(bank).mint(recipient, amount);

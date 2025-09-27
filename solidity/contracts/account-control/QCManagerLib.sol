@@ -674,7 +674,7 @@ library QCManagerLib {
                 qc,
                 btcAddress,
                 nonce,
-                chainId
+                block.chainid
             )
         );
 

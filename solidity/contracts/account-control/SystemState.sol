@@ -629,10 +629,26 @@ contract SystemState is AccessControl {
     }
 
     /// @notice Check if minting is not paused
-    /// @dev This function allows testing the minting pause modifier behavior
+    /// @dev This function allows testing the minting pause modifier behavior.
+    ///      Auto-clears expired pauses.
     /// @custom:error Reverts with MintingIsPaused if minting is currently paused
-    function requireMintingNotPaused() external view {
+    function requireMintingNotPaused() external {
+        _clearExpiredPause(keccak256("minting"));
         if (isMintingPaused) revert MintingIsPaused();
+    }
+
+    function _clearExpiredPause(bytes32 pauseKey) internal {
+        uint256 pausedAt = pauseTimestamps[pauseKey];
+        if (pausedAt != 0 && block.timestamp > pausedAt + emergencyPauseDuration) {
+            if (pauseKey == keccak256("minting")) {
+                isMintingPaused = false;
+            } else if (pauseKey == keccak256("redemption")) {
+                isRedemptionPaused = false;
+            } else if (pauseKey == keccak256("wallet_registration")) {
+                isWalletRegistrationPaused = false;
+            }
+            delete pauseTimestamps[pauseKey];
+        }
     }
 
     /// @notice Modifier to check if QC operations are allowed
@@ -656,7 +672,15 @@ contract SystemState is AccessControl {
     /// @custom:error Reverts with QCIsEmergencyPaused(qc) if QC is paused
     /// @custom:gas Low gas cost check - just reads from storage mapping
     modifier qcNotEmergencyPaused(address qc) {
-        if (qcEmergencyPauses[qc]) revert QCIsEmergencyPaused(qc);
+        if (qcEmergencyPauses[qc]) {
+            uint256 pauseTime = qcPauseTimestamps[qc];
+            if (pauseTime != 0 && block.timestamp > pauseTime + emergencyPauseDuration) {
+                qcEmergencyPauses[qc] = false;
+                delete qcPauseTimestamps[qc];
+            } else {
+                revert QCIsEmergencyPaused(qc);
+            }
+        }
         _;
     }
 }

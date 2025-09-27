@@ -217,15 +217,17 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
 
         // Start escalation timer for INSUFFICIENT_RESERVES violations
         if (reasonCode == INSUFFICIENT_RESERVES) {
-            criticalViolationTimestamps[qc] = block.timestamp;
-            uint256 escalationDeadline = block.timestamp + ESCALATION_DELAY;
-            emit CriticalViolationDetected(
-                qc,
-                reasonCode,
-                msg.sender,
-                block.timestamp,
-                escalationDeadline
-            );
+            if (criticalViolationTimestamps[qc] == 0) {
+                criticalViolationTimestamps[qc] = block.timestamp;
+                uint256 escalationDeadline = block.timestamp + ESCALATION_DELAY;
+                emit CriticalViolationDetected(
+                    qc,
+                    reasonCode,
+                    msg.sender,
+                    block.timestamp,
+                    escalationDeadline
+                );
+            }
         }
     }
 

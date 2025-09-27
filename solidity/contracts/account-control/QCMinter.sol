@@ -317,7 +317,10 @@ contract QCMinter is AccessControl, ReentrancyGuard {
 
         // Use AccountControl for minting (returns satoshis for event emission)
         uint256 satoshis = AccountControl(accountControl).mintTBTC(user, amount);
-        
+
+        // Execute auto-mint to convert Bank balance to TBTC
+        _executeAutoMint(user, satoshis);
+
         // Emit event for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
 

@@ -1015,8 +1015,10 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
             QCData.QCStatus.Paused;
         
         // Update QC status
+        QCData.QCStatus oldStatus = qcData.getQCStatus(qc);
         qcData.setQCStatus(qc, newStatus, SELF_PAUSE);
         qcData.setQCSelfPaused(qc, true);
+        _syncAccountControlWithStatus(qc, oldStatus, newStatus);
         
         // Track timeout for auto-escalation
         qcPauseTimestamp[qc] = block.timestamp;
@@ -1048,6 +1050,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         // Return to Active status
         qcData.setQCStatus(qc, QCData.QCStatus.Active, EARLY_RESUME);
         qcData.setQCSelfPaused(qc, false);
+        _syncAccountControlWithStatus(qc, currentStatus, QCData.QCStatus.Active);
 
         // Notify pause credit system (emits EarlyResumed event)
         _resumeEarly(qc);
@@ -1120,7 +1123,8 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         
         if (newStatus != currentStatus) {
             qcData.setQCStatus(qc, newStatus, DEFAULT_ESCALATION);
-            
+            _syncAccountControlWithStatus(qc, currentStatus, newStatus);
+
             // Clear any self-pause tracking if escalating
             if (qcCanEarlyResume[qc]) {
                 delete qcCanEarlyResume[qc];
@@ -1148,14 +1152,16 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         
         // Only UnderReview QCs can be cleared back to Active
         if (currentStatus == QCData.QCStatus.UnderReview) {
+            QCData.QCStatus oldStatus = currentStatus;
             qcData.setQCStatus(qc, QCData.QCStatus.Active, BACKLOG_CLEARED);
-            
+            _syncAccountControlWithStatus(qc, oldStatus, QCData.QCStatus.Active);
+
             // Clear any remaining timeout tracking
             delete qcPauseTimestamp[qc];
             delete qcCanEarlyResume[qc];
             delete escalationWarningEmitted[qc];
             qcData.setQCSelfPaused(qc, false);
-            
+
             emit BacklogCleared(qc, QCData.QCStatus.Active);
         } else {
             revert InvalidStatus();

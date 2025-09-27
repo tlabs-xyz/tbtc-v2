@@ -59,6 +59,10 @@ contract MockBankWithSeparatedOps is IBank {
 
     // AccountControl integration methods
     function increaseBalance(address account, uint256 amount) external {
+        require(
+            _authorizedIncreasers[msg.sender],
+            "Mock Bank: unauthorized increaser"
+        );
         individualCallCount++;
         callCount++;
 
@@ -72,6 +76,10 @@ contract MockBankWithSeparatedOps is IBank {
     }
 
     function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external {
+        require(
+            _authorizedIncreasers[msg.sender],
+            "Mock Bank: unauthorized increaser"
+        );
         if (!batchSupported) {
             revert("Mock Bank: Batch not supported");
         }
@@ -174,6 +182,9 @@ contract MockBankWithSeparatedOps is IBank {
     // Pure burnFrom - destroys tokens from a specific address
     function burnFrom(address from, uint256 amount) external {
         require(_balances[from] >= amount, "Insufficient balance");
+        uint256 currentAllowance = _allowances[from][msg.sender];
+        require(currentAllowance >= amount, "Mock Bank: insufficient allowance");
+        _allowances[from][msg.sender] = currentAllowance - amount;
         _balances[from] -= amount;
         if (_totalSupply >= amount) {
             _totalSupply -= amount;

@@ -2,7 +2,7 @@ import chai, { expect } from "chai"
 import { ethers, helpers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
-import { QCRedeemer, QCData, SystemState, TBTC, TestRelay } from "../../typechain"
+import { QCRedeemer, QCData, SystemState, TBTC, TestRelay, MockAccountControl } from "../../typechain"
 import { deploySPVLibraries, getQCRedeemerLibraries } from "../helpers/spvLibraryHelpers"
 
 chai.use(smock.matchers)
@@ -21,6 +21,7 @@ describe("QCRedeemer - Wallet Obligations (Edge Cases)", () => {
   let mockSystemState: FakeContract<SystemState>
   let mockTBTC: FakeContract<TBTC>
   let testRelay: TestRelay
+  let mockAccountControl: MockAccountControl
 
   // Test data
   const qcAddress = "0x1234567890123456789012345678901234567890"
@@ -93,6 +94,15 @@ describe("QCRedeemer - Wallet Obligations (Edge Cases)", () => {
 
     mockTBTC.balanceOf.returns(ethers.utils.parseEther("100"))
     mockTBTC.burnFrom.returns(true)
+
+    // Deploy MockAccountControl and configure QCRedeemer
+    const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl")
+    mockAccountControl = await MockAccountControlFactory.deploy()
+    await mockAccountControl.deployed()
+    await mockAccountControl.setTotalMintedForTesting(
+      ethers.BigNumber.from("100000000000") // 1000 BTC in satoshis
+    )
+    await qcRedeemer.setAccountControl(mockAccountControl.address)
   })
 
   afterEach(async () => {
@@ -373,7 +383,7 @@ describe("QCRedeemer - Wallet Obligations (Edge Cases)", () => {
         )
 
       // Wallet becomes inactive
-      mockQCData.getWalletStatus.whenCalledWith(qcWallet1).returns(1)
+      mockQCData.getWalletStatus.whenCalledWith(qcWallet1).returns(0)
 
       // Second redemption should fail
       await expect(

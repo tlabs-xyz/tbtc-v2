@@ -44,14 +44,14 @@ describe("AccountControl Separated Operations", function () {
     });
 
     describe("Pure token minting (mintTokens)", function () {
-        it("should mint tokens without updating accounting", async function () {
+        it("should mint tokens and update accounting", async function () {
             const amount = amounts.SMALL_MINT;
 
             // Track state before
             const mintedBefore = await accountControl.minted(reserve.address);
             const totalMintedBefore = await accountControl.totalMintedAmount();
 
-            // Mint tokens only
+            // Mint tokens
             await expect(accountControl.connect(reserve).mintTokens(user.address, amount))
                 .to.emit(accountControl, "PureTokenMint")
                 .withArgs(reserve.address, user.address, amount);
@@ -59,9 +59,9 @@ describe("AccountControl Separated Operations", function () {
             // Check tokens were minted via Bank
             expect(await mockBank.balanceOf(user.address)).to.equal(amount);
 
-            // Check accounting was NOT updated
-            expect(await accountControl.minted(reserve.address)).to.equal(mintedBefore);
-            expect(await accountControl.totalMintedAmount()).to.equal(totalMintedBefore);
+            // Check accounting WAS updated to enforce caps
+            expect(await accountControl.minted(reserve.address)).to.equal(mintedBefore.add(amount));
+            expect(await accountControl.totalMintedAmount()).to.equal(totalMintedBefore.add(amount));
         });
 
         it("should enforce backing requirements", async function () {

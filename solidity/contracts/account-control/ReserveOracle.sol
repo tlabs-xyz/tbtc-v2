@@ -423,7 +423,7 @@ contract ReserveOracle is AccessControl {
         }
     }
 
-    /// @dev Clean up expired attestations for a QC
+    /// @dev Clean up expired attestations and revoked attesters for a QC
     function _cleanExpiredAttestations(address qc) private {
         address[] storage attesters = pendingAttesters[qc];
         uint256 i = 0;
@@ -434,13 +434,17 @@ contract ReserveOracle is AccessControl {
                 attester
             ];
 
-            if (
-                attestation.timestamp != 0 &&
-                block.timestamp > uint256(attestation.timestamp) + attestationTimeout
-            ) {
-                emit AttestationExpired(qc, attester, uint256(attestation.balance));
+            bool isExpired = attestation.timestamp != 0 &&
+                block.timestamp > uint256(attestation.timestamp) + attestationTimeout;
+            bool isRevoked = attestation.timestamp != 0 &&
+                !hasRole(ATTESTER_ROLE, attester);
 
-                // Remove expired attestation
+            if (isExpired || isRevoked) {
+                if (isExpired) {
+                    emit AttestationExpired(qc, attester, uint256(attestation.balance));
+                }
+
+                // Remove attestation
                 delete pendingAttestations[qc][attester];
 
                 // Remove attester from array by swapping with last element

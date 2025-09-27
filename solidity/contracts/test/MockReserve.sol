@@ -106,7 +106,11 @@ contract MockReserve is Ownable {
         if (simulateReentrancy) {
             simulateReentrancy = false;
             // Attempt reentrant call - should be blocked by AccountControl's ReentrancyGuard
-            accountControl.mint(recipient, amount);
+            try accountControl.mint(recipient, amount) {
+                revert("Reentrancy simulation unexpectedly succeeded");
+            } catch {
+                return;
+            }
         }
 
         // Update state before external call (CEI pattern)
