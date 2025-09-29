@@ -243,6 +243,48 @@ describe("AccountControl Integration Tests (Agent 5 - Tests 1-5)", () => {
     })
   })
 
+  describe("Debug Configuration", () => {
+    it("should check AccountControl configuration", async () => {
+      console.log("AccountControl mode enabled:", await framework.contracts.systemState.isAccountControlEnabled())
+      console.log("QCMinter AccountControl address:", await framework.contracts.qcMinter.accountControl())
+      console.log("Actual AccountControl address:", framework.contracts.accountControl.address)
+      console.log("QC backing:", await framework.contracts.accountControl.backing(qcAddress.address))
+      console.log("QC minting cap:", await framework.contracts.accountControl.mintingCaps(qcAddress.address))
+      console.log("QCMinter has MINTER_ROLE:", await framework.contracts.accountControl.hasRole(
+        ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE")), 
+        framework.contracts.qcMinter.address
+      ))
+    })
+    
+    it("should trace mint execution", async () => {
+      await framework.enableAccountControlMode()
+      
+      const mintAmount = ethers.utils.parseEther("0.005") // 0.005 tBTC
+      console.log("Attempting to mint:", mintAmount.toString())
+      
+      const initialTotalMinted = await framework.contracts.accountControl.totalMinted()
+      console.log("Initial total minted:", initialTotalMinted.toString())
+      
+      console.log("Calling requestQCMint...")
+      const tx = await framework.contracts.qcMinter.connect(framework.signers.owner).requestQCMint(
+        qcAddress.address, 
+        user.address, 
+        mintAmount
+      )
+      const receipt = await tx.wait()
+      console.log("Transaction hash:", receipt.transactionHash)
+      console.log("Transaction mined in block:", receipt.blockNumber)
+      
+      console.log("Events emitted:", receipt.events?.map(e => e.event))
+      
+      const finalTotalMinted = await framework.contracts.accountControl.totalMinted()
+      console.log("Final total minted:", finalTotalMinted.toString())
+      
+      const userBankBalance = await framework.contracts.mockBank.balanceOf(user.address)
+      console.log("User bank balance:", userBankBalance.toString())
+    })
+  })
+
   describe("Cross-Contract Interaction Validation", () => {
     it("4) should maintain consistent state across all contracts", async () => {
       // Setup: Complex multi-contract state

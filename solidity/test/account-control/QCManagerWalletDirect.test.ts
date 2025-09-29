@@ -62,17 +62,28 @@ describe("QCManager - Direct Wallet Registration", () => {
     const qcManagerPauseLib = await QCManagerPauseLibFactory.deploy()
     await qcManagerPauseLib.deployed()
 
-    // Deploy QCManager with libraries
+    // Deploy QCPauseManager first (required for QCManager constructor)
+    const QCPauseManagerFactory = await ethers.getContractFactory("QCPauseManager")
+    const pauseManager = await QCPauseManagerFactory.deploy(
+      mockQCData.address,
+      deployer.address, // Temporary QCManager address
+      deployer.address, // Admin
+      deployer.address  // Emergency role
+    )
+    await pauseManager.deployed()
+
+    // Deploy QCManager with libraries (only QCManagerLib needed)
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
         QCManagerLib: qcManagerLib.address,
-        QCManagerPauseLib: qcManagerPauseLib.address,
+        // NOTE: QCManagerPauseLib is NOT linked to QCManager - it's used by other contracts
       },
     })
     qcManager = await QCManagerFactory.deploy(
       mockQCData.address,
       mockSystemState.address,
-      mockReserveOracle.address
+      mockReserveOracle.address,
+      pauseManager.address
     )
     await qcManager.deployed()
 

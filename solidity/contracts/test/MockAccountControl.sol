@@ -127,7 +127,7 @@ contract MockAccountControl {
 
     /// @notice Mock implementation of redeemTBTC function
     /// @param amount The amount of TBTC being redeemed (in tBTC wei)
-    /// @dev Checks against global totalMinted, as users redeem what was minted for them
+    /// @dev For QCRedeemer integration - reduces minted from the QCRedeemer's balance
     /// @return success True if redemption was successful
     function redeemTBTC(uint256 amount) external whenNotPaused returns (bool success) {
         // Convert tBTC amount to satoshis for comparison

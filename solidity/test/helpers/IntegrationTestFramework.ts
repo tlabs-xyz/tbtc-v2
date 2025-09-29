@@ -244,6 +244,11 @@ export class IntegrationTestFramework {
     await mockAccountControl.setBackingForTesting(qcMinter.address, this.QC_BACKING_AMOUNT * 3)
     await mockAccountControl.setBackingForTesting(qcRedeemer.address, this.QC_BACKING_AMOUNT)
     
+    // Set minting caps for all authorized reserves
+    await mockAccountControl.setMintingCap(qcAddress.address, this.QC_BACKING_AMOUNT)
+    await mockAccountControl.setMintingCap(qcMinter.address, this.QC_BACKING_AMOUNT * 3)
+    await mockAccountControl.setMintingCap(qcRedeemer.address, this.QC_BACKING_AMOUNT)
+    
     // Authorize contracts in Bank
     await mockBank.authorizeBalanceIncreaser(accountControl.address)
     await mockBank.authorizeBalanceIncreaser(qcMinter.address)
@@ -423,20 +428,34 @@ export class IntegrationTestFramework {
    */
   generateValidSPVProof(): { txInfo: any, proof: any } {
     // Generate data matching exact BitcoinTx.Info and BitcoinTx.Proof struct requirements
-    return {
-      txInfo: {
-        version: "0x01000000",           // bytes4: 4 bytes for version
-        inputVector: "0x01" + "00".repeat(36) + "00" + "ffffffff", 
-        outputVector: "0x01" + "1027000000000000" + "17" + "76a914" + "bb".repeat(20) + "88ac",
-        locktime: "0x00000000"           // bytes4: 4 bytes for locktime
-      },
-      proof: {
-        merkleProof: "0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456a1",
-        txIndexInBlock: 2,               // uint256
-        bitcoinHeaders: "0x0100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000123456781d00ffff8765432100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        coinbasePreimage: "0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456" // bytes32: exactly 32 bytes
+    const txInfo = {
+      version: "0x01000000",           // bytes4: 4 bytes for version
+      inputVector: "0x01" + "00".repeat(36) + "00" + "ffffffff", 
+      outputVector: "0x01" + "1027000000000000" + "17" + "76a914" + "bb".repeat(20) + "88ac",
+      locktime: "0x00000000"           // bytes4: 4 bytes for locktime
+    };
+    
+    const proof = {
+      merkleProof: "0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456a1",
+      txIndexInBlock: 2,               // uint256
+      bitcoinHeaders: "0x0100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000123456781d00ffff8765432100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      coinbasePreimage: "0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456" // bytes32: exactly 32 bytes
+    };
+    
+    // Ensure all values are defined and strings are properly formatted
+    Object.keys(txInfo).forEach(key => {
+      if (txInfo[key] === undefined || txInfo[key] === null) {
+        throw new Error(`txInfo.${key} is undefined`);
       }
-    }
+    });
+    
+    Object.keys(proof).forEach(key => {
+      if (proof[key] === undefined || proof[key] === null) {
+        throw new Error(`proof.${key} is undefined`);
+      }
+    });
+    
+    return { txInfo, proof };
   }
 
   /**

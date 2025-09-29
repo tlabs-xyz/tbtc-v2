@@ -81,14 +81,14 @@ describe("AccountControl Oracle Integration", function () {
     const { qcManagerLib, qcManagerPauseLib } = await deployQCManagerLib();
 
     // Deploy QCPauseManager with temporary addresses (circular dependency workaround for testing)
-    const QCPauseManagerFactory = await ethers.getContractFactory("QCPauseManager")
+    const QCPauseManagerFactory = await ethers.getContractFactory("QCPauseManager");
     pauseManager = await QCPauseManagerFactory.deploy(
       qcData.address,        // _qcData
       owner.address,         // _qcManager (temporary - will be QCManager later)
       owner.address,         // _admin
       emergencyCouncil.address // _emergencyRole
-    )
-    await pauseManager.deployed()
+    );
+    await pauseManager.deployed();
 
     // Deploy QCManager with libraries
     const QCManagerFactory = await ethers.getContractFactory(
