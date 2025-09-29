@@ -179,12 +179,9 @@ contract MockBankWithSeparatedOps is IBank {
     // Pure burn - destroys tokens from the caller
     function burn(uint256 amount) external {
         require(_balances[msg.sender] >= amount, "Insufficient balance");
+        require(_totalSupply >= amount, "Mock Bank: totalSupply underflow");
         _balances[msg.sender] -= amount;
-        if (_totalSupply >= amount) {
-            _totalSupply -= amount;
-        } else {
-            _totalSupply = 0;
-        }
+        _totalSupply -= amount;
     }
 
     // Pure burnFrom - destroys tokens from a specific address
@@ -192,12 +189,9 @@ contract MockBankWithSeparatedOps is IBank {
         require(_balances[from] >= amount, "Insufficient balance");
         uint256 currentAllowance = _allowances[from][msg.sender];
         require(currentAllowance >= amount, "Mock Bank: insufficient allowance");
+        require(_totalSupply >= amount, "Mock Bank: totalSupply underflow");
         _allowances[from][msg.sender] = currentAllowance - amount;
         _balances[from] -= amount;
-        if (_totalSupply >= amount) {
-            _totalSupply -= amount;
-        } else {
-            _totalSupply = 0;
-        }
+        _totalSupply -= amount;
     }
 }

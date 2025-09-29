@@ -104,7 +104,9 @@ export async function setupMockRelayForSpv(
   mockRelay.getBlockDifficulty.returns(difficulty)
 
   // Mock getCurrentAndPrevEpochDifficulty if it exists
-  mockRelay.getCurrentAndPrevEpochDifficulty.returns([difficulty, difficulty])
+  if (typeof mockRelay.getCurrentAndPrevEpochDifficulty?.returns === "function") {
+    mockRelay.getCurrentAndPrevEpochDifficulty.returns([difficulty, difficulty])
+  }
 
   // Mock ready status
   mockRelay.ready.returns(true)
@@ -188,11 +190,14 @@ export const bitcoinTestAddresses = {
   empty: "",
 }
 
+let testIdCounter = 0
+
 /**
  * Helper to generate deterministic test data
  */
 export function generateTestId(prefix: string): string {
-  return ethers.utils.id(`${prefix}_${Date.now()}`)
+  testIdCounter += 1
+  return ethers.utils.id(`${prefix}_${testIdCounter}`)
 }
 
 /**

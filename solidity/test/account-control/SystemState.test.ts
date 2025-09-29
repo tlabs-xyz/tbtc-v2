@@ -120,7 +120,8 @@ describe("SystemState", () => {
 
         it("should unpause minting successfully", async () => {
           const tx = await systemState.connect(pauserAccount).unpauseMinting()
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+          const receipt = await tx.wait()
+          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
 
           expect(await systemState.isMintingPaused()).to.be.false
           await expect(tx)
@@ -140,7 +141,8 @@ describe("SystemState", () => {
       describe("pauseRedemption", () => {
         it("should pause redemption successfully", async () => {
           const tx = await systemState.connect(pauserAccount).pauseRedemption()
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+          const receipt = await tx.wait()
+          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
 
           expect(await systemState.isRedemptionPaused()).to.be.true
           await expect(tx)
@@ -166,7 +168,8 @@ describe("SystemState", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .unpauseRedemption()
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+          const receipt = await tx.wait()
+          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
 
           expect(await systemState.isRedemptionPaused()).to.be.false
           await expect(tx)
@@ -188,7 +191,8 @@ describe("SystemState", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .pauseWalletRegistration()
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+          const receipt = await tx.wait()
+          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
 
           expect(await systemState.isWalletRegistrationPaused()).to.be.true
           await expect(tx)
@@ -214,7 +218,8 @@ describe("SystemState", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .unpauseWalletRegistration()
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+          const receipt = await tx.wait()
+          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
 
           expect(await systemState.isWalletRegistrationPaused()).to.be.false
           await expect(tx)
@@ -807,7 +812,8 @@ describe("SystemState", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .emergencyPauseQC(testQC, testReason)
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
+          const receipt = await tx.wait()
+          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
 
           // Verify state changes
           expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
@@ -851,8 +857,9 @@ describe("SystemState", () => {
               const tx = await systemState
                 .connect(pauserAccount)
                 .emergencyPauseQC(qc, reason)
+              const receipt = await tx.wait()
               const currentBlock = await ethers.provider.getBlock(
-                tx.blockNumber!
+                receipt.blockNumber
               )
 
               await expect(tx)
@@ -941,7 +948,8 @@ describe("SystemState", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .emergencyUnpauseQC(testQC)
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
+          const receipt = await tx.wait()
+          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
 
           // Verify state changes
           expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
@@ -1064,7 +1072,8 @@ describe("SystemState", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .emergencyPauseQC(testQC, testReason)
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
+          const receipt = await tx.wait()
+          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
 
           expect(await systemState.getQCPauseTimestamp(testQC)).to.equal(
             currentBlock.timestamp
