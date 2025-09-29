@@ -1,6 +1,7 @@
 import { ethers, deployments, helpers } from "hardhat"
 import { expect } from "chai"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
+import { LibraryLinkingHelper } from "../helpers/libraryLinkingHelper"
 
 describe("v1 System Deployment Tests", () => {
   let deployer: SignerWithAddress
@@ -74,18 +75,19 @@ describe("v1 System Deployment Tests", () => {
 
   describe("v1 Contract Factory Tests", () => {
     it("should be able to get contract factories for v1 contracts", async () => {
-      // Test that we can get factories for the actual implemented contracts
-      const contractsToTest = [
+      // Deploy libraries first for contracts that need them
+      const libraries = await LibraryLinkingHelper.deployAllLibraries()
+      
+      // Test simple contracts (no library dependencies)
+      const simpleContracts = [
         "QCMinter",
-        "QCRedeemer",
         "QCData",
         "SystemState",
-        "QCManager",
         "ReserveOracle",
         "WatchdogEnforcer",
       ]
 
-      for (const contractName of contractsToTest) {
+      for (const contractName of simpleContracts) {
         try {
           const factory = await ethers.getContractFactory(contractName)
           expect(factory).to.not.be.undefined
@@ -96,6 +98,26 @@ describe("v1 System Deployment Tests", () => {
           )
           throw error
         }
+      }
+
+      // Test QCRedeemer with library dependencies
+      try {
+        const qcRedeemerFactory = await LibraryLinkingHelper.getQCRedeemerFactory(libraries)
+        expect(qcRedeemerFactory).to.not.be.undefined
+        expect(qcRedeemerFactory.deploy).to.be.a("function")
+      } catch (error) {
+        console.log(`Failed to get factory for QCRedeemer: ${error.message}`)
+        throw error
+      }
+
+      // Test QCManager with library dependencies
+      try {
+        const qcManagerFactory = await LibraryLinkingHelper.getQCManagerFactory(libraries)
+        expect(qcManagerFactory).to.not.be.undefined
+        expect(qcManagerFactory.deploy).to.be.a("function")
+      } catch (error) {
+        console.log(`Failed to get factory for QCManager: ${error.message}`)
+        throw error
       }
     })
 

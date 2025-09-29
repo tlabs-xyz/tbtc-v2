@@ -124,7 +124,7 @@ describe("QCRedeemer - Wallet Obligations (Edge Cases)", () => {
             userBtcAddress,
             invalidWallet
           )
-      ).to.be.revertedWith("InvalidBitcoinAddressFormat")
+      ).to.be.revertedWithCustomError(qcRedeemer, "InvalidBitcoinAddressFormat")
     })
 
     it("should accept various valid Bitcoin address formats", async () => {
@@ -266,7 +266,7 @@ describe("QCRedeemer - Wallet Obligations (Edge Cases)", () => {
             redemptionId,
             ethers.utils.formatBytes32String("DUPLICATE")
           )
-      ).to.be.revertedWith("RedemptionNotPending")
+      ).to.be.revertedWithCustomError(qcRedeemer, "RedemptionNotPending")
 
       // Counter should be zero and not underflowed
       expect(

@@ -234,7 +234,7 @@ contract ReserveOracle is AccessControl {
         external
         onlyRole(DISPUTE_ARBITER_ROLE)
     {
-        if (newThreshold < 2) revert InvalidThreshold();
+        if (newThreshold < 3 || newThreshold % 2 == 0) revert InvalidThreshold();
 
         uint256 oldThreshold = consensusThreshold;
         consensusThreshold = newThreshold;

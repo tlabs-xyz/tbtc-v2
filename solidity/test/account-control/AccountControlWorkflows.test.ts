@@ -136,7 +136,7 @@ describe("AccountControl Workflows", function () {
       
       await expect(
         accountControl.connect(qc).mint(user.address, mintAmount)
-      ).to.be.revertedWith("InsufficientBacking");
+      ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
       
       // QC restores proper backing  
       await accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT);
@@ -147,12 +147,12 @@ describe("AccountControl Workflows", function () {
       
       await expect(
         accountControl.connect(qc).mint(user.address, mintAmount)
-      ).to.be.revertedWith("ExceedsReserveCap");
+      ).to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
       
       // Test redemption validation
       await expect(
         accountControl.connect(qc).redeem(100000)
-      ).to.be.revertedWith("InsufficientMinted");
+      ).to.be.revertedWithCustomError(accountControl, "InsufficientMinted");
     });
 
     it("should maintain consistency under batch operations", async function () {
@@ -186,7 +186,7 @@ describe("AccountControl Workflows", function () {
       // Cannot deauthorize with outstanding balance - this is a safety check
       await expect(
         accountControl.connect(owner).deauthorizeReserve(qc.address)
-      ).to.be.revertedWith("CannotDeauthorizeWithOutstandingBalance");
+      ).to.be.revertedWithCustomError(accountControl, "CannotDeauthorizeWithOutstandingBalance");
 
       // Must redeem all tokens first before deauthorization
       await accountControl.connect(qc).redeem(mintAmount);
@@ -228,17 +228,17 @@ describe("AccountControl Workflows", function () {
       // Should not be able to mint when paused
       await expect(
         accountControl.connect(qc).mint(user.address, mintAmount)
-      ).to.be.revertedWith("ReserveIsPaused");
+      ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
 
       // Backing updates are also blocked when paused (uses onlyAuthorizedReserve modifier)
       await expect(
         accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT + 100000)
-      ).to.be.revertedWith("ReserveIsPaused");
+      ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
 
       // Redemption is also blocked when paused
       await expect(
         accountControl.connect(qc).redeem(100000)
-      ).to.be.revertedWith("ReserveIsPaused");
+      ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
 
       // Verify backing hasn't changed
       expect(await accountControl.backing(qc.address)).to.equal(QC_BACKING_AMOUNT);

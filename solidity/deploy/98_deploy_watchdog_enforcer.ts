@@ -37,6 +37,20 @@ const func: DeployFunction = async function DeployWatchdogEnforcer(
 }
 
 func.tags = ["WatchdogEnforcer", "Watchdog"]
-func.dependencies = ["QCManager", "ReserveOracle"]
+func.dependencies = [
+  "QCManager",
+  "QCData",
+  "SystemState",
+  "ReserveOracle",
+]
+
+// Skip deployment if USE_EXTERNAL_DEPLOY=true and we're not explicitly running AccountControl tests
+func.skip = async (hre: HardhatRuntimeEnvironment) => {
+  // Skip if we're using external deployment and not explicitly deploying account control
+  if (process.env.USE_EXTERNAL_DEPLOY === "true" && !process.env.DEPLOY_ACCOUNT_CONTROL) {
+    return true
+  }
+  return false
+}
 
 export default func

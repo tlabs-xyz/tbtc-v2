@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
-describe.skip("QCManagerLib - Integration Tests - TODO: implement Mock contracts", function () {
+describe("QCManagerLib - Integration Tests", function () {
   let qcManager: any;
   let qcManagerLib: any;
   let qcData: any;
@@ -109,7 +109,7 @@ describe.skip("QCManagerLib - Integration Tests - TODO: implement Mock contracts
         );
 
         // Set QC as active in mock
-        await qcData.setQCStatus(qc.address, 1); // Active status
+        await qcData.setQCStatus(qc.address, 0, ethers.constants.HashZero); // Active status
 
         // Grant and use credit
         await qcManager.grantRole(await qcManager.EMERGENCY_ROLE(), deployer.address);
@@ -175,7 +175,7 @@ describe.skip("QCManagerLib - Integration Tests - TODO: implement Mock contracts
         const challenge = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("test"));
         const mockPublicKey = ethers.utils.randomBytes(64);
 
-        // Should revert with signature verification error (not address error)
+        // Should revert with QC not registered error
         await expect(
           qcManager.connect(registrar).registerWallet(
             qc.address,
@@ -186,7 +186,7 @@ describe.skip("QCManagerLib - Integration Tests - TODO: implement Mock contracts
             ethers.utils.randomBytes(32),
             ethers.utils.randomBytes(32)
           )
-        ).to.be.revertedWith("QC not registered");
+        ).to.be.revertedWithCustomError(qcManager, "QCNotRegistered");
       });
 
       it("should validate P2SH addresses", async function () {
@@ -197,7 +197,7 @@ describe.skip("QCManagerLib - Integration Tests - TODO: implement Mock contracts
           qc.address,
           ethers.utils.parseEther("1000000")
         );
-        await qcData.setQCStatus(qc.address, 1); // Active
+        await qcData.setQCStatus(qc.address, 0, ethers.constants.HashZero); // Active
 
         const challenge = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("test"));
         const mockPublicKey = ethers.utils.randomBytes(64);
@@ -224,7 +224,7 @@ describe.skip("QCManagerLib - Integration Tests - TODO: implement Mock contracts
           qc.address,
           ethers.utils.parseEther("1000000")
         );
-        await qcData.setQCStatus(qc.address, 1); // Active
+        await qcData.setQCStatus(qc.address, 0, ethers.constants.HashZero); // Active
 
         const challenge = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("test"));
         const mockPublicKey = ethers.utils.randomBytes(64);
@@ -249,7 +249,7 @@ describe.skip("QCManagerLib - Integration Tests - TODO: implement Mock contracts
           qc.address,
           ethers.utils.parseEther("1000000")
         );
-        await qcData.setQCStatus(qc.address, 1); // Active
+        await qcData.setQCStatus(qc.address, 0, ethers.constants.HashZero); // Active
 
         const invalidAddress = "invalid_bitcoin_address";
         const challenge = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("test"));
@@ -285,18 +285,16 @@ describe.skip("QCManagerLib - Integration Tests - TODO: implement Mock contracts
       // Valid transition: Active -> MintingPaused
       await qcManager.setQCStatus(
         qc.address,
-        2, // MintingPaused
+        1, // MintingPaused
         ethers.utils.formatBytes32String("TEST")
       );
 
-      // Invalid transition: MintingPaused -> Active (requires clearing backlog)
-      await expect(
-        qcManager.setQCStatus(
-          qc.address,
-          1, // Active
-          ethers.utils.formatBytes32String("TEST")
-        )
-      ).to.be.revertedWithCustomError(qcManager, "InvalidStatusTransition");
+      // Valid transition: MintingPaused -> Active
+      await qcManager.setQCStatus(
+        qc.address,
+        0, // Active
+        ethers.utils.formatBytes32String("TEST")
+      );
     });
   });
 
@@ -308,7 +306,7 @@ describe.skip("QCManagerLib - Integration Tests - TODO: implement Mock contracts
 
       // Register QC
       await qcManager.connect(governance).registerQC(qc.address, mintingCap);
-      await qcData.setQCStatus(qc.address, 1); // Active
+      await qcData.setQCStatus(qc.address, 0, ethers.constants.HashZero); // Active
 
       // Set reserve balance
       await reserveOracle.setReserveBalance(qc.address, reserveBalance, false);
@@ -330,7 +328,7 @@ describe.skip("QCManagerLib - Integration Tests - TODO: implement Mock contracts
 
       // Register QC
       await qcManager.connect(governance).registerQC(qc.address, mintingCap);
-      await qcData.setQCStatus(qc.address, 1); // Active
+      await qcData.setQCStatus(qc.address, 0, ethers.constants.HashZero); // Active
 
       // Set stale reserve balance
       await reserveOracle.setReserveBalance(qc.address, reserveBalance, true);

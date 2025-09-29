@@ -80,6 +80,8 @@ library SharedSPVCore {
         }
         
         // Validate coinbase proof
+        // The coinbasePreimage is the SHA-256 hash of the coinbase transaction
+        // We hash it once more to get the transaction ID (double SHA-256)
         bytes32 coinbaseHash = sha256(abi.encodePacked(proof.coinbasePreimage));
         if (!coinbaseHash.prove(root, proof.coinbaseProof, 0)) {
             revert SPVErr(6); // Invalid coinbase proof

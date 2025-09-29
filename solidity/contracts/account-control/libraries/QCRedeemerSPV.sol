@@ -32,9 +32,50 @@ library QCRedeemerSPV {
         SPVState.Storage storage spvState,
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
-    ) external view returns (bytes32 txHash) {
+    ) internal view returns (bytes32 txHash) {
         // Use shared core SPV validation
+        // Note: SharedSPVCore.validateCoreSPVProof may throw SPVErr errors
+        // For now, we let them propagate through. The calling function in QCRedeemer
+        // should handle the error conversion to maintain test compatibility.
         return SharedSPVCore.validateCoreSPVProof(spvState, txInfo, proof);
+    }
+    
+    /// @dev Safe wrapper for SPV validation that returns success status
+    /// @param spvState The SPV state storage
+    /// @param txInfo Bitcoin transaction information
+    /// @param proof SPV proof of transaction inclusion
+    /// @return success True if validation passed
+    /// @return txHash The validated transaction hash (0x0 if failed)
+    function validateSPVProofSafe(
+        SPVState.Storage storage spvState,
+        BitcoinTx.Info calldata txInfo,
+        BitcoinTx.Proof calldata proof
+    ) internal view returns (bool success, bytes32 txHash) {
+        // Check basic requirements first to avoid reverts
+        if (!spvState.isInitialized()) {
+            return (false, bytes32(0));
+        }
+        
+        // Check input/output vector lengths
+        if (txInfo.inputVector.length < 5 || txInfo.outputVector.length < 9) {
+            return (false, bytes32(0));
+        }
+        
+        // Check proof structure
+        if (proof.merkleProof.length == 0 || 
+            proof.bitcoinHeaders.length < 80 ||
+            proof.merkleProof.length != proof.coinbaseProof.length) {
+            return (false, bytes32(0));
+        }
+        
+        // If basic checks pass, attempt full validation
+        // Wrap in try-catch to handle SPVErr errors from SharedSPVCore
+        try SharedSPVCore.validateCoreSPVProof(spvState, txInfo, proof) returns (bytes32 validatedTxHash) {
+            return (true, validatedTxHash);
+        } catch {
+            // Catch any SPVErr or other errors and return false
+            return (false, bytes32(0));
+        }
     }
     
     
@@ -129,15 +170,16 @@ library QCRedeemerSPV {
     /// @return valid True if transaction meets redemption requirements
     function validateRedemptionTransaction(
         uint8 redemptionStatus,
-        BitcoinTx.Info calldata txInfo
-    ) external view returns (bool valid) {
-        // Basic validation - ensure required parameters are present
-        if (txInfo.inputVector.length == 0) {
-            return false;
-        }
+        BitcoinTx.Info memory txInfo
+    ) public view returns (bool valid) {
         
         // Status must be Pending (1) for validation
         if (redemptionStatus != 1) {
+            return false;
+        }
+        
+        // Basic validation - ensure required parameters are present
+        if (txInfo.inputVector.length == 0) {
             return false;
         }
         

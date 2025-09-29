@@ -19,7 +19,6 @@ describe("AccountControl Oracle Integration", function () {
   let qcData: QCData;
   let systemState: SystemState;
   let mockBank: any;
-  let messageSigning: any;
   
   let owner: SignerWithAddress;
   let emergencyCouncil: SignerWithAddress;
@@ -55,7 +54,12 @@ describe("AccountControl Oracle Integration", function () {
     reserveOracle = await ReserveOracleFactory.deploy();
 
     // Configure ReserveOracle after deployment
-    await reserveOracle.setConsensusThreshold(2);
+    // First grant DISPUTE_ARBITER_ROLE to owner to set configuration
+    const DISPUTE_ARBITER_ROLE = await reserveOracle.DISPUTE_ARBITER_ROLE();
+    await reserveOracle.grantRole(DISPUTE_ARBITER_ROLE, owner.address);
+    
+    // Set consensus threshold to 3 (minimum odd number)
+    await reserveOracle.setConsensusThreshold(3);
     await reserveOracle.setAttestationTimeout(3600); // 1 hour
 
     // Grant attester roles
@@ -72,14 +76,13 @@ describe("AccountControl Oracle Integration", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Deploy QCManagerLib and MessageSigning libraries
-    const { qcManagerLib, messageSigning: msgSigning } = await deployQCManagerLib();
-    messageSigning = msgSigning;
+    // Deploy QCManagerLib library
+    const { qcManagerLib } = await deployQCManagerLib();
 
     // Deploy QCManager with libraries
     const QCManagerFactory = await ethers.getContractFactory(
       "QCManager",
-      getQCManagerLibraries({ messageSigning, qcManagerLib })
+      getQCManagerLibraries({ qcManagerLib })
     );
     qcManager = await QCManagerFactory.deploy(
       qcData.address,
@@ -115,7 +118,8 @@ describe("AccountControl Oracle Integration", function () {
       
       await reserveOracle.connect(attester1).attestBalance(qc.address, qcBalance);
       await reserveOracle.connect(attester2).attestBalance(qc.address, qcBalance);
-      // Consensus reached with 2/3 attesters
+      await reserveOracle.connect(attester3).attestBalance(qc.address, qcBalance);
+      // Consensus reached with 3/3 attesters
 
       // Register QC - should automatically sync backing
       await qcManager.connect(owner).registerQC(qc.address, QC_MINTING_CAP);
@@ -167,6 +171,7 @@ describe("AccountControl Oracle Integration", function () {
       const initialBacking = ONE_BTC_IN_SATOSHIS.mul(3); // 3 BTC
       await reserveOracle.connect(attester1).attestBalance(qc.address, initialBacking);
       await reserveOracle.connect(attester2).attestBalance(qc.address, initialBacking);
+      await reserveOracle.connect(attester3).attestBalance(qc.address, initialBacking);
 
       // Manually sync to get initial backing
       await qcManager.syncBackingFromOracle(qc.address);
@@ -176,6 +181,7 @@ describe("AccountControl Oracle Integration", function () {
       const newBacking = ONE_BTC_IN_SATOSHIS.mul(6); // 6 BTC
       await reserveOracle.connect(attester1).attestBalance(qc.address, newBacking);
       await reserveOracle.connect(attester2).attestBalance(qc.address, newBacking);
+      await reserveOracle.connect(attester3).attestBalance(qc.address, newBacking);
 
       // Change QC status - should trigger backing sync
       await qcData.setQCStatus(qc.address, 1, "0x0000000000000000000000000000000000000000000000000000000000000000"); // MintingPaused
@@ -195,6 +201,7 @@ describe("AccountControl Oracle Integration", function () {
       const qcBalance = ONE_BTC_IN_SATOSHIS.mul(4); // 4 BTC
       await reserveOracle.connect(attester1).attestBalance(qc.address, qcBalance);
       await reserveOracle.connect(attester2).attestBalance(qc.address, qcBalance);
+      await reserveOracle.connect(attester3).attestBalance(qc.address, qcBalance);
 
       // Sync backing manually
       await expect(
@@ -215,8 +222,10 @@ describe("AccountControl Oracle Integration", function () {
 
       await reserveOracle.connect(attester1).attestBalance(qc.address, balance1);
       await reserveOracle.connect(attester2).attestBalance(qc.address, balance1);
+      await reserveOracle.connect(attester3).attestBalance(qc.address, balance1);
       await reserveOracle.connect(attester1).attestBalance(qc2.address, balance2);
       await reserveOracle.connect(attester2).attestBalance(qc2.address, balance2);
+      await reserveOracle.connect(attester3).attestBalance(qc2.address, balance2);
 
       // Batch sync
       await expect(
@@ -235,6 +244,7 @@ describe("AccountControl Oracle Integration", function () {
       const qcBalance = ONE_BTC_IN_SATOSHIS.mul(2);
       await reserveOracle.connect(attester1).attestBalance(qc.address, qcBalance);
       await reserveOracle.connect(attester2).attestBalance(qc.address, qcBalance);
+      await reserveOracle.connect(attester3).attestBalance(qc.address, qcBalance);
 
       // Consensus should be reached here, updating lastUpdateTimestamp
       // Now fast forward time to make the consensus data stale
@@ -261,6 +271,7 @@ describe("AccountControl Oracle Integration", function () {
       const backing = ONE_BTC_IN_SATOSHIS.mul(2);
       await reserveOracle.connect(attester1).attestBalance(qc.address, backing);
       await reserveOracle.connect(attester2).attestBalance(qc.address, backing);
+      await reserveOracle.connect(attester3).attestBalance(qc.address, backing);
       await qcManager.syncBackingFromOracle(qc.address);
 
       // Mint 1 BTC successfully
@@ -278,6 +289,7 @@ describe("AccountControl Oracle Integration", function () {
       const newBacking = ONE_BTC_IN_SATOSHIS.mul(5);
       await reserveOracle.connect(attester1).attestBalance(qc.address, newBacking);
       await reserveOracle.connect(attester2).attestBalance(qc.address, newBacking);
+      await reserveOracle.connect(attester3).attestBalance(qc.address, newBacking);
       await qcManager.syncBackingFromOracle(qc.address);
 
       // Now minting should succeed
@@ -292,6 +304,7 @@ describe("AccountControl Oracle Integration", function () {
       // Initial consensus with 2 BTC
       await reserveOracle.connect(attester1).attestBalance(qc.address, ONE_BTC_IN_SATOSHIS.mul(2));
       await reserveOracle.connect(attester2).attestBalance(qc.address, ONE_BTC_IN_SATOSHIS.mul(2));
+      await reserveOracle.connect(attester3).attestBalance(qc.address, ONE_BTC_IN_SATOSHIS.mul(2));
       await qcManager.syncBackingFromOracle(qc.address);
       expect(await accountControl.backing(qc.address)).to.equal(ONE_BTC_IN_SATOSHIS.mul(2));
 
@@ -318,7 +331,7 @@ describe("AccountControl Oracle Integration", function () {
       const { qcManagerLib: freshQCManagerLib } = await deployQCManagerLib();
       const freshQCManagerFactory = await ethers.getContractFactory(
         "QCManager",
-        getQCManagerLibraries({ messageSigning, qcManagerLib: freshQCManagerLib })
+        getQCManagerLibraries({ qcManagerLib: freshQCManagerLib })
       );
       const freshQCManager = await freshQCManagerFactory.deploy(
         qcData.address,
@@ -337,6 +350,7 @@ describe("AccountControl Oracle Integration", function () {
       const qcBalance = ONE_BTC_IN_SATOSHIS;
       await reserveOracle.connect(attester1).attestBalance(qc.address, qcBalance);
       await reserveOracle.connect(attester2).attestBalance(qc.address, qcBalance);
+      await reserveOracle.connect(attester3).attestBalance(qc.address, qcBalance);
 
       // Batch with zero address should skip invalid entries
       await expect(

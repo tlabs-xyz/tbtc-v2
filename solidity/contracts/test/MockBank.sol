@@ -18,6 +18,16 @@ contract MockBank is IBank {
 
     // Authorization tracking
     mapping(address => bool) private _authorizedIncreasers;
+    address public admin;
+    
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can call this function");
+        _;
+    }
+    
+    constructor() {
+        admin = msg.sender;
+    }
 
     function balanceAvailable(address account)
         external
@@ -169,11 +179,11 @@ contract MockBank is IBank {
         return _authorizedIncreasers[account];
     }
 
-    function authorizeBalanceIncreaser(address account) external {
+    function authorizeBalanceIncreaser(address account) external onlyAdmin {
         _authorizedIncreasers[account] = true;
     }
 
-    function unauthorizeBalanceIncreaser(address account) external {
+    function unauthorizeBalanceIncreaser(address account) external onlyAdmin {
         _authorizedIncreasers[account] = false;
     }
 }

@@ -4,6 +4,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { smock } from "@defi-wonderland/smock"
 
 import type { QCRedeemer } from "../../typechain"
+import { LibraryLinkingHelper } from "../helpers/libraryLinkingHelper"
 
 describe("Bitcoin Address Validation Integration", () => {
   let deployer: SignerWithAddress
@@ -38,29 +39,25 @@ describe("Bitcoin Address Validation Integration", () => {
     const TestRelay = await ethers.getContractFactory("TestRelay")
     relay = await TestRelay.deploy()
 
-    // Deploy SPV libraries for QCRedeemer
-    const SharedSPVCoreLib = await ethers.getContractFactory("SharedSPVCore")
-    const sharedSPVCoreLib = await SharedSPVCoreLib.deploy()
+    // Deploy all required libraries using the helper
+    const libraries = await LibraryLinkingHelper.deployAllLibraries()
 
+    // Deploy QCRedeemerSPV for testing
     const QCRedeemerSPVLib = await ethers.getContractFactory("QCRedeemerSPV", {
       libraries: {
-        SharedSPVCore: sharedSPVCoreLib.address,
+        SharedSPVCore: libraries.SharedSPVCore,
       },
     })
     qcRedeemerSPV = await QCRedeemerSPVLib.deploy()
 
-    // Deploy QCRedeemer with BitcoinAddressUtils integration and SPV library linking
-    const QCRedeemer = await ethers.getContractFactory("QCRedeemer", {
-      libraries: {
-        QCRedeemerSPV: qcRedeemerSPV.address,
-      },
-    })
-    qcRedeemer = await QCRedeemer.deploy(
+    // Deploy QCRedeemer using the helper
+    qcRedeemer = await LibraryLinkingHelper.deployQCRedeemer(
       tbtc.address,
       qcData.address,
       systemState.address,
-      relay.address, // relay for SPV validation
-      1 // txProofDifficultyFactor
+      relay.address,
+      1, // txProofDifficultyFactor
+      libraries
     )
   })
 
@@ -78,13 +75,8 @@ describe("Bitcoin Address Validation Integration", () => {
       // Mock wallet status as active
       mockQCData.getWalletStatus.returns(1) // Active status
 
-      // Deploy new QCRedeemer with mocked QCData
-      const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer", {
-        libraries: {
-          QCRedeemerSPV: qcRedeemerSPV.address,
-        },
-      })
-      qcRedeemer = await QCRedeemerFactory.deploy(
+      // Deploy new QCRedeemer with mocked QCData using library helper
+      qcRedeemer = await LibraryLinkingHelper.deployQCRedeemer(
         tbtc.address,
         mockQCData.address, // Use mocked QCData
         systemState.address,

@@ -199,6 +199,7 @@ contract SystemState is AccessControl {
 
     modifier notPaused(string memory functionName) {
         bytes32 pauseKey = keccak256(abi.encodePacked(functionName));
+        _clearExpiredPause(pauseKey);
         if (pauseKey == keccak256("minting")) {
             if (isMintingPaused) revert MintingIsPaused();
         } else if (pauseKey == keccak256("redemption")) {
@@ -233,9 +234,11 @@ contract SystemState is AccessControl {
 
     /// @notice Pause minting operations
     function pauseMinting() external onlyRole(EMERGENCY_ROLE) {
+        bytes32 pauseKey = keccak256("minting");
+        _clearExpiredPause(pauseKey);
         if (isMintingPaused) revert MintingAlreadyPaused();
         isMintingPaused = true;
-        pauseTimestamps[keccak256("minting")] = block.timestamp;
+        pauseTimestamps[pauseKey] = block.timestamp;
         emit MintingPaused(msg.sender, block.timestamp);
     }
 
@@ -249,9 +252,11 @@ contract SystemState is AccessControl {
 
     /// @notice Pause redemption operations
     function pauseRedemption() external onlyRole(EMERGENCY_ROLE) {
+        bytes32 pauseKey = keccak256("redemption");
+        _clearExpiredPause(pauseKey);
         if (isRedemptionPaused) revert RedemptionAlreadyPaused();
         isRedemptionPaused = true;
-        pauseTimestamps[keccak256("redemption")] = block.timestamp;
+        pauseTimestamps[pauseKey] = block.timestamp;
         emit RedemptionPaused(msg.sender, block.timestamp);
     }
 
@@ -266,10 +271,12 @@ contract SystemState is AccessControl {
 
     /// @notice Pause wallet registration operations
     function pauseWalletRegistration() external onlyRole(EMERGENCY_ROLE) {
+        bytes32 pauseKey = keccak256("wallet_registration");
+        _clearExpiredPause(pauseKey);
         if (isWalletRegistrationPaused)
             revert WalletRegistrationAlreadyPaused();
         isWalletRegistrationPaused = true;
-        pauseTimestamps[keccak256("wallet_registration")] = block.timestamp;
+        pauseTimestamps[pauseKey] = block.timestamp;
         emit WalletRegistrationPaused(msg.sender, block.timestamp);
     }
 

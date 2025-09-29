@@ -414,7 +414,7 @@ contract AccountControl is
 
     function setMintingCap(address reserve, uint256 newCap) 
         external 
-        onlyOwner 
+        onlyOwnerOrQCManager 
     {
         // Check that reserve is authorized
         if (!authorized[reserve]) revert NotAuthorized(msg.sender);
@@ -474,6 +474,14 @@ contract AccountControl is
         nonReentrant
         validateSequence
     {
+        // Validate mint amount bounds
+        if (amount < MIN_MINT_AMOUNT) {
+            revert AmountTooSmall(amount, MIN_MINT_AMOUNT);
+        }
+        if (amount > MAX_SINGLE_MINT) {
+            revert AmountTooLarge(amount, MAX_SINGLE_MINT);
+        }
+
         // Update accounting to enforce caps and track minted amount
         _creditMintedInternal(msg.sender, amount);
 
@@ -524,18 +532,8 @@ contract AccountControl is
         nonReentrant
         validateSequence
     {
-        // Check caps
-        if (minted[msg.sender] + amount > reserveInfo[msg.sender].mintingCap) {
-            revert ExceedsReserveCap(minted[msg.sender] + amount, reserveInfo[msg.sender].mintingCap);
-        }
-
-        if (globalMintingCap > 0 && totalMintedAmount + amount > globalMintingCap) {
-            revert ExceedsGlobalCap(totalMintedAmount + amount, globalMintingCap);
-        }
-
-        // Pure accounting increment
-        minted[msg.sender] += amount;
-        totalMintedAmount += amount;
+        // Use internal function to handle all checks including backing
+        _creditMintedInternal(msg.sender, amount);
 
         emit AccountingCredit(msg.sender, amount);
     }
@@ -619,6 +617,11 @@ contract AccountControl is
     }
 
     function _creditMintedInternal(address reserve, uint256 amount) internal {
+        // Check backing sufficiency
+        if (backing[reserve] < minted[reserve] + amount) {
+            revert InsufficientBacking(backing[reserve], minted[reserve] + amount);
+        }
+
         // Check caps
         if (minted[reserve] + amount > reserveInfo[reserve].mintingCap) {
             revert ExceedsReserveCap(minted[reserve] + amount, reserveInfo[reserve].mintingCap);
@@ -795,7 +798,7 @@ contract AccountControl is
     // ========== REDEMPTION OPERATIONS ==========
 
     function redeem(uint256 amount) 
-        external 
+        public 
         onlyAuthorizedReserve 
         returns (bool)
     {
@@ -823,7 +826,7 @@ contract AccountControl is
 
         // Convert tBTC to satoshis internally
         uint256 satoshis = _tbtcToSatoshis(tbtcAmount);
-        return this.redeem(satoshis);
+        return redeem(satoshis);
     }
 
     /// @notice Burn tBTC tokens using separated operations

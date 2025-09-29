@@ -68,6 +68,9 @@ describe("AccountControl Separated Operations", function () {
             const testCap = amounts.MEDIUM_CAP.mul(5);
             const excessAmount = testCap.add(amounts.SMALL_MINT);
 
+            // Ensure backing is sufficient to test cap limit instead of backing limit
+            await accountControl.connect(reserve).updateBacking(excessAmount.mul(2));
+
             await expect(accountControl.connect(reserve).mintTokens(user.address, excessAmount))
                 .to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
         });
@@ -100,6 +103,9 @@ describe("AccountControl Separated Operations", function () {
         it("should enforce minting cap limits", async function () {
             const testCap = amounts.MEDIUM_CAP.mul(5);
             const excessAmount = testCap.add(amounts.SMALL_MINT);
+
+            // Ensure backing is sufficient to test cap limit instead of backing limit
+            await accountControl.connect(reserve).updateBacking(excessAmount.mul(2));
 
             await expect(accountControl.connect(reserve).creditMinted(excessAmount))
                 .to.be.revertedWith("ExceedsReserveCap");
@@ -165,7 +171,7 @@ describe("AccountControl Separated Operations", function () {
             await accountControl.connect(reserve).atomicMint(user.address, amount);
             await accountControl.connect(reserve).atomicMint(user.address, amount);
 
-            expect(await mockBank.balanceOf(user.address)).to.equal(amount * 2);
+            expect(await mockBank.balanceOf(user.address)).to.equal(amount.mul(2));
         });
     });
 
@@ -191,10 +197,11 @@ describe("AccountControl Separated Operations", function () {
             // Operation should update timestamp
             await accountControl.connect(reserve).mintTokens(user.address, amount);
 
-            const timestamp = await accountControl.lastOperationTimestamp(reserve.address);
-            const currentBlock = await ethers.provider.getBlockNumber();
+            const lastOperationTimestamp = await accountControl.lastOperationTimestamp(reserve.address);
+            const latestBlock = await ethers.provider.getBlock("latest");
 
-            expect(timestamp).to.equal(currentBlock);
+            // lastOperationTimestamp stores block number, not timestamp
+            expect(lastOperationTimestamp.toNumber()).to.equal(latestBlock.number);
         });
     });
 

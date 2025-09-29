@@ -14,6 +14,12 @@ contract MockAccountControl {
 
     /// @notice Track backing amounts for reserves (for testing)
     mapping(address => uint256) public backing;
+    
+    /// @notice Track authorization status of reserves
+    mapping(address => bool) public authorized;
+    
+    /// @notice Track minting caps for reserves
+    mapping(address => uint256) public mintingCaps;
 
     /// @notice Custom error for insufficient minted balance
     error InsufficientMinted(uint256 available, uint256 requested);
@@ -82,4 +88,129 @@ contract MockAccountControl {
 
     /// @notice Event emitted when TBTC is redeemed
     event TBTCRedeemed(address indexed redeemer, uint256 amount);
+    
+    /// @notice Authorize a reserve
+    function authorizeReserve(address reserve, uint256 mintingCap) external {
+        authorized[reserve] = true;
+        mintingCaps[reserve] = mintingCap;
+    }
+    
+    /// @notice Set minting cap for a reserve
+    function setMintingCap(address reserve, uint256 newCap) external {
+        mintingCaps[reserve] = newCap;
+    }
+    
+    /// @notice Set backing for a reserve
+    function setBacking(address reserve, uint256 amount) external {
+        backing[reserve] = amount;
+    }
+    
+    /// @notice Get backing for a reserve
+    function getBacking(address reserve) external view returns (uint256) {
+        return backing[reserve];
+    }
+    
+    /// @notice Get reserve info
+    function reserveInfo(address reserve) external view returns (
+        bool isAuthorized,
+        uint256 mintingCap,
+        uint256 backingAmount
+    ) {
+        return (authorized[reserve], mintingCaps[reserve], backing[reserve]);
+    }
+    
+    /// @notice Track minted amounts per reserve
+    mapping(address => uint256) public minted;
+    
+    /// @notice System pause state
+    uint256 public systemPaused;
+    
+    /// @notice Core mint function
+    function mint(address recipient, uint256 amount) external returns (bool) {
+        uint256 satoshis = amount / 1e10;
+        if (accountControlEnabled) {
+            totalMinted += satoshis;
+            minted[msg.sender] += satoshis;
+        }
+        emit TBTCMinted(recipient, amount, satoshis);
+        return true;
+    }
+    
+    /// @notice Core redeem function
+    function redeem(uint256 amount) external returns (bool) {
+        // Convert tBTC amount to satoshis for comparison
+        uint256 satoshis = amount / 1e10;
+
+        // Only enforce limits when AccountControl is enabled
+        if (accountControlEnabled) {
+            // Check if system has sufficient total minted balance
+            if (totalMinted < satoshis) {
+                revert InsufficientMinted(totalMinted, satoshis);
+            }
+
+            // Update global minted balance
+            totalMinted -= satoshis;
+        }
+
+        emit TBTCRedeemed(msg.sender, amount);
+        return true;
+    }
+    
+    /// @notice Update backing function
+    function updateBacking(uint256 amount) external {
+        backing[msg.sender] = amount;
+    }
+    
+    /// @notice Get total minted amount (different from totalMinted)
+    function totalMintedAmount() external view returns (uint256) {
+        return totalMinted;
+    }
+    
+    /// @notice Pause system
+    function pauseSystem() external {
+        systemPaused = 1;
+    }
+    
+    /// @notice Unpause system
+    function unpauseSystem() external {
+        systemPaused = 0;
+    }
+    
+    /// @notice Check if reserve can operate
+    function canOperate(address reserve) external view returns (bool) {
+        return authorized[reserve] && systemPaused == 0;
+    }
+    
+    /// @notice Pause reserve (no-op for mock)
+    function pauseReserve(address reserve) external {
+        // Mock implementation - do nothing
+    }
+    
+    /// @notice Unpause reserve (no-op for mock)
+    function unpauseReserve(address reserve) external {
+        // Mock implementation - do nothing
+    }
+    
+    /// @notice Deauthorize reserve
+    function deauthorizeReserve(address reserve) external {
+        authorized[reserve] = false;
+    }
+    
+    /// @notice Credit minted amount for separated operations
+    function creditMinted(uint256 amount) external {
+        uint256 satoshis = amount / 1e10;
+        totalMinted += satoshis;
+        minted[msg.sender] += satoshis;
+    }
+    
+    /// @notice Debit minted amount for separated operations
+    function debitMinted(uint256 amount) external {
+        uint256 satoshis = amount / 1e10;
+        if (totalMinted >= satoshis) {
+            totalMinted -= satoshis;
+        }
+        if (minted[msg.sender] >= satoshis) {
+            minted[msg.sender] -= satoshis;
+        }
+    }
 }

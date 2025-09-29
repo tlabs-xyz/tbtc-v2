@@ -13,6 +13,7 @@ import {
   MockAccountControl,
 } from "../../../typechain"
 import { ValidMainnetProof } from "../../data/bitcoin/spv/valid-spv-proofs"
+import { LibraryLinkingHelper } from "../../helpers/libraryLinkingHelper"
 
 /**
  * Common test constants
@@ -64,20 +65,15 @@ export async function deployQCManagerFixture() {
   const ReserveOracleFactory = await ethers.getContractFactory("ReserveOracle")
   const reserveOracle = await ReserveOracleFactory.deploy()
 
-  // Deploy libraries
-  const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib")
-  const qcManagerLib = await QCManagerLibFactory.deploy()
+  // Deploy libraries using the helper
+  const libraries = await LibraryLinkingHelper.deployAllLibraries()
 
-  // Deploy QCManager with libraries
-  const QCManagerFactory = await ethers.getContractFactory("QCManager", {
-    libraries: {
-      QCManagerLib: qcManagerLib.address,
-    },
-  })
-  const qcManager = await QCManagerFactory.deploy(
+  // Deploy QCManager using the helper
+  const qcManager = await LibraryLinkingHelper.deployQCManager(
     qcData.address,
     systemState.address,
-    reserveOracle.address
+    reserveOracle.address,
+    libraries
   )
 
   // Deploy MockBank for AccountControl
@@ -148,31 +144,23 @@ export async function deployQCRedeemerFixture() {
 
   const TestRelayFactory = await ethers.getContractFactory("TestRelay")
   const testRelay = await TestRelayFactory.deploy()
+  
+  // Configure TestRelay with difficulty from ValidMainnetProof
+  // This ensures SPV validation works correctly with mainnet proofs
+  await testRelay.setCurrentEpochDifficultyFromHeaders(ValidMainnetProof.proof.bitcoinHeaders)
+  await testRelay.setPrevEpochDifficultyFromHeaders(ValidMainnetProof.proof.bitcoinHeaders)
 
-  // Deploy SPV libraries
-  const SharedSPVCoreFactory = await ethers.getContractFactory("SharedSPVCore")
-  const sharedSPVCore = await SharedSPVCoreFactory.deploy()
+  // Deploy all required libraries using the helper
+  const libraries = await LibraryLinkingHelper.deployAllLibraries()
 
-  const QCRedeemerSPVFactory = await ethers.getContractFactory("QCRedeemerSPV", {
-    libraries: {
-      SharedSPVCore: sharedSPVCore.address,
-    },
-  })
-  const qcRedeemerSPVLib = await QCRedeemerSPVFactory.deploy()
-
-  // Deploy QCRedeemer
-  const QCRedeemerFactory = await ethers.getContractFactory("QCRedeemer", {
-    libraries: {
-      QCRedeemerSPV: qcRedeemerSPVLib.address,
-      SharedSPVCore: sharedSPVCore.address,
-    },
-  })
-  const qcRedeemer = await QCRedeemerFactory.deploy(
+  // Deploy QCRedeemer using the helper
+  const qcRedeemer = await LibraryLinkingHelper.deployQCRedeemer(
     tbtc.address,
     qcData.address,
     systemState.address,
     testRelay.address,
-    1 // Low difficulty factor for testing
+    1, // Low difficulty factor for testing
+    libraries
   )
 
   // Deploy MockAccountControl for redemption tests

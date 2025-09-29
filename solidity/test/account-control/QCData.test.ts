@@ -374,10 +374,10 @@ describe("QCData", () => {
       })
 
       it("should revert when maximum wallets per QC exceeded", async () => {
-        const maxWallets = await qcData.MAX_WALLETS_PER_QC()
+        const maxWalletsNum = (await qcData.MAX_WALLETS_PER_QC()).toNumber()
 
         // Register maximum allowed wallets
-        for (let i = 0; i < maxWallets; i++) {
+        for (let i = 0; i < maxWalletsNum; i++) {
           await qcData
             .connect(qcManager)
             .registerWallet(qcAddress.address, `bc1qtest${i}`)
@@ -385,7 +385,7 @@ describe("QCData", () => {
 
         // Verify we're at the limit
         const wallets = await qcData.getQCWallets(qcAddress.address)
-        expect(wallets).to.have.length(maxWallets)
+        expect(wallets).to.have.length(maxWalletsNum)
 
         // Try to register one more - should fail
         await expect(
@@ -412,7 +412,8 @@ describe("QCData", () => {
 
         capacity = await qcData.getQCWalletCapacity(qcAddress.address)
         expect(capacity.current).to.equal(2)
-        expect(capacity.remaining).to.equal((await qcData.MAX_WALLETS_PER_QC()) - 2)
+        const max = await qcData.MAX_WALLETS_PER_QC()
+        expect(capacity.remaining).to.equal(max.sub(2))
       })
     })
 
@@ -562,8 +563,9 @@ describe("QCData", () => {
         expect(await qcData.getQCStatus(qcAddress.address)).to.equal(1) // UnderReview
       })
 
-      it("should return 0 for unregistered QC", async () => {
-        expect(await qcData.getQCStatus(thirdParty.address)).to.equal(0)
+      it("should revert for unregistered QC", async () => {
+        await expect(qcData.getQCStatus(thirdParty.address))
+          .to.be.revertedWithCustomError(qcData, "QCNotRegistered")
       })
     })
 

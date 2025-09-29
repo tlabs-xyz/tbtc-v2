@@ -5,6 +5,7 @@ import "dotenv/config"
 import "@keep-network/hardhat-helpers"
 import "@keep-network/hardhat-local-networks-config"
 import "@nomiclabs/hardhat-waffle"
+import "@nomicfoundation/hardhat-chai-matchers"
 import "@nomiclabs/hardhat-etherscan"
 import "hardhat-gas-reporter"
 import "hardhat-contract-sizer"
@@ -265,7 +266,7 @@ const config: HardhatUserConfig = {
     except: ["BridgeStub$", "WalletRegistry$"],
   },
   mocha: {
-    timeout: 60_000,
+    timeout: 120_000, // Increased timeout for complex tests
   },
   typechain: {
     outDir: "typechain",

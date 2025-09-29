@@ -1,30 +1,17 @@
 import { ethers } from "hardhat"
+import { LibraryLinkingHelper } from "./libraryLinkingHelper"
 
 /**
  * Helper function to deploy SPV libraries in correct dependency order
  * Returns deployed library instances for linking
  */
 export async function deploySPVLibraries() {
-  // Deploy base library first
-  const SharedSPVCoreFactory = await ethers.getContractFactory("SharedSPVCore")
-  const sharedSPVCore = await SharedSPVCoreFactory.deploy()
-  await sharedSPVCore.deployed()
-
-  // Deploy QCRedeemerSPV library (depends on SharedSPVCore)
-  const QCRedeemerSPVFactory = await ethers.getContractFactory("QCRedeemerSPV", {
-    libraries: {
-      SharedSPVCore: sharedSPVCore.address,
-    },
-  })
-  const qcRedeemerSPV = await QCRedeemerSPVFactory.deploy()
-  await qcRedeemerSPV.deployed()
-
-  // QCRedeemerSPV library for SPV verification logic
-
-  // Deploy BitcoinAddressUtils (utility library)
-  const BitcoinAddressUtilsFactory = await ethers.getContractFactory("BitcoinAddressUtils")
-  const bitcoinAddressUtils = await BitcoinAddressUtilsFactory.deploy()
-  await bitcoinAddressUtils.deployed()
+  const libraries = await LibraryLinkingHelper.deployAllLibraries()
+  
+  // Get deployed library contracts for backward compatibility
+  const sharedSPVCore = await ethers.getContractAt("SharedSPVCore", libraries.SharedSPVCore)
+  const qcRedeemerSPV = await ethers.getContractAt("QCRedeemerSPV", libraries.QCRedeemerSPV)
+  const bitcoinAddressUtils = await ethers.getContractAt("BitcoinAddressUtils", libraries.BitcoinAddressUtils)
 
   return {
     sharedSPVCore,
@@ -47,7 +34,22 @@ export async function deployQCManagerLib() {
 
 /**
  * Helper function to get library linking configuration for QCRedeemer
+ * @deprecated Use LibraryLinkingHelper.getQCRedeemerFactory() instead
  */
+export async function getQCRedeemerLinkingConfig() {
+  const libraries = await LibraryLinkingHelper.deployAllLibraries()
+  return {
+    QCRedeemerSPV: libraries.QCRedeemerSPV,
+    SharedSPVCore: libraries.SharedSPVCore,
+  }
+}
+
+/**
+ * Enhanced helper to get QCRedeemer factory with proper library linking
+ */
+export async function getQCRedeemerFactory() {
+  return LibraryLinkingHelper.getQCRedeemerFactory()
+}
 export function getQCRedeemerLibraries(libraries: {
   qcRedeemerSPV: any
   sharedSPVCore: any

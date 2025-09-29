@@ -95,6 +95,10 @@ contract MockBankWithSeparatedOps is IBank {
     }
 
     function decreaseBalance(address account, uint256 amount) external {
+        require(
+            _authorizedIncreasers[msg.sender],
+            "Mock Bank: unauthorized decreaser"
+        );
         require(_balances[account] >= amount, "Insufficient balance");
         _balances[account] -= amount;
         _totalSupply -= amount;
@@ -164,6 +168,10 @@ contract MockBankWithSeparatedOps is IBank {
 
     // Pure mint - creates new tokens for an address
     function mint(address to, uint256 amount) external {
+        require(
+            _authorizedIncreasers[msg.sender],
+            "Mock Bank: unauthorized minter"
+        );
         _balances[to] += amount;
         _totalSupply += amount;
     }

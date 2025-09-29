@@ -189,7 +189,7 @@ describe("AccountControl Integration Tests", function () {
       const initialTotal = await accountControl.totalMinted();
       
       // Request mint through QCMinter (this completes the mint immediately)
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       const receipt = await tx.wait();
 
       // Get mintId from event
@@ -216,7 +216,7 @@ describe("AccountControl Integration Tests", function () {
       const initialMinted = await accountControl.minted(qc.address);
       
       // Request mint (single-step process now)
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       const receipt = await tx.wait();
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
       
@@ -235,19 +235,19 @@ describe("AccountControl Integration Tests", function () {
       // The mint request might succeed but the actual mint will fail
       // Let's check if the request succeeds and then the actual mint fails
       try {
-        const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+        const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
         // If it succeeds, the enforcement happens during the actual mint operation
         // Check that the minted amount doesn't increase
         const mintedBefore = await accountControl.minted(qc.address);
         expect(mintedBefore).to.equal(0);
       } catch (error: any) {
         // If it reverts, check the error message contains something about insufficient backing
-        expect(error.message).to.include("Insufficient");
+        expect(error.message).to.include("InsufficientBacking");
       }
 
       // Verify that with sufficient backing it would succeed
       await accountControl.connect(qc).updateBacking(MINT_AMOUNT.mul(2)); // Set backing higher than mint amount
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       await expect(tx).to.emit(qcMinter, "QCMintRequested");
     });
 
@@ -259,7 +259,7 @@ describe("AccountControl Integration Tests", function () {
       // Test that normal minting within allowed ranges works
       const validAmount = ethers.utils.parseEther("0.001"); // Valid amount for minting
       await accountControl.connect(owner).setMintingCap(qc.address, ethers.utils.parseEther("0.01"));
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, validAmount);
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, validAmount);
       await expect(tx).to.emit(qcMinter, "QCMintRequested");
     });
   });
@@ -267,7 +267,7 @@ describe("AccountControl Integration Tests", function () {
   describe("QCRedeemer Integration", function () {
     beforeEach(async function () {
       // First mint some tokens through the system
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       const receipt = await tx.wait();
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
 
@@ -357,7 +357,7 @@ describe("AccountControl Integration Tests", function () {
       await qcMinter.connect(owner).setAccountControl(mockAccountControlForMinter.address);
 
       // Mint with enabled
-      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       let receipt = await tx.wait();
       let mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
@@ -368,7 +368,7 @@ describe("AccountControl Integration Tests", function () {
       await mockAccountControlForMinter.setAccountControlEnabled(false);
 
       // Mint again with disabled - should not track minted amounts
-      tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       receipt = await tx.wait();
       mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
@@ -380,7 +380,7 @@ describe("AccountControl Integration Tests", function () {
       await mockAccountControlForMinter.setAccountControlEnabled(true);
 
       // Mint again with AccountControl re-enabled
-      tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       receipt = await tx.wait();
       mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
@@ -396,7 +396,7 @@ describe("AccountControl Integration Tests", function () {
       const mintAmount = MINT_AMOUNT;
       
       // Execute mint through QCMinter
-      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, mintAmount);
+      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, mintAmount);
       let receipt = await tx.wait();
       let mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
@@ -455,11 +455,11 @@ describe("AccountControl Integration Tests", function () {
       await accountControl.setBackingForTesting(qcMinter.address, QC_BACKING_AMOUNT * 2);
       
       // Mint from both QCs
-      let tx1 = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      let tx1 = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       let receipt1 = await tx1.wait();
       let mintId1 = receipt1.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       
-      let tx2 = await qcMinter.connect(minter).requestQCMint(qc2.address, MINT_AMOUNT);
+      let tx2 = await qcMinter.connect(minter).requestQCMint(qc2.address, minter.address, MINT_AMOUNT);
       let receipt2 = await tx2.wait();
       let mintId2 = receipt2.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       
@@ -484,7 +484,7 @@ describe("AccountControl Integration Tests", function () {
       expect(initialSupply).to.be.at.least(MINT_AMOUNT); // At least the amount minted in beforeEach
       
       // 1. Request and execute mint
-      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       let receipt = await tx.wait();
       let mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       // Note: executeQCMint no longer exists - minting happens in requestQCMint

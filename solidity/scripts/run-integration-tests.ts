@@ -24,7 +24,12 @@ class IntegrationTestRunner {
     ]
 
     for (const testFile of testFiles) {
-      await this.runTest(testFile)
+      try {
+        await this.runTest(testFile)
+      } catch {
+        // Keep going so the summary covers every test
+        // Error is already recorded in this.results by runTest
+      }
     }
 
     this.printSummary()
@@ -68,18 +73,21 @@ class IntegrationTestRunner {
           console.log(chalk.gray(`   ${passingMatch[1]} tests passed`))
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error))
       const duration = Date.now() - startTime
 
       this.results.push({
         name: testName,
         passed: false,
         duration,
-        error: error.message,
+        error: err.message,
       })
 
       console.log(chalk.red(`❌ ${testName} - FAILED (${duration}ms)`))
-      console.log(chalk.red(`   Error: ${error.message.split("\n")[0]}`))
+      console.log(chalk.red(`   Error: ${err.message.split("\n")[0]}`))
+      
+      throw err
     }
   }
 
@@ -173,7 +181,10 @@ Options:
 
 // Run if called directly
 if (require.main === module) {
-  main().catch(console.error)
+  main().catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
 }
 
 export { IntegrationTestRunner }

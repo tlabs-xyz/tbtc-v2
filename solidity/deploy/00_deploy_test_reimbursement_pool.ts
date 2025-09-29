@@ -3,8 +3,8 @@ import type { DeployFunction } from "hardhat-deploy/types"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre
-  const { deploy, log } = deployments
-  const { deployer } = await getNamedAccounts()
+  const { deploy, execute, log } = deployments
+  const { deployer, governance } = await getNamedAccounts()
 
   // Only deploy for test networks
   if (hre.network.name !== "hardhat" &&
@@ -23,7 +23,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     waitConfirmations: 1,
   })
 
-  log("Deployed test ReimbursementPool")
+  // Transfer ownership to governance account for proper authorization flow
+  await execute(
+    "ReimbursementPool",
+    { from: deployer, log: true, waitConfirmations: 1 },
+    "transferOwnership",
+    governance
+  )
+
+  log("Deployed test ReimbursementPool and transferred ownership to governance")
 }
 
 export default func

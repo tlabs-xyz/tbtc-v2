@@ -286,6 +286,7 @@ const func: DeployFunction = async function DeployAccountControl(
     ],
     libraries: {
       QCRedeemerSPV: qcRedeemerSPV.address,
+      SharedSPVCore: sharedSPVCore.address,
     },
     log: true,
     waitConfirmations: network.live ? 5 : 1,
@@ -407,3 +408,12 @@ func.tags = ["AccountControl"]
 // Dependencies: Optional for test networks, will use mocks if not available
 func.dependencies = []
 // Note: Dependencies are handled conditionally in the script for test networks
+
+// Skip deployment if USE_EXTERNAL_DEPLOY=true and we're not explicitly running AccountControl tests
+func.skip = async (hre: HardhatRuntimeEnvironment) => {
+  // Skip if we're using external deployment and not explicitly deploying account control
+  if (process.env.USE_EXTERNAL_DEPLOY === "true" && !process.env.DEPLOY_ACCOUNT_CONTROL) {
+    return true
+  }
+  return false
+}

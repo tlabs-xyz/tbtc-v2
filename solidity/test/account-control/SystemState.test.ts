@@ -95,7 +95,8 @@ describe("SystemState", () => {
       describe("pauseMinting", () => {
         it("should pause minting successfully", async () => {
           const tx = await systemState.connect(pauserAccount).pauseMinting()
-          const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
+          const receipt = await tx.wait()
+          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
 
           expect(await systemState.isMintingPaused()).to.be.true
           await expect(tx)

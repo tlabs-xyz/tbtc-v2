@@ -138,7 +138,8 @@ class SPVTestHelpers {
   static truncateHeaders(headers: string, keepHeaders: number): string {
     // Each header is 80 bytes
     const headerSize = 80 * 2 // 160 hex characters
-    const totalLength = keepHeaders * headerSize
+    const prefixLength = headers.startsWith("0x") ? 2 : 0
+    const totalLength = prefixLength + keepHeaders * headerSize
 
     return headers.slice(0, totalLength)
   }

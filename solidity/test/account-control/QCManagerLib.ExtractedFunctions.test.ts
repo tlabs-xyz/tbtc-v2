@@ -105,9 +105,7 @@ describe("QCManagerLib - Extracted Functions", function () {
   });
 
   describe("verifyBitcoinSignature", function () {
-    it.skip("should have correct function signature - function is internal", async function () {
-      // Note: verifyBitcoinSignature is an internal function and cannot be accessed directly
-      // It is tested indirectly through functions that use it
-    });
+    // Note: verifyBitcoinSignature is an internal function and cannot be accessed directly
+    // It is tested indirectly through functions that use it
   });
 });

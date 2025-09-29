@@ -10,6 +10,7 @@ import "../bank/Bank.sol";
 import "../vault/TBTCVault.sol";
 import "../token/TBTC.sol";
 import "./AccountControl.sol";
+import "./QCManagerErrors.sol";
 
 
 /// @title QCMinter
@@ -21,12 +22,11 @@ import "./AccountControl.sol";
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - MINTER_ROLE: Can request minting of tBTC tokens
 contract QCMinter is AccessControl, ReentrancyGuard {
-    error InvalidQCAddress();
+    // InvalidQCAddress and QCNotActive are imported from QCManagerErrors
     error InvalidUserAddress();
     error InvalidAmount();
     error MintingPaused();
     error AmountOutsideAllowedRange();
-    error QCNotActive();
     error InsufficientMintingCapacity();
     error NotAuthorizedInBank();
     error InsufficientBalance();
@@ -189,30 +189,33 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @dev Validates QC capacity and creates Bank balance
     ///      SECURITY: nonReentrant protects against reentrancy
     /// @param qc The address of the Qualified Custodian
+    /// @param recipient The address to receive the minted tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
     /// @return mintId Unique identifier for this minting request
-    function requestQCMint(address qc, uint256 amount)
+    function requestQCMint(address qc, address recipient, uint256 amount)
         external
         onlyRole(MINTER_ROLE)
         nonReentrant
         returns (bytes32 mintId)
     {
-        return _requestMint(qc, msg.sender, amount);
+        return _requestMint(qc, recipient, amount);
     }
 
     /// @notice Request QC-backed minting with hybrid options
     /// @param qc The address of the Qualified Custodian
+    /// @param recipient The address to receive the minted tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
     /// @param autoMint Whether to use automated minting (if enabled)
     /// @param permitData Optional permit data for gasless approval (currently unused)
     /// @return mintId Unique identifier for this minting request
     function requestQCMintHybrid(
         address qc,
+        address recipient,
         uint256 amount,
         bool autoMint,
         bytes calldata permitData
     ) external onlyRole(MINTER_ROLE) nonReentrant returns (bytes32 mintId) {
-        return _requestMintHybrid(qc, msg.sender, amount, autoMint, permitData);
+        return _requestMintHybrid(qc, recipient, amount, autoMint, permitData);
     }
 
     /// @notice Internal minting logic
@@ -226,7 +229,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         uint256 amount
     ) internal returns (bytes32 mintId) {
         // Validate inputs
-        if (qc == address(0)) revert InvalidQCAddress();
+        if (qc == address(0)) revert QCManagerErrors.InvalidQCAddress();
         if (user == address(0)) revert InvalidUserAddress();
         if (amount == 0) revert InvalidAmount();
 
@@ -278,7 +281,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
                 msg.sender,
                 block.timestamp
             );
-            revert QCNotActive();
+            revert QCManagerErrors.QCNotActive(qc);
         }
 
         // Check minting capacity
@@ -317,6 +320,11 @@ contract QCMinter is AccessControl, ReentrancyGuard {
 
         // Use AccountControl for minting (returns satoshis for event emission)
         uint256 satoshis = AccountControl(accountControl).mintTBTC(user, amount);
+
+        // Auto-mint if enabled globally
+        if (autoMintEnabled) {
+            _executeAutoMint(user, satoshis);
+        }
 
         // Emit event for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
@@ -364,7 +372,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         bytes calldata permitData
     ) internal returns (bytes32 mintId) {
         // Validate inputs (same as original)
-        if (qc == address(0)) revert InvalidQCAddress();
+        if (qc == address(0)) revert QCManagerErrors.InvalidQCAddress();
         if (user == address(0)) revert InvalidUserAddress();
         if (amount == 0) revert InvalidAmount();
 
@@ -416,7 +424,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
                 msg.sender,
                 block.timestamp
             );
-            revert QCNotActive();
+            revert QCManagerErrors.QCNotActive(qc);
         }
 
         // Check minting capacity (same as original)

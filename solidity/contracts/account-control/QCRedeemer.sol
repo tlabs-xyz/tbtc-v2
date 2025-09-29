@@ -10,6 +10,7 @@ import "../token/TBTC.sol";
 import "../bridge/BitcoinTx.sol";
 import {QCRedeemerSPV} from "./libraries/QCRedeemerSPV.sol";
 import "./AccountControl.sol";
+import "./QCManagerErrors.sol";
 
 /// @title QCRedeemer
 /// @dev Direct implementation for tBTC redemption with QC backing.
@@ -38,7 +39,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     using SPVState for SPVState.Storage;
     
     // Custom errors for gas-efficient reverts
-    error InvalidQCAddress();
+    // InvalidQCAddress is imported from QCManagerErrors
     error InvalidAmount();
     error BitcoinAddressRequired();
     error InvalidBitcoinAddressFormat();
@@ -240,7 +241,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         string calldata userBtcAddress,
         string calldata qcWalletAddress
     ) external nonReentrant returns (bytes32 redemptionId) {
-        if (qc == address(0)) revert InvalidQCAddress();
+        if (qc == address(0)) revert QCManagerErrors.InvalidQCAddress();
         if (amount == 0) revert InvalidAmount();
         if (bytes(userBtcAddress).length == 0) revert BitcoinAddressRequired();
         if (bytes(qcWalletAddress).length == 0) revert BitcoinAddressRequired();
@@ -310,6 +311,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         tbtcToken.burnFrom(msg.sender, amount);
 
         // Notify AccountControl of redemption
+        require(accountControl != address(0), "AccountControl not set");
         AccountControl(accountControl).redeemTBTC(amount);
 
         // Calculate deadline
@@ -683,17 +685,15 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         }
 
         // SPV proof verification
-        if (
-            !_verifySPVProof(
-                redemptionId,
-                userBtcAddress,
-                expectedAmount,
-                txInfo,
-                proof
-            )
-        ) {
-            revert SPVVerificationFailed(redemptionId);
-        }
+        // Note: _verifySPVProof now reverts with RedemptionProofFailed on any error
+        // It no longer returns false, so we just call it directly
+        _verifySPVProof(
+            redemptionId,
+            userBtcAddress,
+            expectedAmount,
+            txInfo,
+            proof
+        );
 
         // State update - mark as fulfilled
         fulfilledRedemptions[redemptionId] = true;
@@ -774,7 +774,11 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Complete SPV validation using library
         
         // 1. Validate SPV proof using library
-        QCRedeemerSPV.validateSPVProof(spvState, txInfo, proof);
+        // First try the safe validation to check if it would fail
+        (bool spvSuccess, bytes32 txHash) = QCRedeemerSPV.validateSPVProofSafe(spvState, txInfo, proof);
+        if (!spvSuccess) {
+            revert RedemptionProofFailed("SPV proof validation failed");
+        }
         
         // 2. Verify transaction contains expected payment to userBtcAddress
         if (!QCRedeemerSPV.verifyRedemptionPayment(userBtcAddress, expectedAmount, txInfo)) {

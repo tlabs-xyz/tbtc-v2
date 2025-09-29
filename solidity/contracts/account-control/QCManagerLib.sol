@@ -26,39 +26,7 @@ library QCManagerLib {
     // Note: Events are defined in main QCManager contract as libraries cannot emit events directly
 
     // ========== ERRORS ==========
-    // Note: These are library-specific error definitions for functions that need them
-    // Main contract errors are in QCManagerErrors.sol
-
-    /// @notice Thrown when QC address is zero address
-    error InvalidQCAddress();
-
-    /// @notice Thrown when minting capacity is invalid (zero or exceeds limits)
-    error InvalidMintingCapacity();
-
-    /// @notice Thrown when wallet address validation fails
-    error InvalidWalletAddress();
-
-    /// @notice Thrown when attempting to register an already registered QC
-    /// @param qc The address that is already registered
-    error QCAlreadyRegistered(address qc);
-
-    /// @notice Thrown when operating on a non-registered QC
-    /// @param qc The address that is not registered
-    error QCNotRegistered(address qc);
-
-    /// @notice Thrown when QC is not in ACTIVE status
-    /// @param qc The address of the inactive QC
-    error QCNotActive(address qc);
-
-    /// @notice Thrown when new capacity is not higher than current
-    /// @param current Current capacity
-    /// @param requested Requested new capacity
-    error NewCapMustBeHigher(uint256 current, uint256 requested);
-
-    /// @notice Thrown when status transition is invalid
-    /// @param from Current status (uint8 to avoid circular dependency)
-    /// @param to Requested new status (uint8 to avoid circular dependency)
-    error InvalidStatusTransition(uint8 from, uint8 to);
+    // All error definitions are imported from QCManagerErrors.sol to avoid duplicates
 
     // ========== REGISTRATION LOGIC ==========
 
@@ -80,14 +48,14 @@ library QCManagerLib {
 
         // Input validation
         if (qc == address(0)) {
-            revert InvalidQCAddress();
+            revert QCManagerErrors.InvalidQCAddress();
         }
         if (maxMintingCap == 0) {
-            revert InvalidMintingCapacity();
+            revert QCManagerErrors.InvalidMintingCapacity();
         }
 
         if (qcData.isQCRegistered(qc)) {
-            revert QCAlreadyRegistered(qc);
+            revert QCManagerErrors.QCAlreadyRegistered(qc);
         }
 
         // Register QC with provided minting capacity
@@ -162,14 +130,14 @@ library QCManagerLib {
         address accountControl
     ) external {
         if (!qcData.isQCRegistered(qc)) {
-            revert QCNotRegistered(qc);
+            revert QCManagerErrors.QCNotRegistered(qc);
         }
 
         uint256 currentCap = qcData.getMaxMintingCapacity(qc);
 
         // Only allow increases
         if (newCap <= currentCap) {
-            revert NewCapMustBeHigher(currentCap, newCap);
+            revert QCManagerErrors.NewCapMustBeHigher(currentCap, newCap);
         }
 
         // Update in QCData
@@ -569,6 +537,9 @@ library QCManagerLib {
                 return capBasedCapacity < reserveBasedCapacity
                     ? capBasedCapacity
                     : reserveBasedCapacity;
+            } else {
+                // Reserves are exhausted - return 0 capacity
+                return 0;
             }
         }
 

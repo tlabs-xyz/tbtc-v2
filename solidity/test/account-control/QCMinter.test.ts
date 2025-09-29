@@ -128,7 +128,7 @@ describe("QCMinter", () => {
       it("should check system state", async () => {
         await qcMinter
           .connect(user)
-          .requestQCMint(qcAddress.address, mintAmount)
+          .requestQCMint(qcAddress.address, user.address, mintAmount)
 
         expect(mockSystemState.isMintingPaused).to.have.been.called
         expect(mockSystemState.isQCEmergencyPaused).to.have.been.calledWith(
@@ -139,7 +139,7 @@ describe("QCMinter", () => {
       it("should verify QC status", async () => {
         await qcMinter
           .connect(user)
-          .requestQCMint(qcAddress.address, mintAmount)
+          .requestQCMint(qcAddress.address, user.address, mintAmount)
 
         expect(mockQCData.getQCStatus).to.have.been.calledWith(
           qcAddress.address
@@ -149,7 +149,7 @@ describe("QCMinter", () => {
       it("should check minting capacity", async () => {
         await qcMinter
           .connect(user)
-          .requestQCMint(qcAddress.address, mintAmount)
+          .requestQCMint(qcAddress.address, user.address, mintAmount)
 
         expect(
           mockQCManager.getAvailableMintingCapacity
@@ -164,7 +164,7 @@ describe("QCMinter", () => {
 
         const tx = await qcMinter
           .connect(user)
-          .requestQCMint(qcAddress.address, mintAmount)
+          .requestQCMint(qcAddress.address, user.address, mintAmount)
 
         // Verify AccountControl.mintTBTC was called via event
         await expect(tx)
@@ -175,7 +175,7 @@ describe("QCMinter", () => {
       it("should update QC minted amount", async () => {
         await qcMinter
           .connect(user)
-          .requestQCMint(qcAddress.address, mintAmount)
+          .requestQCMint(qcAddress.address, user.address, mintAmount)
 
         expect(mockQCManager.updateQCMintedAmount).to.have.been.calledWith(
           qcAddress.address,
@@ -186,7 +186,7 @@ describe("QCMinter", () => {
       it("should emit QCMintRequested event", async () => {
         const tx = await qcMinter
           .connect(user)
-          .requestQCMint(qcAddress.address, mintAmount)
+          .requestQCMint(qcAddress.address, user.address, mintAmount)
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         const receipt = await tx.wait()
 
@@ -202,13 +202,15 @@ describe("QCMinter", () => {
         expect(qcMintRequestedEvent?.args?.[2]).to.equal(mintAmount) // amount
         expect(qcMintRequestedEvent?.args?.[3]).to.not.equal(ethers.utils.hexZeroPad("0x", 32)) // mintId should not be zero
         expect(qcMintRequestedEvent?.args?.[4]).to.equal(user.address) // requestedBy
-        expect(qcMintRequestedEvent?.args?.[5]).to.equal(currentBlock.timestamp) // timestamp
+        expect(qcMintRequestedEvent?.args?.[5]).to.equal(
+          ethers.BigNumber.from(currentBlock.timestamp)
+        ) // timestamp
       })
 
       it("should emit MintCompleted event", async () => {
         const tx = await qcMinter
           .connect(user)
-          .requestQCMint(qcAddress.address, mintAmount)
+          .requestQCMint(qcAddress.address, user.address, mintAmount)
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
 
         await expect(tx).to.emit(qcMinter, "MintCompleted")
@@ -220,13 +222,13 @@ describe("QCMinter", () => {
         await expect(
           qcMinter
             .connect(user)
-            .requestQCMint(ethers.constants.AddressZero, mintAmount)
+            .requestQCMint(ethers.constants.AddressZero, user.address, mintAmount)
         ).to.be.revertedWith("InvalidQCAddress")
       })
 
       it("should revert with zero amount", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, 0)
+          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, 0)
         ).to.be.revertedWith("InvalidAmount")
       })
     })
@@ -238,7 +240,7 @@ describe("QCMinter", () => {
 
       it("should revert", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
+          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
         ).to.be.revertedWith("MintingPaused")
       })
     })
@@ -252,7 +254,7 @@ describe("QCMinter", () => {
 
       it("should revert", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
+          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
         ).to.be.revertedWith("QCIsEmergencyPaused")
       })
     })
@@ -264,7 +266,7 @@ describe("QCMinter", () => {
 
       it("should revert", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
+          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
         ).to.be.revertedWith("QCNotActive")
       })
     })
@@ -276,7 +278,7 @@ describe("QCMinter", () => {
 
       it("should revert", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
+          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
         ).to.be.revertedWith("InsufficientMintingCapacity")
       })
     })
@@ -290,7 +292,7 @@ describe("QCMinter", () => {
 
       it("should revert", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, mintAmount)
+          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
         ).to.be.revertedWith("NotAuthorizedInBank")
       })
     })
@@ -583,7 +585,7 @@ describe("QCMinter", () => {
 
         const tx = await qcMinter
           .connect(user)
-          .requestQCMintHybrid(qcAddress.address, mintAmount, true, permitData)
+          .requestQCMintHybrid(qcAddress.address, user.address, mintAmount, true, permitData)
 
         // Should call AccountControl.mintTBTC via event
         await expect(tx)
@@ -609,7 +611,7 @@ describe("QCMinter", () => {
         await expect(
           qcMinter
             .connect(user)
-            .requestQCMintHybrid(qcAddress.address, mintAmount, true, permitData)
+            .requestQCMintHybrid(qcAddress.address, user.address, mintAmount, true, permitData)
         ).to.emit(qcMinter, "AutoMintCompleted")
           .withArgs(user.address, satoshis, mintAmount)
       })
@@ -624,7 +626,7 @@ describe("QCMinter", () => {
 
         const tx = await qcMinter
           .connect(user)
-          .requestQCMintHybrid(qcAddress.address, mintAmount, false, permitData)
+          .requestQCMintHybrid(qcAddress.address, user.address, mintAmount, false, permitData)
 
         // Should call AccountControl.mintTBTC
         await expect(tx)
@@ -648,7 +650,7 @@ describe("QCMinter", () => {
 
         const tx = await qcMinter
           .connect(user)
-          .requestQCMintHybrid(qcAddress.address, mintAmount, true, permitData)
+          .requestQCMintHybrid(qcAddress.address, user.address, mintAmount, true, permitData)
 
         // Should call AccountControl.mintTBTC
         await expect(tx)
@@ -666,7 +668,7 @@ describe("QCMinter", () => {
         await expect(
           qcMinter
             .connect(user)
-            .requestQCMintHybrid(qcAddress.address, mintAmount, true, permitData)
+            .requestQCMintHybrid(qcAddress.address, user.address, mintAmount, true, permitData)
         ).to.be.revertedWith("InsufficientBalance")
       })
     })
@@ -678,7 +680,7 @@ describe("QCMinter", () => {
         await expect(
           qcMinter
             .connect(thirdParty)
-            .requestQCMint(qcAddress.address, mintAmount)
+            .requestQCMint(qcAddress.address, user.address, mintAmount)
         ).to.be.reverted
       })
     })
@@ -693,7 +695,7 @@ describe("QCMinter", () => {
         await expect(
           qcMinter
             .connect(thirdParty)
-            .requestQCMint(qcAddress.address, mintAmount)
+            .requestQCMint(qcAddress.address, user.address, mintAmount)
         ).to.not.be.reverted
       })
     })

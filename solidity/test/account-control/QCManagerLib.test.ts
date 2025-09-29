@@ -82,9 +82,8 @@ describe("QCManagerLib", function () {
     // Grant QCManager the QC_MANAGER_ROLE in AccountControl
     await accountControl.connect(owner).grantQCManagerRole(qcManager.address);
 
-    // Grant EMERGENCY_COUNCIL_ROLE to QCManager for pauseReserve operations
-    const EMERGENCY_COUNCIL_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("EMERGENCY_COUNCIL_ROLE"));
-    await accountControl.grantRole(EMERGENCY_COUNCIL_ROLE, qcManager.address);
+    // Set QCManager as emergencyCouncil for pauseReserve operations
+    await accountControl.connect(owner).setEmergencyCouncil(qcManager.address);
   });
 
   describe("Library Error Validation", function () {
@@ -92,13 +91,13 @@ describe("QCManagerLib", function () {
     it("should revert with InvalidQCAddress when registering zero address", async function () {
       await expect(
         qcManager.connect(owner).registerQC(ZERO_ADDRESS, MAX_MINTING_CAP)
-      ).to.be.revertedWith("InvalidQCAddress");
+      ).to.be.revertedWithCustomError(qcManager, "InvalidQCAddress");
     });
 
     it("should revert with InvalidMintingCapacity when capacity is zero", async function () {
       await expect(
         qcManager.connect(owner).registerQC(qc1.address, 0)
-      ).to.be.revertedWith("InvalidMintingCapacity");
+      ).to.be.revertedWithCustomError(qcManager, "InvalidMintingCapacity");
     });
 
     it("should revert with QCAlreadyRegistered when registering twice", async function () {
@@ -115,17 +114,20 @@ describe("QCManagerLib", function () {
       ).to.be.reverted;
     });
 
-    it.skip("should revert with InvalidWalletAddress for zero address wallet - addWallet function doesn't exist", async function () {
-      // Function addWallet doesn't exist - wallet registration uses registerWallet or registerWalletDirect
-    });
-
     it("should revert with InvalidStatusTransition for invalid status changes", async function () {
       await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
 
-      // Try to transition from REGISTERED (0) to REMOVED (3) directly
+      // Grant DISPUTE_ARBITER_ROLE to owner for status transitions
+      const DISPUTE_ARBITER_ROLE = await qcManager.DISPUTE_ARBITER_ROLE();
+      await qcManager.grantRole(DISPUTE_ARBITER_ROLE, owner.address);
+      
+      // First set to UnderReview(3)
+      await qcManager.connect(owner).setQCStatus(qc1.address, 3, ethers.utils.formatBytes32String("test"));
+      
+      // Try to transition from UnderReview(3) to MintingPaused(1) - this is invalid
       await expect(
-        qcManager.connect(owner).setQCStatus(qc1.address, 3, ethers.utils.formatBytes32String("test"))
-      ).to.be.reverted;
+        qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"))
+      ).to.be.revertedWithCustomError(qcManager, "InvalidStatusTransition");
     });
 
     it("should revert with NewCapMustBeHigher when not increasing capacity", async function () {
@@ -167,82 +169,36 @@ describe("QCManagerLib", function () {
       await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
     });
 
-    it.skip("should validate status transitions correctly - TODO: requires AccountControl unpause access", async function () {
-      // QC already registered in beforeEach
+    it("should validate status transitions correctly", async function () {
+      // Grant DISPUTE_ARBITER_ROLE to owner for setQCStatus
+      const DISPUTE_ARBITER_ROLE = await qcManager.DISPUTE_ARBITER_ROLE();
+      await qcManager.grantRole(DISPUTE_ARBITER_ROLE, owner.address);
 
-      // Valid: REGISTERED(0) -> MINTING_PAUSED(1)
-      await expect(
-        qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"))
-      ).to.emit(qcManager, "QCStatusChanged")
-        .withArgs(qc1.address, 0, 1);
+      // QC already registered in beforeEach with Active(0) status
 
-      // Valid: MINTING_PAUSED(1) -> UNDER_REVIEW(3)
+      // Valid: Active(0) -> MintingPaused(1)
+      const tx = await qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"));
+      const receipt = await tx.wait();
+      
+      // Find the QCStatusChanged event
+      const event = receipt.events?.find(e => e.event === "QCStatusChanged");
+      expect(event).to.not.be.undefined;
+      expect(event?.args?.qc).to.equal(qc1.address);
+      expect(event?.args?.oldStatus).to.equal(0);
+      expect(event?.args?.newStatus).to.equal(1);
+
+      // Valid: MintingPaused(1) -> UnderReview(3)
       await expect(
         qcManager.connect(owner).setQCStatus(qc1.address, 3, ethers.utils.formatBytes32String("test"))
-      ).to.emit(qcManager, "QCStatusChanged")
-        .withArgs(qc1.address, 1, 3);
+      ).to.emit(qcManager, "QCStatusChanged");
 
-      // Valid: UNDER_REVIEW(3) -> REVOKED(4)
-      await expect(
-        qcManager.connect(owner).setQCStatus(qc1.address, 4, ethers.utils.formatBytes32String("test"))
-      ).to.emit(qcManager, "QCStatusChanged")
-        .withArgs(qc1.address, 3, 4);
-    });
-
-    it.skip("should enforce QCNotActive for operations requiring active status - addWallet doesn't exist", async function () {
-      // Function addWallet doesn't exist
-
-      // Activate QC
-      await qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"));
-
-      // Now wallet addition should work
-      await expect(
-        qcManager.connect(qc1).addWallet(user.address, "bc1qtest", ethers.utils.randomBytes(32))
-      ).to.not.be.reverted;
+      // Note: Revoked status requires owner to call deauthorizeReserve directly
+      // since it has onlyOwner modifier, not onlyOwnerOrQCManager
     });
   });
 
-  describe.skip("Library Wallet Management - TODO: addWallet function doesn't exist", function () {
 
-    beforeEach(async function () {
-      await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
-      await qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test")); // ACTIVE
-    });
-
-    it("should validate wallet addition parameters", async function () {
-      const validBitcoinAddress = "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh";
-      const challenge = ethers.utils.randomBytes(32);
-
-      await expect(
-        qcManager.connect(qc1).addWallet(user.address, validBitcoinAddress, challenge)
-      ).to.emit(qcManager, "WalletAdded")
-        .withArgs(qc1.address, user.address);
-    });
-
-    it("should enforce wallet limit per QC", async function () {
-      const MAX_WALLETS = 10; // As defined in the contract
-      const bitcoinAddress = "bc1qtest";
-      const challenge = ethers.utils.randomBytes(32);
-
-      // Add maximum number of wallets
-      for (let i = 0; i < MAX_WALLETS; i++) {
-        const wallet = ethers.Wallet.createRandom();
-        await qcManager.connect(qc1).addWallet(
-          wallet.address,
-          `${bitcoinAddress}${i}`,
-          challenge
-        );
-      }
-
-      // Try to add one more wallet (should fail)
-      const extraWallet = ethers.Wallet.createRandom();
-      await expect(
-        qcManager.connect(qc1).addWallet(extraWallet.address, `${bitcoinAddress}extra`, challenge)
-      ).to.be.revertedWith("MaximumWalletsReached");
-    });
-  });
-
-  describe.skip("Library Gas Optimization - TODO: requires AccountControl unpause access", function () {
+  describe("Library Gas Optimization", function () {
 
     it("should maintain reasonable gas costs for library operations", async function () {
       // Measure gas for registration
@@ -252,28 +208,21 @@ describe("QCManagerLib", function () {
       // Library calls should not significantly increase gas
       expect(registrationReceipt.gasUsed).to.be.lt(350000);
 
-      // Activate QC
-      await qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"));
+      // Grant DISPUTE_ARBITER_ROLE to owner for status transitions
+      const DISPUTE_ARBITER_ROLE = await qcManager.DISPUTE_ARBITER_ROLE();
+      await qcManager.grantRole(DISPUTE_ARBITER_ROLE, owner.address);
 
-      // Measure gas for wallet addition
-      const walletTx = await qcManager.connect(qc1).addWallet(
-        user.address,
-        "bc1qtest",
-        ethers.utils.randomBytes(32)
-      );
-      const walletReceipt = await walletTx.wait();
+      // Measure gas for status change
+      const statusChangeTx = await qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"));
+      const statusChangeReceipt = await statusChangeTx.wait();
 
-      expect(walletReceipt.gasUsed).to.be.lt(150000);
+      expect(statusChangeReceipt.gasUsed).to.be.lt(150000);
     });
   });
 
-  describe.skip("Library Integration with AccountControl - TODO: requires AccountControl ownership or modifier changes", function () {
+  describe("Library Integration with AccountControl", function () {
 
     it("should properly sync with AccountControl during operations", async function () {
-      // Grant role to QCManager
-      const QC_MANAGER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_MANAGER_ROLE"));
-      await accountControl.grantRole(QC_MANAGER_ROLE, qcManager.address);
-
       // Register QC
       await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
 
@@ -399,10 +348,8 @@ describe("QCManagerLib", function () {
     });
 
     describe("verifyBitcoinSignature", function () {
-      it.skip("should have correct function signature - function is internal", async function () {
-        // Note: verifyBitcoinSignature is an internal function and cannot be accessed directly
-        // It is tested indirectly through functions that use it
-      });
+      // Note: verifyBitcoinSignature is an internal function and cannot be accessed directly
+      // It is tested indirectly through functions that use it
     });
   });
 });

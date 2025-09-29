@@ -410,10 +410,10 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         nonReentrant
     {
         if (qc == address(0)) {
-            revert QCManagerLib.InvalidQCAddress();
+            revert InvalidQCAddress();
         }
         if (newCap == 0) {
-            revert QCManagerLib.InvalidMintingCapacity();
+            revert InvalidMintingCapacity();
         }
 
         uint256 currentCap = qcData.getMaxMintingCapacity(qc);
@@ -510,7 +510,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         }
 
         if (!qcData.isQCRegistered(qc)) {
-            revert QCManagerLib.QCNotRegistered(qc);
+            revert QCNotRegistered(qc);
         }
 
         QCData.QCStatus oldStatus = qcData.getQCStatus(qc);
@@ -751,8 +751,8 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         }
 
         // Validate Bitcoin address format
-        if (bytes(bitcoinAddress).length == 0) revert QCManagerLib.InvalidWalletAddress();
-        if (!QCManagerLib.isValidBitcoinAddress(bitcoinAddress)) revert QCManagerLib.InvalidWalletAddress();
+        if (bytes(bitcoinAddress).length == 0) revert InvalidWalletAddress();
+        if (!QCManagerLib.isValidBitcoinAddress(bitcoinAddress)) revert InvalidWalletAddress();
 
         // Generate unique challenge (simplified version without MessageSigning)
         challenge = keccak256(
@@ -931,7 +931,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         nonReentrant
     {
         if (!qcData.isQCRegistered(qc)) {
-            revert QCManagerLib.QCNotRegistered(qc);
+            revert QCNotRegistered(qc);
         }
 
         uint256 oldAmount = qcData.getQCMintedAmount(qc);
@@ -998,7 +998,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         // Validate QC status
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
         if (currentStatus != QCData.QCStatus.Active) {
-            revert QCManagerLib.QCNotActive(qc);
+            revert QCNotActive(qc);
         }
         
         // Check pause credit availability
@@ -1079,11 +1079,6 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
             
             uint256 timeElapsed = block.timestamp - qcPauseTimestamp[qc];
             
-            // Skip if escalation period has not been reached yet
-            if (timeElapsed < SELF_PAUSE_TIMEOUT) {
-                continue; // Skip this QC, check others
-            }
-            
             // Check for warning period (1 hour before escalation) but only if not yet escalated
             if (timeElapsed >= SELF_PAUSE_TIMEOUT - ESCALATION_WARNING_PERIOD && 
                 timeElapsed < SELF_PAUSE_TIMEOUT &&
@@ -1091,6 +1086,11 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
                 uint256 timeRemaining = SELF_PAUSE_TIMEOUT - timeElapsed;
                 emit ApproachingEscalation(qc, timeRemaining);
                 escalationWarningEmitted[qc] = true;
+            }
+            
+            // Skip if escalation period has not been reached yet
+            if (timeElapsed < SELF_PAUSE_TIMEOUT) {
+                continue; // Skip this QC, check others
             }
             
             // Perform auto-escalation after 48h
@@ -1207,7 +1207,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         
         // Validate conditions
         QCData.QCStatus status = qcData.getQCStatus(qc);
-        if (status != QCData.QCStatus.Active) revert QCManagerLib.QCNotActive(qc);
+        if (status != QCData.QCStatus.Active) revert QCNotActive(qc);
         if (credit.hasCredit) revert CreditAlreadyAvailable();
         if (credit.lastUsed == 0) revert NeverUsedCredit();
         if (block.timestamp < credit.creditRenewTime) revert RenewalPeriodNotMet();
@@ -1266,7 +1266,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     {
         // Verify QC is registered
         if (!qcData.isQCRegistered(qc)) {
-            revert QCManagerLib.QCNotRegistered(qc);
+            revert QCNotRegistered(qc);
         }
         
         if (pauseCredits[qc].lastUsed != 0) revert QCAlreadyInitialized();
@@ -1402,7 +1402,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         
         // Check QC status
         QCData.QCStatus status = qcData.getQCStatus(qc);
-        if (status != QCData.QCStatus.Active) revert QCManagerLib.QCNotActive(qc);
+        if (status != QCData.QCStatus.Active) revert QCNotActive(qc);
         
         // Deadline protection
         uint256 earliestDeadline = getEarliestRedemptionDeadline(qc);
