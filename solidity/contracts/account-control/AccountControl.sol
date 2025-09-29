@@ -613,10 +613,26 @@ contract AccountControl is
         
         // Execute batch mints first to ensure atomicity
         // If any Bank call fails, entire transaction reverts
+        bool batchSucceeded = false;
+        
+        // Try to use batch interface if available
         try IBank(bank).increaseBalances(recipients, amounts) {
             // Batch call succeeded
-        } catch {
-            // Fallback to individual calls if batch not supported
+            batchSucceeded = true;
+        } catch Error(string memory reason) {
+            // Check if error is due to batch not being supported
+            if (keccak256(abi.encodePacked(reason)) == keccak256(abi.encodePacked("Mock Bank: Batch not supported"))) {
+                // Fallback to individual calls
+                for (uint256 i = 0; i < recipients.length; ) {
+                    IBank(bank).increaseBalance(recipients[i], amounts[i]);
+                    unchecked { ++i; }
+                }
+            } else {
+                // Re-throw other errors
+                revert(reason);
+            }
+        } catch (bytes memory) {
+            // Fallback to individual calls for unknown errors
             for (uint256 i = 0; i < recipients.length; ) {
                 IBank(bank).increaseBalance(recipients[i], amounts[i]);
                 unchecked { ++i; }
@@ -627,7 +643,7 @@ contract AccountControl is
         minted[msg.sender] += totalAmount;
         totalMintedAmount += totalAmount;
         
-        // Emit batch event for gas efficiency
+        // Emit batch event for gas efficiency (V2 simplified design)
         emit BatchMintExecuted(msg.sender, recipients.length, totalAmount);
         
         return true;

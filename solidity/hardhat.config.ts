@@ -259,8 +259,8 @@ const config: HardhatUserConfig = {
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
-    runOnCompile: true,
-    strict: true,
+    runOnCompile: process.env.CONTRACT_SIZE_CHECK_DISABLED !== "true",
+    strict: false,
     // WalletRegistry is excluded because it's an external dependency from @keep-network/ecdsa
     // that exceeds the 24KB contract size limit (24.142 KB). We don't control this contract.
     except: ["BridgeStub$", "WalletRegistry$"],

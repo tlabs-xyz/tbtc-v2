@@ -81,11 +81,13 @@ describe("QCMinter", () => {
     mockSystemState.isQCEmergencyPaused.returns(false)
     mockSystemState.minMintAmount.returns(ethers.utils.parseEther("0.01"))
     mockSystemState.maxMintAmount.returns(ethers.utils.parseEther("1000"))
+    mockSystemState.isAccountControlEnabled.returns(true) // Enable AccountControl mode by default
 
     mockQCData.getQCStatus.returns(0) // Active status
     mockQCData.getQCMintedAmount.returns(0)
 
     mockQCManager.getAvailableMintingCapacity.returns(maxMintingCapacity)
+    mockQCManager.consumeMintCapacity.returns(true) // Mock atomic capacity consumption
     mockQCManager.updateQCMintedAmount.returns()
 
     mockBank.authorizedBalanceIncreasers.returns(true)
@@ -151,14 +153,14 @@ describe("QCMinter", () => {
         )
       })
 
-      it("should check minting capacity", async () => {
+      it("should atomically consume minting capacity", async () => {
         await qcMinter
           .connect(user)
           .requestQCMint(qcAddress.address, user.address, mintAmount)
 
         expect(
-          mockQCManager.getAvailableMintingCapacity
-        ).to.have.been.calledWith(qcAddress.address)
+          mockQCManager.consumeMintCapacity
+        ).to.have.been.calledWith(qcAddress.address, mintAmount)
       })
 
       it("should call AccountControl to mint TBTC", async () => {
@@ -177,16 +179,6 @@ describe("QCMinter", () => {
           .withArgs(user.address, mintAmount, satoshis)
       })
 
-      it("should update QC minted amount", async () => {
-        await qcMinter
-          .connect(user)
-          .requestQCMint(qcAddress.address, user.address, mintAmount)
-
-        expect(mockQCManager.updateQCMintedAmount).to.have.been.calledWith(
-          qcAddress.address,
-          mintAmount
-        )
-      })
 
       it("should emit QCMintRequested event", async () => {
         const tx = await qcMinter
@@ -279,6 +271,7 @@ describe("QCMinter", () => {
     context("when amount exceeds capacity", () => {
       beforeEach(async () => {
         mockQCManager.getAvailableMintingCapacity.returns(mintAmount.sub(1))
+        mockQCManager.consumeMintCapacity.returns(false) // Atomic capacity check fails
       })
 
       it("should revert", async () => {

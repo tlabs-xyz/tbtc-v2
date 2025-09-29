@@ -131,22 +131,22 @@ contract MockBankWithSeparatedOps is IBank, Ownable {
     }
 
     // Testing configuration functions
-    function setBatchSupported(bool supported) external {
+    function setBatchSupported(bool supported) external onlyOwner {
         batchSupported = supported;
     }
 
-    function setFailOnSecondCall(bool shouldFail) external {
+    function setFailOnSecondCall(bool shouldFail) external onlyOwner {
         failOnSecondCall = shouldFail;
         callCount = 0; // Reset call count
     }
 
-    function resetCounters() external {
+    function resetCounters() external onlyOwner {
         batchCallCount = 0;
         individualCallCount = 0;
         callCount = 0;
     }
 
-    function setTotalSupply(uint256 newTotalSupply) external {
+    function setTotalSupply(uint256 newTotalSupply) external onlyOwner {
         _totalSupply = newTotalSupply;
     }
 
@@ -165,11 +165,11 @@ contract MockBankWithSeparatedOps is IBank, Ownable {
         return _authorizedIncreasers[account];
     }
 
-    function authorizeBalanceIncreaser(address account) external {
+    function authorizeBalanceIncreaser(address account) external onlyOwner {
         _authorizedIncreasers[account] = true;
     }
 
-    function unauthorizeBalanceIncreaser(address account) external {
+    function unauthorizeBalanceIncreaser(address account) external onlyOwner {
         _authorizedIncreasers[account] = false;
     }
 

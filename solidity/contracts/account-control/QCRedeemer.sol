@@ -305,9 +305,12 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Burn the tBTC tokens
         tbtcToken.burnFrom(msg.sender, amount);
 
-        // Notify AccountControl of redemption
-        require(accountControl != address(0), "AccountControl not set");
-        AccountControl(accountControl).redeemTBTC(amount);
+        // Notify AccountControl of redemption only if AccountControl mode is enabled
+        if (systemState.isAccountControlEnabled()) {
+            require(accountControl != address(0), "AccountControl not set");
+            AccountControl(accountControl).redeemTBTC(amount);
+        }
+        // If AccountControl mode is disabled, redemption proceeds without AccountControl notification
 
         // Calculate deadline
         uint256 redemptionTimeout = systemState.redemptionTimeout();
@@ -392,7 +395,10 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Fulfilled;
         
-        // No action needed here
+        // Note: Redemption accounting happens during initiateRedemption (when tokens are burned)
+        // This function only records the fulfillment proof that BTC was actually sent
+        // No additional AccountControl state changes needed here
+        
         // Tokens were already burned during initiation (tbtcToken.burnFrom)
         // Backing will be updated in ReserveOracle when BTC reserves decrease
         // This maintains proper invariant: backing >= minted

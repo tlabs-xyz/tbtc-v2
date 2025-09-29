@@ -465,10 +465,22 @@ describe("QCRedeemer", () => {
 
     it("should check total minted before allowing redemption", async () => {
       const fixture = await loadFixture(deployQCRedeemerFixture)
-      const { mockAccountControl, qcRedeemer, user, qcAddress, constants } = fixture
+      const { mockAccountControl, qcRedeemer, user, qcAddress, constants, systemState, deployer } = fixture
+
+      // Enable AccountControl mode in SystemState
+      // First grant OPERATIONS_ROLE to deployer
+      const OPERATIONS_ROLE = ethers.utils.id("OPERATIONS_ROLE")
+      await systemState.grantRole(OPERATIONS_ROLE, deployer.address)
+      
+      // Enable AccountControl mode
+      await systemState.setAccountControlMode(true)
 
       // Set total minted to zero (no available BTC to redeem)
       await mockAccountControl.setTotalMintedForTesting(0)
+      
+      // Also set per-reserve minted amount to zero for QCRedeemer
+      // The mock checks minted[msg.sender] where msg.sender is QCRedeemer
+      await mockAccountControl.setMintedForTesting(qcRedeemer.address, 0)
 
       // Setup wallet
       const qcWalletAddress = constants.VALID_LEGACY_BTC

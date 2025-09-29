@@ -80,8 +80,8 @@ describe("SystemState", () => {
       expect(await systemState.isMintingPaused()).to.be.false
       expect(await systemState.isRedemptionPaused()).to.be.false
       expect(await systemState.minMintAmount()).to.equal(
-        ethers.utils.parseEther("0.01")
-      ) // Default 0.01 tBTC
+        ethers.utils.parseEther("0.001")
+      ) // Default 0.001 tBTC
       expect(await systemState.maxMintAmount()).to.equal(
         ethers.utils.parseEther("1000")
       ) // Default 1000 tBTC

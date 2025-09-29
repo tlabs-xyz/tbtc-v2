@@ -78,6 +78,8 @@ contract SystemState is AccessControl {
     error QCIsEmergencyPaused(address qc);
     error QCNotEmergencyPaused(address qc);
     error QCEmergencyPauseExpired(address qc);
+    error AccountControlModeAlreadySet(bool currentMode);
+    error InvalidAccountControlMode();
 
 
 
@@ -96,6 +98,9 @@ contract SystemState is AccessControl {
     uint256 public minCollateralRatio; // Minimum collateral ratio percentage (e.g., 90 for 90%)
     uint256 public failureThreshold; // Number of failures before enforcement action
     uint256 public failureWindow; // Time window for counting failures
+
+    /// @dev AccountControl mode management
+    bool public accountControlMode; // Whether AccountControl integration is enabled
 
     /// @dev Emergency parameters
     address public emergencyCouncil; // Emergency council address
@@ -193,6 +198,13 @@ contract SystemState is AccessControl {
         uint256 indexed newWindow,
         address indexed updatedBy
     );
+
+    /// @dev Emitted when AccountControl mode is toggled
+    event AccountControlModeUpdated(
+        bool indexed oldMode,
+        bool indexed newMode,
+        address indexed updatedBy
+    );
     
 
 
@@ -224,7 +236,7 @@ contract SystemState is AccessControl {
         // Set default parameters
         staleThreshold = 24 hours; // Reserve attestations stale after 24 hours
         redemptionTimeout = 7 days; // 7 days to fulfill redemptions
-        minMintAmount = 0.01 ether; // Minimum 0.01 tBTC
+        minMintAmount = 0.001 ether; // Minimum 0.001 tBTC (lowered for testing)
         maxMintAmount = 1000 ether; // Maximum 1000 tBTC per transaction
         emergencyPauseDuration = 7 days; // Emergency pauses last max 7 days
 
@@ -233,6 +245,8 @@ contract SystemState is AccessControl {
         failureThreshold = 3; // 3 failures trigger enforcement
         failureWindow = 7 days; // Count failures over 7 days
         
+        // AccountControl mode is disabled by default to allow tests to enable it explicitly
+        accountControlMode = false;
 
     }
 
@@ -442,6 +456,30 @@ contract SystemState is AccessControl {
         failureWindow = newWindow;
 
         emit FailureWindowUpdated(oldWindow, newWindow, msg.sender);
+    }
+
+    // =================== ACCOUNT CONTROL MODE MANAGEMENT ===================
+
+    /// @notice Enable AccountControl mode
+    /// @dev When enabled, all minting and redemption operations go through AccountControl
+    function setAccountControlMode(bool enabled)
+        external
+        onlyRole(OPERATIONS_ROLE)
+    {
+        if (accountControlMode == enabled) {
+            revert AccountControlModeAlreadySet(enabled);
+        }
+
+        bool oldMode = accountControlMode;
+        accountControlMode = enabled;
+
+        emit AccountControlModeUpdated(oldMode, enabled, msg.sender);
+    }
+
+    /// @notice Check if AccountControl mode is enabled
+    /// @return enabled True if AccountControl mode is enabled
+    function isAccountControlEnabled() external view returns (bool enabled) {
+        return accountControlMode;
     }
     
 

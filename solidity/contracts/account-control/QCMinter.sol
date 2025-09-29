@@ -283,9 +283,9 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             revert QCManagerErrors.QCNotActive(qc);
         }
 
-        // Check minting capacity
-        uint256 availableCapacity = getAvailableMintingCapacity(qc);
-        if (amount > availableCapacity) {
+        // Atomically check and consume minting capacity
+        bool capacityConsumed = qcManager.consumeMintCapacity(qc, amount);
+        if (!capacityConsumed) {
             emit MintRejected(
                 qc,
                 user,
@@ -309,17 +309,31 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             completed: false
         });
 
-        // Validate accountControl is configured
-        require(accountControl != address(0), "AccountControl not configured");
+        uint256 satoshis;
         
-        // CRITICAL SECURITY FIX: Verify accountControl is authorized in Bank
-        // AccountControl is the contract that actually mints, not QCMinter
-        if (!bank.authorizedBalanceIncreasers(accountControl)) {
-            revert NotAuthorizedInBank();
-        }
+        // Check if AccountControl mode is enabled in SystemState
+        if (systemState.isAccountControlEnabled()) {
+            // Validate accountControl is configured
+            require(accountControl != address(0), "AccountControl not configured");
+            
+            // CRITICAL SECURITY FIX: Verify accountControl is authorized in Bank
+            // AccountControl is the contract that actually mints, not QCMinter
+            if (!bank.authorizedBalanceIncreasers(accountControl)) {
+                revert NotAuthorizedInBank();
+            }
 
-        // Use AccountControl for minting (returns satoshis for event emission)
-        uint256 satoshis = AccountControl(accountControl).mintTBTC(user, amount);
+            // Use AccountControl for minting (returns satoshis for event emission)
+            satoshis = AccountControl(accountControl).mintTBTC(user, amount);
+        } else {
+            // AccountControl mode is disabled - mint directly via Bank
+            // Check if QCMinter itself is authorized to increase balances
+            if (!bank.authorizedBalanceIncreasers(address(this))) {
+                revert NotAuthorizedInBank();
+            }
+            
+            satoshis = amount / SATOSHI_MULTIPLIER;
+            bank.increaseBalance(user, satoshis);
+        }
 
         // Auto-mint if enabled globally
         if (autoMintEnabled) {
@@ -328,9 +342,6 @@ contract QCMinter is AccessControl, ReentrancyGuard {
 
         // Emit event for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
-
-        // Update QC minted amount
-        _updateQCMintedAmount(qc, amount);
 
         // Mark mint as completed
         mintRequests[mintId].completed = true;
@@ -426,9 +437,9 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             revert QCManagerErrors.QCNotActive(qc);
         }
 
-        // Check minting capacity (same as original)
-        uint256 availableCapacity = getAvailableMintingCapacity(qc);
-        if (amount > availableCapacity) {
+        // Atomically check and consume minting capacity (same as mintWithQC)
+        bool capacityConsumed = qcManager.consumeMintCapacity(qc, amount);
+        if (!capacityConsumed) {
             emit MintRejected(
                 qc,
                 user,
@@ -452,20 +463,27 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             completed: false
         });
 
-        // No need to check authorization here - Bank will check when we call increaseBalance
+        // CRITICAL SECURITY FIX: Verify accountControl is authorized in Bank
+        // AccountControl is the contract that actually mints, not QCMinter
+        // Validate accountControl is configured
+        require(accountControl != address(0), "AccountControl not configured");
+        
+        if (!bank.authorizedBalanceIncreasers(accountControl)) {
+            revert NotAuthorizedInBank();
+        }
 
         // HYBRID LOGIC: Choose between manual and automated minting
 
-        // Validate accountControl is configured
-        require(accountControl != address(0), "AccountControl not configured");
-
         uint256 satoshis;
+        bool autoMintExecuted = false;
+        
         if (autoMint && autoMintEnabled) {
             // Option 1: Automated minting - create balance and immediately mint tBTC
             satoshis = AccountControl(accountControl).mintTBTC(user, amount);
             
             // Execute automated minting directly
             _executeAutoMint(user, satoshis);
+            autoMintExecuted = true;
             
             // Emit event for automated completion
             emit QCMintCompleted(user, satoshis, true);
@@ -480,14 +498,11 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // Emit event for QC attribution (same as original)
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
 
-        // Update QC minted amount (same as original)
-        _updateQCMintedAmount(qc, amount);
-
         // Mark mint as completed (same as original)
         mintRequests[mintId].completed = true;
 
         // Emit completion events (same as original)
-        emit QCBackedDepositCredited(user, satoshis, qc, mintId, autoMint);
+        emit QCBackedDepositCredited(user, satoshis, qc, mintId, autoMintExecuted);
         emit MintCompleted(
             mintId,
             qc,
@@ -605,10 +620,14 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     function _executeAutoMint(address user, uint256 satoshis) internal {
         if (user == address(0)) revert InvalidUserAddress();
         if (satoshis == 0) revert ZeroAmount();
-        if (bank.balanceOf(user) < satoshis) revert InsufficientBalance();
+        
+        // Check if user has sufficient Bank balance
+        uint256 userBalance = bank.balanceOf(user);
+        if (userBalance < satoshis) revert InsufficientBalance();
 
         // Check user has approved this contract to spend their balance
-        if (bank.allowance(user, address(this)) < satoshis) {
+        uint256 userAllowance = bank.allowance(user, address(this));
+        if (userAllowance < satoshis) {
             revert InsufficientBalance(); // Reusing error for insufficient allowance
         }
 
@@ -642,9 +661,4 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             );
     }
 
-    /// @dev Helper to update QC minted amount to avoid stack too deep errors
-    function _updateQCMintedAmount(address qc, uint256 amount) private {
-        uint256 currentMinted = qcData.getQCMintedAmount(qc);
-        qcManager.updateQCMintedAmount(qc, currentMinted + amount);
-    }
 }

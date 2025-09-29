@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.17;
 
+import { IBank } from "../interfaces/IBank.sol";
+
 /// @title Mock AccountControl contract for testing
 /// @notice Mock implementation that tracks global minted amount for all users
 /// @dev In the real system, QCs mint on behalf of users, not for themselves
 contract MockAccountControl {
+    /// @notice Reference to the Bank contract for balance management
+    IBank public bank;
     /// @notice Track total minted amount globally (in satoshis)
     /// @dev This represents the total tBTC minted through the AccountControl system
     uint256 public totalMinted;
@@ -31,6 +35,16 @@ contract MockAccountControl {
     modifier whenNotPaused() {
         require(!paused, "Contract paused");
         _;
+    }
+
+    /// @notice Constructor to set the bank reference
+    constructor(address _bank) {
+        bank = IBank(_bank);
+    }
+
+    /// @notice Set the bank address (for testing)
+    function setBank(address _bank) external {
+        bank = IBank(_bank);
     }
 
     /// @notice Enable or disable AccountControl mode for testing
@@ -83,6 +97,11 @@ contract MockAccountControl {
             
             totalMinted += satoshis;
             minted[msg.sender] += satoshis;
+        }
+
+        // Create bank balance for the user
+        if (address(bank) != address(0)) {
+            bank.increaseBalance(user, satoshis);
         }
 
         emit TBTCMinted(user, amount, satoshis);
@@ -174,6 +193,12 @@ contract MockAccountControl {
             totalMinted += satoshis;
             minted[msg.sender] += satoshis;
         }
+        
+        // Create bank balance for the recipient
+        if (address(bank) != address(0)) {
+            bank.increaseBalance(recipient, satoshis);
+        }
+        
         emit TBTCMinted(recipient, amount, satoshis);
         return true;
     }

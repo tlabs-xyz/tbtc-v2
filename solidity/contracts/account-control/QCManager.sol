@@ -65,6 +65,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         keccak256("ENFORCEMENT_ROLE");
     bytes32 public constant MONITOR_ROLE = keccak256("MONITOR_ROLE");
     bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     // =================== STATE MANAGEMENT CONSTANTS ===================
     
@@ -865,6 +866,76 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
             reserveOracle,
             qc
         );
+    }
+
+    /// @notice Atomically consume minting capacity for a QC
+    /// @dev This function atomically checks capacity and updates minted amount to prevent TOCTOU vulnerabilities
+    ///      SECURITY: This is the critical fix for the race condition where multiple mints could exceed capacity
+    /// @param qc The address of the QC
+    /// @param amount The amount to mint (in satoshis)
+    /// @return success True if capacity was successfully consumed
+    function consumeMintCapacity(address qc, uint256 amount)
+        external
+        onlyRole(MINTER_ROLE)
+        nonReentrant
+        returns (bool success)
+    {
+        // Validate inputs
+        if (qc == address(0)) {
+            revert InvalidQCAddress();
+        }
+        if (amount == 0) {
+            return false;
+        }
+
+        // Check QC is registered
+        if (!qcData.isQCRegistered(qc)) {
+            revert QCNotRegistered(qc);
+        }
+
+        // Check QC is active
+        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
+            return false;
+        }
+
+        // Get current state
+        uint256 mintingCap = qcData.getMaxMintingCapacity(qc);
+        uint256 currentMinted = qcData.getQCMintedAmount(qc);
+        
+        // Calculate capacity from minting cap
+        if (currentMinted + amount > mintingCap) {
+            return false;
+        }
+
+        // Check reserve balance if oracle is available
+        if (address(reserveOracle) != address(0)) {
+            (uint256 reserveBalance, bool isStale) = reserveOracle.getReserveBalanceAndStaleness(qc);
+            
+            // If reserves are stale, no capacity available
+            if (isStale) {
+                return false;
+            }
+            
+            // Check if new minted amount would exceed reserves
+            if (currentMinted + amount > reserveBalance) {
+                return false;
+            }
+        }
+
+        // Atomically update the minted amount
+        uint256 newMintedAmount = currentMinted + amount;
+        qcData.updateQCMintedAmount(qc, newMintedAmount);
+
+        // Emit event for tracking
+        emit QCMintedAmountUpdated(
+            qc,
+            currentMinted,
+            newMintedAmount,
+            msg.sender,
+            block.timestamp
+        );
+
+        return true;
     }
 
     /// @notice Verify QC solvency

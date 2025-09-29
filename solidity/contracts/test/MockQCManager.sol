@@ -65,4 +65,19 @@ contract MockQCManager {
     function updateQCMintedAmount(address qc, uint256 newAmount) external {
         qcMintedAmount[qc] = newAmount;
     }
+
+    // Atomically check and consume minting capacity
+    function consumeMintCapacity(address qc, uint256 amount) external returns (bool) {
+        require(isQCRegistered[qc], "QC not registered");
+        uint256 cap = maxMintingCaps[qc];
+        uint256 minted = qcMintedAmount[qc];
+        uint256 newMinted = minted + amount;
+        
+        if (newMinted > cap) {
+            return false; // Capacity exceeded
+        }
+        
+        qcMintedAmount[qc] = newMinted;
+        return true;
+    }
 }

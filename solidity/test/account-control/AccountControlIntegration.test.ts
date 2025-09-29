@@ -51,6 +51,9 @@ describe("AccountControl Integration Tests", function () {
 
     // Configure SystemState with test defaults to prevent AmountOutsideAllowedRange errors
     await setupSystemStateDefaults(mockSystemState, owner);
+    
+    // Enable AccountControl mode in SystemState for integration tests
+    await mockSystemState.connect(owner).setAccountControlMode(true);
 
     // Deploy minimal mock contracts for QCMinter requirements
     const MockTBTCVaultFactory = await ethers.getContractFactory("contracts/test/MockTBTCVault.sol:MockTBTCVault");
@@ -83,6 +86,9 @@ describe("AccountControl Integration Tests", function () {
     const MockQCManagerFactory = await ethers.getContractFactory("MockQCManager");
     mockQcManager = await MockQCManagerFactory.deploy();
 
+    // Register QC in MockQCManager (required for consumeMintCapacity to work)
+    await mockQcManager.registerQC(qc.address, QC_MINTING_CAP);
+    
     // Set up minting capacity for the QC
     await mockQcManager.setMintingCapacity(qc.address, QC_MINTING_CAP);
 
@@ -286,6 +292,9 @@ describe("AccountControl Integration Tests", function () {
       // Set the totalMinted to match what was minted through QCMinter
       const expectedSatoshis = MINT_AMOUNT.div(SATOSHI_MULTIPLIER);
       await mockAccountControlForRedeemer.setTotalMintedForTesting(expectedSatoshis);
+      
+      // Also set the minted amount for QCRedeemer address (since it's the one calling redeem)
+      await mockAccountControlForRedeemer.setMintedForTesting(qcRedeemer.address, expectedSatoshis);
 
       // Setup redemption timeout
       await mockSystemState.setRedemptionTimeout(86400); // 24 hours
@@ -362,8 +371,15 @@ describe("AccountControl Integration Tests", function () {
       const mockAccountControlForMinter = await MockAccountControlFactory.deploy();
       await qcMinter.connect(owner).setAccountControl(mockAccountControlForMinter.address);
       
+      // Increase QC minting capacity for this test (needs 3x MINT_AMOUNT)
+      await mockQcManager.setMintingCapacity(qc.address, MINT_AMOUNT.mul(3));
+      
       // CRITICAL: Authorize the new MockAccountControl in Bank (required for QCMinter to work)
       await mockBank.authorizeBalanceIncreaser(mockAccountControlForMinter.address);
+      
+      // Authorize QCMinter as a reserve in the new MockAccountControl
+      await mockAccountControlForMinter.authorizeReserve(qcMinter.address, QC_BACKING_AMOUNT * 3);
+      await mockAccountControlForMinter.setBackingForTesting(qcMinter.address, QC_BACKING_AMOUNT * 3);
 
       // Mint with enabled
       let tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
@@ -422,6 +438,7 @@ describe("AccountControl Integration Tests", function () {
       const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
       const mockAccountControlForRedeemer = MockAccountControlFactory.attach(mockAccountControlAddress);
       await mockAccountControlForRedeemer.setTotalMintedForTesting(expectedSatoshis);
+      await mockAccountControlForRedeemer.setMintedForTesting(qcRedeemer.address, expectedSatoshis);
 
       // Execute partial redemption
       const redeemAmount = mintAmount.div(2);
@@ -453,6 +470,9 @@ describe("AccountControl Integration Tests", function () {
       const testBtcAddress2 = "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"; // Different valid Bitcoin address
       await mockQcData.connect(owner).registerWallet(qc2.address, testBtcAddress2);
 
+      // Register qc2 in MockQCManager (required for consumeMintCapacity to work)
+      await mockQcManager.registerQC(qc2.address, QC_MINTING_CAP);
+      
       // Set minting capacity for qc2 in MockQCManager
       await mockQcManager.setMintingCapacity(qc2.address, QC_MINTING_CAP);
 
@@ -511,6 +531,7 @@ describe("AccountControl Integration Tests", function () {
       const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
       const mockAccountControlForRedeemer = MockAccountControlFactory.attach(mockAccountControlAddress);
       await mockAccountControlForRedeemer.setTotalMintedForTesting(expectedSatoshis);
+      await mockAccountControlForRedeemer.setMintedForTesting(qcRedeemer.address, expectedSatoshis);
 
       // 3. Execute redemption
       await qcRedeemer.connect(user).initiateRedemption(

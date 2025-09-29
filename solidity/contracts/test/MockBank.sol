@@ -151,17 +151,22 @@ contract MockBank is IBank {
         return _allowances[owner][spender];
     }
 
+    // Standard ERC20-like allowance function for compatibility
+    function allowance(address owner, address spender) external view returns (uint256) {
+        return _allowances[owner][spender];
+    }
+
     // Testing configuration functions
-    function setBatchSupported(bool supported) external {
+    function setBatchSupported(bool supported) external onlyAdmin {
         batchSupported = supported;
     }
     
-    function setFailOnSecondCall(bool shouldFail) external {
+    function setFailOnSecondCall(bool shouldFail) external onlyAdmin {
         failOnSecondCall = shouldFail;
         callCount = 0; // Reset call count
     }
     
-    function resetCounters() external {
+    function resetCounters() external onlyAdmin {
         batchCallCount = 0;
         individualCallCount = 0;
         callCount = 0;

@@ -1,0 +1,4089 @@
+Starting CodeRabbit review in plain text mode...
+
+Connecting to review service
+Setting up
+Analyzing
+Reviewing
+
+============================================================================
+File: solidity/.eslintrc
+Line: 31 to 42
+Type: potential_issue
+
+Comment:
+Reconsider disabling guard-rail rules for flows//.ts.*
+
+Turning off eight rules (async loop safety, restricted syntax, any, console usage, etc.) across an entire production folder removes the safeguards that previously prevented real defects. Please either justify each rule with a narrower scope (e.g., per-file disables) or keep the rules enabled and address the violations directly. This keeps the flows codebase aligned with the project-wide standards and avoids silent regressions.
+
+Prompt for AI Agent:
+In solidity/.eslintrc around lines 31-42, don't blanket-disable eight guard-rail rules for flows//*.ts; instead revert these rules to the project defaults in this config and address violations, or scope any exceptions narrowly: remove the global "off" entries and either fix files to satisfy the rules, add targeted per-file or per-line eslint-disable comments with an explanatory justification and a TODO, or create a new config override that disables only the specific rule(s) for the minimal set of files that legitimately need them; ensure each disable has a short comment linking to an issue or PR for follow-up.
+
+
+
+============================================================================
+File: solidity/.solhint.json
+Line: 6
+Type: potential_issue
+
+Comment:
+Do not fully disable not-rely-on-time (security signal).
+Turning this off can mask risky use of block.timestamp/block.number. Keep it at least a warning and locally suppress with // solhint-disable-next-line not-rely-on-time where intentional.
+
+
+
+-    "not-rely-on-time": "off",
++    "not-rely-on-time": "warn",
+
+Prompt for AI Agent:
+In solidity/.solhint.json around line 6 the rule "not-rely-on-time" is fully disabled which hides risky uses of block.timestamp/block.number; change its value from "off" to "warn" in the config and update any intentional, reviewed uses to use local inline suppression comments (e.g. // solhint-disable-next-line not-rely-on-time) directly above the specific statement so the rule remains active globally but is opt-out per-instance.
+
+
+
+============================================================================
+File: solidity/contracts/test/MockBank.sol
+Line: 155 to 168
+Type: potential_issue
+
+Comment:
+Lock down the configuration setters.
+
+setBatchSupported, setFailOnSecondCall, and resetCounters are callable by anyone, so an arbitrary address can toggle batch support, re-enable forced failures, or wipe the counters. That defeats the newly introduced admin/authorization model and lets unauthorized parties disrupt contract behaviour. Please gate these functions with onlyAdmin.  
+
+-    function setBatchSupported(bool supported) external {
++    function setBatchSupported(bool supported) external onlyAdmin {
+         batchSupported = supported;
+     }
+     
+-    function setFailOnSecondCall(bool shouldFail) external {
++    function setFailOnSecondCall(bool shouldFail) external onlyAdmin {
+         failOnSecondCall = shouldFail;
+         callCount = 0; // Reset call count
+     }
+     
+-    function resetCounters() external {
++    function resetCounters() external onlyAdmin {
+         batchCallCount = 0;
+         individualCallCount = 0;
+         callCount = 0;
+     }
+
+Prompt for AI Agent:
+In solidity/contracts/test/MockBank.sol around lines 155 to 168, the configuration setters (setBatchSupported, setFailOnSecondCall and the resetCounters function) are currently public and must be restricted to the contract admin; update their declarations to include the onlyAdmin modifier so only an authorized admin can call them, ensure the onlyAdmin modifier is defined and applied consistently to these functions, and keep any existing state-reset logic (e.g., callCount = 0) unchanged.
+
+
+
+============================================================================
+File: solidity/.solhint.json
+Line: 2
+Type: potential_issue
+
+Comment:
+Use a safe Solhint base preset  
+Replace "extends": "keep" with "extends": "solhint:recommended" unless you’ve explicitly installed a trusted solhint-config-keep (the npm package was flagged as malicious).  
+- "extends": "keep",
++ "extends": "solhint:recommended",
+
+Prompt for AI Agent:
+In solidity/.solhint.json around line 2, the configuration extends the untrusted "keep" preset; replace the value with "solhint:recommended" so the project uses the official safe Solhint base preset (or, if you intentionally want a custom keep config, ensure and document that a trusted solhint-config-keep package is installed and verified before using it).
+
+
+
+============================================================================
+File: solidity/.prettierignore
+Line: 1
+Type: potential_issue
+
+Comment:
+Ensure Prettier loads the nested .prettierignore  
+Prettier walks up from each file’s directory to find .prettierignore, but when you pass --ignore-path it uses only the specified file. Add --ignore-path=solidity/.prettierignore to your Prettier command (e.g., prettier --write . --ignore-path=solidity/.prettierignore), or run Prettier with cwd=solidity, or merge these rules into a root .prettierignore so ignores always apply.
+
+Prompt for AI Agent:
+In solidity/.prettierignore around line 1, Prettier may not pick up this nested ignore when invoked with --ignore-path pointing elsewhere; update your tooling so Prettier uses this file by either adding --ignore-path=solidity/.prettierignore to the Prettier command, invoking Prettier with cwd set to the solidity directory, or merging these rules into the repository root .prettierignore; choose one approach and update the project scripts/config (package.json scripts, CI lint/prettier jobs, or editor settings) accordingly so the solidity/.prettierignore is consistently applied.
+
+
+
+============================================================================
+File: solidity/contracts/test/TestRelay.sol
+Line: 67 to 69
+Type: potential_issue
+
+Comment:
+Add the missing override for validateHeaderChain.
+
+Since TestRelay implements IRelay, the compiler expects this function to explicitly override the interface declaration. Without the override specifier the contract fails to compile. Add the modifier so the interface implementation is recognized.
+
+
+
+-    function validateHeaderChain(bytes memory) external view returns (uint256) {
++    function validateHeaderChain(bytes memory) external view override returns (uint256) {
+         return validateHeaderChainResult;
+     }
+
+Prompt for AI Agent:
+In solidity/contracts/test/TestRelay.sol around lines 67 to 69, the function validateHeaderChain lacks the required override specifier for the IRelay interface; update the function signature to include the override keyword (e.g. make it external view override returns (uint256)) so the compiler recognizes it as implementing the interface, then recompile to confirm the error is resolved.
+
+
+
+============================================================================
+File: solidity/test/debug_test.js
+Line: 10 to 14
+Type: potential_issue
+
+Comment:
+Wait for deployment to be mined; current assertion can pass even if deployment reverted.
+
+await MockTBTC.deploy() returns before the deployment is mined. Asserting the precomputed address can yield a false positive. Wait for deployment (v5/v6 safe) and assert bytecode exists.
+
+
+
+-    console.log("Calling deploy with no arguments...")
+-    const mockTBTC = await MockTBTC.deploy()
+-    console.log("MockTBTCToken deployed to:", mockTBTC.address)
+-
+-    expect(mockTBTC.address).to.not.equal(ethers.constants.AddressZero)
++    console.log("Calling deploy with no arguments...")
++    const mockTBTC = await MockTBTC.deploy()
++    // Wait for deployment (ethers v6 or v5)
++    if (typeof mockTBTC.waitForDeployment === "function") {
++      await mockTBTC.waitForDeployment()
++    } else if (typeof mockTBTC.deployed === "function") {
++      await mockTBTC.deployed()
++    }
++    const address = typeof mockTBTC.getAddress === "function"
++      ? await mockTBTC.getAddress()
++      : mockTBTC.address
++    console.log("MockTBTCToken deployed to:", address)
++    // Verify code exists at the address (stronger than non‑zero address)
++    const code = await ethers.provider.getCode(address)
++    expect(code).to.not.equal("0x")
+
+Prompt for AI Agent:
+In solidity/test/debug_test.js around lines 10 to 14, the test asserts the precomputed deployed address immediately after MockTBTC.deploy(), which can produce a false positive if the deployment reverted; to fix, wait for the deployment to be mined (use await mockTBTC.deployed() for v5/v6 or await mockTBTC.deployTransaction.wait()) and then verify the contract bytecode exists at mockTBTC.address by calling the provider/getCode and asserting the returned code is not the empty bytecode.
+
+
+
+============================================================================
+File: solidity/contracts/test/MockReimbursementPool.sol
+Line: 18 to 21
+Type: potential_issue
+
+Comment:
+Prevent bricking ownership; add zero-address guard (+ emit standard event).
+
+Transferring to address(0) permanently locks admin functions. Add a guard and emit OwnershipTransferred for EIP‑173 parity.
+
+
+
+-    function transferOwnership(address newOwner) external {
+-        require(msg.sender == owner, "Only owner can transfer ownership");
+-        owner = newOwner;
+-    }
++    function transferOwnership(address newOwner) external {
++        require(msg.sender == owner, "Only owner can transfer ownership");
++        require(newOwner != address(0), "newOwner is zero address");
++        address previousOwner = owner;
++        owner = newOwner;
++        emit OwnershipTransferred(previousOwner, newOwner);
++    }
+
+
+Add this event (outside the shown range, near state declarations):
+
+event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+Prompt for AI Agent:
+In solidity/contracts/test/MockReimbursementPool.sol around lines 18 to 21, the transferOwnership function allows setting owner to address(0) and doesn't emit the standard event; add a require(newOwner != address(0), "New owner is the zero address") to guard against bricking ownership and emit the OwnershipTransferred(previousOwner, newOwner) event when ownership changes. Also add the event declaration event OwnershipTransferred(address indexed previousOwner, address indexed newOwner); near the state declarations (outside the shown range).
+
+
+
+============================================================================
+File: solidity/package.json
+Line: 50
+Type: refactor_suggestion
+
+Comment:
+Remove @nomiclabs/hardhat-waffle in favor of hardhat-chai-matchers
+
+- Hardhat now warns against using waffle alongside chai-matchers; migrate off @nomiclabs/hardhat-waffle to @nomicfoundation/hardhat-chai-matchers or the Hardhat Toolbox.  
+- Verify ethers ^5, chai ^4.3.4 compatibility and Node engine constraints (>=14 vs >=16).
+
+-    "@nomiclabs/hardhat-waffle": "^2.0.2",
++    // removed in favor of @nomicfoundation/hardhat-chai-matchers
+
+
+
+
+============================================================================
+File: solidity/.eslintignore
+Line: 11 to 13
+Type: refactor_suggestion
+
+Comment:
+Update ignore configuration for external optimistic-minting project (solidity/.eslintignore:11-13)  
+Ignore-file patterns are relative to the file’s directory, so optimistic-minting/ in solidity/.eslintignore only skips solidity/optimistic-minting/. To exclude the optimistic-minting/ folder at the repo root, choose one:
+
+- Move (or copy) .eslintignore to the repository root and keep optimistic-minting/.  
+- Run ESLint from the repo root so the root-level ignore file applies.  
+- Invoke ESLint with --ignore-pattern 'optimistic-minting/' when running from the root.
+
+Prompt for AI Agent:
+In solidity/.eslintignore around lines 11-13, the pattern "optimistic-minting/" only ignores solidity/optimistic-minting/ (because ignore patterns are relative to the ignore file). Fix by either: 1) change the pattern to "../optimistic-minting/" to ignore the repo-root optimistic-minting/ directory from this file; or 2) move or copy .eslintignore to the repository root and keep "optimistic-minting/"; or 3) when running ESLint from the repo root, invoke it with --ignore-pattern 'optimistic-minting/' so the repo-root folder is excluded.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCRedeemerSPV.test.ts
+Line: 137 to 139
+Type: potential_issue
+
+Comment:
+Assert the SPV error code, not just the custom error type
+
+Right now we only check that a SPVErr custom error is raised; we never verify the numeric code. That means these tests still pass even if the implementation returns the wrong SPVErr value, undermining the “all 16 error codes are covered” guarantee. Please tighten each of these expectations (here and in the other SPVErr cases) to assert the specific code—for example:
+
+-      await expect(qcRedeemerSPV.validateSPVProof(invalidTxInfo, proof))
+-        .to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr")
++      await expect(qcRedeemerSPV.validateSPVProof(invalidTxInfo, proof))
++        .to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr")
++        .withArgs(2)
+
+
+Apply the same fix to the other SPVErr assertions so the suite actually guards each error code.
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCRedeemerSPV.test.ts around lines 137 to 139, the test only asserts the SPVErr custom error type but not the numeric code; update this expectation to assert the specific numeric error code by appending a .withArgs(expectedCode) (or equivalent assertion) to the revertedWithCustomError call so the test verifies the exact SPV error value, and apply the same change to every other SPVErr assertion in the file to ensure each of the 16 error codes is explicitly checked.
+
+
+
+============================================================================
+File: solidity/test-account-control.sh
+Line: 50 to 88
+Type: potential_issue
+
+Comment:
+Filtering branch still runs every test file
+
+Even when users pass specific files or mocha flags, we still append them after the entire TEST_FILES array. Hardhat happily executes the full list, so ./test-account-control.sh test/account-control/QCMinter.test.ts still runs every account-control test. Please gate the list so the filter branch only forwards what the caller supplied, and hoist the shared timeout/error-handling block.  
+
+
+-if [ $# -gt 0 ]; then
++if [ $# -gt 0 ]; then
+     echo "Running with filter: $@"
+     echo "Node memory: ${NODE_OPTIONS}"
+     echo "Environment: USE_EXTERNAL_DEPLOY=${USE_EXTERNAL_DEPLOY}, TEST_USE_STUBS_TBTC=${TEST_USE_STUBS_TBTC}"
+     echo ""
+-    
+-    # Run with timeout and error handling
+-    timeout 3600 npx hardhat test "${TEST_FILES[@]}" "$@" || {
++    TARGET_ARGS=("$@")
+ else
+     echo "Running all account-control tests..."
+     echo "Node memory: ${NODE_OPTIONS}"
+     echo "Environment: USE_EXTERNAL_DEPLOY=${USE_EXTERNAL_DEPLOY}, TEST_USE_STUBS_TBTC=${TEST_USE_STUBS_TBTC}"
+     echo ""
+-    
+-    # Run with timeout and error handling
+-    timeout 3600 npx hardhat test "${TEST_FILES[@]}" || {
+-        EXIT_CODE=$?
+-        echo ""
+-        echo "❌ Tests failed with exit code: $EXIT_CODE"
+-        if [ $EXIT_CODE -eq 124 ]; then
+-            echo "❌ Tests timed out after 1 hour"
+-        elif [ $EXIT_CODE -eq 50 ]; then
+-            echo "❌ Exit code 50 detected - likely compilation or library linking issue"
+-            echo "💡 Try running: npm run clean && npm run build"
+-        fi
+-        exit $EXIT_CODE
+-    }
++    TARGET_ARGS=("${TEST_FILES[@]}")
+ fi
++
++# Run with timeout and error handling
++timeout 3600 npx hardhat test "${TARGET_ARGS[@]}" || {
++    EXIT_CODE=$?
++    echo ""
++    echo "❌ Tests failed with exit code: $EXIT_CODE"
++    if [ $EXIT_CODE -eq 124 ]; then
++        echo "❌ Tests timed out after 1 hour"
++    elif [ $EXIT_CODE -eq 50 ]; then
++        echo "❌ Exit code 50 detected - likely compilation or library linking issue"
++        echo "💡 Try running: npm run clean && npm run build"
++    }
++    exit $EXIT_CODE
++}
+
+
+
+
+============================================================================
+File: solidity/hardhat.config.ts
+Line: 4
+Type: potential_issue
+
+Comment:
+Load dotenv before importing local modules/tasks.
+
+If ./tasks reads environment variables at import time, loading dotenv/config afterward can yield undefined values. Move it to the top.
+
+
+-import "./tasks"
+-import "dotenv/config"
++import "dotenv/config"
++import "./tasks"
+
+Prompt for AI Agent:
+In solidity/hardhat.config.ts around line 4, dotenv/config is imported after local modules/tasks which may read env vars at import time; move the import "dotenv/config" to the very top of the file (before any local imports or task imports) so environment variables from the .env file are loaded before any module executes and tasks can reliably access process.env values.
+
+
+
+============================================================================
+File: solidity/deploy/00_deploy_test_reimbursement_pool.ts
+Line: 18 to 33
+Type: potential_issue
+
+Comment:
+Make deployment and ownership transfer idempotent to avoid rerun reverts.
+
+On persistent local chains, after the first run the owner is governance, so calling transferOwnership from deployer will revert on subsequent runs. Also, be explicit about skipping redeploys.
+
+
+
+-  await deploy("ReimbursementPool", {
+-    from: deployer,
+-    contract: "MockReimbursementPool",
+-    args: [],
+-    log: true,
+-    waitConfirmations: 1,
+-  })
++  const { newlyDeployed } = await deploy("ReimbursementPool", {
++    from: deployer,
++    contract: "MockReimbursementPool",
++    args: [],
++    log: true,
++    waitConfirmations: 1,
++    skipIfAlreadyDeployed: true,
++  })
+ 
+-  // Transfer ownership to governance account for proper authorization flow
+-  await execute(
+-    "ReimbursementPool",
+-    { from: deployer, log: true, waitConfirmations: 1 },
+-    "transferOwnership",
+-    governance
+-  )
++  // Transfer ownership to governance account (idempotent)
++  const { read } = deployments
++  const owner: string = await read("ReimbursementPool", "owner")
++  if (owner.toLowerCase() !== governance.toLowerCase()) {
++    await execute(
++      "ReimbursementPool",
++      { from: deployer, log: true, waitConfirmations: 1 },
++      "transferOwnership",
++      governance
++    )
++    log(Transferred ownership to governance: ${governance})
++  } else {
++    log("Ownership already set to governance; skipping transfer")
++  }
+
+
+Note: This assumes deployer is the current owner when a transfer is needed. If not, you may want to handle that case explicitly (e.g., warn/abort).
+
+Prompt for AI Agent:
+In solidity/deploy/00_deploy_test_reimbursement_pool.ts around lines 18-33, the script always redeploys and unconditionally calls transferOwnership which will revert on re-runs; make it idempotent by (1) using the deploy helper options to skip redeploy if already deployed (e.g., check if the contract was newly deployed or use a conditional on deployments.get or deployer.getNetworkName) and (2) before calling transferOwnership, fetch the current owner from the deployed ReimbursementPool and only call transferOwnership from the deployer if owner === deployer (otherwise skip and optionally log a warning); ensure waits/logging remain the same and handle errors gracefully.
+
+
+
+============================================================================
+File: solidity/contracts/bank/Bank.sol
+Line: 34 to 36
+Type: potential_issue
+
+Comment:
+If intent is “contracts only”, enforce it.
+
+The comment says “Authorized contracts…”, but EOAs currently can be authorized. Either:
+- enforce increaser.code.length > 0, or
+- reword docs to allow EOAs.
+
+Suggest enforcing contract-type at the setter:
+
+ function setAuthorizedBalanceIncreaser(address increaser, bool authorized)
+     external
+     onlyOwner
+ {
+     require(increaser != address(0), "Increaser address cannot be zero");
++    require(increaser.code.length > 0, "Increaser must be a contract");
+     authorizedBalanceIncreasers[increaser] = authorized;
+     emit AuthorizedBalanceIncreaserUpdated(increaser, authorized);
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/bank/Bank.sol around lines 34-36, the NatSpec says “Authorized contracts…” but the mapping currently allows EOAs; enforce contract-only addresses in the setter by requiring increaser.code.length > 0 (or extcodesize > 0 for older compilers) and revert with a clear error message if zero, and update the NatSpec/comment to match the enforced behavior; alternatively, if EOAs must be allowed, update the comment to remove “contracts only” wording instead of adding the check.
+
+
+
+============================================================================
+File: solidity/deploy/07_deploy_tbtc_vault.ts
+Line: 12 to 19
+Type: potential_issue
+
+Comment:
+Guard fallback to BridgeStub by network and fail fast if neither exists
+
+Unconditional fallback to the stub on any error risks deploying against BridgeStub in prod if Bridge lookup fails for unrelated reasons. Prefer explicit network-gated fallback and a clear error when neither deployment is present.
+
+
+
+Apply this diff to lines 12-19:
+
+-  // Handle both Bridge and BridgeStub deployments (for testing)
+-  let Bridge
+-  try {
+-    Bridge = await deployments.get("Bridge")
+-  } catch (error) {
+-    // Fallback to BridgeStub for test environments
+-    Bridge = await deployments.get("BridgeStub")
+-  }
++  // Resolve Bridge deployment with env-aware fallback; fail fast if missing
++  const isTestNet =
++    hre.network.tags?.test || ["hardhat", "localhost"].includes(hre.network.name)
++  const Bridge =
++    (await deployments.getOrNull("Bridge")) ??
++    (isTestNet ? await deployments.getOrNull("BridgeStub") : null)
++  if (!Bridge) {
++    throw new Error(
++      "TBTCVault deploy: missing Bridge (prod) or BridgeStub (test) deployment"
++    )
++  }
+
+Prompt for AI Agent:
+In solidity/deploy/07_deploy_tbtc_vault.ts around lines 12 to 19, the current code unconditionally falls back to BridgeStub on any error which can cause accidental use of the stub in production; change the logic to first attempt to get "Bridge", and if that fails only attempt "BridgeStub" when the current network is one of the explicitly allowed test/local networks (e.g. hardhat, localhost, ganache, or a configured test chain id); if the network is not in that allowlist or BridgeStub is also missing, throw a clear error (include the original error message) so deployment fails fast rather than silently using a stub.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCRedeemerSPV.test.ts
+Line: 91 to 92
+Type: potential_issue
+
+Comment:
+Replace .deployed() with the Ethers v6 deployment wait
+
+With the Hardhat Ethers v6 typings in this suite (HardhatEthersSigner), Contract.deployed() no longer exists. Calling it raises TypeError: deployedSPV.deployed is not a function, so this test fails before reaching the assertions. Use the new waitForDeployment() helper (or drop the extra await entirely) so the contract is properly awaited without throwing.
+
+-      await deployedSPV.deployed()
++      await deployedSPV.waitForDeployment()
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCRedeemerSPV.test.ts around lines 91 to 92, the test calls deployedSPV.deployed() which doesn't exist under Hardhat Ethers v6 and throws; replace that call by awaiting the Ethers v6 deployment helper (e.g., await deployedSPV.waitForDeployment()) or remove the extra await entirely if deploy() already resolves to a ready contract; update the code to use waitForDeployment() (or drop the second await) so the test no longer calls the non-existent .deployed() method.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManagerLib.sol
+Line: 264 to 273
+Type: potential_issue
+
+Comment:
+Fix parity computation for compressed pubkey prefix.
+
+The current loop only preserves the most-significant byte of the Y coordinate because each bytes32(publicKey[32 + i]) >> (i * 8) call shifts non-zero bytes entirely out for i > 0. As a result, yCoord collapses to the first byte of Y, and the compressed key prefix is chosen based on the MSB parity instead of the actual LSB parity. Roughly half of valid wallet keys will therefore derive the wrong bech32 address and fail registration, blocking legitimate QCs. Compute the parity directly from the least significant bit of publicKey[63] instead.
+
+-        bytes32 yCoordBytes;
+-        for (uint i = 0; i > (i * 8);
+-        }
+-        uint256 yCoord = uint256(yCoordBytes);
+-        compressed[0] = (yCoord % 2 == 0) ? bytes1(0x02) : bytes1(0x03);
++        uint8 yLsb = uint8(publicKey[63]) & 0x01;
++        compressed[0] = yLsb == 0 ? bytes1(0x02) : bytes1(0x03);
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManagerLib.sol around lines 264 to 273, the code reconstructs yCoord incorrectly by shifting individual bytes which preserves only the most-significant byte; instead determine parity from the least-significant bit of the last Y byte. Replace the yCoord build and uint256 parity check with a direct parity read from publicKey[63] (e.g. check publicKey[63] & 1 == 0) and set compressed[0] to 0x02 when even or 0x03 when odd; keep the subsequent loop that copies the X coordinate unchanged.
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlSeparatedOperations.test.ts
+Line: 107 to 112
+Type: potential_issue
+
+Comment:
+Use custom‑error matcher consistently for cap exceed.
+
+Else this test will fail if the contract emits the custom error (earlier you matched it as custom).
+
+-            await expect(accountControl.connect(reserve).creditMinted(excessAmount))
+-                .to.be.revertedWith("ExceedsReserveCap");
++            await expect(accountControl.connect(reserve).creditMinted(excessAmount))
++                .to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
+
+Prompt for AI Agent:
+In solidity/test/account-control/AccountControlSeparatedOperations.test.ts around lines 107 to 112, the test uses .revertedWith("ExceedsReserveCap") which is inconsistent with earlier custom-error assertions and will fail if the contract emits the custom error; replace the .revertedWith(...) assertion with the custom-error matcher .revertedWithCustomError(accountControl, "ExceedsReserveCap") (add .withArgs(...) only if specific error args should be asserted) so the test consistently checks the custom error.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/SPVState.sol
+Line: 74 to 77
+Type: potential_issue
+
+Comment:
+Enforce init + custom errors + observability on difficulty updates
+
+- Guard with initialized.
+- Use existing custom error for zero.
+- Emit an update event for ops visibility.
+
+ function setTxProofDifficultyFactor(Storage storage self, uint96 _txProofDifficultyFactor) internal {
+-        require(_txProofDifficultyFactor > 0, "SPVState: difficulty factor must be positive");
+-        self.txProofDifficultyFactor = _txProofDifficultyFactor;
++        if (!self.initialized) revert NotInitialized();
++        if (_txProofDifficultyFactor == 0) revert DifficultyFactorZero();
++        uint96 previous = self.txProofDifficultyFactor;
++        self.txProofDifficultyFactor = _txProofDifficultyFactor;
++        emit DifficultyFactorUpdated(previous, _txProofDifficultyFactor);
+ }
+
+
+
+
+============================================================================
+File: solidity/contracts/account-control/SPVState.sol
+Line: 14 to 22
+Type: refactor_suggestion
+
+Comment:
+Add missing NotInitialized error; add update events; index relay in init event
+
+Improves invariants and monitoring; keeps revert style consistent and cheaper than strings.
+
+     // Custom errors for initialization states
+     error RelayAddressZero();
+     error DifficultyFactorZero();
+     error AlreadyInitialized();
+     error RelayNotContract();
++    error NotInitialized();
+ 
+     // Events
+-    event SPVInitialized(address relay, uint96 txProofDifficultyFactor);
++    event SPVInitialized(address indexed relay, uint96 txProofDifficultyFactor);
++    event RelayUpdated(address indexed previousRelay, address indexed newRelay);
++    event DifficultyFactorUpdated(uint96 previousDifficultyFactor, uint96 newDifficultyFactor);
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/SPVState.sol around lines 14–22, add a NotInitialized() custom error, add update events (e.g., RelayUpdated(address indexed oldRelay, address indexed newRelay) and DifficultyFactorUpdated(uint96 oldFactor, uint96 newFactor)) and change the existing SPVInitialized event to index the relay parameter (address indexed relay, uint96 txProofDifficultyFactor); ensure subsequent revert uses the NotInitialized error where appropriate and emit the new update events when relay or difficulty factor are changed, maintaining custom-error style instead of string reverts.
+
+
+
+============================================================================
+File: solidity/hardhat.config.ts
+Line: 8
+Type: refactor_suggestion
+
+Comment:
+Remove deprecated Waffle plugin and adopt the Foundation stack  
+@nomiclabs/hardhat-waffle is deprecated and incompatible with @nomicfoundation/hardhat-chai-matchers. Remove any Waffle imports and switch to @nomicfoundation/hardhat-ethers or include the bundled @nomicfoundation/hardhat-toolbox to avoid conflicts.
+
+Prompt for AI Agent:
+In solidity/hardhat.config.ts around line 8, the code still references the deprecated Waffle stack; remove any imports of @nomiclabs/hardhat-waffle and replace them with the Foundation plugins — either import "@nomicfoundation/hardhat-ethers" or import the bundled "@nomicfoundation/hardhat-toolbox" at the top of the file, update package.json devDependencies to remove @nomiclabs/hardhat-waffle and add the chosen @nomicfoundation package, run npm/yarn install, and ensure any Waffle-specific matcher/test code is migrated to use the Foundation matchers (hardhat-chai-matchers) and ethers provider APIs.
+
+
+
+============================================================================
+File: solidity/test/account-control/SPVLibrariesIntegration.test.ts
+Line: 95 to 97
+Type: potential_issue
+
+Comment:
+Await deployments to eliminate flakiness with ethers v6
+
+Ensure contracts are mined before first call.
+
+
+-    testRelay = await TestRelay.deploy()
++    testRelay = await TestRelay.deploy()
++    await testRelay.waitForDeployment()
+@@
+-    qcRedeemerSPVTest = await QCRedeemerSPVTest.deploy(
++    qcRedeemerSPVTest = await QCRedeemerSPVTest.deploy(
+       testRelay.address,
+       1 // txProofDifficultyFactor for testing
+     )
++    await qcRedeemerSPVTest.waitForDeployment()
+
+
+
+Also applies to: 112-116
+
+Prompt for AI Agent:
+In solidity/test/account-control/SPVLibrariesIntegration.test.ts around lines 95-97 (and also apply the same change at lines 112-116), the test deploys TestRelay and SPV libraries but does not wait for the deployment transactions to be mined, causing flakiness with ethers v6; update the test to await the deployed contract instances (or their deployment transaction promises) before making any calls—i.e., use the async deploy helper returns/promises and await them (or call .deployed() / await tx.wait() as appropriate) so contracts are fully mined before proceeding.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerLib.Integration.test.ts
+Line: 176 to 205
+Type: potential_issue
+
+Comment:
+Tighten the P2PKH validation assertion
+
+The “should validate P2PKH addresses” test passes even if address validation fails: any revert other than QCNotRegistered (including InvalidWalletAddress) will satisfy to.not.be.revertedWithCustomError. That means a regression in the P2PKH path slips through unnoticed. Please set the QC status to active as in the other wallet tests and assert on the specific post-validation revert (e.g. SignatureVerificationFailed) so we actually prove the address is accepted.
+
+
+
+       await qcManager.connect(governance).registerQC(
+         qc.address,
+         ethers.utils.parseEther("1000000")
+       );
+-      
+-      await qcManager.grantRole(await qcManager.EMERGENCY_ROLE(), deployer.address);
+-      await qcManager.grantInitialCredit(qc.address);
++      await qcData.setQCStatus(qc.address, 0, ethers.constants.HashZero); // Active
++
++      await qcManager.grantRole(await qcManager.EMERGENCY_ROLE(), deployer.address);
++      await qcManager.grantInitialCredit(qc.address);
+ ...
+-      await expect(
++      await expect(
+         qcManager.connect(registrar).registerWallet(
+           qc.address,
+           p2pkhAddress,
+           challenge,
+           mockPublicKey,
+           27,
+           ethers.utils.randomBytes(32),
+           ethers.utils.randomBytes(32)
+         )
+-      ).to.not.be.revertedWithCustomError(qcManager, "QCNotRegistered");
++      ).to.be.revertedWithCustomError(qcManager, "SignatureVerificationFailed");
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerLib.Integration.test.ts around lines 176 to 205, the test currently only asserts that registerWallet does not revert with QCNotRegistered which can hide an InvalidWalletAddress regression; instead, ensure the QC is fully activated as done in the other wallet tests (set QC status to active/approved after registration, e.g. follow the same activation steps used elsewhere), then call registerWallet and assert it reverts with the specific post-validation error (for example expect(...).to.be.revertedWithCustomError(qcManager, "SignatureVerificationFailed")) to prove the P2PKH address passed validation rather than relying on a negated QCNotRegistered check.
+
+
+
+============================================================================
+File: solidity/test/account-control/BitcoinAddressUtils.test.ts
+Line: 8
+Type: potential_issue
+
+Comment:
+Remove unused signer to avoid TS noUnusedLocals and keep tests lean
+
+deployer is assigned but never used.
+
+
+-  let deployer: HardhatEthersSigner
+@@
+-    const [deployerSigner] = await ethers.getSigners()
+-    deployer = deployerSigner
++    // No explicit signer needed; ContractFactory uses the default signer.
+
+
+
+Also applies to: 12-14
+
+Prompt for AI Agent:
+In solidity/test/account-control/BitcoinAddressUtils.test.ts around lines 8 and 12-14, there are unused HardhatEthersSigner declarations (deployer and others) causing TypeScript noUnusedLocals warnings; remove the unused signer variable declarations or, if you want to keep them for clarity, prefix their names with an underscore (e.g., _deployer) or use them in a noop manner so they are referenced, then run tests/ts build to confirm the warnings are gone.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/SPVState.sol
+Line: 66 to 69
+Type: potential_issue
+
+Comment:
+Setters bypass init and allow non-contract relay; unify to custom errors
+
+- Missing initialized guard lets callers mutate state pre-init.
+- No contract-code check here (unlike initialize).
+- Uses string requires instead of defined custom errors.
+
+Apply:
+
+ function setRelay(Storage storage self, address _relay) internal {
+-        require(_relay != address(0), "SPVState: relay address cannot be zero");
+-        self.relay = IRelay(_relay);
++        if (!self.initialized) revert NotInitialized();
++        if (_relay == address(0)) revert RelayAddressZero();
++        if (_relay.code.length == 0) revert RelayNotContract();
++        address previous = address(self.relay);
++        self.relay = IRelay(_relay);
++        emit RelayUpdated(previous, _relay);
+ }
+
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerAccountControlIntegration.test.ts
+Line: 206 to 219
+Type: potential_issue
+
+Comment:
+Same issue for cap update failure revert.
+
+Align the expectation with the configured mock revert reason.
+
+
+-).to.be.revertedWith("Transaction reverted: function returned an unexpected amount of data");
++).to.be.revertedWith("Mock cap update failure");
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerAccountControlIntegration.test.ts around lines 206 to 219, the test expects the generic low-level revert message but the AccountControl mock was configured to revert with "Mock cap update failure"; update the assertion to expect that configured mock revert reason (e.g., use .to.be.revertedWith("Mock cap update failure")) so the test aligns with the mock behavior.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerAccountControlIntegration.test.ts
+Line: 188 to 201
+Type: potential_issue
+
+Comment:
+Revert expectation is incorrect/brittle; assert the mock’s revert reason instead.
+
+You configure mockAccountControl.authorizeReserve.reverts("Mock authorization failure") but then expect "function returned an unexpected amount of data". Assert the actual revert reason (or a custom error) to avoid env‑specific messages.
+
+
+-).to.be.revertedWith("Transaction reverted: function returned an unexpected amount of data");
++).to.be.revertedWith("Mock authorization failure");
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerAccountControlIntegration.test.ts around lines 188 to 201, the test asserts a brittle environment-specific revert message; change the assertion to check the mock AccountControl revert reason you set ("Mock authorization failure") instead of "Transaction reverted: function returned an unexpected amount of data" so the test expects the actual revert from mockAccountControl.authorizeReserve.reverts("Mock authorization failure") (i.e., use await expect(...).to.be.revertedWith("Mock authorization failure") or the equivalent custom-error assertion).
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/QCRedeemerSPV.sol
+Line: 141 to 146
+Type: potential_issue
+
+Comment:
+Safe path can still revert (parsing helpers may throw).
+
+parseVarInt and extractOutputAtIndex can revert on malformed/truncated data. The simplistic length < 9 + i*9 bound does not guard variable-length outputs. This breaks the “never throws” guarantee.
+
+
+- Implement a bounded, cursor-based scan that checks lengths before every read (value[8] + varint(scriptLen) + script bytes).
+- Decode the target address once, then compare against each output to avoid re-decoding per iteration.
+I can provide a drop‑in scanOutputsAndSumToHashSafe(...) helper if useful.
+
+
+Also applies to: 148-166
+
+
+
+
+============================================================================
+File: solidity/test/account-control/WatchdogEnforcer.test.ts
+Line: 330 to 351
+Type: potential_issue
+
+Comment:
+“Reentrancy protection” test doesn’t test reentrancy.
+
+Calling the function once and asserting no revert does not validate the nonReentrant guard. Create a malicious QCManager that calls back into enforceObjectiveViolation from requestStatusChange to confirm the second (reentrant) call reverts.
+
+
+
+
+
+Example minimal harness (outline):
+
+// contracts/test/ReentrantQCManager.sol
+pragma solidity ^0.8.20;
+
+interface IEnforcer { function enforceObjectiveViolation(address qc, bytes32 reason) external; }
+
+contract ReentrantQCManager {
+  IEnforcer private enforcer;
+  bytes32 private reason;
+  address private qc;
+  bool private reentered;
+
+  constructor(IEnforcer _enforcer, address _qc, bytes32 _reason) {
+    enforcer = _enforcer; qc = _qc; reason = _reason;
+  }
+
+  function requestStatusChange(address, uint8, bytes32) external {
+    if (!reentered) {
+      reentered = true;
+      enforcer.enforceObjectiveViolation(qc, reason); // should revert due to nonReentrant
+    }
+  }
+}
+
+
+Then deploy this QCManager in the test and expect the outer call to succeed but the inner (reentrant) call to revert.
+Do you want me to wire this into the test file?
+
+Prompt for AI Agent:
+In solidity/test/account-control/WatchdogEnforcer.test.ts around lines 330 to 351, the "reentrancy protection" test only calls enforceObjectiveViolation once and doesn't verify the nonReentrant guard; replace the current mock QCManager with a minimal deployed ReentrantQCManager contract that implements requestStatusChange and in its first call calls back into watchdogEnforcer.enforceObjectiveViolation (so the inner call should revert), then in the test: deploy ReentrantQCManager pointing to the enforcer, call watchdogEnforcer.enforceObjectiveViolation via that QCManager and assert the outer call succeeds while the inner reentrant call reverts (expect revert on the nested call), and finally verify requestStatusChange was invoked exactly once; add necessary deployment and signer setup and the revert assertion to validate the nonReentrant behavior.
+
+
+
+============================================================================
+File: solidity/test/account-control/SystemState.test.ts
+Line: 2 to 6
+Type: potential_issue
+
+Comment:
+Fix Hardhat helpers usage: replace non-standard helpers.snapshot/helpers.time.increaseTime with @nomicfoundation/hardhat-network-helpers.
+
+helpers.snapshot.createSnapshot/restoreSnapshot and helpers.time.increaseTime are not part of Hardhat's public HRE. Use takeSnapshot()/SnapshotRestorer and time.increase() to avoid runtime failures and flakiness.
+
+
+
+
+Apply these diffs (and propagate time.increase replacements across the file):
+
+-import { ethers, helpers } from "hardhat"
++import { ethers } from "hardhat"
++import { time, takeSnapshot } from "@nomicfoundation/hardhat-network-helpers"
++import type { SnapshotRestorer } from "@nomicfoundation/hardhat-network-helpers"
+@@
+-const { createSnapshot, restoreSnapshot } = helpers.snapshot
++let snapshot: SnapshotRestorer
+@@
+-beforeEach(async () => {
+-  await createSnapshot()
++beforeEach(async () => {
++  snapshot = await takeSnapshot()
+@@
+-afterEach(async () => {
+-  await restoreSnapshot()
++afterEach(async () => {
++  await snapshot.restore()
+
+
+- await helpers.time.increaseTime(3)
++ await time.increase(3)
+
+
+- await helpers.time.increaseTime(2)
++ await time.increase(2)
+
+
+- await helpers.time.increaseTime(1)
++ await time.increase(1)
+
+
+
+Also applies to: 46-61, 1048-1049, 1236-1239, 1241-1243
+
+Prompt for AI Agent:
+In solidity/test/account-control/SystemState.test.ts (lines 2-6 and also update occurrences at 46-61, 1048-1049, 1236-1239, 1241-1243), replace usage of the non-public Hardhat helpers (helpers.snapshot.createSnapshot / restoreSnapshot and helpers.time.increaseTime) with the official @nomicfoundation/hardhat-network-helpers equivalents: import and use the snapshot/takeSnapshot/restoreSnapshot (SnapshotRestorer) API for snapshots and use time.increase(...) for advancing time; update all calls accordingly (replace createSnapshot/restoreSnapshot calls with takeSnapshot()/SnapshotRestorer pattern and replace helpers.time.increaseTime with time.increase) so the tests use the supported public HRE helpers.
+
+
+
+============================================================================
+File: solidity/test/account-control/SystemState.test.ts
+Line: 905 to 910
+Type: potential_issue
+
+Comment:
+Use full AccessControl revert messages; partial matches will fail.
+
+.to.be.revertedWith("AccessControl: account") won’t match OZ’s full revert string. Assert the complete message (addresses lowercased) or factor a small helper to build it.
+
+
+
+-).to.be.revertedWith("AccessControl: account")
++).to.be.revertedWith(
++  AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}
++)
+
+
+-).to.be.revertedWith("AccessControl: account")
++).to.be.revertedWith(
++  AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}
++)
+
+
+-).to.be.revertedWith("AccessControl: account")
++).to.be.revertedWith(
++  AccessControl: account ${adminAccount.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}
++)
+
+
+-).to.be.revertedWith("AccessControl: account")
++).to.be.revertedWith(
++  AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}
++)
+
+
+
+Also applies to: 996-999, 1130-1136, 1167-1170
+
+Prompt for AI Agent:
+In solidity/test/account-control/SystemState.test.ts around lines 905-910 (and also update the similar assertions at 996-999, 1130-1136, 1167-1170), the test uses a partial revert string "AccessControl: account" which won't match OpenZeppelin's full revert; replace these assertions to expect the full message in the form "AccessControl: account  is missing role ", where  is thirdParty.address.toLowerCase() and  is the exact bytes32 role hash used in the contract (or generate both via a small helper that formats the address and role into the expected string), then use that full expected string in the .to.be.revertedWith assertions.
+
+
+
+============================================================================
+File: solidity/test/account-control/SystemState.test.ts
+Line: 841 to 865
+Type: potential_issue
+
+Comment:
+Avoid concurrent sends with the same signer; Promise.all can cause nonce collisions.
+
+Multiple txs from pauserAccount are fired concurrently; this is a common source of flaky tests (“nonce too low” / replacement errors). Send sequentially or use a NonceManager.
+
+
+
+
+-await Promise.all(
+-  reasons.map(async (reason) => {
+-    const qc = ethers.Wallet.createRandom().address
+-    const tx = await systemState.connect(pauserAccount).emergencyPauseQC(qc, reason)
+-    const receipt = await tx.wait()
+-    const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
+-    await expect(tx).to.emit(systemState, "QCEmergencyPaused").withArgs(
+-      qc, pauserAccount.address, currentBlock.timestamp, reason
+-    )
+-    expect(await systemState.isQCEmergencyPaused(qc)).to.be.true
+-  })
+-)
++for (const reason of reasons) {
++  const qc = ethers.Wallet.createRandom().address
++  const tx = await systemState.connect(pauserAccount).emergencyPauseQC(qc, reason)
++  const receipt = await tx.wait()
++  const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
++  await expect(tx).to.emit(systemState, "QCEmergencyPaused").withArgs(
++    qc, pauserAccount.address, currentBlock.timestamp, reason
++  )
++  expect(await systemState.isQCEmergencyPaused(qc)).to.be.true
++}
+
+
+-await Promise.all(
+-  qcs.map(async (qc) => {
+-    await systemState.connect(pauserAccount).emergencyUnpauseQC(qc)
+-    expect(await systemState.isQCEmergencyPaused(qc)).to.be.false
+-  })
+-)
++for (const qc of qcs) {
++  await systemState.connect(pauserAccount).emergencyUnpauseQC(qc)
++  expect(await systemState.isQCEmergencyPaused(qc)).to.be.false
++}
+
+
+-await Promise.all(
+-  qcs.map(async (qc) => {
+-    await systemState.connect(pauserAccount).emergencyPauseQC(qc, testReason)
+-  })
+-)
++for (const qc of qcs) {
++  await systemState.connect(pauserAccount).emergencyPauseQC(qc, testReason)
++}
+
+
+
+Also applies to: 1262-1269, 1282-1288
+
+Prompt for AI Agent:
+In solidity/test/account-control/SystemState.test.ts around lines 841-865 (and similarly at 1262-1269 and 1282-1288), the test fires multiple transactions from the same signer concurrently which can cause nonce collisions; replace the Promise.all concurrent sends with sequential awaits (e.g., for/for-of loop that awaits each systemState.connect(pauserAccount).emergencyPauseQC(...) and its receipt before sending the next) or attach a NonceManager to the signer so each transaction gets a unique nonce; ensure you still assert the emitted event and isQCEmergencyPaused after each awaited tx/receipt.
+
+
+
+============================================================================
+File: solidity/test/account-control/SPVTestHelpers.ts
+Line: 181 to 213
+Type: potential_issue
+
+Comment:
+Strengthen parsing: explicit typing and length checks.
+
+Prevent runtime errors on malformed vectors and preserve return typing.
+
+
+-  static parseOutputVector(outputVector: string): Array {
+     // Remove 0x prefix
+     let data = outputVector.startsWith("0x")
+       ? outputVector.slice(2)
+       : outputVector
+ 
+     // First byte is output count
+     const outputCount = parseInt(data.slice(0, 2), 16)
+     data = data.slice(2)
+ 
+-    const outputs = []
++    const outputs: Array = []
+     for (let i = 0; i < outputCount; i++) {
+       // 8 bytes for value (little-endian)
+-      const valueHex = data.slice(0, 16)
+-      const value = BigInt(0x${valueHex.match(/../g)!.reverse().join("")})
++      if (data.length < 16) throw new Error("outputVector: truncated value field")
++      const valueHex = data.slice(0, 16)
++      const bytes = valueHex.match(/../g)
++      if (!bytes) throw new Error("outputVector: invalid hex in value")
++      const value = BigInt(0x${bytes.reverse().join("")})
+       data = data.slice(16)
+ 
+       // 1 byte for script length
+-      const scriptLen = parseInt(data.slice(0, 2), 16) * 2
++      if (data.length < 2) throw new Error("outputVector: missing script length")
++      const scriptLen = parseInt(data.slice(0, 2), 16) * 2
+       data = data.slice(2)
+ 
+       // Script bytes
+-      const script = data.slice(0, scriptLen)
++      if (data.length < scriptLen) throw new Error("outputVector: truncated script")
++      const script = data.slice(0, scriptLen)
+       data = data.slice(scriptLen)
+ 
+       outputs.push({ value, script })
+     }
+ 
+     return outputs
+   }
+
+Prompt for AI Agent:
+In solidity/test/account-control/SPVTestHelpers.ts around lines 181 to 213, the parseOutputVector function lacks explicit return typing and defensive length checks which can cause runtime exceptions on malformed vectors; update the signature to return Array explicitly, validate and normalize the input (handle missing or empty strings), parse and validate the outputCount ensuring it is within a safe bound, and before every slice/substring ensure data has the required length (for value 16 chars, for script length byte, and for script bytes) otherwise throw a clear Error; also validate scriptLen is even and non-negative, convert the value bytes safely (with a guard against short valueHex), and preserve the typed outputs array so the function always returns the declared typed array or throws on invalid input.
+
+
+
+============================================================================
+File: solidity/scripts/run-integration-tests.ts
+Line: 73 to 81
+Type: potential_issue
+
+Comment:
+"PASSED" is logged unconditionally.
+
+If parsing ever yields passed === false, we still print PASSED. Log based on passed.
+
+-      console.log(chalk.green(✅ ${testName} - PASSED (${duration}ms)))
++      const status = passed
++        ? chalk.green(✅ ${testName} - PASSED (${duration}ms))
++        : chalk.red(❌ ${testName} - FAILED (${duration}ms))
++      console.log(status)
+
+Prompt for AI Agent:
+In solidity/scripts/run-integration-tests.ts around lines 73 to 81, the summary always prints "PASSED" regardless of the test's actual result; change the logic to check the passed boolean and print either a green "✅  - PASSED (ms)" when passed is true or a red "❌  - FAILED (ms)" when passed is false, keeping the subsequent passing/failing counts output unchanged.
+
+
+
+============================================================================
+File: solidity/scripts/run-integration-tests.ts
+Line: 47 to 51
+Type: refactor_suggestion
+
+Comment:
+Avoid shell injection and stdout buffer overflows: switch from exec to spawn (or at least raise maxBuffer).
+
+- Security: exec interpolates testPath into a shell command; a crafted --test value could inject shell tokens.
+- Reliability: default exec buffers (~1MB) can overflow on verbose test output.
+
+Short-term fix (raise buffer):
+
+-      const { stdout, stderr } = await execAsync(
+-        npx hardhat test ${testPath} --network hardhat,
+-        { timeout: 300000 } // 5 minutes timeout
+-      )
++      const { stdout, stderr } = await execAsync(
++        npx hardhat test "${testPath}" --network hardhat,
++        { timeout: 300000, maxBuffer: 64  1024  1024 } // 64MB
++      )
+
+
+Recommended fix (no shell, safer + streaming): use spawn('npx', ['hardhat','test', testPath,'--network','hardhat'], { shell:false }) and capture output. I can provide a concrete patch if you prefer the spawn route.
+
+Prompt for AI Agent:
+In solidity/scripts/run-integration-tests.ts around lines 47 to 51, the current use of exec with an interpolated command risks shell injection and small stdout buffer overflows; replace execAsync with a spawn-based approach: call child_process.spawn('npx', ['hardhat','test', testPath, '--network','hardhat'], { shell: false }) and stream stdout/stderr by attaching 'data' listeners, collect output if needed, enforce a timeout by killing the child if it exceeds 5 minutes, and resolve/reject the surrounding promise based on the child process 'exit'/'error' events; if you cannot convert to spawn now, at minimum keep execAsync but pass a very large maxBuffer option (e.g., { maxBuffer: 10  1024  1024 }) and avoid shell interpolation by sanitizing/validating testPath before use.
+
+
+
+============================================================================
+File: solidity/scripts/run-integration-tests.ts
+Line: 178 to 183
+Type: potential_issue
+
+Comment:
+Validate --test input to prevent command injection.
+
+Whitelist allowed test names before constructing testFile.
+
+-  if (specificTest) {
+-    const testName = specificTest.split("=")[1]
++  if (specificTest) {
++    const testName = specificTest.split("=")[1]
++    if (!/^[A-Za-z0-9_-]+$/.test(testName)) {
++      throw new Error("Invalid --test value. Use alphanumerics, '-', or '_'.")
++    }
+     const testFile = ${testName}Integration.test.ts
+     await runner.runTest(testFile)
+
+Prompt for AI Agent:
+In solidity/scripts/run-integration-tests.ts around lines 178 to 183, the code uses the raw --test value to build a filename which can allow command/path injection; validate and whitelist allowed test names before constructing testFile. Replace direct usage with either (a) a predefined set/array of allowed test base names and only accept values that exactly match an entry, or (b) validate the extracted testName against a strict regex (e.g. only letters, numbers, underscores, hyphens) and explicitly map it to the corresponding filename; reject or error on anything not matched. Also ensure you never allow path separators or extensions from the input and use the validated/mapped value to construct ${validatedTestName}Integration.test.ts before calling runner.runTest.
+
+
+
+============================================================================
+File: solidity/test/helpers/libraryLinkingHelper.ts
+Line: 28 to 31
+Type: potential_issue
+
+Comment:
+Validate cached addresses to survive hardhat_reset/chain restarts
+
+Global cache may point to wiped addresses after hardhat_reset or a fork change; returning them will fail at runtime. Validate bytecode before reusing the cache.
+
+
+Apply both diffs:
+
+1) Guard cache use
+
+-    if (useCache && this.globalLibraryCache) {
+-      return this.globalLibraryCache
+-    }
++    if (useCache && this.globalLibraryCache) {
++      const stillDeployed = await this.isCacheValid(this.globalLibraryCache)
++      if (stillDeployed) return this.globalLibraryCache
++      this.globalLibraryCache = null
++    }
+
+
+2) Add validator helper
+
++  /
++   * Ensure cached addresses still contain code on-chain.
++   */
++  private static async isCacheValid(libs: LibraryLinks): Promise {
++    for (const addr of Object.values(libs)) {
++      if (!addr) return false
++      const code = await ethers.provider.getCode(addr)
++      if (!code || code === "0x") return false
++    }
++    return true
++  }
+
+
+
+Also applies to: 111-118
+
+Prompt for AI Agent:
+In solidity/test/helpers/libraryLinkingHelper.ts around lines 28-31 and 111-118, the globalLibraryCache is returned unvalidated which can point to wiped contracts after hardhat_reset or chain forks; add a guard that validates cached addresses before reuse and only return cache when validation passes. Implement a small validator helper (e.g., validateDeployedBytecode or isValidDeployedContract) that takes an address and expected bytecode/hash, queries the provider for getCode, and confirms the code is non-empty and matches the expected signature; call this helper for each cached library entry and clear or rebuild cache entries that fail validation. Ensure the cache-usage branch (useCache && this.globalLibraryCache) first runs validation for all entries and only returns the cache if every entry is valid; otherwise invalidate affected entries (or the whole cache) and proceed to redeploy/resolve libraries as before.
+
+
+
+============================================================================
+File: solidity/contracts/test/MockReserve.sol
+Line: 79 to 83
+Type: potential_issue
+
+Comment:
+“Fail once” simulation is ineffective; state write is reverted
+
+Setting failOnNext = false right before revert does not persist (all state is reverted). The contract will keep failing until manually reset, which likely contradicts the “next operation should fail” intent.
+
+- Minimal fix: remove the no-op write and clarify docs that failure persists until reset.
+
+ function _setBacking(uint256 newBacking) internal {
+-        if (failOnNext) {
+-            failOnNext = false;
+-            revert SimulatedFailure();
+-        }
++        if (failOnNext) {
++            revert SimulatedFailure(); // persists until reset via resetTestControls/simulateFailure(false)
+         }
+
+
+Update NatSpec to reflect “until reset” behavior:
+
+-/// @param shouldFail Whether to simulate a failure on next backing update
++/// @param shouldFail Whether to simulate failure on backing updates (persists until reset)
+
+
+If you truly need a one-shot failure, it cannot auto-reset within the reverting transaction. You’ll need an explicit post-failure reset in tests.  
+
+
+
+
+
+Also applies to: 204-209
+
+Prompt for AI Agent:
+In solidity/contracts/test/MockReserve.sol around lines 79-83 (and similarly 204-209), the code attempts to set failOnNext = false immediately before revert which never persists because the revert rolls back the state; either remove that ineffective write and update the NatSpec/comments to state that the failure flag persists until explicitly cleared, or if a true one-shot failure is required implement the reset outside the reverting transaction (e.g., have tests clear the flag after observing the revert) — choose one approach and update code/comments accordingly so behavior is explicit.
+
+
+
+============================================================================
+File: solidity/test/account-control/MockReserveIntegration.test.ts
+Line: 709 to 719
+Type: potential_issue
+
+Comment:
+Function existence check uses await on a function reference
+
+await mockReserve.enableReentrancyTest awaits a function object and will always “exist.” Check that the property is a function instead.
+
+-      expect(await mockReserve.enableReentrancyTest).to.not.be.undefined;
+-      expect(await mockReserve.resetTestControls).to.not.be.undefined;
++      expect(typeof (mockReserve as any).enableReentrancyTest).to.equal("function");
++      expect(typeof (mockReserve as any).resetTestControls).to.equal("function");
+
+Optional: add a targeted reentrancy attempt using the mock’s toggle to prove AC’s guard actually blocks it.
+
+Prompt for AI Agent:
+In solidity/test/account-control/MockReserveIntegration.test.ts around lines 709 to 719, the test incorrectly uses await on function references (e.g., await mockReserve.enableReentrancyTest) which merely awaits a function object and always passes; change those assertions to check the property type without awaiting (e.g., expect(typeof mockReserve.enableReentrancyTest).to.equal('function') and same for resetTestControls). Optionally add a targeted test that calls the mock's enableReentrancyTest toggle and then attempts a reentrant mint to assert AccountControl's nonReentrant modifier blocks the reentry.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/QCManagerPauseLib.sol
+Line: 90 to 96
+Type: potential_issue
+
+Comment:
+Blocker: Library functions with storage parameters cannot be external (won’t compile). Use internal.
+
+Functions that accept mapping(... ) storage cannot be ABI-encoded; declare them internal so they’re inlined via DELEGATECALL. Apply to all listed signatures.
+
+
+
+Apply this diff to update visibility:
+
+-    ) external view returns (bool canPause) {
++    ) internal view returns (bool canPause) {
+
+-    ) external {
++    ) internal {
+
+-    ) external {
++    ) internal {
+
+-    ) external returns (bytes32 reasonHash) {
++    ) internal returns (bytes32 reasonHash) {
+
+-    ) external {
++    ) internal {
+
+-    ) external returns (bytes32 reasonHash) {
++    ) internal returns (bytes32 reasonHash) {
+
+-    ) external {
++    ) internal {
+
+-    ) external view returns (
++    ) internal view returns (
+
+-    ) external view returns (uint256 timeUntilRenewal) {
++    ) internal view returns (uint256 timeUntilRenewal) {
+
+
+
+Also applies to: 126-131, 151-155, 174-179, 202-207, 227-234, 268-272, 293-303, 338-342
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/QCManagerPauseLib.sol around lines 90-96 (and also update the same change at 126-131, 151-155, 174-179, 202-207, 227-234, 268-272, 293-303, 338-342), the library functions currently declare parameters of type mapping(... ) storage but are marked external which won’t compile; change their visibility from external to internal so they are inlined (and can accept storage parameters), update any callers if needed to use internal access (or expose thin external wrappers that delegate to the internal functions), and run the compiler to confirm all usages and imports compile cleanly.
+
+
+
+============================================================================
+File: solidity/scripts/grant-bank-role.js
+Line: 57 to 64
+Type: potential_issue
+
+Comment:
+Use AccessControl admin checks (don’t assume Ownable owner) and expand ABI.
+
+Granting roles in OZ AccessControl requires the role’s admin (often DEFAULT_ADMIN_ROLE). The current owner() equality check can fail or be irrelevant if the owner doesn’t hold admin. Add getRoleAdmin/DEFAULT_ADMIN_ROLE and check admin privileges; fallback to owner() only if needed.
+
+
+
+
+   const bankABI = [
+-    "function owner() view returns (address)",
+-    "function grantRole(bytes32 role, address account)",
+-    "function hasRole(bytes32 role, address account) view returns (bool)",
+-    "function BALANCE_INCREASER_ROLE() view returns (bytes32)"
++    "function owner() view returns (address)",
++    "function grantRole(bytes32 role, address account)",
++    "function hasRole(bytes32 role, address account) view returns (bool)",
++    "function BALANCE_INCREASER_ROLE() view returns (bytes32)",
++    "function getRoleAdmin(bytes32 role) view returns (bytes32)",
++    "function DEFAULT_ADMIN_ROLE() view returns (bytes32)",
++    "function supportsInterface(bytes4 interfaceId) view returns (bool)"
+   ];
+@@
+-    // Verify we're using the correct owner
+-    const currentOwner = await bank.owner();
+-    console.log(Current Bank owner: ${currentOwner});
+-    
+-    if (currentOwner.toLowerCase() !== bankOwnerWallet.address.toLowerCase()) {
+-      console.error("ERROR: Provided key does not match Bank owner!");
+-      console.error(Expected: ${currentOwner});
+-      console.error(Got: ${bankOwnerWallet.address});
+-      process.exit(1);
+-    }
+-    
+-    // Get the BALANCE_INCREASER_ROLE
+-    const BALANCE_INCREASER_ROLE = await bank.BALANCE_INCREASER_ROLE();
+-    console.log(BALANCE_INCREASER_ROLE: ${BALANCE_INCREASER_ROLE});
++    // Resolve role + verify privileges (AccessControl first, fallback to Ownable)
++    const BALANCE_INCREASER_ROLE = await bank.BALANCE_INCREASER_ROLE();
++    console.log(BALANCE_INCREASER_ROLE: ${BALANCE_INCREASER_ROLE});
++
++    let adminRole = null;
++    try {
++      adminRole = await bank.getRoleAdmin(BALANCE_INCREASER_ROLE);
++    } catch (_) { / Bank may not expose AccessControl / }
++    const defaultAdminRole = await bank.DEFAULT_ADMIN_ROLE().catch(() => null);
++    const hasAdmin = adminRole ? await bank.hasRole(adminRole, bankOwnerWallet.address) : false;
++    const hasDefaultAdmin = defaultAdminRole ? await bank.hasRole(defaultAdminRole, bankOwnerWallet.address) : false;
++    let isOwner = false;
++    if (!hasAdmin && !hasDefaultAdmin) {
++      isOwner = await bank.owner().then(o => {
++        console.log(Current Bank owner: ${o});
++        return o.toLowerCase() === bankOwnerWallet.address.toLowerCase();
++      }).catch(() => false);
++    }
++    if (!hasAdmin && !hasDefaultAdmin && !isOwner) {
++      console.error("ERROR: Signer lacks privileges to grant role (neither AccessControl admin nor owner).");
++      console.error(Signer: ${bankOwnerWallet.address});
++      process.exit(1);
++    }
+
+
+
+Also applies to: 69-79, 80-86
+
+Prompt for AI Agent:
+In solidity/scripts/grant-bank-role.js around lines 57-64 (and also apply the same change to checks at 69-79 and 80-86), the script assumes Ownable.owner() is the authority to grant AccessControl roles; instead expand the bankABI to include "function getRoleAdmin(bytes32) view returns (bytes32)" and "function DEFAULT_ADMIN_ROLE() view returns (bytes32)" (keep owner() if you want a fallback), then: call DEFAULT_ADMIN_ROLE() or getRoleAdmin(BALANCE_INCREASER_ROLE()) to determine the admin role, check hasRole(roleAdmin, signerAddress) to confirm the signer has admin privileges before calling grantRole, and only use owner() as a last-resort fallback if the contract exposes it and the signer equals owner; update error messages accordingly.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/WatchdogEnforcer.sol
+Line: 153 to 164
+Type: potential_issue
+
+Comment:
+Don’t emit events before a revert — logs are discarded but you still pay gas.
+
+EnforcementAttempted is emitted and then the tx reverts on no violation; the log is lost and the caller paid extra gas. Either drop the event or only emit on the success path.
+
+Minimal fix (drop pre-revert emit):
+
+-        emit EnforcementAttempted(
+-            qc,
+-            reasonCode,
+-            msg.sender,
+-            violated,
+-            failureReason
+-        );
+-
+         if (!violated) {
+             revert ViolationNotFound();
+         }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/WatchdogEnforcer.sol around lines 153 to 164, the contract emits EnforcementAttempted before reverting when no violation is found which wastes gas because logs are discarded on revert; remove the pre-revert emit (or move the emit to only occur on the success path) so that EnforcementAttempted is only emitted when the function will not revert; update the code to either delete the emit statement preceding the ViolationNotFound revert or conditionally emit after the violated check passes.
+
+
+
+============================================================================
+File: solidity/scripts/grant-bank-role.js
+Line: 111 to 114
+Type: potential_issue
+
+Comment:
+Log full error (stack) for debuggability.
+
+Current log may hide root cause.
+
+
+
+-    console.error("Error granting role:", error.message);
++    console.error("Error granting role:", error?.stack || error);
+
+Prompt for AI Agent:
+In solidity/scripts/grant-bank-role.js around lines 111 to 114, the catch block currently logs only error.message which can hide the root cause; change the logging to output the full error (stack) by passing the error object or using error.stack in the console.error call so the full stack trace is captured, then keep the process.exit(1) behavior.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCMinter.sol
+Line: 287 to 299
+Type: refactor_suggestion
+
+Comment:
+Avoid capacity TOCTOU: atomically consume capacity in QCManager.
+
+The pattern “check available capacity” then later “update minted” is race‑prone across concurrent txs. Prefer a single atomic call in QCManager that consumes capacity and reverts on insufficiency.
+
+
+
+Suggested approach (in QCManager):
+- consumeMintCapacity(qc, amount) that internally checks status/limits and updates minted amount atomically.
+- Replace calls here with that single method and remove separate check+update.
+
+
+Also applies to: 333-334, 515-521
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCMinter.sol around lines 287-299 (and similarly at 333-334 and 515-521), the current pattern reads availableCapacity then later updates minted which is vulnerable to TOCTOU races; replace this with a single atomic call on QCManager such as consumeMintCapacity(qc, amount) that checks status/limits and increments minted in one internal transaction and reverts on insufficiency, then remove the separate availableCapacity check and separate minted update in this file and instead call that new QCManager method and handle its revert/logging here (emit MintRejected only if the QCManager call reverts or returns a failure indicator).
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCMinter.sol
+Line: 338 to 356
+Type: potential_issue
+
+Comment:
+Fix event ordering and inaccurate autoMint flag in _requestMint.
+
+- QCMintRequested is emitted after completion; it should be emitted when the request is created.
+- QCBackedDepositCredited(..., autoMinted) is always emitted with true even when auto‑mint is disabled.
+
+
+
+Apply this diff:
+
+-        // Validate accountControl is configured
++        // Validate accountControl is configured
+         require(accountControl != address(0), "AccountControl not configured");
+-        
++        // Announce request early
++        emit QCMintRequested(
++            qc, user, amount, mintId, msg.sender, block.timestamp
++        );
++
+         // CRITICAL SECURITY FIX: Verify accountControl is authorized in Bank
+         // AccountControl is the contract that actually mints, not QCMinter
+         if (!bank.authorizedBalanceIncreasers(accountControl)) {
+             revert NotAuthorizedInBank();
+         }
+ 
+         // Use AccountControl for minting (returns satoshis for event emission)
+         uint256 satoshis = AccountControl(accountControl).mintTBTC(user, amount);
++        require(amount % SATOSHI_MULTIPLIER == 0, "Amount not satoshi-aligned");
++        require(satoshis == amount / SATOSHI_MULTIPLIER, "Conversion mismatch");
+ 
+         // Auto-mint if enabled globally
+-        if (autoMintEnabled) {
++        bool didAutoMint = false;
++        if (autoMintEnabled) {
+             _executeAutoMint(user, satoshis);
++            didAutoMint = true;
+         }
+ 
+         // Emit event for QC attribution
+         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
+@@
+         // Emit events
+-        emit QCBackedDepositCredited(user, satoshis, qc, mintId, true);
++        emit QCBackedDepositCredited(user, satoshis, qc, mintId, didAutoMint);
+         emit MintCompleted(
+             mintId,
+             qc,
+             user,
+             amount,
+             msg.sender,
+             block.timestamp
+         );
+-        emit QCMintRequested(
+-            qc,
+-            user,
+-            amount,
+-            mintId,
+-            msg.sender,
+-            block.timestamp
+-        );
+
+
+
+Also applies to: 312-317, 324-328
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCMinter.sol around lines 312-317, 324-328 and 338-356, fix two event issues: emit QCMintRequested at the moment the mint request is created (move the QCMintRequested emit earlier into the request-creation block) so it is not emitted after completion, and change the QCBackedDepositCredited(...) call to pass the actual auto-mint boolean (use the function/local autoMint variable or mintRequests[mintId].autoMint) instead of the hardcoded true value; also ensure event ordering is logical (request-created events before completion events).
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCMinter.sol
+Line: 459 to 466
+Type: potential_issue
+
+Comment:
+Align hybrid path with base path: add Bank auth check, emit request early, and assert conversion.
+
+- Missing authorizedBalanceIncreasers(accountControl) check here.
+- Emit QCMintRequested when the request is stored.
+- Add the amount/satoshi invariant.
+
+
+
+         // HYBRID LOGIC: Choose between manual and automated minting
+@@
+-        // Validate accountControl is configured
++        // Validate accountControl is configured
+         require(accountControl != address(0), "AccountControl not configured");
++        emit QCMintRequested(
++            qc, user, amount, mintId, msg.sender, block.timestamp
++        );
++        if (!bank.authorizedBalanceIncreasers(accountControl)) {
++            revert NotAuthorizedInBank();
++        }
+ 
+         uint256 satoshis;
+         if (autoMint && autoMintEnabled) {
+             // Option 1: Automated minting - create balance and immediately mint tBTC
+             satoshis = AccountControl(accountControl).mintTBTC(user, amount);
++            require(amount % SATOSHI_MULTIPLIER == 0, "Amount not satoshi-aligned");
++            require(satoshis == amount / SATOSHI_MULTIPLIER, "Conversion mismatch");
+@@
+         } else {
+             // Option 2: Manual process - just create Bank balance
+             satoshis = AccountControl(accountControl).mintTBTC(user, amount);
++            require(amount % SATOSHI_MULTIPLIER == 0, "Amount not satoshi-aligned");
++            require(satoshis == amount / SATOSHI_MULTIPLIER, "Conversion mismatch");
+@@
+-        emit QCMintRequested(
+-            qc,
+-            user,
+-            amount,
+-            mintId,
+-            msg.sender,
+-            block.timestamp
+-        );
+
+
+
+Also applies to: 471-478, 490-506, 463-466
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCMinter.sol around lines 459-466 (and similarly for ranges 471-478, 490-506, and 463-466), the hybrid minting path is missing parity with the base path: add a Bank authorization check by calling authorizedBalanceIncreasers(accountControl) before proceeding, emit QCMintRequested immediately when the request is saved to storage (so listeners see the request even if later steps revert), and assert the amount/satoshi invariant (e.g., require(amount == satoshiToAmount(satoshi)) or equivalent conversion check) right after storing the request; apply the same three changes to the other mentioned blocks so both manual and automated branches perform the auth check, emit the event early, and assert the conversion invariant.
+
+
+
+============================================================================
+File: solidity/test/account-control/MockReserveIntegration.test.ts
+Line: 271 to 275
+Type: refactor_suggestion
+
+Comment:
+Strengthen assertion: minted should equal exact sum for a fresh reserve
+
+gte can mask bugs. For a newly deployed reserve in this beforeEach, minted should equal the batch sum exactly.
+
+-      const totalMinted = constants.MIN_MINT_AMOUNT.add(constants.MIN_MINT_AMOUNT.mul(2)).add(constants.MIN_MINT_AMOUNT.mul(3));
+-      expect(await accountControl.minted(mockReserve.address)).to.be.gte(totalMinted);
++      const totalMinted = constants.MIN_MINT_AMOUNT
++        .add(constants.MIN_MINT_AMOUNT.mul(2))
++        .add(constants.MIN_MINT_AMOUNT.mul(3));
++      const mintedAfter = await accountControl.minted(mockReserve.address);
++      expect(mintedAfter).to.equal(totalMinted);
+
+Prompt for AI Agent:
+In solidity/test/account-control/MockReserveIntegration.test.ts around lines 271 to 275, the test currently uses a gte assertion which can hide over-minting bugs; replace the loose check with an exact equality check so the freshly deployed reserve's minted value must equal the computed batch sum exactly — change the assertion to assert equality (expect(await accountControl.minted(mockReserve.address)).to.equal(totalMinted)) and ensure totalMinted and the returned minted value are both BigNumber instances so the strict equality comparison works.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/SharedSPVCore.sol
+Line: 23 to 38
+Type: potential_issue
+
+Comment:
+Error code scheme is inconsistent with usage (code 8 reused for multiple errors).
+
+Comments list “8: Not at current/previous difficulty”, but code also uses 8 for invalid header length and invalid target/difficulty. This ambiguity hinders troubleshooting and on‑chain integrations.
+
+
+- Assign unique codes for:
+  - Invalid header length
+  - Invalid target/difficulty bits
+  - Not at current/previous difficulty
+- Update the comment block and corresponding revert SPVErr(...) call sites to match.
+
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCMinter.sol
+Line: 567 to 568
+Type: refactor_suggestion
+
+Comment:
+Use SafeERC20 for TBTC transfers (handle non‑standard ERC‑20 safely).
+
+Direct tbtc.transfer may silently fail if it returns false. Use SafeERC20.
+
+
+
+Apply these diffs:
+
+Imports:
+
+ import "@openzeppelin/contracts/access/AccessControl.sol";
+ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
++import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
++import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+
+Enable library:
+
+-contract QCMinter is AccessControl, ReentrancyGuard {
++contract QCMinter is AccessControl, ReentrancyGuard {
++    using SafeERC20 for IERC20;
+
+
+Replace transfers:
+
+-        tbtcVault.mint(tbtcAmount);
+-        tbtc.transfer(user, tbtcAmount);
++        tbtcVault.mint(tbtcAmount);
++        IERC20(address(tbtc)).safeTransfer(user, tbtcAmount);
+
+
+-        tbtcVault.mint(tbtcAmount);
+-        tbtc.transfer(user, tbtcAmount);
++        tbtcVault.mint(tbtcAmount);
++        IERC20(address(tbtc)).safeTransfer(user, tbtcAmount);
+
+
+
+Also applies to: 623-624, 4-14, 24-25
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCMinter.sol around lines 4-14, 24-25, 567-568 and 623-624, replace direct tbtc.transfer calls with SafeERC20 usage: import OpenZeppelin's IERC20 and SafeERC20 at the top of the file, add "using SafeERC20 for IERC20;" inside the contract, ensure the tbtc token variable is typed as IERC20 (or cast it where used), and change any occurrences of tbtc.transfer(...) to tbtc.safeTransfer(...) (and tbtc.transferFrom(...) to tbtc.safeTransferFrom(...) if present) so non‑standard ERC‑20 tokens are handled safely. Ensure imports and the using directive are added only once and update affected transfer lines accordingly.
+
+
+
+============================================================================
+File: solidity/scripts/run-integration-tests.ts
+Line: 100 to 145
+Type: refactor_suggestion
+
+Comment:
+Do not call process.exit inside library code; return status and let the CLI decide.
+
+printSummary lives in an exported class; process.exit here will terminate hosts that use the class programmatically.
+
+-  private printSummary(): void {
++  private printSummary(): boolean {
+...
+-    if (failedTests > 0) {
+-      console.log(
+-        chalk.red("\n⚠️  Some tests failed. Please review the errors above.")
+-      )
+-      process.exit(1)
+-    } else {
+-      console.log(
+-        chalk.green("\n🎉 All integration tests passed successfully!")
+-      )
+-    }
++    const allPassed = failedTests === 0
++    console.log(
++      allPassed
++        ? chalk.green("\n🎉 All integration tests passed successfully!")
++        : chalk.red("\n⚠️  Some tests failed. Please review the errors above.")
++    )
++    return allPassed
+   }
+
+
+And throw after summary so the CLI’s catch handles exit:
+-    this.printSummary()
++    const allPassed = this.printSummary()
++    if (!allPassed) throw new Error("Integration tests failed")
+
+Applies near Lines 35-36.
+
+Prompt for AI Agent:
+In solidity/scripts/run-integration-tests.ts around lines 100 to 145, printSummary currently calls process.exit(1) when tests fail which will unconditionally terminate any host using this exported class; remove the process.exit call and instead return a status (e.g., boolean or numeric exit code) or throw an Error after printing the summary so the caller/CLI can decide how to exit; update the method signature/return to convey success/failure and ensure callers handle the returned status or catch the thrown error to call process.exit as appropriate.
+
+
+
+============================================================================
+File: solidity/test/account-control/SPVTestHelpers.ts
+Line: 39 to 71
+Type: potential_issue
+
+Comment:
+Wrong hash for Bitcoin tx; return both ETH tx hash and BTC txid.
+
+txHash is computed with keccak256 over a Solidity pack. Bitcoin txid is double‑SHA256 of the raw serialized tx (then displayed byte‑reversed). This is misleading and will not match real txids.
+
+
+-  static async validateProofWithGas(
++  static async validateProofWithGas(
+     spvValidator: SPVValidator,
+     spvProof: SPVProofTestData,
+     expectedGasRange?: { min: number; max: number }
+-  ): Promise {
++  ): Promise {
+     const tx = await spvValidator.validateProof(spvProof.txInfo, spvProof.proof)
+ 
+     const receipt = await tx.wait()
+     const gasUsed = receipt.gasUsed.toNumber()
+ 
+-    // Calculate transaction hash from the transaction data
+-    const txHash = ethers.utils.keccak256(
+-      ethers.utils.solidityPack(
+-        ["bytes", "bytes", "bytes", "bytes"],
+-        [
+-          spvProof.txInfo.version,
+-          spvProof.txInfo.inputVector,
+-          spvProof.txInfo.outputVector,
+-          spvProof.txInfo.locktime,
+-        ]
+-      )
+-    )
++    // Compute Bitcoin txid (double-SHA256 over raw tx bytes, displayed byte-reversed).
++    const packed = ethers.utils.solidityPack(
++      ["bytes", "bytes", "bytes", "bytes"],
++      [
++        spvProof.txInfo.version,
++        spvProof.txInfo.inputVector,
++        spvProof.txInfo.outputVector,
++        spvProof.txInfo.locktime,
++      ]
++    )
++    const h1 = ethers.utils.sha256(packed)
++    const h2 = ethers.utils.sha256(h1)
++    const btcTxId = ethers.utils.hexlify(
++      ethers.utils.arrayify(h2).reverse()
++    )
++    const ethTxHash = tx.hash
+ 
+     if (expectedGasRange) {
+       assertGasUsed(gasUsed, expectedGasRange.min, expectedGasRange.max)
+     }
+ 
+-    return { tx, txHash, gasUsed }
++    return { tx, ethTxHash, btcTxId, gasUsed }
+   }
+
+
+
+
+============================================================================
+File: solidity/test/account-control/SPVTestHelpers.ts
+Line: 123 to 133
+Type: potential_issue
+
+Comment:
+Bounds-check position when tampering proof.
+
+Avoid negative indices or OOB writes; clamp position and no-op on short inputs.
+
+   static tamperMerkleProof(originalProof: string, position: number): string {
+     // Convert hex string to bytes
+     const proofBytes = ethers.utils.arrayify(originalProof)
+ 
+     // Tamper with bytes at the specified position
+-    for (let i = 0; i < 32 && position + i < proofBytes.length; i++) {
+-      proofBytes[position + i] = 0xff
++    const start = Math.max(0, Math.min(position, proofBytes.length))
++    for (let i = 0; i < 32 && start + i < proofBytes.length; i++) {
++      proofBytes[start + i] = 0xff
+     }
+ 
+     return ethers.utils.hexlify(proofBytes)
+   }
+
+Prompt for AI Agent:
+In solidity/test/account-control/SPVTestHelpers.ts around lines 123 to 133, the tamperMerkleProof function currently uses the provided position directly and may perform negative or out-of-bounds writes; update it to validate and clamp the position: if position is negative or greater than/equal to proofBytes.length, return the originalProof (no-op); otherwise set start = Math.max(0, Math.min(position, proofBytes.length - 1)) and iterate only while start + i < proofBytes.length (and i < 32) to avoid OOB writes, then return the hexlified bytes.
+
+
+
+============================================================================
+File: solidity/deploy/95_deploy_account_control.ts
+Line: 46 to 52
+Type: refactor_suggestion
+
+Comment:
+Possible ABI mismatch when Bank is a mock — select ABI based on what was deployed
+
+In the mock path, you deploy MockBank but later attach with "Bank" ABI. If the mock diverges, calls like owner() or setAuthorizedBalanceIncreaser may revert or encode incorrectly. Track the artifact name and use it when attaching.
+
+
+Apply this diff:
+
+-  let bank, tbtcVault, tbtc, lightRelay
++  let bank, tbtcVault, tbtc, lightRelay
++  let bankAbiName = "Bank"
+@@
+-      bank = await deploy("MockBank", {
++      bank = await deploy("MockBank", {
+         from: deployer,
+         args: [],
+         log: true,
+       })
++      bankAbiName = "MockBank"
+@@
+-      log(  MockBank: ${bank.address})
++      log(  MockBank: ${bank.address})
+@@
+-      const bankContract = await ethers.getContractAt("Bank", bank.address)
++      const bankContract = await ethers.getContractAt(bankAbiName, bank.address)
+
+
+
+Also applies to: 365-371, 26-27, 72-76
+
+Prompt for AI Agent:
+In solidity/deploy/95_deploy_account_control.ts around lines 46-52 (and similarly at 26-27, 72-76, and 365-371), the script deploys MockBank but later attaches using the "Bank" artifact/ABI which can cause ABI mismatches; change the attach logic to use the actual artifact name returned/used at deployment (e.g., store the deploy artifact name or returned contract object and call deployResult.address with deployResult.contractName or use the deployed contract instance directly) so the script attaches with the matching ABI for mocks and real contracts, updating all attach calls in the listed line ranges to select the ABI dynamically based on what was deployed.
+
+
+
+============================================================================
+File: solidity/test/account-control/MockReserveIntegration.test.ts
+Line: 110 to 127
+Type: potential_issue
+
+Comment:
+Event emitter mismatch: assert on AccountControl, not MockReserve
+
+Comment says AC emits the event, but the assertion listens on mockReserve. Fix the emitter target; also align the test title with the event name.
+
+-    it("should emit BackingUpdated event with old and new values", async () => {
++    it("should emit BackingChanged event with old and new values", async () => {
+       const oldBacking = 0;
+       const newBacking = ONE_BTC;
+
+-      // Note: The event is emitted by AccountControl, not MockReserve
+-      await expect(mockReserve.setBacking(newBacking))
+-        .to.emit(mockReserve, "BackingChanged")
+-        .withArgs(oldBacking, newBacking);
++      // Note: The event is emitted by AccountControl
++      await expect(mockReserve.setBacking(newBacking))
++        .to.emit(accountControl, "BackingChanged");
++        // If AC's event includes args, consider:
++        // .withArgs(mockReserve.address, oldBacking, newBacking)
+     });
+
+Prompt for AI Agent:
+solidity/test/account-control/MockReserveIntegration.test.ts lines 110-127: the test incorrectly listens for the event on mockReserve while the comment says AccountControl emits it and the test title doesn't match the actual event name; change the emitter in the expect to accountControl (e.g. expect(mockReserve.setBacking(newBacking)).to.emit(accountControl, "BackingChanged").withArgs(oldBacking, newBacking)) and update the it title to reflect that AccountControl emits BackingChanged with old and new values.
+
+
+
+============================================================================
+File: solidity/contracts/test/MockAccountControl.sol
+Line: 207 to 210
+Type: potential_issue
+
+Comment:
+Doc mismatch: function returns totalMinted (not “different from totalMinted”)
+
+Update the comment to reflect reality.
+
+
+
+-    /// @notice Get total minted amount (different from totalMinted)
++    /// @notice Get total minted amount (alias of totalMinted)
+     function totalMintedAmount() external view returns (uint256) {
+         return totalMinted;
+     }
+
+Prompt for AI Agent:
+In solidity/contracts/test/MockAccountControl.sol around lines 207 to 210, the NatSpec comment wrongly claims the function returns a value "different from totalMinted" while the function actually returns totalMinted; update the comment to accurately describe the behavior (e.g., "Get total minted amount (returns totalMinted)" or simply "Returns totalMinted") so the doc matches the implementation.
+
+
+
+============================================================================
+File: solidity/scripts/grant-bank-role.js
+Line: 49 to 56
+Type: refactor_suggestion
+
+Comment:
+Sanity-check network and code at BANK_ADDRESS before tx.
+
+Avoid mis-sends to the wrong chain or EOAs.
+
+
+
+   const provider = ethers.provider;
+   const bankOwnerWallet = new ethers.Wallet(BANK_OWNER_PRIVATE_KEY, provider);
+ 
++  const net = await provider.getNetwork();
++  console.log(Network: ${net.name} (chainId=${net.chainId}));
++  const bankCode = await provider.getCode(BANK_ADDRESS);
++  if (!bankCode || bankCode === "0x") {
++    console.error("ERROR: No contract code at BANK_ADDRESS on this network.");
++    process.exit(1);
++  }
+
+Prompt for AI Agent:
+In solidity/scripts/grant-bank-role.js around lines 49–56, we currently log addresses but do not sanity-check that BANK_ADDRESS points to a deployed contract on the expected network; add checks before sending any tx: verify provider.getCode(BANK_ADDRESS) returns non-empty code (not "0x"), confirm provider.getNetwork().chainId matches the expected CHAIN_ID/NETWORK (or compare to an env var), ensure BANK_ADDRESS is neither empty nor the zero address, and require a human confirmation (or explicit env flag) before proceeding with the transaction to avoid mis-sends to the wrong chain or EOAs.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/WatchdogEnforcer.sol
+Line: 328 to 331
+Type: potential_issue
+
+Comment:
+Avoid string hashing to infer staleness — use the oracle’s staleness flag.
+
+Comparing keccak256 of the reason string is brittle and can wedge timers if the message changes. Query the oracle for isStale directly.
+
+-            if (keccak256(abi.encodePacked(reason)) != keccak256(abi.encodePacked("Reserves are stale, cannot determine violation"))) {
+-                delete criticalViolationTimestamps[qc];
+-                emit EscalationTimerCleared(qc, msg.sender, block.timestamp);
+-            }
++            (, bool isStaleNow) = reserveOracle.getReserveBalanceAndStaleness(qc);
++            if (!isStaleNow) {
++                delete criticalViolationTimestamps[qc];
++                emit EscalationTimerCleared(qc, msg.sender, block.timestamp);
++            }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/WatchdogEnforcer.sol around lines 328-331, replace the brittle keccak256 string comparison with a direct check of the oracle's staleness flag: call the oracle's isStale (or equivalent) view function for the relevant feed/quote identifier (qc) and only clear delete criticalViolationTimestamps[qc] and emit EscalationTimerCleared when the oracle reports not stale; remove the string hashing logic, handle the oracle call as a safe external view (use try/catch or treat it as view if available) and fail-safe (do not clear the timer if the staleness call reverts or returns stale).
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/SharedSPVCore.sol
+Line: 44 to 49
+Type: potential_issue
+
+Comment:
+Compilation blocker: library function with Storage pointer cannot be external.
+
+Library functions that take SPVState.Storage storage must be internal (ABI can’t encode storage refs for external/public). This won’t compile as-is.
+
+Apply this diff:
+
+-    ) external view returns (bytes32 txHash) {
++    ) internal view returns (bytes32 txHash) {
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/SharedSPVCore.sol around lines 44 to 49, the function validateCoreSPVProof currently declares a parameter of type SPVState.Storage storage but is marked external, which is invalid because storage pointers cannot be passed to external/public functions; change the function visibility from external to internal and update any callers to call it internally (or add a thin external wrapper that converts inputs and calls the internal function) so the storage pointer is only used in an internal/internal-only context.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerLib.test.ts
+Line: 112 to 114
+Type: potential_issue
+
+Comment:
+Assert the intended custom error
+
+This test is supposed to guarantee we surface the QCAlreadyRegistered custom error, but the current assertion passes on any revert (even unrelated access-control failures), so we could miss regressions in the duplicate-registration guard. Please assert the concrete custom error.
+
+
+
+       await expect(
+-        qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP)
+-      ).to.be.reverted;
++        qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP)
++      ).to.be.revertedWithCustomError(qcManager, "QCAlreadyRegistered");
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerLib.test.ts around lines 112-114, the test currently asserts a generic revert which can mask unrelated failures; replace the generic revert assertion with a concrete check for the QCAlreadyRegistered custom error. Wrap the call in await expect(...) and use Hardhat Chai's revertedWithCustomError matcher targeting the qcManager instance and the 'QCAlreadyRegistered' error name (e.g. await expect(qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP)).to.be.revertedWithCustomError(qcManager, 'QCAlreadyRegistered')). Ensure the expect is awaited so the assertion actually runs.
+
+
+
+============================================================================
+File: solidity/test/data/bitcoin/spv/valid-spv-proofs.ts
+Line: 246 to 254
+Type: potential_issue
+
+Comment:
+Ensure bitcoinHeaders truncation preserves 80‑byte header boundaries
+
+The hardcoded hex block labeled “Only 2 headers” appears longer than 2×80 bytes and may cut mid‑header, causing parsing failures unrelated to “insufficient PoW.”
+
+Prefer slicing an exact multiple of 80 bytes from the known‑good headers:
+
+-    // Only 2 headers instead of required amount
+-    bitcoinHeaders:
+-      "0x0000002073bd2184edd9c4fc76642ea6754ee40136970efc10c41900000" +
+-      "00000000000000296ef123ea96da5cf695f22bf7d94be87d49db1ad7ac371" +
+-      "ac43c4da4161c8c216349c5ba11928170d38782b00000020fe70e48339d6b" +
+-      "17fbbf1340d245338f57336e97767cc240000000000000000005af53b865c" +
+-      "27c6e9b5e5db4c3ea8e024f8329178a79ddb39f7727ea2fe6e6825d1349c5" +
+-      "ba1192817e2d9515900000020baaea6746f4c16ccb7cd961655b636d39b5f",
++    // Only 2 headers (160 bytes) to trigger insufficient PoW without parse errors
++    bitcoinHeaders: (() => {
++      const src = ValidMainnetProof.proof.bitcoinHeaders as string
++      const hex = src.startsWith("0x") ? src.slice(2) : src
++      const twoHeadersHex = hex.slice(0, 80  2 /bytes/  2 /hex/ )
++      return 0x${twoHeadersHex}
++    })(),
+
+
+If you’d rather avoid an IIFE, introduce a small helper:
+
+function sliceBitcoinHeaders(headers: BytesLike, n: number): BytesLike {
+  const hex = (typeof headers === "string" ? headers : String(headers)).replace(/^0x/, "")
+  return 0x${hex.slice(0, n  80  2)}
+}
+
+and set bitcoinHeaders: sliceBitcoinHeaders(ValidMainnetProof.proof.bitcoinHeaders, 2),
+
+Prompt for AI Agent:
+In solidity/test/data/bitcoin/spv/valid-spv-proofs.ts around lines 246–254 the hardcoded "Only 2 headers" bitcoinHeaders value may cut a header mid‑way because it isn’t sliced on 80‑byte boundaries; replace the literal with a slice of the known-good headers that takes exactly n  80 bytes (i.e. n  80  2 hex chars) and preserves the 0x prefix so you only return whole 80‑byte headers (either via a tiny helper that strips 0x, slices hex to n80*2 chars and re‑prefixes 0x, or an inline slice) and set bitcoinHeaders to that sliced value for n=2.
+
+
+
+============================================================================
+File: solidity/contracts/test/MockQCData.sol
+Line: 87 to 90
+Type: potential_issue
+
+Comment:
+Gate minting by registration and self‑pause (avoid false positives).
+
+canQCMint ignores registered and selfPaused, so unregistered or self‑paused QCs can mint if status equals Active.
+
+
+
+Apply this minimal fix; optional capacity gating shown as comments:
+
+-    function canQCMint(address qc) external view returns (bool) {
+-        return qcStatuses[qc] == QCData.QCStatus.Active;
+-    }
++    function canQCMint(address qc) external view returns (bool) {
++        if (!registered[qc] || selfPaused[qc]) return false;
++        // Optional: also enforce capacity in tests
++        // uint256 cap = maxCapacities[qc];
++        // if (cap != 0 && mintedAmounts[qc] >= cap) return false;
++        return qcStatuses[qc] == QCData.QCStatus.Active;
++    }
+
+Prompt for AI Agent:
+In solidity/contracts/test/MockQCData.sol around lines 87 to 90, canQCMint currently only checks qcStatuses[qc] == QCData.QCStatus.Active which allows unregistered or selfPaused QCs to mint; update the function to also require that qcReg[qc].registered is true and qcReg[qc].selfPaused is false (and optionally, if capacity gating is desired, also check qcReg[qc].capacity > 0 — include that check as a commented suggestion), ensuring the function returns true only when status is Active, the QC is registered, and not self-paused.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/QCManagerPauseLib.sol
+Line: 268 to 281
+Type: potential_issue
+
+Comment:
+Guard early resume; avoid silent no‑ops and misuse.
+
+resumeEarly clears state even when not paused, and anyone the caller exposes can call it. Add a paused check and use the existing NotPaused() error.
+
+
+
+ function resumeEarly(
+     mapping(address => PauseCredit) storage pauseCredits,
+     address qc
+- ) external {
++ ) internal {
+     PauseCredit storage credit = pauseCredits[qc];
+-    
+-    // Clear pause state
++    if (!credit.isPaused) revert NotPaused();
++    // Clear pause state
+     credit.isPaused = false;
+     credit.pauseEndTime = 0;
+     credit.pauseReason = bytes32(0);
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/QCManagerPauseLib.sol around lines 268 to 281, add a guard that reverts when trying to resume an account that is not paused: check PauseCredit storage credit = pauseCredits[qc]; then if (!credit.isPaused) revert NotPaused(); only after that clear isPaused, pauseEndTime and pauseReason. This prevents silent no-ops and uses the existing NotPaused() error; keep the EarlyResumed event emission comment as-is (caller should emit).
+
+
+
+============================================================================
+File: solidity/deploy/95_deploy_account_control.ts
+Line: 345 to 359
+Type: potential_issue
+
+Comment:
+Blocker: catch variables are unknown in TS ≥4.4; .message access will not compile
+
+Several catch clauses access .message on an unknown. Either type the error as any or safely derive a string.
+
+
+Apply this diff:
+
+-    } catch (roleError) {
+-      log(Warning: Could not configure QCMinter auto-mint: ${roleError.message})
++    } catch (roleError: any) {
++      const roleMsg = roleError instanceof Error ? roleError.message : String(roleError)
++      log(Warning: Could not configure QCMinter auto-mint: ${roleMsg})
+@@
+-        } catch (cleanupError) {
+-          log(Warning: Could not revoke temporary GOVERNANCE_ROLE: ${cleanupError.message})
++        } catch (cleanupError: any) {
++          const cleanupMsg = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
++          log(Warning: Could not revoke temporary GOVERNANCE_ROLE: ${cleanupMsg})
+@@
+-  } catch (error) {
+-    log(Warning: Could not configure roles automatically: ${error.message})
++  } catch (error: any) {
++    const msg = error instanceof Error ? error.message : String(error)
++    log(Warning: Could not configure roles automatically: ${msg})
+@@
+-  } catch (configError) {
+-    log(Warning: Could not configure system automatically: ${configError.message})
++  } catch (configError: any) {
++    const msg = configError instanceof Error ? configError.message : String(configError)
++    log(Warning: Could not configure system automatically: ${msg})
+
+
+
+Also applies to: 376-379, 421-424
+
+Prompt for AI Agent:
+In solidity/deploy/95_deploy_account_control.ts around lines 345-359 (and also at 376-379 and 421-424), the catch blocks assume the caught value has a .message property which is typed as unknown in TS ≥4.4; change each catch to either explicitly type the caught error (catch (err: any)) or safer: capture a message string inside the block (const msg = err instanceof Error ? err.message : String(err)) and use msg in logs so the code compiles and reliably logs error details; apply the same pattern to all three locations.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerLib.test.ts
+Line: 118 to 120
+Type: potential_issue
+
+Comment:
+Tighten the revert assertion to QCNotRegistered
+
+The test title promises we detect the QCNotRegistered error, yet the assertion only checks for any revert. If the call fails for the wrong reason, the test still passes. Please pin the expectation to the specific custom error.
+
+
+
+       await expect(
+         qcManager.connect(owner).setQCStatus(qc1.address, 2, ethers.utils.formatBytes32String("test")) // PAUSED
+-      ).to.be.reverted;
++      ).to.be.revertedWithCustomError(qcManager, "QCNotRegistered");
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerLib.test.ts around lines 118 to 120, the assertion currently uses .to.be.reverted which allows any revert reason; replace it with a targeted assertion for the custom error by using await expect(...).to.be.revertedWithCustomError(qcManager, "QCNotRegistered") (or the appropriate chai helper in your test setup) so the test only passes when the QCNotRegistered custom error is thrown.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerLib.test.ts
+Line: 142 to 144
+Type: potential_issue
+
+Comment:
+Ensure we surface NewCapMustBeHigher
+
+For the non-increasing capacity scenario we only assert a generic revert, so the test will succeed even if the revert reason is unrelated. Tighten it to the specific custom error to guarantee we cover the intended guard.
+
+
+
+       await expect(
+         qcManager.connect(owner).increaseMintingCapacity(qc1.address, MAX_MINTING_CAP)
+-      ).to.be.reverted;
++      ).to.be.revertedWithCustomError(qcManager, "NewCapMustBeHigher");
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerLib.test.ts around lines 142-144, the test currently asserts a generic revert when increasing minting capacity with a non-higher value; change the expectation to assert the specific custom error NewCapMustBeHigher so unrelated reverts don't pass: replace the generic .to.be.reverted with .to.be.revertedWithCustomError(qcManager, "NewCapMustBeHigher") (or the equivalent matcher in your test setup) to ensure the exact guard is covered.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/ReserveOracle.sol
+Line: 370 to 373
+Type: potential_issue
+
+Comment:
+Avoid liveness DoS when some pending entries are invalid
+
+If pendingAttesters[qc].length ≥ threshold but validCount < threshold (e.g., borderline expiry between cleanup and consensus), _processConsensus reverts, rolling back the caller’s fresh attestation. Prefer non-reverting early return so the valid attestation is retained and consensus can be reached on the next submission.
+
+
+
+Suggested change:
+
+-        if (validCount < consensusThreshold) {
+-            revert InsufficientAttestations();
+-        }
++        if (validCount < consensusThreshold) {
++            // Not enough valid attestations yet; keep state and try again later
++            return;
++        }
+
+
+
+Also applies to: 340-343
+
+
+
+
+============================================================================
+File: solidity/test/account-control/SPVSecurityTests.test.ts
+Line: 167 to 206
+Type: potential_issue
+
+Comment:
+Tests in this suite likely revert due to missing role, not SPV validation. Grant the fulfillment role so you actually hit the SPV code path.
+
+recordRedemptionFulfillment appears role‑gated (you grant it in other suites, but not here). The generic to.be.reverted will pass even for AccessControl, masking SPV bugs.
+
+
+
+ describe("Merkle Proof Manipulation Attacks", () => {
++    beforeEach(async () => {
++      const role = await qcRedeemer.DISPUTE_ARBITER_ROLE()
++      await qcRedeemer.grantRole(role, deployer.address)
++    })
+
+
+Optionally assert the specific SPV failure (custom error or reason) once available. 
+
+
+
+Also applies to: 242-250
+
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/SharedSPVCore.sol
+Line: 179 to 183
+Type: potential_issue
+
+Comment:
+Overflow‑safe accumulated difficulty check.
+
+requestedDiff * difficultyFactor can overflow (then revert) under high difficulties. Compare using division to avoid overflow.
+
+Apply this diff:
+
+-        if (observedDiff < requestedDiff * difficultyFactor) {
++        if (difficultyFactor == 0 || observedDiff / difficultyFactor < requestedDiff) {
+             revert SPVErr(12); // Insufficient accumulated difficulty
+         }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/SharedSPVCore.sol around lines 179-183, the current check uses requestedDiff * difficultyFactor which can overflow; replace the multiply-based comparison with a division-based one to avoid overflow by verifying observedDiff / difficultyFactor < requestedDiff (ensure difficultyFactor != 0 or otherwise handle the zero case if possible in your context) and revert SPVErr(12) when the condition holds.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/QCManagerPauseLib.sol
+Line: 174 to 196
+Type: potential_issue
+
+Comment:
+Require a non‑empty reason when clearing in emergency; you already defined ReasonRequired().
+
+This improves auditability and aligns with useEmergencyPause, which requires a reason.
+
+
+
+ function emergencyClearPause(
+     mapping(address => PauseCredit) storage pauseCredits,
+     address qc,
+     string calldata reason
+- ) external returns (bytes32 reasonHash) {
++ ) internal returns (bytes32 reasonHash) {
+     PauseCredit storage credit = pauseCredits[qc];
++    if (bytes(reason).length == 0) revert ReasonRequired();
+     
+     // Clear pause state
+     credit.isPaused = false;
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/QCManagerPauseLib.sol around lines 174 to 196, enforce that the provided reason string is non-empty before performing the emergency clear: at the top of the function validate bytes(reason).length > 0 (or revert with the existing ReasonRequired() error) then proceed to clear the pause state and compute reasonHash as already done; ensure the check occurs before any state changes so the call reverts on empty reason and does not modify pauseCredits.
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlWorkflows.test.ts
+Line: 2 to 3
+Type: potential_issue
+
+Comment:
+Update import to foundation-scoped path  
+-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
++import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+
+Prompt for AI Agent:
+In solidity/test/account-control/AccountControlWorkflows.test.ts around lines 2 to 3, the SignerWithAddress import uses the old scope "@nomiclabs/hardhat-ethers/signers"; update that import to the foundation-scoped package by replacing it with "@nomicfoundation/hardhat-ethers/signers" so the test imports use the new package path.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerWalletDirect.test.ts
+Line: 259 to 262
+Type: potential_issue
+
+Comment:
+Pause key likely bytes32; “wallet_reg” string won’t match
+
+SystemState.isFunctionPaused typically takes a bytes32 key. Passing "wallet_reg" as a string won’t hit whenCalledWith. Define a bytes32 constant and use it.
+
+
+
+@@
+-  const testNonce = 12345
++  const testNonce = 12345
++  const WALLET_REG_KEY = ethers.utils.keccak256(
++    ethers.utils.toUtf8Bytes("wallet_reg")
++  )
+@@
+-        mockSystemState.isFunctionPaused
+-          .whenCalledWith("wallet_reg")
+-          .returns(true)
++        mockSystemState.isFunctionPaused
++          .whenCalledWith(WALLET_REG_KEY)
++          .returns(true)
+
+
+
+Also applies to: 27-31
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerWalletDirect.test.ts around lines 259-262 (and also fix occurrences at lines ~27-31), the mock call uses the plain string "wallet_reg" but SystemState.isFunctionPaused expects a bytes32 key; replace the string with a bytes32 constant: define e.g. const WALLET_REG_KEY = ethers.utils.formatBytes32String("wallet_reg") (or use your test framework's bytes32 helper) at the top of the test file, import/ensure ethers is available, and update mockSystemState.isFunctionPaused.whenCalledWith(...) and any other usages to use WALLET_REG_KEY instead of "wallet_reg".
+
+
+
+============================================================================
+File: solidity/deploy/95_deploy_account_control.ts
+Line: 363 to 364
+Type: potential_issue
+
+Comment:
+Mainnet‑fork guard can fail under ethers v6 (bigint chainId) — normalize before compare
+
+If the project upgrades to ethers v6, getNetwork().chainId is a bigint; chainId !== 1 will always be true, potentially running test‑only auth on a mainnet fork. Normalize to a number for a robust check.
+
+
+Apply this diff:
+
+-    const chainId = await ethers.provider.getNetwork().then(n => n.chainId)
+-    if (network.name !== "mainnet" && chainId !== 1) {
++    const { chainId } = await ethers.provider.getNetwork()
++    const chainIdNum = typeof chainId === "bigint" ? Number(chainId) : chainId
++    if (network.name !== "mainnet" && chainIdNum !== 1) {
+
+Prompt for AI Agent:
+In solidity/deploy/95_deploy_account_control.ts around lines 363 to 364, the mainnet‑fork guard compares chainId !== 1 but ethers v6 may return chainId as a bigint so the comparison can fail; normalize chainId to a number (e.g., use Number(chainId) or parseInt(String(chainId))) before comparing to 1 so the check correctly detects mainnet forks and avoids running test‑only auth on mainnet.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManager.test.ts
+Line: 163 to 166
+Type: potential_issue
+
+Comment:
+Fix status comment inconsistency.
+
+Comment says “starts in Active status = 0” but earlier it’s “REGISTERED = 0”. Align the comment.
+
+
+
+-// Register QC (starts in Active status = 0)
++// Register QC (starts in REGISTERED status = 0)
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManager.test.ts around lines 163 to 166, the inline comment incorrectly says "starts in Active status = 0" while the enum earlier defines REGISTERED = 0; update the comment to say "starts in REGISTERED status = 0" (or otherwise reference REGISTERED) so it accurately reflects the enum name.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 1069 to 1095
+Type: potential_issue
+
+Comment:
+Batch escalation should skip ineligible QCs, not revert the whole batch.
+
+A single ineligible QC reverts the loop. Prefer continue.
+
+
+-      if (currentStatus != QCData.QCStatus.Paused && currentStatus != QCData.QCStatus.MintingPaused) {
+-          revert QCNotEligibleForEscalation();
+-      }
++      if (currentStatus != QCData.QCStatus.Paused && currentStatus != QCData.QCStatus.MintingPaused) {
++          continue;
++      }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 1069 to 1095, the loop currently reverts on a single ineligible QC via QCNotEligibleForEscalation(), which aborts the whole batch; change this to skip the ineligible QC and continue the loop instead. Replace the revert with a continue so the function emits warnings, checks timestamps, and auto-escalates only eligible QCs while allowing the loop to proceed to other QCs; ensure any necessary state checks remain intact and no other logic relies on the revert side-effect.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 404 to 427
+Type: potential_issue
+
+Comment:
+Enforce strictly increasing cap or fix event naming.
+
+Event name “MintingCapIncreased” implies newCap > currentCap, but no check exists locally. Either enforce or rename event. Prefer enforce:
+
+
+   uint256 currentCap = qcData.getMaxMintingCapacity(qc);
+
++  // Enforce monotonic increase locally to align with event semantics
++  require(newCap > currentCap, "newCap must be greater than currentCap");
+
+   // Delegate to library for validation and update
+   QCManagerLib.updateMintingCapacity(
+       qcData,
+       qc,
+       newCap,
+       address(accountControl)
+   );
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 404 to 427, the code emits MintingCapIncreased but does not ensure newCap > currentCap; add a check before calling QCManagerLib.updateMintingCapacity to enforce strict increase (e.g., require(newCap > currentCap, "Minting cap must increase") or revert with a new custom error like MintingCapNotIncreased()) so the event name matches behavior, keeping the check prior to delegating to the library and before emitting the event.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerWalletDirect.test.ts
+Line: 33
+Type: potential_issue
+
+Comment:
+Uncompressed pubkey is 65 bytes (0x04 + 64 bytes), not 64
+
+Current mock is 64 bytes; prepend 0x04 for an uncompressed key or adjust the comment to avoid confusion.
+
+
+
+-const mockWalletPublicKey = 0x${"aa".repeat(64)} // 64 bytes uncompressed public key
++const mockWalletPublicKey = 0x04${"aa".repeat(64)} // 65 bytes uncompressed public key
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerWalletDirect.test.ts around line 33, the mockWalletPublicKey is built as 64 bytes but the comment and intended use expect an uncompressed public key which is 65 bytes (0x04 + 64 bytes); fix by prepending the 0x04 byte to the hex string when constructing mockWalletPublicKey (or alternatively update the comment to state it is a 64-byte raw X/Y concatenation rather than an uncompressed key) so the test data and comment accurately reflect an uncompressed public key.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/QCRedeemerSPV.sol
+Line: 175 to 201
+Type: potential_issue
+
+Comment:
+Match on script type and avoid re-decoding address per output.
+
+Current check compares only raw hashes; it ignores script type and decodes the address on every call.
+
+
+- Decode address once to (valid, addrType, hash) and match only outputs of the same addrType.
+- Overload with isPaymentToDecodedHash(bytes output, uint8 addrType, bytes memory hash) and call that inside loops.
+Example:
+-    function isPaymentToAddress(bytes memory output, string calldata userBtcAddress) internal pure returns (bool) {
++    function isPaymentToDecodedHash(bytes memory output, uint8 addrType, bytes memory hash) internal pure returns (bool) {
+         if (output.length == 0) return false;
+-        (bool valid, , bytes memory hash) = SharedSPVCore.decodeAndValidateBitcoinAddress(userBtcAddress);
+-        if (!valid) return false;
+-        bytes memory outputHash = output.extractHash();
+-        if (outputHash.length == 0) return false;
+-        return keccak256(outputHash) == keccak256(hash);
++        // TODO: when available, gate by script type via BitcoinTx.determineOutputType(output)
++        bytes memory outputHash = output.extractHash();
++        if (outputHash.length == 0) return false;
++        return keccak256(outputHash) == keccak256(hash);
+     }
+
+Then decode once in callers and use this overload.
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/QCRedeemerSPV.sol around lines 175-201, change the logic so the address is decoded once and script type is matched before comparing hashes: add a new overload isPaymentToDecodedHash(bytes memory output, uint8 addrType, bytes memory hash) that extracts the output script type (using the existing utility that determines output type when available or by inspecting the script pattern/length) and returns false if types differ, otherwise compares keccak256(output.extractHash()) to keccak256(hash); then modify the existing isPaymentToAddress to call SharedSPVCore.decodeAndValidateBitcoinAddress once, obtain (valid, addrType, hash), return false if !valid, and call the new overload instead of re-decoding per output so callers can also decode once and pass addrType+hash into the overload when iterating outputs.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 553 to 571
+Type: potential_issue
+
+Comment:
+Guard AccountControl sync when not configured to avoid unintended reverts.
+
+Several flows (selfPause, defaults, backlog clear) call _syncAccountControlWithStatus without requiresAccountControl. Early‑return if unset.
+
+
+ function _syncAccountControlWithStatus(
+     address qc,
+     QCData.QCStatus oldStatus,
+     QCData.QCStatus newStatus
+ ) private {
+   if (oldStatus == newStatus) return;
++  if (accountControl == address(0)) return;
+
+   if (newStatus != QCData.QCStatus.Revoked) {
+     try this.syncBackingFromOracle(qc) {
+     } catch {
+     }
+   }
+
+   QCManagerLib.syncAccountControlWithStatus(
+       accountControl,
+       qc,
+       oldStatus,
+       newStatus
+   );
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 553 to 571, the sync routine calls QCManagerLib.syncAccountControlWithStatus even when account control is not configured causing unintended reverts; add a guard at the start of the function to check the accountControl configuration (e.g., call requiresAccountControl(accountControl) or equivalent) and early-return when account control is unset so the function no-ops instead of attempting to sync, preserving existing behavior for status-equal and the oracle sync branch.
+
+
+
+============================================================================
+File: solidity/contracts/test/MockAccountControl.sol
+Line: 265 to 273
+Type: potential_issue
+
+Comment:
+Fix partial debit that breaks invariants; make operation atomic
+
+debitMinted can decrement totalMinted without decrementing minted[msg.sender], leaving state inconsistent. Revert early and update both or none.
+
+
+
+ function debitMinted(uint256 amount) external whenNotPaused {
+-        uint256 satoshis = amount / 1e10;
+-        if (totalMinted >= satoshis) {
+-            totalMinted -= satoshis;
+-        }
+-        if (minted[msg.sender] >= satoshis) {
+-            minted[msg.sender] -= satoshis;
+-        }
++        uint256 satoshis = amount / 1e10;
++        // Validate first to avoid partial updates and preserve invariants.
++        require(totalMinted >= satoshis, "Insufficient totalMinted");
++        if (minted[msg.sender] < satoshis) {
++            revert InsufficientMinted(minted[msg.sender], satoshis);
++        }
++        totalMinted -= satoshis;
++        minted[msg.sender] -= satoshis;
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/test/MockAccountControl.sol around lines 265-273, debitMinted currently subtracts satoshis from totalMinted and minted[msg.sender] independently which can leave state inconsistent; change the logic to first compute satoshis, then require both totalMinted >= satoshis and minted[msg.sender] >= satoshis (reverting otherwise), and only after both checks perform the two subtractions so the update is atomic and invariants are preserved.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/SharedSPVCore.sol
+Line: 75 to 80
+Type: potential_issue
+
+Comment:
+Guard and slice first 80-byte header before extracting merkleRoot.
+
+extractMerkleRootLE() is intended for a single 80‑byte header; calling it on a concatenated headers blob without a prior length guard/slice risks revert. Add the length check here (not later) and slice the first header.
+
+
+Apply this diff:
+
+-        // Validate merkle proof
+-        bytes32 root = proof.bitcoinHeaders.extractMerkleRootLE();
++        // Validate merkle proof
++        if (proof.bitcoinHeaders.length < 80) {
++            revert SPVErr(8); // Invalid header length
++        }
++        bytes32 root = proof.bitcoinHeaders.slice(0, 80).extractMerkleRootLE();
+
+
+
+
+============================================================================
+File: solidity/scripts/verify-roles.ts
+Line: 304 to 309
+Type: potential_issue
+
+Comment:
+Fix role-name lookup and compare addresses case-insensitively.
+
+- getRoleName expects a role hash; pass ROLES[assignment.role].
+- Normalize addresses when comparing to avoid checksum/case mismatches.
+- Don’t default expected governance to deployer; pass optional governance.
+
+
+
+-    const actualHolders = await getRoleHolders(
++    const actualHolders = await getRoleHolders(
+       contractInstance,
+       ROLES[assignment.role]
+     )
+-    const expectedHolders = await resolveExpectedHolders(
++    const expectedHolders = await resolveExpectedHolders(
+       assignment.expectedHolders,
+       deployer.address,
+-      governance?.address || deployer.address
++      governance?.address
+     )
+ 
+-    // Check if deployer still has admin roles
+-    if (
+-      assignment.role === "DEFAULT_ADMIN_ROLE" &&
+-      actualHolders.includes(deployer.address)
+-    ) {
++    // Normalize addresses to checksum for comparisons
++    const toC = (a: string) => ethers.getAddress(a)
++    const expectedNorm = expectedHolders.map(toC)
++    const actualNorm = actualHolders.map(toC)
++
++    // Check if deployer still has admin roles
++    if (
++      assignment.role === "DEFAULT_ADMIN_ROLE" &&
++      actualNorm.includes(toC(deployer.address))
++    ) {
+       deployerPrivileges.push(
+         ${assignment.contract} still has deployer as admin
+       )
+     }
+ 
+     // Analyze results
+     let status: "✅ OK" | "⚠️ WARNING" | "❌ ERROR" = "✅ OK"
+     let message = ""
+ 
+-    const missingHolders = expectedHolders.filter(
+-      (e) => !actualHolders.includes(e)
++    const missingHolders = expectedNorm.filter(
++      (e) => !actualNorm.includes(e)
+     )
+-    const unexpectedHolders = actualHolders.filter(
+-      (a) => !expectedHolders.includes(a) && a !== deployer.address
++    const unexpectedHolders = actualNorm.filter(
++      (a) => !expectedNorm.includes(a) && a !== toC(deployer.address)
+     )
+ ...
+-        criticalErrors.push(
+-          ${assignment.contract}.${getRoleName(assignment.role)}: ${message}
+-        )
++        criticalErrors.push(
++          ${assignment.contract}.${getRoleName(ROLES[assignment.role])}: ${message}
++        )
+ ...
+-        warnings.push(
+-          ${assignment.contract}.${getRoleName(assignment.role)}: ${message}
+-        )
++        warnings.push(
++          ${assignment.contract}.${getRoleName(ROLES[assignment.role])}: ${message}
++        )
+ ...
+-      warnings.push(
+-        ${assignment.contract}.${getRoleName(
+-          assignment.role
+-        )}: Unexpected holders
+-      )
++      warnings.push(
++        ${assignment.contract}.${getRoleName(
++          ROLES[assignment.role]
++        )}: Unexpected holders
++      )
+ ...
+     results.push({
+       contract: assignment.contract,
+       role: assignment.role,
+-      roleName: getRoleName(assignment.role),
+-      expected: expectedHolders,
+-      actual: actualHolders,
++      roleName: getRoleName(ROLES[assignment.role]),
++      expected: expectedNorm,
++      actual: actualNorm,
+       status,
+       message: message || "All expected holders present",
+     })
+
+
+
+Also applies to: 310-331, 331-367
+
+Prompt for AI Agent:
+In solidity/scripts/verify-roles.ts around lines 304-309 (and similarly for 310-331 and 331-367), fix role-name lookup and address comparisons: pass ROLES[assignment.role] (the role hash) into getRoleName instead of the string key; when comparing addresses normalize both sides (e.g. toLowerCase()) to avoid checksum/case mismatches; and when calling resolveExpectedHolders do not default governance to deployer — forward the optional governance value as-is (allow undefined) so expected holders are resolved correctly for governance being absent. Ensure these changes are applied consistently across the indicated line ranges.
+
+
+
+============================================================================
+File: solidity/scripts/verify-roles.ts
+Line: 217 to 221
+Type: potential_issue
+
+Comment:
+Harden role enumeration fallback and error handling.
+
+- Check function existence before calling getRoleMemberCount.
+- Don’t assume a second signer exists; guard governance.
+- Keep error handling type-safe.
+
+
+
+-    const memberCount = contract.getRoleMemberCount
+-      ? await contract.getRoleMemberCount(role)
+-      : 0
+-    const count = typeof memberCount === 'bigint' ? Number(memberCount) : (memberCount.toNumber ? memberCount.toNumber() : memberCount)
++    const memberCount =
++      typeof (contract as any).getRoleMemberCount === "function"
++        ? await (contract as any).getRoleMemberCount(role)
++        : 0
++    const count =
++      typeof memberCount === "bigint"
++        ? Number(memberCount)
++        : memberCount?.toNumber
++        ? memberCount.toNumber()
++        : Number(memberCount)
+ ...
+-      const [deployer, governance] = await ethers.getSigners()
+-      const addresses = [deployer.address, governance.address]
++      const [deployer, governance] = await ethers.getSigners()
++      const addresses: string[] = [deployer.address]
++      if (governance) addresses.push(governance.address)
+ ...
+-        } catch {
++        } catch {
+           // Ignore errors for invalid addresses
+         }
+ ...
+-  } catch (error) {
+-    console.error(Error getting role holders: ${error.message})
++  } catch (error) {
++    const msg = error instanceof Error ? error.message : String(error)
++    console.error(Error getting role holders: ${msg})
+
+
+
+Also applies to: 230-233, 249-259, 260-262
+
+
+
+
+============================================================================
+File: solidity/scripts/run-integration-tests.ts
+Line: 1 to 6
+Type: potential_issue
+
+Comment:
+Chalk v5 is ESM-only; import will break under Hardhat’s default CommonJS TS setup. Hardhat’s ts-node runs in CommonJS, so import chalk from "chalk" (v5) causes “ERR_REQUIRE_ESM.” Choose one:
+- Downgrade to chalk@4.1.2 to keep import chalk from "chalk" under CJS  
+- Convert to ESM (add "type":"module" in package.json) and use native ESM imports  
+- Use dynamic import in CJS:  
+    const chalk = (await import("chalk")).default
+  
+Resolve this before running integration tests.
+
+Prompt for AI Agent:
+In solidity/scripts/run-integration-tests.ts around lines 1 to 6, importing Chalk v5 with a static ESM import will fail under Hardhat's default CommonJS ts-node; fix by either downgrading chalk to 4.1.2, converting the project to ESM (set "type":"module" and adjust imports), or change this file to use a dynamic import that loads chalk at runtime and uses the default export; pick one approach and apply it consistently so the script runs under the current module system.
+
+
+
+============================================================================
+File: solidity/contracts/test/MockBankWithSeparatedOps.sol
+Line: 168 to 175
+Type: potential_issue
+
+Comment:
+Authorization functions are open to everyone.
+
+Anyone can authorize or deauthorize increasers, enabling arbitrary mint/decrease operations. Restrict to owner (or a role) to avoid masking privilege bugs in tests.
+
+
+
+
+-    function authorizeBalanceIncreaser(address account) external {
++    function authorizeBalanceIncreaser(address account) external onlyOwner {
+         _authorizedIncreasers[account] = true;
+     }
+ 
+-    function unauthorizeBalanceIncreaser(address account) external {
++    function unauthorizeBalanceIncreaser(address account) external onlyOwner {
+         _authorizedIncreasers[account] = false;
+     }
+
+Prompt for AI Agent:
+In solidity/contracts/test/MockBankWithSeparatedOps.sol around lines 168 to 175, the authorizeBalanceIncreaser and unauthorizeBalanceIncreaser functions are publicly callable by anyone; restrict them to owner/role to prevent arbitrary actors from granting/revoking mint rights. Fix by adding an access control mechanism (e.g., inherit OpenZeppelin Ownable or implement an owner state and onlyOwner modifier), apply the onlyOwner (or equivalent) modifier to both functions, and initialize/set the owner in the constructor (or use Ownable's constructor) so only the contract owner can call these authorization functions.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/ReserveOracle.sol
+Line: 131 to 135
+Type: refactor_suggestion
+
+Comment:
+Separate duties: don’t grant admin the ATTESTER role by default
+
+Granting ATTESTER_ROLE to the DEFAULT_ADMIN (msg.sender) weakens separation of duties and increases blast radius if the admin key is compromised. Prefer granting ATTESTER_ROLE only to dedicated signers (ideally via a different multisig) and keep admin/arbiter isolated.
+
+
+
+Apply this minimal change:
+
+ constructor() {
+   _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+-  _grantRole(ATTESTER_ROLE, msg.sender);
+   _grantRole(DISPUTE_ARBITER_ROLE, msg.sender);
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/ReserveOracle.sol around lines 131 to 135, the constructor currently grants ATTESTER_ROLE to DEFAULT_ADMIN (msg.sender) which breaks separation of duties; remove the _grantRole(ATTESTER_ROLE, msg.sender) call from the constructor so the admin address only receives DEFAULT_ADMIN_ROLE (and keep DISPUTE_ARBITER_ROLE if desired), and add a note in comments that ATTESTER_ROLE should be granted separately after deployment to dedicated signers/multisig.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 956 to 985
+Type: potential_issue
+
+Comment:
+“ReserveBalanceUpdated” event is misleading; no on-chain update happens here.
+
+This path only validates solvency; it doesn’t persist newBalance. Emitting “Updated” can mislead indexers/ops and be abused for false signaling. Rename or drop.
+
+
+- event ReserveBalanceUpdated(
++ // Consider renaming to ReserveBalanceValidated (and emit only on successful validation)
++ event ReserveBalanceValidated(
+     address indexed qc,
+     uint256 indexed oldBalance,
+     uint256 indexed newBalance,
+     address updatedBy,
+     uint256 timestamp
+ );
+ ...
+- emit ReserveBalanceUpdated(
++ emit ReserveBalanceValidated(
+     qc,
+     oldBalance,
+     newBalance,
+     msg.sender,
+     block.timestamp
+ );
+
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 1301 to 1317
+Type: potential_issue
+
+Comment:
+Auto-escalation doesn’t sync AccountControl — add sync to keep reserve ops consistent.
+
+After auto-escalation, AccountControl state may drift from QC status. Call _syncAccountControlWithStatus here.
+
+
+ function _performAutoEscalation(address qc) private {
+   QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+
+   QCData.QCStatus newStatus = QCManagerLib.performAutoEscalationLogic(
+       qcData,
+       qc,
+       AUTO_ESCALATION
+   );
+
+   if (newStatus != currentStatus) {
++    _syncAccountControlWithStatus(qc, currentStatus, newStatus);
+     delete qcCanEarlyResume[qc];
+     delete qcPauseTimestamp[qc];
+     qcData.setQCSelfPaused(qc, false);
+
+     emit AutoEscalated(qc, currentStatus, newStatus);
+   }
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 1301 to 1317, after the auto-escalation branch updates qc state (deleting qcCanEarlyResume/qcPauseTimestamp and setting qcselfPaused=false) you must call _syncAccountControlWithStatus(qc) so AccountControl is kept consistent with the new QC status; insert the call inside the if (newStatus != currentStatus) block (after the state updates and before or after emitting AutoEscalated) to ensure reserve operations and AccountControl state are synchronized with the new status.
+
+
+
+============================================================================
+File: solidity/test/account-control/WatchdogEnforcer.test.ts
+Line: 2
+Type: refactor_suggestion
+
+Comment:
+Use Hardhat Network Helpers for snapshots  
+Hardhat doesn’t export helpers.snapshot.createSnapshot/restoreSnapshot; import takeSnapshot/loadFixture from @nomicfoundation/hardhat-network-helpers instead.
+
+Minimal changes:
+
+-import { ethers, helpers } from "hardhat"
++import { ethers } from "hardhat"
++import { helpers } from "@nomicfoundation/hardhat-network-helpers"
+
+
+-const { createSnapshot, restoreSnapshot } = helpers.snapshot
++let snapshot: Awaited>
+
+
+-beforeEach(async () => {
+-  await createSnapshot()
++beforeEach(async () => {
++  snapshot = await helpers.takeSnapshot()
+
+
+-afterEach(async () => {
+-  await restoreSnapshot()
++afterEach(async () => {
++  await snapshot.restore()
+
+
+For improved performance, replace snapshots with fixtures:
+
+const deployFixture = async () => { / deploy contracts / }
+beforeEach(() => loadFixture(deployFixture))
+
+Prompt for AI Agent:
+In solidity/test/account-control/WatchdogEnforcer.test.ts around line 2, the test currently imports helpers from hardhat and likely uses helpers.snapshot/restoreSnapshot which Hardhat doesn't export; replace that with importing loadFixture (and takeSnapshot only if needed) from @nomicfoundation/hardhat-network-helpers and refactor tests to use a deployFixture function that deploys and returns the contracts/state, then call await loadFixture(deployFixture) in beforeEach to reset state between tests; ensure the file import line is updated accordingly and remove any calls to helpers.snapshot.createSnapshot/restoreSnapshot.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCRedeemer.sol
+Line: 280 to 287
+Type: potential_issue
+
+Comment:
+Events before revert don’t persist. Remove pre-revert emissions.
+
+RedemptionRequestFailed is emitted and then the tx reverts, so the log is discarded. This wastes gas and provides no signal.
+
+
+
+-            emit RedemptionRequestFailed(
+-                qc,
+-                msg.sender,
+-                amount,
+-                "VALIDATION_FAILED",
+-                msg.sender
+-            );
+             revert ValidationFailed(msg.sender, qc, amount);
+
+
+-            emit RedemptionRequestFailed(
+-                qc,
+-                msg.sender,
+-                amount,
+-                "REDEMPTION_ID_ALREADY_USED",
+-                msg.sender
+-            );
+             revert RedemptionIdAlreadyUsed(redemptionId);
+
+Optionally remove the unused event declaration if not used elsewhere.
+
+
+Also applies to: 292-299
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCRedeemer.sol around lines 280-287 (and similarly 292-299), the code emits RedemptionRequestFailed immediately before reverting, which is ineffective because events are discarded on revert; remove the pre-revert emit calls (and if RedemptionRequestFailed is unused elsewhere, remove its declaration) and instead either emit the event only on successful non-reverting paths or restructure to return an error state without reverting if an on-chain log is required.
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlOracleIntegration.test.ts
+Line: 111 to 112
+Type: potential_issue
+
+Comment:
+Comment nit: initializer, not constructor
+
+Proxy deploy uses initialize; adjust comment to avoid confusion.
+
+
+- // Note: owner is already set in AccountControl constructor
++ // Note: owner is set via AccountControl.initialize(...)
+
+Prompt for AI Agent:
+In solidity/test/account-control/AccountControlOracleIntegration.test.ts around lines 111 to 112, the inline comment says "owner is already set in AccountControl constructor" which is misleading for a proxy deployment; update the comment to reference the initializer (e.g., "owner is already set in AccountControl initializer") to avoid confusion about proxy initialization.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/AccountControl.sol
+Line: 295 to 301
+Type: potential_issue
+
+Comment:
+Wrong error on unknown reserve in setMintingCap.
+
+This checks the target reserve, not the caller. Use ReserveNotFound(reserve) for accuracy.
+
+
+
+-        if (!authorized[reserve]) revert NotAuthorized(msg.sender);
++        if (!authorized[reserve]) revert ReserveNotFound(reserve);
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/AccountControl.sol around lines 295-301, the revert currently uses NotAuthorized(msg.sender) when checking the target reserve; replace that revert with ReserveNotFound(reserve) so the error reflects the unknown/unauthorized reserve being set (i.e., revert ReserveNotFound(reserve) instead of NotAuthorized(msg.sender)), keeping the rest of the logic unchanged.
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManagerWalletDirect.test.ts
+Line: 138 to 153
+Type: potential_issue
+
+Comment:
+Nonce‑reuse test is a no‑op; mark pending or make it meaningful
+
+The test never marks a nonce used. Either stub the verification to succeed (so the nonce is consumed) and then assert reuse reverts, or skip with a TODO.
+
+
+
+-it("should reject registration with already used nonce", async () => {
++it.skip("should reject registration with already used nonce (TODO: stub verification to succeed first)", async () => {
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManagerWalletDirect.test.ts around lines 138-153, the "should reject registration with already used nonce" test is a no-op because it only checks the nonce is unused and never exercises the registration path or marks the nonce as used; either mark the test as pending/skipped with a TODO, or make it meaningful by stubbing/mocking the signature verification (or invoking a test-only helper) so a simulated successful registration consumes the nonce, then attempt the same registration again and assert it reverts; implement the chosen approach and add an explicit assertion that the second attempt fails due to nonce reuse.
+
+
+
+============================================================================
+File: solidity/test/account-control/SPVSecurityTests.test.ts
+Line: 329 to 335
+Type: refactor_suggestion
+
+Comment:
+Use an actually “old” locktime (2009 timestamp) and correct endianness.
+
+0x01000000 is little‑endian for 1, not a 2009 timestamp. Use 1231006505 (Jan 03, 2009) encoded little‑endian.
+
+
+
+-        locktime: "0x01000000", // Old locktime from 2009
++        // 1231006505 (2009‑01‑03T02:15:05Z) => 0x499602D9, little‑endian bytes: d9 02 96 49
++        locktime: "0xd9029649",
+
+Prompt for AI Agent:
+In solidity/test/account-control/SPVSecurityTests.test.ts around lines 329 to 335, the locktime is set to little‑endian 0x01000000 (value 1) instead of the intended 2009 timestamp; replace it with the little‑endian encoding of 1231006505 (Jan 03, 2009) — i.e. set locktime to 0xD9029649 so the test uses the correct old timestamp and endianness.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/AccountControl.sol
+Line: 350 to 374
+Type: potential_issue
+
+Comment:
+mintTokens contradicts its doc; currently performs accounting + token mint.
+
+Docs/events say “pure token mint without accounting”, but code calls _creditMintedInternal (updates accounting) and emits PureTokenMint. This mismatch is risky and confusing.
+
+
+
+Minimal, safe fix: make this a thin wrapper around the already-safe _mintInternal (and align eventing):
+
+-/// @notice Pure token minting without accounting updates
+-/// @dev Enforces backing requirements but doesn't update minted[reserve]
++/// @notice Backward-compatible token mint that also updates accounting
++/// @dev Wrapper around _mintInternal to ensure invariant checks and consistent eventing
+ function mintTokens(address recipient, uint256 amount)
+     external
+     onlyAuthorizedReserve
+     nonReentrant
+ {
+-    // Validate mint amount bounds
+-    if (amount  MAX_SINGLE_MINT) {
+-        revert AmountTooLarge(amount, MAX_SINGLE_MINT);
+-    }
+-
+-    // Update accounting to enforce caps and track minted amount
+-    _creditMintedInternal(msg.sender, amount);
+-
+-    // Pure token minting via Bank
+-    IBank(bank).mint(recipient, amount);
+-
+-    emit PureTokenMint(msg.sender, recipient, amount);
++    _mintInternal(msg.sender, recipient, amount);
+ }
+
+
+If you still need true “separated ops”, introduce an “in-flight” accounting buffer to enforce caps/backing across sequences; otherwise omit the public “pure” variants. I can draft this if desired.
+
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCManager.sol
+Line: 1188 to 1194
+Type: potential_issue
+
+Comment:
+Emit PauseCreditExpired only when an actual expiry-triggered resume occurs.
+
+Currently always emitted, creating noisy or misleading signals.
+
+
+ function resumeIfExpired(address qc) external {
+-    QCManagerPauseLib.resumeIfExpired(pauseCredits, qc);
+-    emit PauseCreditExpired(qc);
++    (bool isPaused, uint256 pauseEndTime, , , ) = QCManagerPauseLib.getPauseInfo(pauseCredits, qc);
++    bool shouldEmit = isPaused && pauseEndTime <= block.timestamp;
++    QCManagerPauseLib.resumeIfExpired(pauseCredits, qc);
++    if (shouldEmit) {
++        emit PauseCreditExpired(qc);
++    }
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCManager.sol around lines 1188-1194, the PauseCreditExpired event is emitted unconditionally; change the call to QCManagerPauseLib.resumeIfExpired so it returns a bool indicating whether a resume actually occurred (or use an existing boolean return), capture that value, and only emit PauseCreditExpired(qc) when the returned value is true; if the library lacks a return, update the library function to return a bool and propagate it here before emitting.
+
+
+
+============================================================================
+File: solidity/test/account-control/SPVSecurityTests.test.ts
+Line: 254 to 310
+Type: potential_issue
+
+Comment:
+Replay test doesn’t verify replay; add a second fulfillment attempt with the same tx.
+
+Right now only the first call is made (and reverts on SPV). Make the same call for redemptionId2 to demonstrate replay protection.
+
+
+
+       // Even if first had succeeded, second attempt with same tx should be prevented
+-      // Our implementation validates each redemption independently, preventing replay
++      // Our implementation validates each redemption independently, preventing replay
++      await expect(
++        qcRedeemer.recordRedemptionFulfillment(
++          redemptionId2,
++          validBitcoinAddress,
++          100000000,
++          txInfo,
++          proof
++        )
++      ).to.be.reverted
+
+Prompt for AI Agent:
+In solidity/test/account-control/SPVSecurityTests.test.ts around lines 254 to 310, the test claims to check replay protection but only attempts fulfillment for redemptionId1; add a second fulfillment attempt using the exact same txInfo/proof/bitcoin address/amount for redemptionId2 and assert it is rejected (expect .to.be.reverted or the specific revert reason used by the contract) so the test verifies that the same Bitcoin transaction cannot be reused for multiple redemptions.
+
+
+
+============================================================================
+File: solidity/deploy/102_transfer_roles_to_governance.ts
+Line: 122 to 124
+Type: potential_issue
+
+Comment:
+Fix catch (error) typing to avoid TS compile error and log safely
+
+In TS, error is unknown; error.message will fail under strict settings. Narrow before accessing.
+
+
+-    } catch (error) {
+-      log(Warning: Could not process ${contractName}: ${error.message})
+-    }
++    } catch (error) {
++      const msg =
++        error instanceof Error
++          ? error.message
++          : typeof error === "string"
++          ? error
++          : JSON.stringify(error)
++      log(Warning: Could not process ${contractName}: ${msg})
++    }
+
+Prompt for AI Agent:
+In solidity/deploy/102_transfer_roles_to_governance.ts around lines 122-124, the catch currently assumes error has a message property which fails under TS strict mode; change the catch to catch (error: unknown) and narrow the type before accessing message — e.g., create a message variable like const msg = error instanceof Error ? error.message : String(error) (or use JSON.stringify fallback) and use that in the log call so no direct property access on unknown occurs.
+
+
+
+============================================================================
+File: solidity/test/account-control/SystemStateSecurityTest.test.ts
+Line: 118 to 129
+Type: potential_issue
+
+Comment:
+Flaky timestamp read: wait for the tx and fetch its block.
+
+Reading latest without tx.wait() can race. Use the receipt’s block to make the pause timestamp assertion deterministic.
+
+
+-        const pauseTx = await systemState.connect(pauser).pauseMinting()
+-        const block = await ethers.provider.getBlock("latest")
+-        const pauseTime = block.timestamp
++        const tx = await systemState.connect(pauser).pauseMinting()
++        const receipt = await tx.wait()
++        const block = await ethers.provider.getBlock(receipt.blockNumber)
++        const pauseTime = block.timestamp
+
+Prompt for AI Agent:
+In solidity/test/account-control/SystemStateSecurityTest.test.ts around lines 118 to 129, the test reads the "latest" block before ensuring the pauseMinting transaction is mined which can cause a race; change the flow to await the transaction receipt (const receipt = await pauseTx.wait()), use receipt.blockNumber to fetch that exact block (await ethers.provider.getBlock(receipt.blockNumber)) to obtain a deterministic timestamp, and then assert that systemState.pauseTimestamps(mintingPauseKey) equals the timestamp from that block.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCData.sol
+Line: 164 to 170
+Type: potential_issue
+
+Comment:
+Prevent duplicate wallet registrations for bech32 BTC addresses (case-insensitivity)
+
+bech32 addresses are case-insensitive; hashing raw strings allows registering the same address in different cases as distinct wallets. Enforce canonical lowercase for bech32 inputs to keep keys unique and predictable.
+
+
+Apply this diff to enforce canonical bech32 on write paths (and optionally reads):
+
+@@
+ function registerWallet(address qc, string calldata btcAddress)
+     external
+     onlyRole(QC_MANAGER_ROLE)
+ {
++    _assertCanonicalBech32(btcAddress); // enforce lowercase for bech32 inputs
+     if (!isQCRegistered(qc)) revert QCNotRegistered();
+     if (bytes(btcAddress).length == 0) revert QCManagerErrors.InvalidWalletAddress();
+     if (isWalletRegistered(btcAddress)) revert WalletAlreadyRegistered();
+     if (custodians[qc].walletAddresses.length >= MAX_WALLETS_PER_QC) revert MaxWalletsExceeded();
+@@
+ function requestWalletDeRegistration(string calldata btcAddress)
+     external
+     onlyRole(QC_MANAGER_ROLE)
+ {
++    _assertCanonicalBech32(btcAddress); // keep caller inputs consistent
+     if (!isWalletRegistered(btcAddress)) revert WalletNotRegistered();
+     if (!isWalletActive(btcAddress)) revert WalletNotActive();
+@@
+ function finalizeWalletDeRegistration(string calldata btcAddress)
+     external
+     onlyRole(QC_MANAGER_ROLE)
+ {
++    _assertCanonicalBech32(btcAddress); // keep caller inputs consistent
+     if (!isWalletRegistered(btcAddress)) revert WalletNotRegistered();
+     bytes32 walletKey = _getWalletKey(btcAddress);
+
+
+Add the helper and custom error (place with other errors and helpers):
+
++    error NonCanonicalBech32(); // bech32 must be lowercase per canonical form
+@@
+-    function _getWalletKey(string calldata btcAddress) private pure returns (bytes32 key) {
+-        return keccak256(bytes(btcAddress));
+-    }
++    function _getWalletKey(string calldata btcAddress) private pure returns (bytes32 key) {
++        // Key is keccak256 of canonical input; canonicalization is asserted at call sites.
++        return keccak256(bytes(btcAddress));
++    }
++
++    /// @dev Asserts that if the input looks like bech32 (bc1/tb1/bcrt1), it is all lowercase.
++    function _assertCanonicalBech32(string calldata s) private pure {
++        bytes calldata b = bytes(s);
++        if (b.length = 5
++            && (b[0] | 0x20) == bytes1("b") && (b[1] | 0x20) == bytes1("c")
++            && (b[2] | 0x20) == bytes1("r") && (b[3] | 0x20) == bytes1("t") && b[4] == bytes1("1");
++        if (!(isBc1 || isTb1 || isBcrt1)) return;
++        // Enforce lowercase canonical form for bech32.
++        for (uint256 i = 0; i = 0x41 && ch <= 0x5A) revert NonCanonicalBech32(); // 'A'..'Z'
++        }
++    }
+
+
+Note: This keeps base58 addresses (which are case-sensitive) untouched while enforcing canonical bech32 lowercase. Add a short NatSpec note on registerWallet indicating the requirement. 
+
+
+
+Also applies to: 238-265, 266-287, 289-325
+
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlValidation.test.ts
+Line: 78 to 81
+Type: refactor_suggestion
+
+Comment:
+Replace string-based revert assertion with custom error check  
+OpenZeppelin Contracts v5’s Ownable now reverts with OwnableUnauthorizedAccount(account). Update the test to:
+
+- await expect(
+-   accountControl.connect(emergencyCouncil).unpauseSystem()
+- ).to.be.revertedWith("Ownable: caller is not the owner");
++ await expect(
++   accountControl.connect(emergencyCouncil).unpauseSystem()
++ ).to.be.revertedWithCustomError(accountControl, "OwnableUnauthorizedAccount");
+
+Prompt for AI Agent:
+In solidity/test/account-control/AccountControlValidation.test.ts around lines 78-81, replace the string-based revert assertion with a custom error check: use chai's revertedWithCustomError against the deployed contract (accountControl) and assert the OwnableUnauthorizedAccount error with the emergencyCouncil address as argument (e.g. .to.be.revertedWithCustomError(accountControl, "OwnableUnauthorizedAccount").withArgs(emergencyCouncil.address)).
+
+
+
+============================================================================
+File: solidity/tasks/setup-accounts.ts
+Line: 271 to 278
+Type: potential_issue
+
+Comment:
+Private keys in plaintext .env.
+
+Strongly recommend generating a .env.accounts (separate from main .env), adding to .gitignore, and using 0600 mode (above). Optionally output an encrypted bundle or a mnemonic instead of individual keys.
+
+
+
+
+============================================================================
+File: solidity/tasks/setup-accounts.ts
+Line: 326 to 331
+Type: potential_issue
+
+Comment:
+.env path and permissions.
+
+Current path writes to solidity/.env, not repo root as the logs imply. Also set restrictive permissions and avoid clobbering existing files.
+
+
+Apply:
+-const envPath = path.join(__dirname, "../.env")
+-fs.writeFileSync(envPath, envContent.join("\n"))
+-console.log(✅ .env file generated at: ${envPath})
+-console.log("🔧 Remember to set your Sepolia RPC URL in the .env file\n")
++const envPath = path.join(process.cwd(), ".env.accounts")
++fs.writeFileSync(envPath, envContent.join("\n"), { mode: 0o600, flag: "wx" })
++console.log(✅ .env (accounts) generated at: ${envPath})
++console.log("🔧 Remember to set your Sepolia RPC URL in the generated file\n")
+
+
+Ensure .env.accounts is in .gitignore.
+
+
+Also applies to: 329-331
+
+Prompt for AI Agent:
+In solidity/tasks/setup-accounts.ts around lines 326 to 331, the task currently writes a .env file to solidity/.env (contradicting the log) and overwrites files without setting permissions or ensuring .env.accounts is ignored; change behavior to write .env.accounts to the repository root (path.resolve(__dirname, "../../.env.accounts")), do not clobber an existing file (if it exists, back it up or skip and log that it already exists), write the file with restrictive permissions (mode 0o600), update the console messages to show the actual path written, and ensure the repo .gitignore contains an entry for .env.accounts (append it if missing).
+
+
+
+============================================================================
+File: solidity/tasks/setup-accounts.ts
+Line: 42 to 44
+Type: potential_issue
+
+Comment:
+Use wei/bigint everywhere; current float math can misfund or fail.
+
+ETH math via parseFloat/toFixed introduces rounding errors; parseEther/formatEther with bigint avoids this and aligns with Ethers v6.
+
+
+Key changes:
+
+1) Define wei constants:
+ // Minimum balance threshold (in ETH) - ultra low for 0.02 ETH budget
+ const MIN_BALANCE_THRESHOLD = "0.0005"
++
++// Precompute amounts in wei to avoid floating‑point errors
++const FUNDING_AMOUNTS_WEI = Object.fromEntries(
++  Object.entries(FUNDING_AMOUNTS).map(([k, v]) => [k, parseEther(v)])
++) as Record
++const MIN_BALANCE_THRESHOLD_WEI = parseEther(MIN_BALANCE_THRESHOLD)
+
+
+2) DerivedAccount tracks wei:
+ interface DerivedAccount {
+   name: string
+   index: number
+   address: string
+   privateKey: string
+   wallet: HDNodeWallet
+   targetBalance: string
++  targetWei: bigint
+   currentBalance?: string
++  currentBalanceWei?: bigint
+ }
+
+
+3) Total funding in wei:
+-const totalFunding = Object.values(FUNDING_AMOUNTS).reduce(
+-  (sum, amount) => sum + parseFloat(amount),
+-  0
+-)
+-console.log(💰 Total funding needed: ${totalFunding.toFixed(6)} ETH (fits in 0.02 ETH budget!))
++const totalFundingWei = Object.values(FUNDING_AMOUNTS_WEI).reduce(
++  (sum, amount) => sum + amount,
++  0n
++)
++console.log(💰 Total funding needed: ${formatEther(totalFundingWei)} ETH (fits in 0.02 ETH budget!))
+
+
+4) Assign targetWei when deriving:
+-const targetBalance = FUNDING_AMOUNTS[actorName]
++const targetBalance = FUNDING_AMOUNTS[actorName]
++const targetWei = FUNDING_AMOUNTS_WEI[actorName]
+ ...
+-  targetBalance,
++  targetBalance,
++  targetWei,
+
+
+5) Balance checks in wei:
+-const balance = await account.wallet.getBalance()
+-account.currentBalance = formatEther(balance)
+-const balanceNum = parseFloat(account.currentBalance)
+-const targetNum = parseFloat(account.targetBalance)
+-const status = balanceNum >= targetNum ? "✅" : "❌"
+-console.log(${status} ... | ${formatEther(balance).padStart(10)} ETH | Target: ${account.targetBalance} ETH)
++const balanceWei = await account.wallet.getBalance()
++account.currentBalanceWei = balanceWei
++account.currentBalance = formatEther(balanceWei)
++const status = balanceWei >= account.targetWei ? "✅" : "❌"
++console.log(${status} ... | ${account.currentBalance.padStart(10)} ETH | Target: ${account.targetBalance} ETH)
+
+
+6) Funding needs in wei:
+-let totalNeeded = 0
+-let totalAvailable = 0
++let totalNeededWei = 0n
++let totalAvailableWei = 0n
+ ...
+-const current = parseFloat(account.currentBalance || "0")
+-const target = parseFloat(account.targetBalance)
+-if (current  totalAvailable) {
+-  const deficit = totalNeeded - totalAvailable
+-  console.log(   ❌ Deficit: ${deficit.toFixed(6)} ETH)
++if (totalNeededWei > totalAvailableWei) {
++  const deficitWei = totalNeededWei - totalAvailableWei
++  console.log(   ❌ Deficit: ${formatEther(deficitWei)} ETH)
+
+
+7) Choose best source in wei:
+-let maxBalance = 0
++let maxBalanceWei = 0n
+ ...
+-const balance = parseFloat(account.currentBalance)
+-const target = parseFloat(account.targetBalance)
+-const surplus = balance - target
+-if (surplus > parseFloat(MIN_BALANCE_THRESHOLD) && balance > maxBalance) {
+-  maxBalance = balance
++const balanceWei = account.currentBalanceWei ?? 0n
++const surplusWei = balanceWei - account.targetWei
++if (surplusWei > MIN_BALANCE_THRESHOLD_WEI && balanceWei > maxBalanceWei) {
++  maxBalanceWei = balanceWei
+   bestAccount = account
+ }
+
+
+8) Track transfers in wei and type transactions:
+-let totalTransferred = 0
+-const transactions: any[] = []
++let totalTransferredWei = 0n
++type FundingTx = { account: keyof typeof ACTOR_ACCOUNTS; amountWei: bigint; hash: string }
++const transactions: FundingTx[] = []
+
+
+9) Send amounts in wei (with gas buffer) and let provider estimate gas:
+-const current = parseFloat(account.currentBalance || "0")
+-const target = parseFloat(account.targetBalance)
+-if (current < target) {
+-  const needed = target - current
+-  const amount = parseEther(needed.toFixed(6))
+-  console.log(💸 Funding ${account.name}: ${needed.toFixed(6)} ETH)
++const currentWei = account.currentBalanceWei ?? 0n
++const targetWei = account.targetWei
++if (currentWei < targetWei) {
++  const neededWei = targetWei - currentWei
++  const gasReserveWei = parseEther("0.00005") // small buffer for fees
++  const transferableWei = (bestAccount.currentBalanceWei ?? 0n) - bestAccount.targetWei - gasReserveWei
++  const amountWei = neededWei < transferableWei ? neededWei : transferableWei
++  if (amountWei <= 0n) continue
++  console.log(💸 Funding ${account.name}: ${formatEther(amountWei)} ETH)
+   try {
+     const tx = await bestAccount.wallet.sendTransaction({
+       to: account.address,
+-      value: amount,
+-      gasLimit: 21000, // Standard ETH transfer
++      value: amountWei,
++      // let provider estimate EIP‑1559 gas instead of hardcoding 21k
+     })
+     console.log(   📄 Transaction: ${tx.hash})
+     transactions.push({
+-      account: account.name,
+-      amount: needed,
++      account: account.name as keyof typeof ACTOR_ACCOUNTS,
++      amountWei: amountWei,
+       hash: tx.hash,
+     })
+-    totalTransferred += needed
++    totalTransferredWei += amountWei
+     await tx.wait()
+     console.log("   ✅ Confirmed\n")
+
+
+10) Final totals in wei:
+-let finalTotal = 0
++let finalTotalWei = 0n
+ ...
+-const balance = await account.wallet.getBalance()
+-finalTotal += parseFloat(formatEther(balance))
++const balanceWei = await account.wallet.getBalance()
++finalTotalWei += balanceWei
+ ...
+-\n💰 Total ETH across all accounts: ${finalTotal.toFixed(6)} ETH
++\n💰 Total ETH across all accounts: ${formatEther(finalTotalWei)} ETH
+ ...
+-if (finalTotal < totalFunding) {
+-  const stillNeeded = totalFunding - finalTotal
+-  console.log(⚠️  Still need: ${stillNeeded.toFixed(6)} ETH to meet all targets)
++if (finalTotalWei < totalFundingWei) {
++  const stillNeededWei = totalFundingWei - finalTotalWei
++  console.log(⚠️  Still need: ${formatEther(stillNeededWei)} ETH to meet all targets)
+
+
+
+Also applies to: 76-86, 45-53, 103-113, 128-141, 149-168, 179-195, 207-209, 217-241, 248-249, 354-376, 365-376, 369-376
+
+Prompt for AI Agent:
+In solidity/tasks/setup-accounts.ts around lines 42-44 (and also update ranges 45-53, 76-86, 103-113, 128-141, 149-168, 179-195, 207-209, 217-241, 248-249, 354-376, 365-376, 369-376), replace all ETH float/string math with wei-based bigint arithmetic: define MIN_BALANCE_THRESHOLD and other constants as BigInt wei (e.g., use parseEther or BigInt("...") to create wei values), change DerivedAccount to track balances and target amounts in wei (bigint), compute total funding, funding needs, and selection logic using bigint arithmetic, track transfers and transaction amounts in wei, request provider gas estimates and add a gas buffer in wei before sending, and format final totals using formatEther only for display; ensure no parseFloat/toFixed or JS number math remain and use ethers.parseEther/formatEther or explicit BigInt conversions consistently.
+
+
+
+============================================================================
+File: solidity/test/data/bitcoin/spv/valid-spv-proofs.ts
+Line: 142 to 158
+Type: potential_issue
+
+Comment:
+Fix malformed “coinbase-like” input outpoint
+
+For a coinbase input, the prevout must be 32 zero bytes and index ffffffff (not 00000000). The current values will fail strict parsers.
+
+Apply this diff to make Input 1 a proper coinbase outpoint:
+
+-      // Input 1
+-      "1111111111111111111111111111111111111111111111111111111111111111" +
+-      "00000000" +
+-      "00" + // empty script (coinbase-like)
++      // Input 1 (coinbase)
++      "0000000000000000000000000000000000000000000000000000000000000000" +
++      "ffffffff" +
++      "00" + // empty script (coinbase)
+       "ffffffff" +
+
+Prompt for AI Agent:
+In solidity/test/data/bitcoin/spv/valid-spv-proofs.ts around lines 142 to 158 the coinbase-like Input 1 prevout is malformed: the prevout hash is correctly zeroed but the index is set to "00000000" instead of "ffffffff" for a coinbase; update Input 1’s outpoint index to "ffffffff" (leave the 32 zero bytes prevout, empty script length "00", and sequence "ffffffff" unchanged) so the input is a proper coinbase outpoint accepted by strict parsers.
+
+
+
+============================================================================
+File: solidity/tasks/setup-accounts.ts
+Line: 55 to 60
+Type: potential_issue
+
+Comment:
+Seed phrase via CLI is risky; prefer secure input.
+
+Passing a mnemonic in --seed leaks into shell history/process lists. Support alternatives: --seed-file (read file), or read from env (MNEMONIC) or prompt (no echo). I can provide a secure prompt helper.
+
+
+
+
+============================================================================
+File: solidity/test/account-control/SPVSecurityTests.test.ts
+Line: 595 to 636
+Type: potential_issue
+
+Comment:
+The “relay configured” test targets the wrong component; assert missing relay on the redeemer instead.
+
+You deploy a QCManager with a zero reserve oracle, then call registerWallet. That doesn’t exercise SPV relay configuration. Deploy a QCRedeemer with relay = address(0) (or unset relay) and call an SPV‑gated function.
+
+
+
+-      // Deploy QCManagerLib library for this test
+-      const QCManagerLib = await ethers.getContractFactory("QCManagerLib")
+-      const qcManagerLib = await QCManagerLib.deploy()
+-
+-      const QCManagerNoRelay = await ethers.getContractFactory("QCManager", {
+-        libraries: {
+-          QCManagerLib: qcManagerLib.address,
+-        },
+-      })
+-      const qcManagerNoRelay = await QCManagerNoRelay.deploy(
+-        qcData.address,
+-        systemState.address,
+-        ethers.constants.AddressZero // NO RESERVE ORACLE
+-      )
++      // Deploy a QCRedeemer instance with NO relay set
++      const QCRedeemerSPV2 = await ethers.getContractFactory("QCRedeemerSPV", {
++        libraries: { SharedSPVCore: (await (await ethers.getContractFactory("SharedSPVCore")).deploy()).address },
++      })
++      const qcRedeemerSPV2 = await QCRedeemerSPV2.deploy()
++      const QCRedeemerFactory2 = await ethers.getContractFactory("QCRedeemer", {
++        libraries: { QCRedeemerSPV: qcRedeemerSPV2.address },
++      })
++      const qcRedeemerNoRelay = await QCRedeemerFactory2.deploy(
++        tbtcToken.address,
++        qcData.address,
++        systemState.address,
++        ethers.constants.AddressZero, // NO RELAY
++        1000
++      )
+...
+-      await expect(
+-        qcManagerNoRelay.registerWallet(
+-          qc.address,
+-          validBitcoinAddress,
+-          ethers.constants.HashZero, // challenge as bytes32
+-          "0x1234" // signature
+-        )
+-      ).to.be.reverted // Will now fail with Bitcoin address format validation error
++      // Any SPV operation should revert due to missing relay
++      await expect(
++        qcRedeemerNoRelay.recordRedemptionFulfillment(
++          0, // dummy
++          validBitcoinAddress,
++          100000000,
++          txInfo,
++          proof
++        )
++      ).to.be.reverted
+
+Prompt for AI Agent:
+In solidity/test/account-control/SPVSecurityTests.test.ts around lines 595 to 636, the test currently deploys a QCManager with a zero reserve oracle and calls registerWallet, which does not exercise SPV relay configuration; change the test to deploy a QCRedeemer (or the redeemer contract used for SPV checks) with its relay explicitly set to ethers.constants.AddressZero (or left unset), then invoke an SPV‑gated function on that redeemer and assert that the call reverts due to missing relay configuration; update any constructor args to use the deployed QCManager/QC data as needed and replace the registerWallet call with the appropriate redeemer call and revert expectation.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCRedeemer.sol
+Line: 487 to 489
+Type: potential_issue
+
+Comment:
+Use stored deadline, not the current system timeout.
+
+isRedemptionTimedOut() recalculates timeout with a mutable parameter, causing inconsistent behavior vs the stored, immutable deadline. Use redemption.deadline for determinism.
+
+
+
+-        uint256 timeout = systemState.redemptionTimeout();
+-        return block.timestamp > redemption.requestedAt + timeout;
++        return block.timestamp > redemption.deadline;
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCRedeemer.sol around lines 487-489, the check uses isRedemptionTimedOut which recalculates a timeout from a mutable parameter causing inconsistent behavior; replace that runtime recalculation by comparing the stored immutable deadline on the Redemption struct (redemption.deadline) against block.timestamp (e.g. block.timestamp > redemption.deadline) or otherwise pass the stored deadline into the timeout check so the logic uses the recorded deadline value for determinism and avoid relying on external mutable timeout inputs.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/QCRedeemer.sol
+Line: 976 to 980
+Type: potential_issue
+
+Comment:
+Prevent setting AccountControl to zero address.
+
+Setting 0 would brick new redemptions (initiateRedemption requires non-zero), likely unintended.
+
+
+
+ function setAccountControl(address _accountControl) external onlyRole(DEFAULT_ADMIN_ROLE) {
+-        address oldAddress = accountControl;
+-        accountControl = _accountControl;
++        require(_accountControl != address(0), "Invalid AccountControl");
++        address oldAddress = accountControl;
++        accountControl = _accountControl;
+         emit AccountControlUpdated(oldAddress, _accountControl, msg.sender, block.timestamp);
+ }
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/QCRedeemer.sol around lines 976 to 980, the setter for the Account Control contract currently allows the zero address which would break new redemptions; add a validation that the provided _accountControl is not the zero address (require(_accountControl != address(0), "AccountControl: zero address")) and revert with a clear message, then proceed to assign the state variable and emit any existing event; ensure the check is applied before any state changes.
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlMintTBTC.test.ts
+Line: 1 to 3
+Type: refactor_suggestion
+
+Comment:
+Update SignerWithAddress import to new plugin path  
+Replace the legacy import on line 3 with:  
+import type { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+
+Prompt for AI Agent:
+In solidity/test/account-control/AccountControlMintTBTC.test.ts around lines 1 to 3, the SignerWithAddress import uses the legacy plugin path; replace the current line importing from "@nomiclabs/hardhat-ethers/signers" with the new typed import from "@nomicfoundation/hardhat-ethers/signers" and include the TypeScript-only import keyword (i.e., import type { SignerWithAddress } ...) so the test uses the updated plugin path and avoids emitting a runtime import.
+
+
+
+============================================================================
+File: solidity/test/data/bitcoin/spv/valid-spv-proofs.ts
+Line: 97 to 107
+Type: potential_issue
+
+Comment:
+Fix P2PKH scriptSig length and missing SIGHASH byte  
+- The scriptSig length prefix 0x6a (106 bytes) doesn’t match the actual data: the DER signature’s S field is truncated and the trailing 01 SIGHASH_ALL byte is omitted, leading to a length mismatch.  
+- Either supply the full DER signature (including the SIGHASH byte) and adjust the varint accordingly, or mark this test vector as synthetic so that script parsing/length checks aren’t applied.
+
+Prompt for AI Agent:
+In solidity/test/data/bitcoin/spv/valid-spv-proofs.ts around lines 97 to 107, the P2PKH scriptSig length prefix 0x6a is incorrect because the provided DER signature is truncated (S field cut off) and the trailing SIGHASH_ALL byte (0x01) is missing; fix by either replacing the signature with the complete DER-encoded signature including the final 0x01 and update the scriptSig varint length to match the full byte count, or mark this test vector as synthetic so script parsing/length validation is skipped.
+
+
+
+============================================================================
+File: solidity/scripts/verify-roles.ts
+Line: 9 to 19
+Type: potential_issue
+
+Comment:
+Use ethers v6 hashing and freeze ROLES for type-safety.
+
+ethers.utils.id is v5; under v6 it’s ethers.id. Also add as const so keys can be used as a literal union.
+
+
+
+-const ROLES = {
++const ROLES = {
+   DEFAULT_ADMIN_ROLE:
+     "0x0000000000000000000000000000000000000000000000000000000000000000",
+-  GOVERNANCE_ROLE: ethers.utils.id("GOVERNANCE_ROLE"),
+-  OPERATIONS_ROLE: ethers.utils.id("OPERATIONS_ROLE"),
+-  EMERGENCY_ROLE: ethers.utils.id("EMERGENCY_ROLE"),
+-  MINTER_ROLE: ethers.utils.id("MINTER_ROLE"),
+-  DISPUTE_ARBITER_ROLE: ethers.utils.id("DISPUTE_ARBITER_ROLE"),
+-  ATTESTER_ROLE: ethers.utils.id("ATTESTER_ROLE"),
+-  REGISTRAR_ROLE: ethers.utils.id("REGISTRAR_ROLE"),
+-  MONITOR_ROLE: ethers.utils.id("MONITOR_ROLE"),
+-  QC_MANAGER_ROLE: ethers.utils.id("QC_MANAGER_ROLE"),
+-  ENFORCEMENT_ROLE: ethers.utils.id("ENFORCEMENT_ROLE"),
+-}
++  GOVERNANCE_ROLE: ethers.id("GOVERNANCE_ROLE"),
++  OPERATIONS_ROLE: ethers.id("OPERATIONS_ROLE"),
++  EMERGENCY_ROLE: ethers.id("EMERGENCY_ROLE"),
++  MINTER_ROLE: ethers.id("MINTER_ROLE"),
++  DISPUTE_ARBITER_ROLE: ethers.id("DISPUTE_ARBITER_ROLE"),
++  ATTESTER_ROLE: ethers.id("ATTESTER_ROLE"),
++  REGISTRAR_ROLE: ethers.id("REGISTRAR_ROLE"),
++  MONITOR_ROLE: ethers.id("MONITOR_ROLE"),
++  QC_MANAGER_ROLE: ethers.id("QC_MANAGER_ROLE"),
++  ENFORCEMENT_ROLE: ethers.id("ENFORCEMENT_ROLE"),
++} as const
+
+Prompt for AI Agent:
+In solidity/scripts/verify-roles.ts around lines 9 to 19, the ROLES object uses the v5 helper ethers.utils.id and is not frozen for type-safety; update each call to use ethers.id (ethers v6 API) and mark the ROLES object with as const to freeze values and enable literal union typing so consumers can use the keys/types safely.
+
+
+
+============================================================================
+File: solidity/test/account-control/SystemStateSecurityTest.test.ts
+Line: 163 to 166
+Type: refactor_suggestion
+
+Comment:
+Use official Hardhat Network Helpers for time travel  
+Replace the obsolete helpers.time.increaseTime and raw JSON-RPC mine call with the supported API from @nomicfoundation/hardhat-network-helpers.  
+
+         // Advance time
+-        await helpers.time.increaseTime(60 * 60) // 1 hour
+-        await ethers.provider.send("evm_mine", [])
++        await time.increase(60 * 60) // 1 hour
++        await mine()
+
+
+Ensure you’ve imported the helpers at the top of the file:
+
+import { time, mine } from "@nomicfoundation/hardhat-network-helpers";
+
+Prompt for AI Agent:
+In solidity/test/account-control/SystemStateSecurityTest.test.ts around lines 163-166, the test uses the obsolete helpers.time.increaseTime and a raw ethers.provider.send("evm_mine", []) call; replace them with the official Hardhat Network Helpers API by importing time and mine from "@nomicfoundation/hardhat-network-helpers" at the top of the file, then call await time.increase(60 * 60) to advance time and await mine(1) (or await mine() with the appropriate block count) to mine the next block.
+
+
+
+============================================================================
+File: solidity/deploy/95_deploy_account_control.ts
+Line: 242 to 246
+Type: potential_issue
+
+Comment:
+Blocker: deployments.save stores ABI as JSON string; hardhat-deploy expects ABI array
+
+QCManagerFactory.interface.format("json") returns a JSON string, not an ABI array. deployments.save requires { abi: any[] }. Persisting a string will break hardhat-deploy’s artifact cache and consumers.
+
+
+Apply this diff:
+
+-    await deployments.save("QCManager", {
+-      address: qcManagerContract.address,
+-      abi: QCManagerFactory.interface.format("json") as any,
+-    })
++    const artifact = await deployments.getArtifact("QCManager")
++    await deployments.save("QCManager", {
++      address: qcManagerContract.address,
++      abi: artifact.abi,
++    })
+
+Prompt for AI Agent:
+In solidity/deploy/95_deploy_account_control.ts around lines 242 to 246, the code passes QCManagerFactory.interface.format("json") (a JSON string) to deployments.save but hardhat-deploy expects an ABI array; change the save call to provide an actual ABI array by parsing the JSON and extracting the abi (e.g. JSON.parse(QCManagerFactory.interface.format("json")).abi) or by using the interface fragments/ABI array directly, and ensure the saved object uses abi:  rather than a JSON string.
+
+
+
+============================================================================
+File: solidity/tasks/setup-accounts.ts
+Line: 65 to 71
+Type: refactor_suggestion
+
+Comment:
+Type the catch blocks; avoid error.message on unknown.
+
+TS treats catch param as unknown. Use an Error guard or String(error) to log safely; also store wei default when balance fetch fails.
+
+
+Apply:
+-} catch (error) {
++} catch (error: unknown) {
+   // ...
+ }
+
+And where you log message:
+- console.log(... ${error.message})
++ const msg = error instanceof Error ? error.message : String(error)
++ console.log(... ${msg})
+
+Also set:
+- account.currentBalance = "0"
++ account.currentBalance = "0"
++ account.currentBalanceWei = 0n
+
+
+
+Also applies to: 142-146, 241-243, 350-351, 361-362
+
+
+
+
+============================================================================
+File: solidity/test/account-control/QCManager.test.ts
+Line: 16
+Type: potential_issue
+
+Comment:
+Fix Ethers v6 compatibility in QCManager tests  
+Migrate all v5 utils/constants to v6 top-level exports (or pin ethers v5):  
+- ethers.constants.AddressZero → ethers.ZeroAddress  
+- ethers.constants.HashZero → ethers.ZeroHash  
+- ethers.utils.formatBytes32String(…) → ethers.encodeBytes32String(…)  
+- ethers.utils.id(…) → ethers.id(…)  
+
+Update occurrences in solidity/test/account-control/QCManager.test.ts at lines 16, 71, 145–155, 168, 181, 185–187, 245–246, 272, 308, and 320.
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCManager.test.ts around lines 16, 71, 145-155, 168, 181, 185-187, 245-246, 272, 308, and 320, update Ethers v5 utils/constants usages to Ethers v6 top-level exports: replace ethers.constants.AddressZero with ethers.ZeroAddress, ethers.constants.HashZero with ethers.ZeroHash, ethers.utils.formatBytes32String(...) with ethers.encodeBytes32String(...), and ethers.utils.id(...) with ethers.id(...); modify each occurrence accordingly so tests import and call the v6 exports directly and run under Ethers v6 (or alternatively pin ethers to v5 if you prefer not to change the code).
+
+
+
+============================================================================
+File: solidity/contracts/test/MockBankWithSeparatedOps.sol
+Line: 6 to 8
+Type: refactor_suggestion
+
+Comment:
+Add v5-compatible Ownable constructor  
+If using OpenZeppelin Contracts v5, Ownable requires an initialOwner parameter. In solidity/contracts/test/MockBankWithSeparatedOps.sol, update the contract declaration as follows:
+
+ contract MockBankWithSeparatedOps is IBank, Ownable {
++    constructor() Ownable(msg.sender) {}
+     // …
+ }
+
+
+If the project remains on OZ v4, no change is needed.
+
+Prompt for AI Agent:
+In solidity/contracts/test/MockBankWithSeparatedOps.sol around lines 6-8, the contract currently inherits Ownable without supplying the required initialOwner used in OpenZeppelin Contracts v5; update the contract to pass an initial owner to the Ownable base (e.g. using Ownable(msg.sender) in the inheritance list) or add a constructor that calls Ownable(initialOwner) so the Ownable initializer receives the correct address (if the project stays on OZ v4, leave as-is).
+
+
+
+============================================================================
+File: solidity/contracts/account-control/libraries/QCManagerPauseLib.sol
+Line: 112 to 118
+Type: refactor_suggestion
+
+Comment:
+Harden against reverts from redemption-deadline calls using try/catch on an interface.  
+Replace the bare function-pointer parameter with an external interface (e.g. IRedemptionDeadlineProvider), then invoke:  
+try provider.getEarliestRedemptionDeadline(qc) returns (uint256 d) {
+    if (d > 0 && d < block.timestamp + PAUSE_DURATION + MIN_REDEMPTION_BUFFER) {
+        return false;
+    }
+} catch {
+    return false;
+}
+  
+so that any revert is treated as “cannot pause.”
+
+Prompt for AI Agent:
+In solidity/contracts/account-control/libraries/QCManagerPauseLib.sol around lines 112 to 118, the current code calls getEarliestRedemptionDeadline via a bare function-pointer and doesn't handle reverts; replace that function-pointer parameter with an external interface type (e.g. IRedemptionDeadlineProvider) added to the file imports/definitions and update the function signature accordingly, then call provider.getEarliestRedemptionDeadline(qc) inside a try/catch: in the try branch check if returned d > 0 and d < block.timestamp + PAUSE_DURATION + MIN_REDEMPTION_BUFFER and return false if so; in the catch branch return false so any revert is treated as “cannot pause.” Ensure you update any callers to pass the provider contract instance rather than a function pointer.
+
+
+
+============================================================================
+File: solidity/test/account-control/AccountControlFeatures.test.ts
+Line: 1 to 3
+Type: potential_issue
+
+Comment:
+Update Hardhat‐Ethers imports and TypeChain output directory  
+– Replace import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers" with import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers".  
+– Ensure typechain.outDir in hardhat.config.ts (or rely on the default) points to typechain-types.
+
+Prompt for AI Agent:
+In solidity/test/account-control/AccountControlFeatures.test.ts around lines 1 to 3, the test imports SignerWithAddress from the old @nomiclabs package; replace that import with SignerWithAddress from @nomicfoundation/hardhat-ethers/signers to match the newer hardhat-ethers plugin. Also update your Hardhat config (hardhat.config.ts) so typechain.outDir points to "typechain-types" (or remove custom outDir to use the TypeChain default) so generated types match imports; regenerate TypeChain types after the change.
+
+
+
+============================================================================
+File: solidity/test/account-control/BitcoinAddressUtils.test.ts
+Line: 19 to 21
+Type: potential_issue
+
+Comment:
+Replace deployed() with waitForDeployment()  
+The deployed() method is removed in Ethers v6; use await testContract.waitForDeployment() to await deployment (docs.tenderly.co).
+
+-    testContract = await TestBitcoinAddressUtils.deploy()
+-    await testContract.deployed()
++    testContract = await TestBitcoinAddressUtils.deploy()
++    await testContract.waitForDeployment()
+
+Prompt for AI Agent:
+In solidity/test/account-control/BitcoinAddressUtils.test.ts around lines 19 to 21, the test currently uses the removed Ethers v5 method deployed(); replace that call with the Ethers v6 equivalent by calling await testContract.waitForDeployment() instead so the test waits for the contract to be deployed; ensure the await is present and remove any references to deployed().
+
+
+
+============================================================================
+File: solidity/test/account-control/QCData.test.ts
+Line: 1052 to 1055
+Type: potential_issue
+
+Comment:
+Use complete revert messages (or custom errors) in AccessControl assertions
+
+revertedWith must match the revert string exactly; using only "AccessControl: account" will fail even when the contract reverts correctly because the real message includes the offending address and role hash. Update these expectations to assert the full string (AccessControl: account ${...} is missing role ${...}) or switch to revertedWithCustomError if the contract uses OZ’s custom errors. Same fix applies to all three occurrences noted in this hunk. (ethereum.stackexchange.com)
+
+
+
+Also applies to: 1088-1091, 1172-1177
+
+Prompt for AI Agent:
+In solidity/test/account-control/QCData.test.ts around lines 1052-1055 (also apply same fix to 1088-1091 and 1172-1177), the AccessControl revert assertions use the truncated string "AccessControl: account" which will not match the full revert message; update each expectation to either assert the full revert string "AccessControl: account  is missing role " by interpolating the exact address and role hash used in the call, or replace the check with revertedWithCustomError (pointing to OpenZeppelin’s AccessControl error) and assert the expected error arguments; ensure the final assertion matches the exact revert format emitted by the contract.
+
+
+
+============================================================================
+File: solidity/scripts/verify-roles.ts
+Line: 185 to 207
+Type: potential_issue
+
+Comment:
+Support literal addresses and avoid forcing governance to deployer in resolution.
+
+Currently only “deployer”, “governance”, or contract names are resolved; literal addresses are ignored. Also make governance optional here to avoid masking misconfiguration.
+
+
+
+-async function resolveExpectedHolders(
+-  holders: string[],
+-  deployer: string,
+-  governance: string
+-): Promise {
++async function resolveExpectedHolders(
++  holders: string[],
++  deployer: string,
++  governance?: string
++): Promise {
+   const resolved: string[] = []
+ 
+   for (const holder of holders) {
+     if (holder === "deployer") {
+-      resolved.push(deployer)
++      resolved.push(ethers.getAddress(deployer))
+     } else if (holder === "governance") {
+-      resolved.push(governance)
++      if (governance) resolved.push(ethers.getAddress(governance))
++    } else if (ethers.isAddress(holder)) {
++      resolved.push(ethers.getAddress(holder))
+     } else {
+       // It's a contract name, try to get its address
+       const address = await getContractAddress(holder)
+       if (address) {
+-        resolved.push(address)
++        resolved.push(ethers.getAddress(address))
+       }
+     }
+   }
+ 
+   return resolved
+ }
+
+Prompt for AI Agent:
+In solidity/scripts/verify-roles.ts around lines 185-207, the resolver currently only handles "deployer", "governance" and contract names, which ignores literal addresses and silently substitutes governance with deployer; update the logic to (1) detect literal addresses using a proper check (e.g. ethers.utils.isAddress) and push the normalized address when present, (2) stop defaulting governance to deployer — if holder === "governance" only push governance when a non-empty governance value is provided (otherwise skip or surface an error/warning), and (3) keep the existing contract-name resolution via getContractAddress for other cases. Ensure addresses are normalized consistently (checksum or lowercase) before pushing.
+
+
+
+============================================================================
+File: solidity/test/account-control/ReserveOracle.test.ts
+Line: 6 to 7
+Type: refactor_suggestion
+
+Comment:
+Replace invalid snapshot helpers with Hardhat’s takeSnapshot
+
+- @nomicfoundation/hardhat-network-helpers doesn’t expose helpers.snapshot.createSnapshot or .restoreSnapshot; use  
+    const snapshot = await takeSnapshot();
+  // …tests…
+  await snapshot.restore();
+    
+  instead.  
+- Move the snapshot call to immediately after deployment and role grants, or switch to loadFixture() for faster, reliable resets.
+
+Prompt for AI Agent:
+In solidity/test/account-control/ReserveOracle.test.ts around lines 6-7 the test imports and uses non-existent helpers.snapshot.createSnapshot/restoreSnapshot; replace that pattern by importing takeSnapshot from @nomicfoundation/hardhat-network-helpers, call const snapshot = await takeSnapshot() immediately after deployment and role-grant setup (or convert the test to use loadFixture() for faster/reliable resets), run your test logic, and then restore state with await snapshot.restore(); remove the old helpers.snapshot references.
+
+
+
+============================================================================
+File: solidity/contracts/account-control/BitcoinAddressUtils.sol
+Line: 224 to 267
+Type: potential_issue
+
+Comment:
+Uppercase Bech32 addresses currently revert
+
+isBech32Address explicitly allows all-uppercase HRPs (for example BC1…), but the decoder can never handle them: bech32CharToValue only matches lowercase letters, so the loop on Line 228 falls through and reverts with InvalidAddressPrefix(). Even if you special-case the character lookup, the checksum check on Lines 242‑267 will still fail because it hashes the original (uppercase) HRP. BIP‑173 requires decoders to accept both uppercase and lowercase encodings, so this is a functional bug that rejects valid witness addresses in the wild.
+
+Please normalize the Bech32 payload to a single case (typically lowercase) before both the charset lookup and checksum calculation. One way to do this is to build a lowercase copy of addr inside decodeBech32Address, use it when filling data/values, and pass the normalized buffer into verifyBech32Checksum. For example:
+
+-        bytes memory data = new bytes(addr.length - sepIndex - 1);
+-        for (uint256 i = sepIndex + 1; i = 0x41 && c <= 0x5A)
++                ? bytes1(uint8(c) + 32)
++                : c;
++        }
++
++        bytes memory data = new bytes(normalized.length - sepIndex - 1);
++        for (uint256 i = sepIndex + 1; i < normalized.length; i++) {
++            data[i - sepIndex - 1] = normalized[i];
++        }
+…
+-        if (!verifyBech32Checksum(addr, sepIndex, values))
++        if (!verifyBech32Checksum(normalized, sepIndex, values))
+             revert InvalidChecksum();
+
+
+This keeps mixed-case rejection intact while ensuring both lowercase and uppercase Bech32 inputs decode successfully.
+
+
+
+
+============================================================================
+File: solidity/deploy/00_deploy_test_reimbursement_pool.ts
+Line: 7 to 8
+Type: potential_issue
+
+Comment:
+Guard against missing named accounts.
+
+If governance (or deployer) isn’t configured, the transfer will fail. Add a hard check early.
+
+
+   const { deployer, governance } = await getNamedAccounts()
++
++  if (!deployer || !governance) {
++    throw new Error("Missing named accounts: 'deployer' or 'governance'")
++  }
+
+Prompt for AI Agent:
+In solidity/deploy/00_deploy_test_reimbursement_pool.ts around lines 7-8, the code destructures { deployer, governance } from getNamedAccounts() but does not guard against them being undefined; add an explicit early check after that line that verifies both deployer and governance are present and otherwise throw a clear error (or call hre.run/exit) so the script fails fast with a descriptive message like "Missing named account: deployer" or "Missing named account: governance" instead of proceeding to a transfer that will fail.
+
+
+
+Review completed ✔
