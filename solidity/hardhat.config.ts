@@ -267,11 +267,8 @@ const config: HardhatUserConfig = {
   },
   mocha: {
     timeout: 120_000, // Increased timeout for complex tests
-    parallel: true, // ✅ PERFORMANCE: Enable parallel test execution
-    jobs: 4, // ✅ PERFORMANCE: Use 4 worker processes (adjust based on CPU cores)
-    retries: 1, // ✅ RELIABILITY: Retry failed tests once (parallel execution can be flaky)
-    slow: 5000, // ✅ MONITORING: Mark tests taking >5s as slow
-    reporter: 'spec', // ✅ DEBUGGING: Clear test output for parallel execution
+    slow: 5000, // Mark tests taking >5s as slow
+    reporter: 'spec',
   },
   typechain: {
     outDir: "typechain",
