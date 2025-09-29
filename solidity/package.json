@@ -25,7 +25,10 @@
     "lint:sol": "solhint 'contracts/**/*.sol'",
     "lint:fix:sol": "solhint 'contracts/**/*.sol' --fix",
     "test": "USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test",
+    "test:local": "hardhat --config hardhat.test.config.ts test",
     "test:integration": "NODE_ENV=integration-test USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test ./test/integration/*.test.ts",
+    "test:integration:account-control": "NODE_ENV=integration-test USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true ts-node scripts/run-integration-tests.ts",
+    "setup:accounts": "hardhat setup-accounts --network sepolia --seed",
     "prepack": "tsc -p tsconfig.export.json && hardhat export-artifacts export/artifacts",
     "prepublishOnly": "./scripts/prepare-artifacts.sh --network $npm_config_network"
   },
@@ -34,6 +37,7 @@
     "@keep-network/ecdsa": "development",
     "@keep-network/random-beacon": "development",
     "@keep-network/tbtc": "development",
+    "@nomicfoundation/hardhat-network-helpers": "^1.1.0",
     "@openzeppelin/contracts": "^4.8.1",
     "@openzeppelin/contracts-upgradeable": "^4.8.1",
     "@thesis/solidity-contracts": "github:thesis/solidity-contracts#4985bcf"

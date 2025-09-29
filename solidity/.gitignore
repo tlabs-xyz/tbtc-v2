@@ -14,3 +14,15 @@
 
 # OpenZeppelin
 /.openzeppelin/unknown-*.json
+
+/flows
+/stil*.md # enable later
+
+# Ignore environment files
+.env*
+
+# Ignore Claude conversation files
+CLAUDE.md
+
+# Ignore symlinked directory
+optimistic-minting

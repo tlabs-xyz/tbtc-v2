@@ -27,6 +27,19 @@
         "no-console": "off",
         "@typescript-eslint/no-unused-vars": "off"
       }
+    },
+    {
+      "files": ["flows/**/*.ts"],
+      "rules": {
+        "no-await-in-loop": "off",
+        "no-restricted-syntax": "off",
+        "import/prefer-default-export": "off",
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/explicit-module-boundary-types": "off",
+        "class-methods-use-this": "off",
+        "no-console": "off",
+        "func-names": "off"
+      }
     }
   ]
 }

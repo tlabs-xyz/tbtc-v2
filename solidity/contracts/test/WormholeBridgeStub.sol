@@ -19,8 +19,8 @@ contract WormholeBridgeStub is IWormholeTokenBridge {
 
     // Two simple events allowing to assert Wormhole bridge functions are
     // called.
-    event WormholeBridgeStub_completeTransferWithPayload(bytes encodedVm);
-    event WormholeBridgeStub_transferTokens(
+    event WormholeBridgeStubCompleteTransferWithPayload(bytes encodedVm);
+    event WormholeBridgeStubTransferTokens(
         address token,
         uint256 amount,
         uint16 recipientChain,
@@ -28,7 +28,7 @@ contract WormholeBridgeStub is IWormholeTokenBridge {
         uint256 arbiterFee,
         uint32 nonce
     );
-    event WormholeBridgeStub_transferTokensWithPayload(
+    event WormholeBridgeStubTransferTokensWithPayload(
         address token,
         uint256 amount,
         uint16 recipientChain,
@@ -45,7 +45,7 @@ contract WormholeBridgeStub is IWormholeTokenBridge {
         external
         returns (bytes memory)
     {
-        emit WormholeBridgeStub_completeTransferWithPayload(encodedVm);
+        emit WormholeBridgeStubCompleteTransferWithPayload(encodedVm);
         wormholeToken.mint(msg.sender, transferAmount);
 
         // In a real implementation, encodedVm is parsed. To avoid copy-pasting
@@ -75,7 +75,7 @@ contract WormholeBridgeStub is IWormholeTokenBridge {
         uint256 arbiterFee,
         uint32 nonce
     ) external payable returns (uint64 sequence) {
-        emit WormholeBridgeStub_transferTokens(
+        emit WormholeBridgeStubTransferTokens(
             token,
             amount,
             recipientChain,
@@ -94,7 +94,7 @@ contract WormholeBridgeStub is IWormholeTokenBridge {
         uint32 nonce,
         bytes memory payload
     ) external payable returns (uint64 sequence) {
-        emit WormholeBridgeStub_transferTokensWithPayload(
+        emit WormholeBridgeStubTransferTokensWithPayload(
             token,
             amount,
             recipientChain,

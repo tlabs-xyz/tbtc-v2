@@ -5,6 +5,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, helpers } = hre
   const { log } = deployments
 
+  // Skip ReimbursementPool check for test networks
+  if (hre.network.name === "hardhat" || 
+      hre.network.name === "localhost" ||
+      hre.network.name === "development") {
+    log("Skipping ReimbursementPool resolution for test network")
+    return
+  }
+
   const ReimbursementPool = await deployments.getOrNull("ReimbursementPool")
 
   if (ReimbursementPool && helpers.address.isValid(ReimbursementPool.address)) {
