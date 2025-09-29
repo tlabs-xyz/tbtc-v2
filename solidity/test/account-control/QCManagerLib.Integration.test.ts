@@ -23,6 +23,11 @@ describe("QCManagerLib - Integration Tests", function () {
     qcManagerLib = await QCManagerLibFactory.deploy();
     await qcManagerLib.deployed();
 
+    // Deploy QCManagerPauseLib (required for linking)
+    const QCManagerPauseLibFactory = await ethers.getContractFactory("QCManagerPauseLib");
+    const qcManagerPauseLib = await QCManagerPauseLibFactory.deploy();
+    await qcManagerPauseLib.deployed();
+
     // Deploy mock dependencies
     const MockQCData = await ethers.getContractFactory("MockQCData");
     qcData = await MockQCData.deploy();
@@ -40,6 +45,7 @@ describe("QCManagerLib - Integration Tests", function () {
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
         QCManagerLib: qcManagerLib.address,
+        QCManagerPauseLib: qcManagerPauseLib.address,
       },
     });
 

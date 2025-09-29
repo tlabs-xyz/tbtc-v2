@@ -21,7 +21,7 @@ export async function deploySPVLibraries() {
 }
 
 /**
- * Helper function to deploy QCManagerLib library
+ * Helper function to deploy QCManager libraries
  */
 export async function deployQCManagerLib() {
   // Deploy QCManagerLib (no linking needed - it's a library)
@@ -29,7 +29,12 @@ export async function deployQCManagerLib() {
   const qcManagerLib = await QCManagerLibFactory.deploy()
   await qcManagerLib.deployed()
 
-  return { qcManagerLib }
+  // Deploy QCManagerPauseLib (no linking needed - it's a library)
+  const QCManagerPauseLibFactory = await ethers.getContractFactory("QCManagerPauseLib")
+  const qcManagerPauseLib = await QCManagerPauseLibFactory.deploy()
+  await qcManagerPauseLib.deployed()
+
+  return { qcManagerLib, qcManagerPauseLib }
 }
 
 /**
@@ -67,10 +72,14 @@ export function getQCRedeemerLibraries(libraries: {
  */
 export function getQCManagerLibraries(libraries: {
   qcManagerLib: any
+  qcManagerPauseLib?: any
 }) {
   return {
     libraries: {
       QCManagerLib: libraries.qcManagerLib.address,
+      ...(libraries.qcManagerPauseLib && {
+        QCManagerPauseLib: libraries.qcManagerPauseLib.address,
+      }),
     },
   }
 }

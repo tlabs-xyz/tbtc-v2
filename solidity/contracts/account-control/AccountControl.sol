@@ -34,8 +34,7 @@ contract AccountControl is
     /// added through upgrades while maintaining type safety.
     enum ReserveType {
         UNINITIALIZED,   // Default/uninitialized state (0)
-        QC_PERMISSIONED, // Qualified Custodian with permissioned access
-        QC_VAULT_STRATEGY // CEX vault strategies with loss handling
+        QC_PERMISSIONED  // Qualified Custodian with permissioned access
     }
 
     // ========== STRUCTS ==========
@@ -99,7 +98,6 @@ contract AccountControl is
     // ========== PHASE 1: Reserve Type Registry ==========
     // Storage slots 165-167: Reserve type management and operation validation
     mapping(address => ReserveType) public reserveTypes;           /// @dev Slot 165: Reserve type mapping
-    uint256 public constant MIN_VAULT_CAP = 10 * 10**8;           /// @dev 10 BTC minimum for vaults (no storage)
 
     // ========== EVENTS ==========
     event MintExecuted(address indexed reserve, address indexed recipient, uint256 amount);
@@ -235,11 +233,6 @@ contract AccountControl is
         if (authorized[reserve]) revert AlreadyAuthorized(reserve);
         if (mintingCap == 0) revert AmountTooSmall(mintingCap, 1);
         require(rType != ReserveType.UNINITIALIZED, "Invalid type");
-
-        // Type-specific validation
-        if (rType == ReserveType.QC_VAULT_STRATEGY) {
-            require(mintingCap >= MIN_VAULT_CAP, "Vault cap too low");
-        }
 
         authorized[reserve] = true;
         reserveInfo[reserve] = ReserveInfo({

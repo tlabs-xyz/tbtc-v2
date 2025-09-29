@@ -76,13 +76,13 @@ describe("AccountControl Oracle Integration", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Deploy QCManagerLib library
-    const { qcManagerLib } = await deployQCManagerLib();
+    // Deploy QCManager libraries
+    const { qcManagerLib, qcManagerPauseLib } = await deployQCManagerLib();
 
     // Deploy QCManager with libraries
     const QCManagerFactory = await ethers.getContractFactory(
       "QCManager",
-      getQCManagerLibraries({ qcManagerLib })
+      getQCManagerLibraries({ qcManagerLib, qcManagerPauseLib })
     );
     qcManager = await QCManagerFactory.deploy(
       qcData.address,
@@ -328,10 +328,10 @@ describe("AccountControl Oracle Integration", function () {
 
     it("should handle syncBackingFromOracle when AccountControl not set", async function () {
       // Deploy new QCManager without setting AccountControl
-      const { qcManagerLib: freshQCManagerLib } = await deployQCManagerLib();
+      const { qcManagerLib: freshQCManagerLib, qcManagerPauseLib: freshQCManagerPauseLib } = await deployQCManagerLib();
       const freshQCManagerFactory = await ethers.getContractFactory(
         "QCManager",
-        getQCManagerLibraries({ qcManagerLib: freshQCManagerLib })
+        getQCManagerLibraries({ qcManagerLib: freshQCManagerLib, qcManagerPauseLib: freshQCManagerPauseLib })
       );
       const freshQCManager = await freshQCManagerFactory.deploy(
         qcData.address,

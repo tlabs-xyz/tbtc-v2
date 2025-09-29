@@ -3,57 +3,21 @@ import { ethers } from "hardhat";
 
 describe("QCManagerLib - Extracted Functions", function () {
   let qcManagerLib: any;
+  let qcManagerPauseLib: any;
 
   beforeEach(async function () {
     // Deploy QCManagerLib for direct testing
     const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib");
     qcManagerLib = await QCManagerLibFactory.deploy();
+    
+    // Deploy QCManagerPauseLib for calculateTimeUntilRenewal tests
+    const QCManagerPauseLibFactory = await ethers.getContractFactory("QCManagerPauseLib");
+    qcManagerPauseLib = await QCManagerPauseLibFactory.deploy();
   });
 
-  describe("calculateTimeUntilRenewal", function () {
-    it("should return 0 when credit is available", async function () {
-      const result = await qcManagerLib.calculateTimeUntilRenewal(
-        true, // hasCredit
-        0,    // lastUsed
-        0     // creditRenewTime
-      );
-      expect(result).to.equal(0);
-    });
-
-    it("should return 0 when lastUsed is 0", async function () {
-      const result = await qcManagerLib.calculateTimeUntilRenewal(
-        false, // hasCredit
-        0,     // lastUsed
-        ethers.utils.parseEther("1000") // creditRenewTime
-      );
-      expect(result).to.equal(0);
-    });
-
-    it("should return 0 when renewal time has passed", async function () {
-      const pastTime = Math.floor(Date.now() / 1000) - 1000; // 1000 seconds ago
-
-      const result = await qcManagerLib.calculateTimeUntilRenewal(
-        false,    // hasCredit
-        1,        // lastUsed
-        pastTime  // creditRenewTime
-      );
-      expect(result).to.equal(0);
-    });
-
-    it("should return correct time until renewal", async function () {
-      const currentBlock = await ethers.provider.getBlock("latest");
-      const futureTime = currentBlock.timestamp + 3600; // 1 hour from now
-
-      const result = await qcManagerLib.calculateTimeUntilRenewal(
-        false,     // hasCredit
-        1,         // lastUsed
-        futureTime // creditRenewTime
-      );
-
-      // Should be approximately 3600 seconds (allowing for block time differences)
-      expect(result).to.be.gte(3590).and.lte(3600);
-    });
-  });
+  // Note: calculateTimeUntilRenewal is an internal function in QCManagerPauseLib
+  // It is tested indirectly through QCManager's getTimeUntilRenewal function
+  // See QCManagerLib.Integration.test.ts for those tests
 
   describe("isValidBitcoinAddress", function () {
     it("should return false for empty address", async function () {

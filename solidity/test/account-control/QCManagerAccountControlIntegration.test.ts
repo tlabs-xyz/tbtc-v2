@@ -50,10 +50,16 @@ describe("QCManager - AccountControl Integration", function () {
     const qcManagerLib = await QCManagerLibFactory.deploy();
     await qcManagerLib.deployed();
 
+    // Deploy QCManagerPauseLib library (required for QCManager)
+    const QCManagerPauseLibFactory = await ethers.getContractFactory("QCManagerPauseLib");
+    const qcManagerPauseLib = await QCManagerPauseLibFactory.deploy();
+    await qcManagerPauseLib.deployed();
+
     // Deploy QCManager with libraries linked
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
         QCManagerLib: qcManagerLib.address,
+        QCManagerPauseLib: qcManagerPauseLib.address,
       },
     });
     qcManager = await QCManagerFactory.deploy(

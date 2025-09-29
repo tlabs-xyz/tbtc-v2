@@ -48,10 +48,15 @@ describe("QCManagerLib", function () {
     const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib");
     const qcManagerLib = await QCManagerLibFactory.deploy();
 
+    // Deploy QCManagerPauseLib library
+    const QCManagerPauseLibFactory = await ethers.getContractFactory("QCManagerPauseLib");
+    const qcManagerPauseLib = await QCManagerPauseLibFactory.deploy();
+
     // Deploy QCManager with libraries linked
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
         QCManagerLib: qcManagerLib.address,
+        QCManagerPauseLib: qcManagerPauseLib.address,
       },
     });
     qcManager = await QCManagerFactory.deploy(
@@ -251,50 +256,7 @@ describe("QCManagerLib", function () {
       qcManagerLib = await QCManagerLibFactory.deploy();
     });
 
-    describe("calculateTimeUntilRenewal", function () {
-      it("should return 0 when credit is available", async function () {
-        const result = await qcManagerLib.calculateTimeUntilRenewal(
-          true, // hasCredit
-          0,    // lastUsed
-          0     // creditRenewTime
-        );
-        expect(result).to.equal(0);
-      });
-
-      it("should return 0 when lastUsed is 0", async function () {
-        const result = await qcManagerLib.calculateTimeUntilRenewal(
-          false, // hasCredit
-          0,     // lastUsed
-          ethers.utils.parseEther("1000") // creditRenewTime
-        );
-        expect(result).to.equal(0);
-      });
-
-      it("should return 0 when renewal time has passed", async function () {
-        const pastTime = Math.floor(Date.now() / 1000) - 1000; // 1000 seconds ago
-
-        const result = await qcManagerLib.calculateTimeUntilRenewal(
-          false,    // hasCredit
-          1,        // lastUsed
-          pastTime  // creditRenewTime
-        );
-        expect(result).to.equal(0);
-      });
-
-      it("should return correct time until renewal", async function () {
-        const currentBlock = await ethers.provider.getBlock("latest");
-        const futureTime = currentBlock.timestamp + 3600; // 1 hour from now
-
-        const result = await qcManagerLib.calculateTimeUntilRenewal(
-          false,     // hasCredit
-          1,         // lastUsed
-          futureTime // creditRenewTime
-        );
-
-        // Should be approximately 3600 seconds (allowing for block time differences)
-        expect(result).to.be.gte(3590).and.lte(3600);
-      });
-    });
+    // calculateTimeUntilRenewal tests removed - function moved to QCManagerPauseLib
 
     describe("getReserveBalanceAndStaleness", function () {
       it("should call reserve oracle correctly", async function () {
