@@ -225,11 +225,11 @@ describe("SPV Libraries Integration", () => {
 
     it("should match output hashes correctly", async () => {
       // Test address matching logic
-      const outputHash = `0x${"00".repeat(20)}` // Mock output hash
+      const mockOutput = `0x${"00".repeat(34)}` // Mock transaction output (8 bytes value + 1 byte script len + 25 bytes script)
 
-      const matches = await qcRedeemerSPVTest.testAddressMatchesOutputHash(
-        userBtcAddress,
-        outputHash
+      const matches = await qcRedeemerSPVTest.testIsPaymentToAddress(
+        mockOutput,
+        userBtcAddress
       )
 
       expect(matches).to.be.a("boolean")

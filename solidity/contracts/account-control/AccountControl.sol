@@ -35,21 +35,10 @@ contract AccountControl is
     enum ReserveType {
         UNINITIALIZED,   // Default/uninitialized state (0)
         QC_PERMISSIONED, // Qualified Custodian with permissioned access
-        QC_BASIC,        // Traditional QC reserves (legacy compatibility)
-        QC_VAULT_STRATEGY, // CEX vault strategies with loss handling
-        QC_RESTAKING,    // Future: restaking protocols
-        QC_BRIDGE        // Future: cross-chain bridges
+        QC_VAULT_STRATEGY // CEX vault strategies with loss handling
     }
 
     // ========== STRUCTS ==========
-    /// @notice Type information for different reserve categories
-    struct ReserveTypeInfo {
-        string name;                // Human-readable name
-        bool requiresBtcAddress;    // Whether BTC address is required
-        bool supportsLosses;        // Can handle burns/losses
-        bool requiresWrapper;       // Needs delegation layer
-        uint256 maxBackingRatio;    // backing/minted limit (0 = unlimited)
-    }
 
     // ========== STATE VARIABLES ==========
     /*
@@ -110,10 +99,7 @@ contract AccountControl is
     // ========== PHASE 1: Reserve Type Registry ==========
     // Storage slots 165-167: Reserve type management and operation validation
     mapping(address => ReserveType) public reserveTypes;           /// @dev Slot 165: Reserve type mapping
-    mapping(ReserveType => ReserveTypeInfo) public typeInfo;       /// @dev Slot 166: Type information
-    mapping(address => uint256) public lastOperationTimestamp;     /// @dev Slot 167: Last operation timestamp per reserve
     uint256 public constant MIN_VAULT_CAP = 10 * 10**8;           /// @dev 10 BTC minimum for vaults (no storage)
-    uint256 public constant OPERATION_COOLDOWN = 1;               /// @dev Minimum blocks between operations (prevents sequence abuse)
 
     // ========== EVENTS ==========
     event MintExecuted(address indexed reserve, address indexed recipient, uint256 amount);
@@ -136,7 +122,6 @@ contract AccountControl is
 
     // Reserve type events
     event ReserveTypeUpdated(address indexed reserve, ReserveType oldType, ReserveType newType);
-    event ReserveTypeInfoUpdated(ReserveType indexed rType, string name);
 
     // ========== ERRORS ==========
     error InsufficientBacking(uint256 available, uint256 required);
@@ -154,7 +139,6 @@ contract AccountControl is
     error InsufficientMinted(uint256 available, uint256 requested);
     error ReserveNotFound(address reserve);
     error CannotDeauthorizeWithOutstandingBalance(address reserve, uint256 outstandingAmount);
-    error OperationTooFrequent(uint256 lastOperation, uint256 currentBlock);
     error UnsafeOperationSequence(string operation);
 
     // ========== MODIFIERS ==========
@@ -183,16 +167,6 @@ contract AccountControl is
         _;
     }
 
-    /// @notice Validates safe operation sequencing to prevent abuse
-    modifier validateSequence() {
-        // Prevent rapid sequential operations that could bypass safeguards
-        if (lastOperationTimestamp[msg.sender] != 0 &&
-            block.number < lastOperationTimestamp[msg.sender] + OPERATION_COOLDOWN) {
-            revert OperationTooFrequent(lastOperationTimestamp[msg.sender], block.number);
-        }
-        _;
-        lastOperationTimestamp[msg.sender] = block.number;
-    }
 
     // ========== INITIALIZATION ==========
     
@@ -224,8 +198,6 @@ contract AccountControl is
         _grantRole(QC_MANAGER_ROLE, _owner); // Owner can authorize reserves initially
         deploymentBlock = block.number;
 
-        // Initialize default type information
-        initializeTypeInfo();
     }
 
     // ========== RESERVE MANAGEMENT ==========
@@ -237,8 +209,8 @@ contract AccountControl is
         external
         onlyOwnerOrQCManager
     {
-        // Default to QC_BASIC for backward compatibility
-        _authorizeReserveWithType(reserve, mintingCap, ReserveType.QC_BASIC);
+        // Default to QC_PERMISSIONED for backward compatibility
+        _authorizeReserveWithType(reserve, mintingCap, ReserveType.QC_PERMISSIONED);
     }
 
     /// @notice Authorize a new reserve with specific type
@@ -259,6 +231,7 @@ contract AccountControl is
         uint256 mintingCap,
         ReserveType rType
     ) internal {
+        if (reserve == address(0)) revert ZeroAddress("reserve");
         if (authorized[reserve]) revert AlreadyAuthorized(reserve);
         if (mintingCap == 0) revert AmountTooSmall(mintingCap, 1);
         require(rType != ReserveType.UNINITIALIZED, "Invalid type");
@@ -266,7 +239,6 @@ contract AccountControl is
         // Type-specific validation
         if (rType == ReserveType.QC_VAULT_STRATEGY) {
             require(mintingCap >= MIN_VAULT_CAP, "Vault cap too low");
-            require(typeInfo[rType].supportsLosses, "No loss support");
         }
 
         authorized[reserve] = true;
@@ -311,106 +283,9 @@ contract AccountControl is
 
     // ========== RESERVE TYPE MANAGEMENT ==========
 
-    /// @notice Initialize type information for a reserve type (governance only)
-    /// @param rType The reserve type to configure
-    /// @param info The type information to set
-    function setReserveTypeInfo(
-        ReserveType rType,
-        ReserveTypeInfo memory info
-    ) external onlyOwner {
-        require(rType != ReserveType.UNINITIALIZED, "Invalid type");
 
-        typeInfo[rType] = info;
 
-        emit ReserveTypeInfoUpdated(rType, info.name);
-    }
 
-    /// @notice Update the type of an existing reserve
-    /// @param reserve The reserve address
-    /// @param newType The new type to assign
-    function updateReserveType(
-        address reserve,
-        ReserveType newType
-    ) external onlyOwner {
-        require(authorized[reserve], "Not authorized");
-        require(newType != ReserveType.UNINITIALIZED, "Invalid type");
-
-        ReserveType oldType = reserveTypes[reserve];
-        reserveTypes[reserve] = newType;
-        reserveInfo[reserve].reserveType = newType;
-
-        // Type-specific validation for vault strategies
-        if (newType == ReserveType.QC_VAULT_STRATEGY) {
-            require(
-                reserveInfo[reserve].mintingCap >= MIN_VAULT_CAP,
-                "Vault cap too low"
-            );
-            require(
-                typeInfo[newType].supportsLosses,
-                "No loss support"
-            );
-        }
-
-        emit ReserveTypeUpdated(reserve, oldType, newType);
-    }
-
-    /// @notice Get the reserve type for a given reserve
-    /// @param reserve The reserve address to query
-    /// @return The reserve type
-    function getReserveType(address reserve) external view returns (ReserveType) {
-        if (!authorized[reserve]) {
-            return ReserveType.UNINITIALIZED;
-        }
-        return reserveTypes[reserve] == ReserveType.UNINITIALIZED
-            ? ReserveType.QC_BASIC  // Default for backward compatibility
-            : reserveTypes[reserve];
-    }
-
-    /// @notice Initialize default type information (called once during deployment)
-    function initializeTypeInfo() internal {
-        // QC_BASIC - Traditional reserves
-        typeInfo[ReserveType.QC_BASIC] = ReserveTypeInfo({
-            name: "QC Basic Reserve",
-            requiresBtcAddress: true,
-            supportsLosses: false,
-            requiresWrapper: false,
-            maxBackingRatio: 0  // No limit
-        });
-
-        // QC_VAULT_STRATEGY - CEX vaults
-        typeInfo[ReserveType.QC_VAULT_STRATEGY] = ReserveTypeInfo({
-            name: "QC Vault Strategy",
-            requiresBtcAddress: false,
-            supportsLosses: true,
-            requiresWrapper: true,
-            maxBackingRatio: 120 * 10**16  // 120% backing ratio (1.2e18)
-        });
-
-        // QC_PERMISSIONED - Legacy type
-        typeInfo[ReserveType.QC_PERMISSIONED] = ReserveTypeInfo({
-            name: "Permissioned QC",
-            requiresBtcAddress: true,
-            supportsLosses: false,
-            requiresWrapper: false,
-            maxBackingRatio: 0  // No limit
-        });
-    }
-
-    /// @notice Validate if a reserve can perform a specific operation based on its type
-    /// @param reserve The reserve address
-    /// @param isBurnOperation Whether this is a burn/loss operation
-    function validateTypeOperation(address reserve, bool isBurnOperation) internal view {
-        if (isBurnOperation) {
-            ReserveType rType = reserveTypes[reserve] == ReserveType.UNINITIALIZED
-                ? ReserveType.QC_BASIC
-                : reserveTypes[reserve];
-
-            require(
-                typeInfo[rType].supportsLosses,
-                "No loss support"
-            );
-        }
-    }
 
     function setMintingCap(address reserve, uint256 newCap) 
         external 
@@ -472,7 +347,6 @@ contract AccountControl is
         external
         onlyAuthorizedReserve
         nonReentrant
-        validateSequence
     {
         // Validate mint amount bounds
         if (amount < MIN_MINT_AMOUNT) {
@@ -512,10 +386,7 @@ contract AccountControl is
         external
         onlyAuthorizedReserve
         nonReentrant
-        validateSequence
     {
-        // Validate that this reserve type supports losses/burns
-        validateTypeOperation(msg.sender, true);
 
         // Pure token burning via Bank - burn from the caller (reserve)
         IBank(bank).burnFrom(msg.sender, amount);
@@ -530,7 +401,6 @@ contract AccountControl is
         external
         onlyAuthorizedReserve
         nonReentrant
-        validateSequence
     {
         // Use internal function to handle all checks including backing
         _creditMintedInternal(msg.sender, amount);
@@ -545,7 +415,6 @@ contract AccountControl is
         external
         onlyAuthorizedReserve
         nonReentrant
-        validateSequence
     {
         // Validation
         if (minted[msg.sender] < amount) {
@@ -584,8 +453,6 @@ contract AccountControl is
         nonReentrant
         returns (bool)
     {
-        // Validate that this reserve type supports losses/burns
-        validateTypeOperation(msg.sender, true);
 
         // Validation
         if (minted[msg.sender] < amount) {
@@ -772,15 +639,6 @@ contract AccountControl is
         emit BackingUpdated(msg.sender, amount);
     }
 
-    /// @dev Testing function - only available on test networks
-    /// @dev Should only be used in MockAccountControl in production
-    function setBackingForTesting(address reserve, uint256 amount) external {
-        require(
-            block.chainid == 31337 || block.chainid == 1337,
-            "Test only"
-        );
-        backing[reserve] = amount;
-    }
 
     /// @notice Allow QCManager to set backing for any QC based on oracle data
     /// @dev Only callable by addresses with QC_MANAGER_ROLE (i.e., QCManager contract)
@@ -842,8 +700,6 @@ contract AccountControl is
         // Ensure no precision loss
         require(tbtcAmount % SATOSHI_MULTIPLIER == 0, "Bad precision");
 
-        // Validate that this reserve type supports losses/burns
-        validateTypeOperation(msg.sender, true);
 
         uint256 satoshis = _tbtcToSatoshis(tbtcAmount);
 

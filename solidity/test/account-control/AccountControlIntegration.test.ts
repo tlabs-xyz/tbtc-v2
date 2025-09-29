@@ -143,6 +143,9 @@ describe("AccountControl Integration Tests", function () {
     const GOVERNANCE_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("GOVERNANCE_ROLE"));
     await qcMinter.connect(owner).grantRole(GOVERNANCE_ROLE, owner.address);
     await qcRedeemer.connect(owner).grantRole(GOVERNANCE_ROLE, owner.address);
+    
+    // Grant QC_MANAGER_ROLE to owner on AccountControl for setBacking calls
+    await accountControl.connect(owner).grantQCManagerRole(owner.address);
 
     // Set AccountControl address in QCMinter (critical for integration!)
     await qcMinter.connect(owner).setAccountControl(accountControl.address);
@@ -158,10 +161,10 @@ describe("AccountControl Integration Tests", function () {
     // Set MockAccountControl address in QCRedeemer (allows simple integration testing)
     await qcRedeemer.connect(owner).setAccountControl(mockAccountControlForRedeemer.address);
 
-    // Set backing for QCMinter using real AccountControl (with test function)
+    // Set backing for QCMinter using real AccountControl 
     // In production, this backing would come from actual QC deposits
     // Need 3x backing for toggle test that mints 3 times
-    await accountControl.setBackingForTesting(qcMinter.address, QC_BACKING_AMOUNT * 3);
+    await accountControl.connect(owner).setBacking(qcMinter.address, QC_BACKING_AMOUNT * 3);
 
     // Set backing for QCRedeemer using MockAccountControl
     await mockAccountControlForRedeemer.setBackingForTesting(qcRedeemer.address, QC_BACKING_AMOUNT);
@@ -452,7 +455,7 @@ describe("AccountControl Integration Tests", function () {
       await accountControl.connect(qc2).updateBacking(QC_BACKING_AMOUNT);
 
       // Set backing for QCMinter to handle qc2 (needs more backing for two QCs)
-      await accountControl.setBackingForTesting(qcMinter.address, QC_BACKING_AMOUNT * 2);
+      await accountControl.connect(owner).setBacking(qcMinter.address, QC_BACKING_AMOUNT * 2);
       
       // Mint from both QCs
       let tx1 = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);

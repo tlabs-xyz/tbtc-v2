@@ -74,7 +74,7 @@ contract MockReserve is Ownable {
         _setBacking(newBacking);
     }
 
-    /// @notice Internal function to update backing (prevents reentrancy)
+    /// @notice Internal function to update backing (follows CEI pattern; reentrancy protection enforced by AccountControl)
     /// @param newBacking The new backing amount in satoshis
     function _setBacking(uint256 newBacking) internal {
         if (failOnNext) {
@@ -100,17 +100,6 @@ contract MockReserve is Ownable {
     function mintTokens(address recipient, uint256 amount) external onlyOwner {
         if (recipient == address(0)) {
             revert InvalidRecipient();
-        }
-
-        // Test reentrancy if enabled
-        if (simulateReentrancy) {
-            simulateReentrancy = false;
-            // Attempt reentrant call - should be blocked by AccountControl's ReentrancyGuard
-            try accountControl.mint(recipient, amount) {
-                revert("Reentrancy simulation unexpectedly succeeded");
-            } catch {
-                return;
-            }
         }
 
         // Update state before external call (CEI pattern)

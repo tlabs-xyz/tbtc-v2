@@ -23,6 +23,10 @@ async function main() {
     console.error("ERROR: BANK_ADDRESS is not a valid hex address.");
     process.exit(1);
   }
+  if (BANK_ADDRESS === "0x0000000000000000000000000000000000000000") {
+    console.error("ERROR: BANK_ADDRESS cannot be the zero address.");
+    process.exit(1);
+  }
   if (!QC_MINTER_ADDRESS) {
     console.error("ERROR: QC_MINTER_ADDRESS not set. Deploy Account Control first.");
     process.exit(1);

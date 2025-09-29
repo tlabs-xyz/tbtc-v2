@@ -175,35 +175,6 @@ describe("AccountControl Separated Operations", function () {
         });
     });
 
-    describe("Operation sequence validation", function () {
-        it("should allow operations after cooldown period", async function () {
-            const amount = amounts.SMALL_MINT;
-
-            // First operation
-            await accountControl.connect(reserve).mintTokens(user.address, amount);
-
-            // Mine a block to pass cooldown
-            await ethers.provider.send("evm_mine", []);
-
-            // Second operation should now succeed (mintTokens includes both token and accounting)
-            await accountControl.connect(reserve).mintTokens(user.address, amount);
-
-            expect(await accountControl.minted(reserve.address)).to.equal(amount.mul(2));
-        });
-
-        it("should track last operation timestamp per reserve", async function () {
-            const amount = amounts.SMALL_MINT;
-
-            // Operation should update timestamp
-            await accountControl.connect(reserve).mintTokens(user.address, amount);
-
-            const lastOperationTimestamp = await accountControl.lastOperationTimestamp(reserve.address);
-            const latestBlock = await ethers.provider.getBlock("latest");
-
-            // lastOperationTimestamp stores block number, not timestamp
-            expect(lastOperationTimestamp.toNumber()).to.equal(latestBlock.number);
-        });
-    });
 
     describe("Integration with existing functionality", function () {
         it("should maintain backing invariant across separated operations", async function () {

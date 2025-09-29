@@ -91,7 +91,7 @@ describe("QCRedeemerSPV Library", () => {
       // The contract deployment itself should fail with zero address relay
       await expect(
         uninitializedSPV.deploy(ethers.constants.AddressZero, 1)
-      ).to.be.revertedWith("SPVState: relay address cannot be zero")
+      ).to.be.revertedWithCustomError(uninitializedSPV, "RelayAddressZero")
     })
 
     it("should revert with SPVErr(2) when input vector is invalid", async () => {

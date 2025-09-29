@@ -44,6 +44,10 @@ contract SystemState is AccessControl {
     bytes32 public constant OPERATIONS_ROLE =
         keccak256("OPERATIONS_ROLE");
     bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
+    
+    // Action constants for emergency events
+    bytes32 public constant ACTION_QC_EMERGENCY_PAUSE = keccak256("QC_EMERGENCY_PAUSE");
+    bytes32 public constant ACTION_QC_EMERGENCY_UNPAUSE = keccak256("QC_EMERGENCY_UNPAUSE");
 
     // Custom errors for gas-efficient reverts
     error MintingAlreadyPaused();
@@ -491,7 +495,7 @@ contract SystemState is AccessControl {
         emit QCEmergencyPaused(qc, msg.sender, block.timestamp, reason);
         emit EmergencyActionTaken(
             qc,
-            "QC_EMERGENCY_PAUSE",
+            ACTION_QC_EMERGENCY_PAUSE,
             msg.sender,
             block.timestamp
         );
@@ -526,7 +530,7 @@ contract SystemState is AccessControl {
         emit QCEmergencyUnpaused(qc, msg.sender, block.timestamp);
         emit EmergencyActionTaken(
             qc,
-            "QC_EMERGENCY_UNPAUSE",
+            ACTION_QC_EMERGENCY_UNPAUSE,
             msg.sender,
             block.timestamp
         );

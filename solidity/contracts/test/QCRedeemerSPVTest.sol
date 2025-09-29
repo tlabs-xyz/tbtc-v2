@@ -77,12 +77,12 @@ contract QCRedeemerSPVTest {
         return QCRedeemerSPV.calculatePaymentToAddress(outputVector, targetAddress);
     }
     
-    /// @dev Wrapper for addressMatchesOutputHash (internal function test)
-    function testAddressMatchesOutputHash(
-        string calldata targetAddress,
-        bytes memory outputHash
+    /// @dev Wrapper for isPaymentToAddress (internal function test)
+    function testIsPaymentToAddress(
+        bytes memory output,
+        string calldata userBtcAddress
     ) external pure returns (bool matches) {
-        return QCRedeemerSPV.addressMatchesOutputHash(targetAddress, outputHash);
+        return QCRedeemerSPV.isPaymentToAddress(output, userBtcAddress);
     }
     
     /// @dev Get SPV state for testing

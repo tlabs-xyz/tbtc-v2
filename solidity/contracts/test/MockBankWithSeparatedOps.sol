@@ -3,8 +3,9 @@
 pragma solidity ^0.8.17;
 
 import "../integrator/IBank.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MockBankWithSeparatedOps is IBank {
+contract MockBankWithSeparatedOps is IBank, Ownable {
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
     uint256 private _totalSupply;
@@ -109,8 +110,16 @@ contract MockBankWithSeparatedOps is IBank {
     }
 
     // Mock-specific functions for testing setup
-    function setBalance(address account, uint256 amount) external {
+    function setBalance(address account, uint256 amount) external onlyOwner {
+        uint256 currentBalance = _balances[account];
         _balances[account] = amount;
+        
+        // Update total supply to maintain invariant
+        if (amount > currentBalance) {
+            _totalSupply += (amount - currentBalance);
+        } else {
+            _totalSupply -= (currentBalance - amount);
+        }
     }
 
     function getAllowance(address owner, address spender)

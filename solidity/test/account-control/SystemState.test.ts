@@ -49,7 +49,7 @@ describe("SystemState", () => {
     // Deploy SystemState
     const SystemStateFactory = await ethers.getContractFactory("SystemState")
     systemState = await SystemStateFactory.deploy()
-    await systemState.deployed()
+    await systemState.waitForDeployment()
 
     // Grant roles
     await systemState.grantRole(EMERGENCY_ROLE, pauserAccount.address)

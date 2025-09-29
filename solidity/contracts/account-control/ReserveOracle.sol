@@ -178,7 +178,11 @@ contract ReserveOracle is AccessControl {
     {
         ReserveData memory data = reserves[qc];
         balance = data.balance;
-        isStale = block.timestamp > data.lastUpdateTimestamp + maxStaleness;
+        if (data.lastUpdateTimestamp == 0) {
+            isStale = true;
+        } else {
+            isStale = block.timestamp - data.lastUpdateTimestamp > maxStaleness;
+        }
     }
 
     /// @notice Get current reserve balance for a QC
@@ -196,9 +200,9 @@ contract ReserveOracle is AccessControl {
     /// @param qc The address of the Qualified Custodian
     /// @return isStale True if the reserve data is stale
     function isReserveDataStale(address qc) external view returns (bool) {
-        return
-            block.timestamp >
-            reserves[qc].lastUpdateTimestamp + maxStaleness;
+        uint256 ts = reserves[qc].lastUpdateTimestamp;
+        if (ts == 0) return true;
+        return block.timestamp - ts > maxStaleness;
     }
 
     /// @notice Get pending attestation count for a QC
@@ -284,6 +288,7 @@ contract ReserveOracle is AccessControl {
         external
         onlyRole(DISPUTE_ARBITER_ROLE)
     {
+        if (qc == address(0)) revert QCAddressRequired();
         uint256 oldBalance = reserves[qc].balance;
         reserves[qc] = ReserveData({
             balance: balance,

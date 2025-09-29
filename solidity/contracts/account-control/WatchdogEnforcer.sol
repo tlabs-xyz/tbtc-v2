@@ -3,6 +3,7 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./ReserveOracle.sol";
 import "./QCManager.sol";
 import "./QCData.sol";
@@ -92,17 +93,24 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
     );
 
     // Custom errors
+    error ZeroAddress();
     error InvalidReasonCode();
     error ViolationNotFound();
     error NotObjectiveViolation();
+    error EscalationDelayNotReached();
 
     constructor(
-        address _reserveLedger,
+        address _reserveOracle,
         address _qcManager,
         address _qcData,
         address _systemState
     ) {
-        reserveOracle = ReserveOracle(_reserveLedger);
+        if (_reserveOracle == address(0)) revert ZeroAddress();
+        if (_qcManager == address(0)) revert ZeroAddress();
+        if (_qcData == address(0)) revert ZeroAddress();
+        if (_systemState == address(0)) revert ZeroAddress();
+        
+        reserveOracle = ReserveOracle(_reserveOracle);
         qcManager = QCManager(_qcManager);
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
@@ -181,10 +189,10 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         uint256 minted = qcData.getQCMintedAmount(qc);
         uint256 collateralRatio = systemState.minCollateralRatio();
 
-        // Use cross-multiplication to avoid precision loss from division
+        // Use safe mulDiv to avoid overflow
         // Check if: reserves < (minted * collateralRatio) / 100
-        // Equivalent to: reserves * 100 < minted * collateralRatio
-        if (reserves * 100 < minted * collateralRatio) {
+        uint256 required = Math.mulDiv(minted, collateralRatio, 100);
+        if (reserves < required) {
             return (true, "");
         }
 
@@ -309,12 +317,12 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
 
         // Must have exceeded the escalation delay
         if (block.timestamp < violationTimestamp + ESCALATION_DELAY) {
-            revert("Escalation delay not yet reached");
+            revert EscalationDelayNotReached();
         }
 
-        // QC must still be in UnderReview status (not resolved)
-        if (qcData.getQCStatus(qc) != QCData.QCStatus.UnderReview) {
-            // QC status changed - clear the timer
+        // Re-verify violation before escalating
+        (bool stillViolating,) = _checkReserveViolation(qc);
+        if (!stillViolating) {
             delete criticalViolationTimestamps[qc];
             emit EscalationTimerCleared(qc, msg.sender, block.timestamp);
             return;

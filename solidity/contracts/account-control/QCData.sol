@@ -26,6 +26,7 @@ contract QCData is AccessControl {
     error WalletNotActive();
     error WalletNotPendingDeregistration();
     error InvalidCapacity();
+    error CapacityBelowTotalMinted();
     error MaxWalletsExceeded();
 
     /// @dev QC status enumeration - enhanced 5-state model
@@ -356,6 +357,7 @@ contract QCData is AccessControl {
     {
         if (!isQCRegistered(qc)) revert QCNotRegistered();
         if (newCapacity == 0) revert InvalidCapacity();
+        if (newCapacity < custodians[qc].totalMintedAmount) revert CapacityBelowTotalMinted();
 
         uint256 oldCapacity = custodians[qc].maxMintingCapacity;
         custodians[qc].maxMintingCapacity = newCapacity;

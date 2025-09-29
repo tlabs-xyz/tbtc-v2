@@ -17,7 +17,7 @@ describe("BitcoinAddressUtils", () => {
       "TestBitcoinAddressUtils"
     )
     testContract = await TestBitcoinAddressUtils.deploy()
-    await testContract.deployed()
+    await testContract.waitForDeployment()
   })
 
   describe("P2PKH Address Decoding", () => {
@@ -25,7 +25,7 @@ describe("BitcoinAddressUtils", () => {
       const address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" // Bitcoin genesis address
 
       const result = await testContract.decodeAddress(address)
-      expect(result.scriptType).to.equal(0) // P2PKH
+      expect(Number(result.scriptType)).to.equal(0) // P2PKH
       expect(result.scriptHash.length).to.equal(42) // 20 bytes = 40 hex chars + 0x prefix
     })
 
@@ -33,7 +33,7 @@ describe("BitcoinAddressUtils", () => {
       const address = "mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn" // Example testnet P2PKH
 
       const result = await testContract.decodeAddress(address)
-      expect(result.scriptType).to.equal(0) // P2PKH
+      expect(Number(result.scriptType)).to.equal(0) // P2PKH
       expect(result.scriptHash.length).to.equal(42) // 20 bytes
     })
 
@@ -49,7 +49,7 @@ describe("BitcoinAddressUtils", () => {
       const address = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy" // Example P2SH address
 
       const result = await testContract.decodeAddress(address)
-      expect(result.scriptType).to.equal(1) // P2SH
+      expect(Number(result.scriptType)).to.equal(1) // P2SH
       expect(result.scriptHash.length).to.equal(42) // 20 bytes
     })
 
@@ -57,7 +57,7 @@ describe("BitcoinAddressUtils", () => {
       const address = "2MzQwSSnBHWHqSAqtTVQ6v47XtaisrJa1Vc" // Example testnet P2SH
 
       const result = await testContract.decodeAddress(address)
-      expect(result.scriptType).to.equal(1) // P2SH
+      expect(Number(result.scriptType)).to.equal(1) // P2SH
       expect(result.scriptHash.length).to.equal(42) // 20 bytes
     })
   })
@@ -67,7 +67,7 @@ describe("BitcoinAddressUtils", () => {
       const address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4" // Example P2WPKH
 
       const result = await testContract.decodeAddress(address)
-      expect(result.scriptType).to.equal(2) // P2WPKH
+      expect(Number(result.scriptType)).to.equal(2) // P2WPKH
       expect(result.scriptHash.length).to.equal(42) // 20 bytes
     })
 
@@ -84,7 +84,7 @@ describe("BitcoinAddressUtils", () => {
         "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3" // Valid P2WSH from BIP173
 
       const result = await testContract.decodeAddress(address)
-      expect(result.scriptType).to.equal(3) // P2WSH
+      expect(Number(result.scriptType)).to.equal(3) // P2WSH
       expect(result.scriptHash.length).to.equal(66) // 32 bytes = 64 hex chars + 0x prefix
     })
   })

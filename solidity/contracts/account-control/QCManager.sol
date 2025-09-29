@@ -76,6 +76,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     bytes32 public constant AUTO_ESCALATION = keccak256("AUTO_ESCALATION");
     bytes32 public constant DEFAULT_ESCALATION = keccak256("DEFAULT_ESCALATION");
     bytes32 public constant BACKLOG_CLEARED = keccak256("BACKLOG_CLEARED");
+    bytes32 public constant UNDERCOLLATERALIZED_REASON = keccak256("UNDERCOLLATERALIZED");
     
     // =================== PAUSE CREDIT CONSTANTS ===================
     
@@ -900,7 +901,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
 
         // If insolvent, change status to UnderReview
         if (!solvent && qcData.getQCStatus(qc) == QCData.QCStatus.Active) {
-            bytes32 reason = keccak256("UNDERCOLLATERALIZED");
+            bytes32 reason = UNDERCOLLATERALIZED_REASON;
             _executeStatusChange(
                 qc,
                 QCData.QCStatus.UnderReview,
