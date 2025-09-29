@@ -3,7 +3,6 @@ import { ethers, upgrades } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { AccountControl } from "../../typechain";
-import { getContractConstants, expectBalanceChange, getTestAmounts, deployAccountControlForTest } from "../helpers/testing-utils";
 
 describe("AccountControl Features", function () {
   let accountControl: AccountControl;
@@ -17,7 +16,6 @@ describe("AccountControl Features", function () {
 
   // Mock Bank that supports both individual and batch operations
   let mockBankContract: any;
-  let amounts: any;
 
   beforeEach(async function () {
     [owner, emergencyCouncil, mockBank, reserve1, reserve2, user1, user2] = await ethers.getSigners();
@@ -26,37 +24,39 @@ describe("AccountControl Features", function () {
     const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBankContract = await MockBankFactory.deploy();
 
-    // Deploy AccountControl using helper
-    accountControl = await deployAccountControlForTest(owner, emergencyCouncil, mockBankContract) as AccountControl;
 
-    // Get dynamic test amounts
-    amounts = await getTestAmounts(accountControl);
+    const AccountControlFactory = await ethers.getContractFactory("AccountControl");
+    accountControl = await upgrades.deployProxy(
+      AccountControlFactory,
+      [owner.address, emergencyCouncil.address, mockBankContract.address],
+      { initializer: "initialize" }
+    ) as AccountControl;
 
     // Note: Using direct updateBacking() for unit tests (oracle integration tested separately)
 
     // Authorize reserves for testing (QC_PERMISSIONED is initialized by default)
-    await accountControl.connect(owner).authorizeReserve(reserve1.address, amounts.SMALL_CAP); // 0.01 BTC cap
-    await accountControl.connect(owner).authorizeReserve(reserve2.address, amounts.MEDIUM_CAP); // 0.02 BTC cap
-
+    await accountControl.connect(owner).authorizeReserve(reserve1.address, 1000000); // 0.01 BTC cap
+    await accountControl.connect(owner).authorizeReserve(reserve2.address, 2000000); // 0.02 BTC cap
+    
     // Reserves set their own backing (federated model)
-    await accountControl.connect(reserve1).updateBacking(amounts.SMALL_CAP);
-    await accountControl.connect(reserve2).updateBacking(amounts.MEDIUM_CAP);
+    await accountControl.connect(reserve1).updateBacking(1000000);
+    await accountControl.connect(reserve2).updateBacking(2000000);
   });
 
   describe("Batch Atomicity", function () {
     it("should execute Bank calls before state updates in batchMint", async function () {
       const recipients = [user1.address, user2.address];
-      const mintAmounts = [amounts.MEDIUM_MINT, amounts.MEDIUM_MINT.mul(2)]; // 0.001 BTC, 0.002 BTC
+      const amounts = [100000, 200000]; // 0.001 BTC, 0.002 BTC
 
       // Check initial state
       const initialMinted = await accountControl.minted(reserve1.address);
       const initialTotal = await accountControl.totalMinted();
 
-      await accountControl.connect(reserve1).batchMint(recipients, mintAmounts);
+      await accountControl.connect(reserve1).batchMint(recipients, amounts);
 
       // Verify state was updated after Bank calls succeeded
-      expect(await accountControl.minted(reserve1.address)).to.equal(initialMinted.add(amounts.MEDIUM_MINT.mul(3)));
-      expect(await accountControl.totalMinted()).to.equal(initialTotal.add(amounts.MEDIUM_MINT.mul(3)));
+      expect(await accountControl.minted(reserve1.address)).to.equal(initialMinted.add(300000));
+      expect(await accountControl.totalMinted()).to.equal(initialTotal.add(300000));
     });
 
     it("should revert entire transaction if any Bank call fails", async function () {
