@@ -552,14 +552,6 @@ describe("SystemState", () => {
         )
       })
 
-      it("should revert for setWalletRegistrationDelay", async () => {
-        await expect(
-          systemState.connect(thirdParty).setWalletRegistrationDelay(3600)
-        ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
-        )
-      })
-
       it("should revert for setEmergencyPauseDuration", async () => {
         await expect(
           systemState.connect(thirdParty).setEmergencyPauseDuration(86400)
@@ -777,10 +769,6 @@ describe("SystemState", () => {
             .connect(adminAccount)
             .setStaleThreshold(testStaleThreshold)
         ).to.emit(systemState, "StaleThresholdUpdated")
-
-        await expect(
-          systemState.connect(adminAccount).setWalletRegistrationDelay(3600)
-        ).to.emit(systemState, "WalletRegistrationDelayUpdated")
 
         await expect(
           systemState

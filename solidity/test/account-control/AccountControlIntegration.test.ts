@@ -86,8 +86,9 @@ describe("AccountControl Integration Tests", function () {
     // Set up minting capacity for the QC
     await mockQcManager.setMintingCapacity(qc.address, QC_MINTING_CAP);
 
-    // Create simple mock address for relay
-    mockRelay = owner; // Reuse existing signer as mock
+    // Deploy TestRelay for SPV validation
+    const TestRelayFactory = await ethers.getContractFactory("TestRelay");
+    mockRelay = await TestRelayFactory.deploy();
 
     // Deploy QCMinter with constructor (not upgradeable)
     const QCMinterFactory = await ethers.getContractFactory("QCMinter");

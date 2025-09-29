@@ -76,21 +76,23 @@ describe("QCRedeemerSPV Library", () => {
     }
 
     it("should revert with SPVErr(1) when relay not set", async () => {
-      // Test with uninitialized SPV state - need to deploy libraries again for this test
+      // Test with uninitialized SPV state - use special uninitialized test contract
       const spvLibraries = await deploySPVLibraries()
       const uninitializedSPV = await ethers.getContractFactory(
-        "QCRedeemerSPVTest",
+        "QCRedeemerSPVTestUninitialized",
         {
           libraries: {
             SharedSPVCore: spvLibraries.sharedSPVCore.address,
-            QCRedeemerSPV: spvLibraries.qcRedeemerSPV.address,
           },
         }
       )
 
-      // The contract deployment should succeed but fail when validating SPV proof
-      const deployedSPV = await uninitializedSPV.deploy(ethers.constants.AddressZero, 1)
+      // Deploy the uninitialized test contract
+      const deployedSPV = await uninitializedSPV.deploy()
       await deployedSPV.deployed()
+      
+      // Verify SPV state is not initialized
+      expect(await deployedSPV.isInitialized()).to.be.false
       
       const validTxInfo = {
         version: "0x01000000",
@@ -107,9 +109,15 @@ describe("QCRedeemerSPV Library", () => {
         coinbaseProof: "0x1234",
       }
       
-      // Should fail with custom error for zero relay address
-      await expect(deployedSPV.validateSPVProof(validTxInfo, proof))
-        .to.be.revertedWithCustomError(deployedSPV, "RelayAddressZero")
+      // Should fail with SPVErr(1) for uninitialized SPV state
+      // Since SPVErr is from a library, we need to catch and decode the error manually
+      try {
+        await deployedSPV.validateSPVProof(validTxInfo, proof)
+        expect.fail("Expected transaction to revert")
+      } catch (error: any) {
+        // SPVErr(1) is encoded as: 0x9ab1fed3 (selector) + 0x0000...0001 (uint8 code)
+        expect(error.data).to.equal("0x9ab1fed30000000000000000000000000000000000000000000000000000000000000001")
+      }
     })
 
     it("should revert with SPVErr(2) when input vector is invalid", async () => {

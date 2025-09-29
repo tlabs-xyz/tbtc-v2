@@ -61,7 +61,6 @@ contract SystemState is AccessControl {
     error MaxAmountBelowMin(uint256 maxAmount, uint256 minAmount);
     error InvalidTimeout();
     error TimeoutTooLong(uint256 timeout, uint256 maxTimeout);
-    error DelayTooLong(uint256 delay, uint256 maxDelay);
     error InvalidThreshold();
     error ThresholdTooLong(uint256 threshold, uint256 maxThreshold);
     error InvalidDuration();
@@ -86,7 +85,6 @@ contract SystemState is AccessControl {
     uint256 public redemptionTimeout; // Maximum time for redemption fulfillment
     uint256 public minMintAmount; // Minimum amount for minting operations
     uint256 public maxMintAmount; // Maximum amount for single minting operation
-    uint256 public walletRegistrationDelay; // Delay between wallet registration and activation
 
     /// @dev Automated enforcement parameters
     uint256 public minCollateralRatio; // Minimum collateral ratio percentage (e.g., 90 for 90%)
@@ -119,11 +117,6 @@ contract SystemState is AccessControl {
     event RedemptionTimeoutUpdated(
         uint256 indexed oldTimeout,
         uint256 indexed newTimeout,
-        address indexed updatedBy
-    );
-    event WalletRegistrationDelayUpdated(
-        uint256 indexed oldDelay,
-        uint256 indexed newDelay,
         address indexed updatedBy
     );
 
@@ -340,19 +333,6 @@ contract SystemState is AccessControl {
         emit RedemptionTimeoutUpdated(oldTimeout, newTimeout, msg.sender);
     }
 
-    /// @notice Update wallet registration delay
-    /// @param newDelay The new delay in seconds
-    function setWalletRegistrationDelay(uint256 newDelay)
-        external
-        onlyRole(OPERATIONS_ROLE)
-    {
-        if (newDelay > 30 days) revert DelayTooLong(newDelay, 30 days);
-
-        uint256 oldDelay = walletRegistrationDelay;
-        walletRegistrationDelay = newDelay;
-
-        emit WalletRegistrationDelayUpdated(oldDelay, newDelay, msg.sender);
-    }
 
     /// @notice Update stale threshold
     /// @param newThreshold The new threshold in seconds
