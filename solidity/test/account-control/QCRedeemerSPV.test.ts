@@ -439,7 +439,7 @@ describe("QCRedeemerSPV Library", () => {
       expect(result).to.be.false // Should fail output count check
     })
 
-    it("should return false for future locktime (anti-replay protection)", async () => {
+    it("should accept future locktime (cross-chain time validation removed)", async () => {
       // Get current block timestamp and add 2 days
       const block = await ethers.provider.getBlock("latest")
       const futureTime = block.timestamp + 86400 * 2 // 2 days in future
@@ -460,7 +460,7 @@ describe("QCRedeemerSPV Library", () => {
         1,
         txInfo
       )
-      expect(result).to.be.false // Should fail future locktime check
+      expect(result).to.be.true // Cross-chain time comparison removed per implementation note
     })
 
     it("should return false for invalid transaction version", async () => {
