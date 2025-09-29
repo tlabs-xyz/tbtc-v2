@@ -62,6 +62,12 @@ contract MockAccountControl {
 
         // Track total minted amount globally when AccountControl is enabled
         if (accountControlEnabled) {
+            // Check authorization
+            require(authorized[msg.sender], "Reserve not authorized");
+            
+            // Check minting cap
+            require(minted[msg.sender] + satoshis <= mintingCaps[msg.sender], "Minting cap exceeded");
+            
             // Enforce backing >= minted invariant
             require(
                 backing[msg.sender] >= minted[msg.sender] + satoshis,
@@ -146,6 +152,12 @@ contract MockAccountControl {
     function mint(address recipient, uint256 amount) external whenNotPaused returns (bool) {
         uint256 satoshis = amount / 1e10;
         if (accountControlEnabled) {
+            // Check authorization
+            require(authorized[msg.sender], "Reserve not authorized");
+            
+            // Check minting cap
+            require(minted[msg.sender] + satoshis <= mintingCaps[msg.sender], "Minting cap exceeded");
+            
             // Enforce backing >= minted invariant
             require(
                 backing[msg.sender] >= minted[msg.sender] + satoshis,
@@ -223,6 +235,21 @@ contract MockAccountControl {
     /// @notice Credit minted amount for separated operations
     function creditMinted(uint256 amount) external whenNotPaused {
         uint256 satoshis = amount / 1e10;
+        
+        if (accountControlEnabled) {
+            // Check authorization
+            require(authorized[msg.sender], "Reserve not authorized");
+            
+            // Check minting cap
+            require(minted[msg.sender] + satoshis <= mintingCaps[msg.sender], "Minting cap exceeded");
+            
+            // Enforce backing >= minted invariant
+            require(
+                backing[msg.sender] >= minted[msg.sender] + satoshis,
+                "Insufficient backing for mint"
+            );
+        }
+        
         totalMinted += satoshis;
         minted[msg.sender] += satoshis;
     }

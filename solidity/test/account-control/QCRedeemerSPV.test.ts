@@ -169,6 +169,22 @@ describe("QCRedeemerSPV Library", () => {
         .to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr")
     })
 
+    it("should allow empty coinbase proof with non-empty merkle proof", async () => {
+      const proof = {
+        merkleProof: "0x1234", // Non-empty merkle proof
+        txIndexInBlock: 0,
+        bitcoinHeaders: "0x00", // Valid minimum headers
+        coinbasePreimage: ethers.constants.HashZero,
+        coinbaseProof: "0x", // Empty coinbase proof - should now be allowed
+      }
+
+      // This should not fail the proof structure validation anymore
+      // (it will fail later due to invalid proof data, but that's expected)
+      await expect(qcRedeemerSPV.validateSPVProof(validTxInfo, proof))
+        .to.be.revertedWithCustomError(qcRedeemerSPV, "SPVErr")
+        // The error should NOT be SPVErr(4) for proof length mismatch
+    })
+
     it("should revert with SPVErr(7) when headers are empty", async () => {
       const proof = {
         merkleProof: "0x1234",

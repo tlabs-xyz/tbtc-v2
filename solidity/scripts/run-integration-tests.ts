@@ -55,8 +55,14 @@ class IntegrationTestRunner {
         throw new Error(stderr)
       }
 
-      // Parse output for test results
-      const passed = stdout.includes("passing") && !stdout.includes("failing")
+      // Parse output for test results - improved parsing logic
+      const failingMatch = stdout.match(/(\d+) failing/)
+      const passingMatch = stdout.match(/(\d+) passing/)
+      const failingCount = failingMatch ? parseInt(failingMatch[1]) : 0
+      const passingCount = passingMatch ? parseInt(passingMatch[1]) : 0
+      
+      // Test passes if there are passing tests and no failing tests
+      const passed = passingCount > 0 && failingCount === 0
 
       this.results.push({
         name: testName,
@@ -67,11 +73,11 @@ class IntegrationTestRunner {
       console.log(chalk.green(`✅ ${testName} - PASSED (${duration}ms)`))
 
       // Show test details
-      if (stdout.includes("passing")) {
-        const passingMatch = stdout.match(/(\d+) passing/)
-        if (passingMatch) {
-          console.log(chalk.gray(`   ${passingMatch[1]} tests passed`))
-        }
+      if (passingCount > 0) {
+        console.log(chalk.gray(`   ${passingCount} tests passed`))
+      }
+      if (failingCount > 0) {
+        console.log(chalk.red(`   ${failingCount} tests failed`))
       }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error))

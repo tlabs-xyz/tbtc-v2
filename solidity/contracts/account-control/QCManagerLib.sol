@@ -278,7 +278,8 @@ library QCManagerLib {
         // Step 3: Witness program is implicitly version 0 with 20 bytes pubKeyHash
         
         // Step 4: Convert to 5-bit groups for bech32
-        uint256[] memory values = new uint256[](32);
+        // Need 33 entries: 1 witness version + 32 payload groups (20 bytes * 8 bits / 5 bits = 32)
+        uint256[] memory values = new uint256[](39); // Extra space for checksum calculation
         values[0] = 0; // witness version
         
         // Convert 20 bytes to 5-bit groups
@@ -300,7 +301,15 @@ library QCManagerLib {
             values[idx++] = (accumulator << (5 - bits)) & 0x1f;
         }
         
-        // Step 5: Encode as bech32
+        // Step 5: Calculate bech32 checksum
+        uint256 checksum = _bech32Checksum("bc", values, idx);
+        
+        // Append checksum (6 characters)
+        for (uint256 i = 0; i < 6; i++) {
+            values[idx++] = (checksum >> (5 * (5 - i))) & 0x1f;
+        }
+        
+        // Step 6: Encode as bech32
         bytes memory result = "bc1";
         bytes memory charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
         
@@ -309,6 +318,58 @@ library QCManagerLib {
         }
         
         return string(result);
+    }
+
+    /**
+     * @notice Calculate bech32 checksum according to BIP 173
+     * @param hrp Human readable part (e.g., "bc")
+     * @param data The data part in 5-bit groups
+     * @param dataLen Length of data array to process
+     * @return checksum The 30-bit checksum
+     */
+    function _bech32Checksum(string memory hrp, uint256[] memory data, uint256 dataLen) internal pure returns (uint256) {
+        uint256 chk = 1;
+        
+        // Process HRP
+        bytes memory hrpBytes = bytes(hrp);
+        for (uint256 i = 0; i < hrpBytes.length; i++) {
+            chk = _bech32Polymod(chk) ^ (uint256(uint8(hrpBytes[i])) >> 5);
+        }
+        chk = _bech32Polymod(chk);
+        
+        for (uint256 i = 0; i < hrpBytes.length; i++) {
+            chk = _bech32Polymod(chk) ^ (uint256(uint8(hrpBytes[i])) & 0x1f);
+        }
+        
+        // Process data
+        for (uint256 i = 0; i < dataLen; i++) {
+            chk = _bech32Polymod(chk) ^ data[i];
+        }
+        
+        // Process 6 zeros for checksum
+        for (uint256 i = 0; i < 6; i++) {
+            chk = _bech32Polymod(chk);
+        }
+        
+        return chk ^ 1;
+    }
+
+    /**
+     * @notice Bech32 polymod function for checksum calculation
+     * @param pre Previous checksum state
+     * @return Updated checksum state
+     */
+    function _bech32Polymod(uint256 pre) internal pure returns (uint256) {
+        uint256 b = pre >> 25;
+        uint256 chk = (pre & 0x1ffffff) << 5;
+        
+        if (b & 1 != 0) chk ^= 0x3b6a57b2;
+        if (b & 2 != 0) chk ^= 0x26508e6d;
+        if (b & 4 != 0) chk ^= 0x1ea119fa;
+        if (b & 8 != 0) chk ^= 0x3d4233dd;
+        if (b & 16 != 0) chk ^= 0x2a1462b3;
+        
+        return chk;
     }
 
     /**

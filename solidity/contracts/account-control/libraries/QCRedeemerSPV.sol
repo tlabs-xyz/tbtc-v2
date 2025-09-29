@@ -72,7 +72,7 @@ library QCRedeemerSPV {
         // Check proof structure
         if (proof.merkleProof.length == 0 || 
             proof.bitcoinHeaders.length < 80 ||
-            proof.merkleProof.length != proof.coinbaseProof.length) {
+            (proof.coinbaseProof.length != 0 && proof.merkleProof.length != proof.coinbaseProof.length)) {
             return (false, bytes32(0));
         }
         

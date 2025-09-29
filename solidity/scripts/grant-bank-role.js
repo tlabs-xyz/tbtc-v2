@@ -105,6 +105,7 @@ async function main() {
       console.log("✅ SUCCESS: QCMinter now has BALANCE_INCREASER_ROLE!");
     } else {
       console.error("❌ ERROR: Role grant failed!");
+      process.exit(1);
     }
     
   } catch (error) {

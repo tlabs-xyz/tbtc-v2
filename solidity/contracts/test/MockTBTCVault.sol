@@ -14,13 +14,20 @@ contract MockTBTCVault is ITBTCVault {
     uint32 public override optimisticMintingFeeDivisor = 1000; // 0.1% fee
     mapping(uint256 => DepositInfo) private deposits;
     bool public paused = false;
+    address public admin;
 
     modifier whenNotPaused() {
         require(!paused, "Contract paused");
         _;
     }
 
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can call this function");
+        _;
+    }
+
     constructor() {
+        admin = msg.sender;
         // Will be set via setTbtcToken
     }
 
@@ -66,7 +73,7 @@ contract MockTBTCVault is ITBTCVault {
         return info.revealedAt != 0;
     }
 
-    function setPaused(bool _paused) external {
+    function setPaused(bool _paused) external onlyAdmin {
         paused = _paused;
     }
 }

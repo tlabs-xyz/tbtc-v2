@@ -158,14 +158,14 @@ describe("QCManager", () => {
 
     it("should allow DISPUTE_ARBITER to set any status", async () => {
       const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, governance } = fixture
+      const { qcManager, arbiter } = fixture
 
       // Register QC (starts in Active status = 0)
       const qc = await setupTestQC(fixture)
 
       // DISPUTE_ARBITER can set any status directly (including UnderReview)
       await expect(
-        qcManager.connect(governance).setQCStatus(qc.address, 3, ethers.utils.formatBytes32String("review"))
+        qcManager.connect(arbiter).setQCStatus(qc.address, 3, ethers.utils.formatBytes32String("review"))
       ).to.emit(qcManager, "QCStatusChanged")
     })
   })

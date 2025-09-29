@@ -194,6 +194,12 @@ contract AccountControl is
         // Grant roles - owner gets admin role and can manage QC managers
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(QC_MANAGER_ROLE, _owner); // Owner can authorize reserves initially
+        
+        // Revoke admin role from initializer if it's different from owner
+        if (msg.sender != _owner) {
+            _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        }
+        
         deploymentBlock = block.number;
 
     }
