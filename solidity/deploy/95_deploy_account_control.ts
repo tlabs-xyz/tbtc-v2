@@ -299,7 +299,7 @@ const func: DeployFunction = async function DeployAccountControl(
   const watchdogEnforcer = await deploy("WatchdogEnforcer", {
     from: deployer,
     args: [
-      reserveOracle.address,  // _reserveLedger (ReserveOracle)
+      reserveOracle.address,  // _reserveOracle (renamed for clarity in Phase 1)
       qcManager.address,      // _qcManager
       qcData.address,         // _qcData
       systemState.address,    // _systemState

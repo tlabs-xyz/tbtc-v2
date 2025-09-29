@@ -11,6 +11,7 @@ import {BitcoinAddressUtils} from "./BitcoinAddressUtils.sol";
 import {CheckBitcoinSigs} from "@keep-network/bitcoin-spv-sol/contracts/CheckBitcoinSigs.sol";
 import "./AccountControl.sol";
 import "./QCManagerLib.sol";
+import "./libraries/QCManagerPauseLib.sol";
 
 // =================== CONSOLIDATED INTERFACES ===================
 // Interfaces for contracts that will be removed in consolidation
@@ -79,29 +80,19 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     bytes32 public constant UNDERCOLLATERALIZED_REASON = keccak256("UNDERCOLLATERALIZED");
     
     // =================== PAUSE CREDIT CONSTANTS ===================
-    
-    uint256 public constant PAUSE_DURATION = 48 hours;
-    uint256 public constant RENEWAL_PERIOD = 90 days;
-    uint256 public constant MIN_REDEMPTION_BUFFER = 8 hours;
+    // Constants moved to QCManagerPauseLib
+    using QCManagerPauseLib for mapping(address => QCManagerPauseLib.PauseCredit);
 
     // Additional errors not in QCManagerErrors
     error QCNotEligibleForEscalation();
     error EscalationPeriodNotReached();
     error OnlyStateManager();
-    error WouldBreachRedemptionDeadline();
+    // WouldBreachRedemptionDeadline moved to QCManagerPauseLib
     
 
     // =================== STRUCTS ===================
     
-    /// @dev Pause credit information for each QC
-    struct PauseCredit {
-        bool hasCredit;              // Can QC pause themselves?
-        uint256 lastUsed;            // When last used (0 = never)
-        uint256 creditRenewTime;     // When credit can be renewed
-        bool isPaused;               // Currently paused?
-        uint256 pauseEndTime;        // When pause expires
-        bytes32 pauseReason;         // Why paused
-    }
+    // PauseCredit struct moved to QCManagerPauseLib
 
     QCData public immutable qcData;
     SystemState public immutable systemState;
@@ -123,7 +114,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     
     // =================== PAUSE CREDIT STORAGE ===================
     
-    mapping(address => PauseCredit) public pauseCredits;
+    mapping(address => QCManagerPauseLib.PauseCredit) public pauseCredits;
     
     // =================== WALLET REGISTRATION STORAGE ===================
     
@@ -507,7 +498,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         string memory /* authority */
     ) private requiresAccountControl {
         if (reason == bytes32(0)) {
-            revert ReasonRequired();
+            revert QCManagerPauseLib.ReasonRequired();
         }
 
         if (!qcData.isQCRegistered(qc)) {
@@ -1004,7 +995,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         
         // Check pause credit availability
         if (!canSelfPause(qc)) {
-            revert NoPauseCredit();
+            revert QCManagerPauseLib.NoPauseCredit();
         }
         
         // Use renewable pause credit
@@ -1034,13 +1025,13 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         address qc = msg.sender;
         
         if (!qcCanEarlyResume[qc]) {
-            revert CannotEarlyResume();
+            revert QCManagerPauseLib.CannotEarlyResume();
         }
         
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
         if (currentStatus != QCData.QCStatus.MintingPaused && 
             currentStatus != QCData.QCStatus.Paused) {
-            revert NotSelfPaused();
+            revert QCManagerPauseLib.NotSelfPaused();
         }
         
         // Clear pause tracking
@@ -1146,7 +1137,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     {
         // Check for pending redemptions
         if (hasUnfulfilledRedemptions(qc)) {
-            revert HasPendingRedemptions();
+            revert QCManagerPauseLib.HasPendingRedemptions();
         }
         
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
@@ -1175,64 +1166,25 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     /// @param qc QC address
     /// @return canPause Whether QC can self-pause
     function canSelfPause(address qc) public view returns (bool canPause) {
-        PauseCredit memory credit = pauseCredits[qc];
-        
-        // Must have credit and not be currently paused
-        if (!credit.hasCredit || credit.isPaused) {
-            return false;
-        }
-        
-        // Check QC is active
-        try qcData.getQCStatus(qc) returns (QCData.QCStatus status) {
-            if (status != QCData.QCStatus.Active) {
-                return false;
-            }
-        } catch {
-            return false;
-        }
-        
-        // Check redemption deadline protection
-        uint256 earliestDeadline = getEarliestRedemptionDeadline(qc);
-        if (earliestDeadline > 0 && 
-            earliestDeadline < block.timestamp + PAUSE_DURATION + MIN_REDEMPTION_BUFFER) {
-            return false;
-        }
-        
-        return true;
+        return QCManagerPauseLib.canSelfPause(
+            pauseCredits,
+            qcData,
+            qc,
+            this.getEarliestRedemptionDeadline
+        );
     }
     
     /// @notice Renew pause credit after 90 days
     function renewPauseCredit() external {
         address qc = msg.sender;
-        PauseCredit storage credit = pauseCredits[qc];
-        
-        // Validate conditions
-        QCData.QCStatus status = qcData.getQCStatus(qc);
-        if (status != QCData.QCStatus.Active) revert QCNotActive(qc);
-        if (credit.hasCredit) revert CreditAlreadyAvailable();
-        if (credit.lastUsed == 0) revert NeverUsedCredit();
-        if (block.timestamp < credit.creditRenewTime) revert RenewalPeriodNotMet();
-        
-        // Renew credit
-        credit.hasCredit = true;
-        credit.creditRenewTime = 0;
-        
-        emit PauseCreditRenewed(qc, block.timestamp + RENEWAL_PERIOD);
+        QCManagerPauseLib.renewPauseCredit(pauseCredits, qcData, qc);
+        emit PauseCreditRenewed(qc, block.timestamp + QCManagerPauseLib.RENEWAL_PERIOD);
     }
     
     /// @notice Check and auto-resume if pause expired
     /// @param qc QC address
     function resumeIfExpired(address qc) external {
-        PauseCredit storage credit = pauseCredits[qc];
-        
-        if (!credit.isPaused) revert NotPaused();
-        if (block.timestamp < credit.pauseEndTime) revert PauseNotExpired();
-        
-        // Clear pause state
-        credit.isPaused = false;
-        credit.pauseEndTime = 0;
-        credit.pauseReason = bytes32(0);
-        
+        QCManagerPauseLib.resumeIfExpired(pauseCredits, qc);
         emit PauseCreditExpired(qc);
     }
     
@@ -1243,20 +1195,8 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         external 
         onlyRole(EMERGENCY_ROLE) 
     {
-        PauseCredit storage credit = pauseCredits[qc];
-        
-        // Clear pause state
-        credit.isPaused = false;
-        credit.pauseEndTime = 0;
-        credit.pauseReason = bytes32(0);
-        
-        // Optionally restore credit if it was consumed
-        if (!credit.hasCredit && credit.lastUsed > 0) {
-            credit.hasCredit = true;
-            credit.creditRenewTime = 0;
-        }
-        
-        emit EmergencyCleared(qc, msg.sender, keccak256(bytes(reason)));
+        bytes32 reasonHash = QCManagerPauseLib.emergencyClearPause(pauseCredits, qc, reason);
+        emit EmergencyCleared(qc, msg.sender, reasonHash);
     }
     
     /// @notice Grant initial credit to new QC
@@ -1265,15 +1205,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         external 
         onlyRole(EMERGENCY_ROLE) 
     {
-        // Verify QC is registered
-        if (!qcData.isQCRegistered(qc)) {
-            revert QCNotRegistered(qc);
-        }
-        
-        if (pauseCredits[qc].lastUsed != 0) revert QCAlreadyInitialized();
-        
-        pauseCredits[qc].hasCredit = true;
-        
+        QCManagerPauseLib.grantInitialCredit(pauseCredits, qcData, qc);
         emit InitialCreditGranted(qc, msg.sender);
     }
     
@@ -1343,14 +1275,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         bool hasCredit,
         uint256 creditRenewTime
     ) {
-        PauseCredit memory credit = pauseCredits[qc];
-        return (
-            credit.isPaused,
-            credit.pauseEndTime,
-            credit.pauseReason,
-            credit.hasCredit,
-            credit.creditRenewTime
-        );
+        return QCManagerPauseLib.getPauseInfo(pauseCredits, qc);
     }
     
     /// @notice Get time until credit renewal is available
@@ -1361,12 +1286,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         view
         returns (uint256 timeUntilRenewal)
     {
-        PauseCredit memory credit = pauseCredits[qc];
-        return QCManagerLib.calculateTimeUntilRenewal(
-            credit.hasCredit,
-            credit.lastUsed,
-            credit.creditRenewTime
-        );
+        return QCManagerPauseLib.getTimeUntilRenewal(pauseCredits, qc);
     }
     
     // =================== INTERNAL HELPER FUNCTIONS ===================
@@ -1394,44 +1314,19 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     
     /// @dev Internal function to use emergency pause credit
     function _useEmergencyPause(address qc, string memory reason) private {
-        PauseCredit storage credit = pauseCredits[qc];
-        
-        // Validate conditions
-        if (!credit.hasCredit) revert NoPauseCredit();
-        if (credit.isPaused) revert AlreadyPaused();
-        if (bytes(reason).length == 0) revert ReasonRequired();
-        
-        // Check QC status
-        QCData.QCStatus status = qcData.getQCStatus(qc);
-        if (status != QCData.QCStatus.Active) revert QCNotActive(qc);
-        
-        // Deadline protection
-        uint256 earliestDeadline = getEarliestRedemptionDeadline(qc);
-        if (earliestDeadline > 0 && 
-            earliestDeadline < block.timestamp + PAUSE_DURATION + MIN_REDEMPTION_BUFFER) {
-            revert WouldBreachRedemptionDeadline();
-        }
-        
-        // Consume credit and set pause
-        credit.hasCredit = false;
-        credit.lastUsed = block.timestamp;
-        credit.creditRenewTime = block.timestamp + RENEWAL_PERIOD;
-        credit.isPaused = true;
-        credit.pauseEndTime = block.timestamp + PAUSE_DURATION;
-        credit.pauseReason = keccak256(bytes(reason));
-        
-        emit PauseCreditUsed(qc, credit.pauseReason, PAUSE_DURATION);
+        bytes32 reasonHash = QCManagerPauseLib.useEmergencyPause(
+            pauseCredits, 
+            qcData, 
+            qc, 
+            reason, 
+            this.getEarliestRedemptionDeadline
+        );
+        emit PauseCreditUsed(qc, reasonHash, QCManagerPauseLib.PAUSE_DURATION);
     }
     
     /// @dev Internal function for early resume from pause credit system
     function _resumeEarly(address qc) private {
-        PauseCredit storage credit = pauseCredits[qc];
-        
-        // Clear pause state
-        credit.isPaused = false;
-        credit.pauseEndTime = 0;
-        credit.pauseReason = bytes32(0);
-        
+        QCManagerPauseLib.resumeEarly(pauseCredits, qc);
         emit EarlyResumed(qc, msg.sender);
     }
 

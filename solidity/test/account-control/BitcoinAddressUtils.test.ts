@@ -17,7 +17,7 @@ describe("BitcoinAddressUtils", () => {
       "TestBitcoinAddressUtils"
     )
     testContract = await TestBitcoinAddressUtils.deploy()
-    await testContract.waitForDeployment()
+    await testContract.deployed()
   })
 
   describe("P2PKH Address Decoding", () => {

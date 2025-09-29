@@ -93,7 +93,7 @@ export class LibraryLinkingHelper {
         libraries,
       })
       const library = await LibraryFactory.deploy()
-      await library.waitForDeployment()
+      await library.deployed()
 
       this.deployedLibraries.set(libraryName, library.address)
 
@@ -184,7 +184,7 @@ export class LibraryLinkingHelper {
       lightRelayAddress,
       txProofDifficultyFactor
     )
-    await qcRedeemer.waitForDeployment()
+    await qcRedeemer.deployed()
 
     return qcRedeemer
   }
@@ -206,7 +206,7 @@ export class LibraryLinkingHelper {
       systemStateAddress,
       reserveOracleAddress
     )
-    await qcManager.waitForDeployment()
+    await qcManager.deployed()
 
     return qcManager
   }

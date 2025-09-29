@@ -49,7 +49,7 @@ describe("SystemState", () => {
     // Deploy SystemState
     const SystemStateFactory = await ethers.getContractFactory("SystemState")
     systemState = await SystemStateFactory.deploy()
-    await systemState.waitForDeployment()
+    await systemState.deployed()
 
     // Grant roles
     await systemState.grantRole(EMERGENCY_ROLE, pauserAccount.address)
@@ -835,7 +835,7 @@ describe("SystemState", () => {
             .to.emit(systemState, "EmergencyActionTaken")
             .withArgs(
               testQC,
-              ethers.utils.formatBytes32String("QC_EMERGENCY_PAUSE"),
+              ethers.utils.id("QC_EMERGENCY_PAUSE"),
               pauserAccount.address,
               currentBlock.timestamp
             )
@@ -964,7 +964,7 @@ describe("SystemState", () => {
             .to.emit(systemState, "EmergencyActionTaken")
             .withArgs(
               testQC,
-              ethers.utils.formatBytes32String("QC_EMERGENCY_UNPAUSE"),
+              ethers.utils.id("QC_EMERGENCY_UNPAUSE"),
               pauserAccount.address,
               currentBlock.timestamp
             )

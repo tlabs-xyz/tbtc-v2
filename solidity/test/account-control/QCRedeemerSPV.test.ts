@@ -88,10 +88,28 @@ describe("QCRedeemerSPV Library", () => {
         }
       )
 
-      // The contract deployment itself should fail with zero address relay
-      await expect(
-        uninitializedSPV.deploy(ethers.constants.AddressZero, 1)
-      ).to.be.revertedWithCustomError(uninitializedSPV, "RelayAddressZero")
+      // The contract deployment should succeed but fail when validating SPV proof
+      const deployedSPV = await uninitializedSPV.deploy(ethers.constants.AddressZero, 1)
+      await deployedSPV.deployed()
+      
+      const validTxInfo = {
+        version: "0x01000000",
+        inputVector: `0x01${"00".repeat(36)}00${"00".repeat(4)}`,
+        outputVector: `0x01${"00".repeat(8)}00`,
+        locktime: "0x00000000",
+      }
+      
+      const proof = {
+        merkleProof: "0x1234",
+        txIndexInBlock: 0,
+        bitcoinHeaders: "0x00",
+        coinbasePreimage: ethers.constants.HashZero,
+        coinbaseProof: "0x1234",
+      }
+      
+      // Should fail with custom error for zero relay address
+      await expect(deployedSPV.validateSPVProof(validTxInfo, proof))
+        .to.be.revertedWithCustomError(deployedSPV, "RelayAddressZero")
     })
 
     it("should revert with SPVErr(2) when input vector is invalid", async () => {

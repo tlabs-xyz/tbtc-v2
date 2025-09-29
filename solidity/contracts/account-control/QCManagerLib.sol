@@ -315,28 +315,7 @@ library QCManagerLib {
 
 
 
-    /**
-     * @notice Calculate time until pause credit renewal
-     * @param hasCredit Whether QC has available pause credit
-     * @param lastUsed Timestamp of last pause credit usage
-     * @param creditRenewTime When credit becomes available again
-     * @return timeUntilRenewal Time in seconds until credit renewal (0 if available)
-     */
-    function calculateTimeUntilRenewal(
-        bool hasCredit,
-        uint256 lastUsed,
-        uint256 creditRenewTime
-    ) public view returns (uint256 timeUntilRenewal) {
-        if (hasCredit || lastUsed == 0) {
-            return 0;
-        }
-
-        if (block.timestamp >= creditRenewTime) {
-            return 0;
-        }
-
-        return creditRenewTime - block.timestamp;
-    }
+    // calculateTimeUntilRenewal moved to QCManagerPauseLib
 
     /**
      * @notice Get reserve balance and staleness from oracle

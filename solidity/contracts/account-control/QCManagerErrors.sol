@@ -76,8 +76,7 @@ interface QCManagerErrors {
     /// @notice Thrown when status is invalid for operation
     error InvalidStatus();
 
-    /// @notice Thrown when reason is required but not provided
-    error ReasonRequired();
+    // ReasonRequired moved to QCManagerPauseErrors interface
 
     // =================== Solvency & Balance Errors ===================
 
@@ -95,45 +94,7 @@ interface QCManagerErrors {
     error QCNotRegisteredForSolvency(address qc);
 
     // =================== Pause Credit Errors ===================
-
-    /// @notice Thrown when no pause credit is available
-    error NoPauseCredit();
-
-    /// @notice Thrown when already paused
-    error AlreadyPaused();
-
-    /// @notice Thrown when not self-paused
-    error NotSelfPaused();
-
-    /// @notice Thrown when cannot early resume
-    error CannotEarlyResume();
-
-    /// @notice Thrown when pause level is invalid
-    error InvalidPauseLevel();
-
-    /// @notice Thrown when has pending redemptions
-    error HasPendingRedemptions();
-
-    /// @notice Thrown when credit already available
-    error CreditAlreadyAvailable();
-
-    /// @notice Thrown when never used credit
-    error NeverUsedCredit();
-
-    /// @notice Thrown when renewal period not met
-    error RenewalPeriodNotMet();
-
-    /// @notice Thrown when pause expired
-    error PauseExpired();
-
-    /// @notice Thrown when not currently paused
-    error NotPaused();
-
-    /// @notice Thrown when pause not expired
-    error PauseNotExpired();
-
-    /// @notice Thrown when QC already initialized
-    error QCAlreadyInitialized();
+    // Pause credit errors moved to QCManagerPauseErrors interface to reduce contract size
 
     // =================== Service & System Errors ===================
 

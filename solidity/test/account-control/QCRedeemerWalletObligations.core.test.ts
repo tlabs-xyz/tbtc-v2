@@ -57,7 +57,7 @@ describe("QCRedeemer - Wallet Obligations (Core Functionality)", () => {
     // Deploy test relay (required by SPVState)
     const TestRelayFactory = await ethers.getContractFactory("TestRelay")
     testRelay = await TestRelayFactory.deploy()
-    await testRelay.waitForDeployment()
+    await testRelay.deployed()
 
     // Deploy SPV libraries for QCRedeemer
     const libraries = await deploySPVLibraries()
@@ -71,7 +71,7 @@ describe("QCRedeemer - Wallet Obligations (Core Functionality)", () => {
       testRelay.address,
       1 // txProofDifficultyFactor
     )
-    await qcRedeemer.waitForDeployment()
+    await qcRedeemer.deployed()
 
     // Grant dispute arbiter role
     await qcRedeemer.grantRole(
@@ -102,7 +102,7 @@ describe("QCRedeemer - Wallet Obligations (Core Functionality)", () => {
     // Deploy MockAccountControl and configure QCRedeemer
     const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl")
     mockAccountControl = await MockAccountControlFactory.deploy()
-    await mockAccountControl.waitForDeployment()
+    await mockAccountControl.deployed()
     await mockAccountControl.setTotalMintedForTesting(
       ethers.BigNumber.from("100000000000") // 1000 BTC in satoshis
     )
