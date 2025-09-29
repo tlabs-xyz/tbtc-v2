@@ -121,14 +121,28 @@ export class IntegrationTestFramework {
       qcManager.address
     ) as QCMinter
 
-    // Deploy QCRedeemer using LibraryLinkingHelper
-    const qcRedeemer = await LibraryLinkingHelper.deployQCRedeemer(
-      tbtcToken.address,
-      qcData.address,
-      systemState.address,
-      testRelay.address,
-      100 // txProofDifficultyFactor
-    ) as QCRedeemer
+    // Deploy QCRedeemer with proper library linking
+    let qcRedeemer: QCRedeemer
+    try {
+      console.log("=== Deploying libraries ===")
+      // First deploy the required libraries
+      const libraries = await LibraryLinkingHelper.deployAllLibraries()
+      console.log("✓ Libraries deployed:", Object.keys(libraries))
+      
+      console.log("=== Deploying QCRedeemer ===")
+      qcRedeemer = await LibraryLinkingHelper.deployQCRedeemer(
+        tbtcToken.address,
+        qcData.address,
+        systemState.address,
+        testRelay.address,
+        100, // txProofDifficultyFactor
+        libraries // Provide the libraries explicitly
+      ) as QCRedeemer
+      console.log("✓ QCRedeemer deployed")
+    } catch (error) {
+      console.error("❌ Error deploying QCRedeemer:", error)
+      throw error
+    }
 
     // Store all contracts
     this.contracts = {
@@ -149,6 +163,7 @@ export class IntegrationTestFramework {
   }
   
   async configureIntegration(): Promise<void> {
+    console.log("=== configureIntegration: Starting ===")
     const { owner, qcAddress } = this.signers
     const { 
       accountControl, 
@@ -162,15 +177,41 @@ export class IntegrationTestFramework {
       reserveOracle
     } = this.contracts
 
-    // Setup SystemState defaults
-    await systemState.connect(owner).grantRole(await systemState.OPERATIONS_ROLE(), owner.address)
-    await setupSystemStateDefaults(systemState, owner)
+    try {
+      console.log("=== Step 1: SystemState setup ===")
+      // Setup SystemState defaults
+      const opsRole = await systemState.OPERATIONS_ROLE()
+      console.log("✓ Got OPERATIONS_ROLE:", opsRole)
+      
+      await systemState.connect(owner).grantRole(opsRole, owner.address)
+      console.log("✓ Granted OPERATIONS_ROLE")
+      
+      await setupSystemStateDefaults(systemState, owner)
+      console.log("✓ SystemState defaults set")
 
-    // Setup QCData
-    await qcData.grantRole(await qcData.QC_MANAGER_ROLE(), owner.address)
-    await qcData.connect(owner).registerQC(qcAddress.address, this.QC_MINTING_CAP)
-    await qcData.connect(owner).setQCStatus(qcAddress.address, 0, ethers.utils.formatBytes32String("Active"))
-    await qcData.connect(owner).registerWallet(qcAddress.address, "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
+      console.log("=== Step 2: QCData setup ===")
+      // Setup QCData
+      const qcManagerRole = await qcData.QC_MANAGER_ROLE()
+      console.log("✓ Got QC_MANAGER_ROLE:", qcManagerRole)
+      
+      await qcData.grantRole(qcManagerRole, owner.address)
+      console.log("✓ Granted QC_MANAGER_ROLE")
+      
+      await qcData.connect(owner).registerQC(qcAddress.address, this.QC_MINTING_CAP)
+      console.log("✓ QC registered")
+      
+      const statusBytes = ethers.utils.formatBytes32String("Active")
+      console.log("✓ Status bytes formatted:", statusBytes)
+      
+      await qcData.connect(owner).setQCStatus(qcAddress.address, 0, statusBytes)
+      console.log("✓ QC status set")
+      
+      await qcData.connect(owner).registerWallet(qcAddress.address, "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
+      console.log("✓ Wallet registered")
+    } catch (error) {
+      console.error("❌ Error in configureIntegration:", error)
+      throw error
+    }
 
     // Setup MockQCManager - MUST register QC first before setting capacity
     const mockQCManager = qcManager as any // Cast to any for mock methods

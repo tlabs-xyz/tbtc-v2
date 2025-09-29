@@ -28,8 +28,17 @@ describe("AccountControl Integration Tests (Agent 5 - Tests 1-5)", () => {
   let deadline: number
   
   beforeEach(async () => {
+    console.log("=== BeforeEach: Starting setup ===")
     framework = new IntegrationTestFramework()
-    await framework.deploySystem()
+    console.log("✓ Framework created")
+    
+    try {
+      await framework.deploySystem()
+      console.log("✓ System deployed")
+    } catch (error) {
+      console.error("❌ Error during deploySystem:", error)
+      throw error
+    }
     
     // Extract signers for convenience
     const signers = framework.signers
@@ -41,25 +50,36 @@ describe("AccountControl Integration Tests (Agent 5 - Tests 1-5)", () => {
     attester2 = signers.attester2
     attester3 = signers.attester3
     qcAddress = signers.qcAddress
+    console.log("✓ Signers extracted")
     
     // Setup test data
     qcWallet = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
     btcAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
     redemptionAmount = framework.MINT_AMOUNT
+    console.log("✓ Test data setup")
     
     const block = await ethers.provider.getBlock("latest")
     deadline = block.timestamp + 86400 // 24 hours
+    console.log("✓ BeforeEach completed")
   })
 
   describe("QCRedeemer Integration", () => {
     it("1) should notify AccountControl of redemption when enabled", async () => {
+      console.log("=== Test Step 1: Enable AccountControl mode ===")
       // Setup: Enable AccountControl mode
       await framework.enableAccountControlMode()
+      console.log("✓ AccountControl mode enabled")
       
+      console.log("=== Test Step 2: Execute mint ===")
       // Setup: Create initial mint to have tokens to redeem
       await framework.executeMint(qcAddress.address, user.address, redemptionAmount)
-      const initialMinted = await framework.contracts.accountControl.totalMinted()
+      console.log("✓ Mint executed")
       
+      console.log("=== Test Step 3: Get initial minted amount ===")
+      const initialMinted = await framework.contracts.accountControl.totalMinted()
+      console.log("✓ Initial minted:", initialMinted.toString())
+      
+      console.log("=== Test Step 4: Execute redemption ===")
       // Action: Create redemption
       const redemptionId = await framework.executeRedemption(
         qcAddress.address,
@@ -67,11 +87,52 @@ describe("AccountControl Integration Tests (Agent 5 - Tests 1-5)", () => {
         btcAddress,
         qcWallet
       )
+      console.log("✓ Redemption executed, ID:", redemptionId)
       
+      console.log("=== Test Step 5: Generate SPV proof ===")
       // Action: Fulfill redemption with SPV proof
       const validProof = framework.generateValidSPVProof()
+      console.log("✓ SPV proof generated")
       // Convert amount to uint64 (satoshis)
       const amountInSatoshis = redemptionAmount.div(framework.SATOSHI_MULTIPLIER).toNumber()
+      
+      // Debug all parameters in detail before contract call
+      console.log("=== Detailed Parameter Debug ===")
+      console.log("redemptionId:", { value: redemptionId, type: typeof redemptionId, defined: redemptionId !== undefined })
+      console.log("btcAddress:", { value: btcAddress, type: typeof btcAddress, defined: btcAddress !== undefined })
+      console.log("amountInSatoshis:", { value: amountInSatoshis, type: typeof amountInSatoshis, defined: amountInSatoshis !== undefined })
+      
+      console.log("txInfo fields:")
+      Object.keys(validProof.txInfo).forEach(key => {
+        const val = validProof.txInfo[key]
+        console.log(`  ${key}:`, { value: val, type: typeof val, defined: val !== undefined, isString: typeof val === 'string', length: val?.length })
+      })
+      
+      console.log("proof fields:")
+      Object.keys(validProof.proof).forEach(key => {
+        const val = validProof.proof[key]
+        console.log(`  ${key}:`, { value: val, type: typeof val, defined: val !== undefined, isString: typeof val === 'string', length: val?.length })
+      })
+      console.log("=== End Debug ===")
+      
+      // Validate all fields are strings or numbers as expected
+      const validateHexString = (val, name) => {
+        if (typeof val !== 'string') throw new Error(`${name} must be string, got ${typeof val}`)
+        if (!val.startsWith('0x')) throw new Error(`${name} must start with 0x, got ${val}`)
+        if (val === '0x') throw new Error(`${name} cannot be empty hex`)
+      }
+      
+      validateHexString(validProof.txInfo.version, 'txInfo.version')
+      validateHexString(validProof.txInfo.inputVector, 'txInfo.inputVector')
+      validateHexString(validProof.txInfo.outputVector, 'txInfo.outputVector')
+      validateHexString(validProof.txInfo.locktime, 'txInfo.locktime')
+      validateHexString(validProof.proof.merkleProof, 'proof.merkleProof')
+      validateHexString(validProof.proof.bitcoinHeaders, 'proof.bitcoinHeaders')
+      validateHexString(validProof.proof.coinbasePreimage, 'proof.coinbasePreimage')
+      
+      if (typeof validProof.proof.txIndexInBlock !== 'number') {
+        throw new Error(`proof.txIndexInBlock must be number, got ${typeof validProof.proof.txIndexInBlock}`)
+      }
       
       const tx2 = await framework.contracts.qcRedeemer.connect(watchdog).recordRedemptionFulfillment(
         redemptionId, 
