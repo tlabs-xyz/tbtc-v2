@@ -112,9 +112,13 @@ describe("QCRedeemer - Wallet Obligations (Core Functionality)", () => {
     mockTBTC.balanceOf.returns(ethers.BigNumber.from("10000000000")) // 100 BTC in satoshis
     mockTBTC.burnFrom.returns(true)
 
+    // Deploy MockBank first for MockAccountControl dependency
+    const MockBankFactory = await ethers.getContractFactory("MockBank")
+    const mockBank = await MockBankFactory.deploy()
+
     // Deploy MockAccountControl and configure QCRedeemer
     const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl")
-    mockAccountControl = await MockAccountControlFactory.deploy()
+    mockAccountControl = await MockAccountControlFactory.deploy(mockBank.address)
     await mockAccountControl.deployed()
     await mockAccountControl.setTotalMintedForTesting(
       ethers.BigNumber.from("100000000000") // 1000 BTC in satoshis

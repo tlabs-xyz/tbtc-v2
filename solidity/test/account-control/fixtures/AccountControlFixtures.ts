@@ -163,9 +163,13 @@ export async function deployQCRedeemerFixture() {
     libraries
   )
 
+  // Deploy MockBank first for MockAccountControl dependency
+  const MockBankFactory = await ethers.getContractFactory("MockBank")
+  const mockBank = await MockBankFactory.deploy()
+
   // Deploy MockAccountControl for redemption tests
   const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl")
-  const mockAccountControl = await MockAccountControlFactory.deploy()
+  const mockAccountControl = await MockAccountControlFactory.deploy(mockBank.address)
   await qcRedeemer.setAccountControl(mockAccountControl.address)
 
   // Setup basic configuration

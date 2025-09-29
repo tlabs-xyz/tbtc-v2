@@ -41,7 +41,7 @@ describe("Debug AccountControl Integration", () => {
     console.log("QC backing:", backing.toString())
     
     // Check minting cap
-    const mintingCap = await framework.contracts.accountControl.mintingCap(qcAddress.address)
+    const mintingCap = await framework.contracts.accountControl.mintingCaps(qcAddress.address)
     console.log("QC minting cap:", mintingCap.toString())
     
     // Check if QCMinter can mint

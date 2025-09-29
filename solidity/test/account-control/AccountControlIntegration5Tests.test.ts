@@ -5,22 +5,22 @@
  * as specified in the parallel implementation plan.
  */
 
-import chai, { expect } from "chai"
+import { expect } from "chai"
 import { ethers } from "hardhat"
-import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers"
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 
 import { IntegrationTestFramework } from "../helpers/IntegrationTestFramework"
 
 describe("AccountControl Integration Tests (Agent 5 - Tests 1-5)", () => {
   let framework: IntegrationTestFramework
-  let owner: HardhatEthersSigner
-  let user: HardhatEthersSigner
-  let watchdog: HardhatEthersSigner
-  let arbiter: HardhatEthersSigner
-  let attester1: HardhatEthersSigner
-  let attester2: HardhatEthersSigner
-  let attester3: HardhatEthersSigner
-  let qcAddress: HardhatEthersSigner
+  let owner: SignerWithAddress
+  let user: SignerWithAddress
+  let watchdog: SignerWithAddress
+  let arbiter: SignerWithAddress
+  let attester1: SignerWithAddress
+  let attester2: SignerWithAddress
+  let attester3: SignerWithAddress
+  let qcAddress: SignerWithAddress
   
   let qcWallet: string
   let btcAddress: string

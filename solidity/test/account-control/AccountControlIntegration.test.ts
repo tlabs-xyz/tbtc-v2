@@ -159,11 +159,11 @@ describe("AccountControl Integration Tests", function () {
 
     // Deploy MockAccountControl for backing functionality in QCMinter
     const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
-    mockAccountControlForMinter = await MockAccountControlFactory.deploy();
+    mockAccountControlForMinter = await MockAccountControlFactory.deploy(mockBank.address);
 
     // For integration tests, use MockAccountControl for QCRedeemer to avoid minted balance tracking issues
     // The real AccountControl integration will be tested separately for complex cross-contract scenarios
-    mockAccountControlForRedeemer = await MockAccountControlFactory.deploy();
+    mockAccountControlForRedeemer = await MockAccountControlFactory.deploy(mockBank.address);
 
     // Set MockAccountControl address in QCRedeemer (allows simple integration testing)
     await qcRedeemer.connect(owner).setAccountControl(mockAccountControlForRedeemer.address);
@@ -368,7 +368,7 @@ describe("AccountControl Integration Tests", function () {
     it("should handle AccountControl mode toggling mid-operation", async function () {
       // For this test, use MockAccountControl for QCMinter to enable toggle functionality
       const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
-      const mockAccountControlForMinter = await MockAccountControlFactory.deploy();
+      const mockAccountControlForMinter = await MockAccountControlFactory.deploy(mockBank.address);
       await qcMinter.connect(owner).setAccountControl(mockAccountControlForMinter.address);
       
       // Increase QC minting capacity for this test (needs 3x MINT_AMOUNT)

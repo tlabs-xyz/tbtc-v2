@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.17;
 
-import { IBank } from "../interfaces/IBank.sol";
+// Define minimal interface for Bank operations
+interface IBankWithIncrease {
+    function increaseBalance(address account, uint256 amount) external;
+    function decreaseBalance(address account, uint256 amount) external;
+}
 
 /// @title Mock AccountControl contract for testing
 /// @notice Mock implementation that tracks global minted amount for all users
 /// @dev In the real system, QCs mint on behalf of users, not for themselves
 contract MockAccountControl {
     /// @notice Reference to the Bank contract for balance management
-    IBank public bank;
+    IBankWithIncrease public bank;
     /// @notice Track total minted amount globally (in satoshis)
     /// @dev This represents the total tBTC minted through the AccountControl system
     uint256 public totalMinted;
+    
+    /// @notice Role constants for testing
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /// @notice Track whether AccountControl integration is enabled
     bool public accountControlEnabled = true;
@@ -39,12 +46,12 @@ contract MockAccountControl {
 
     /// @notice Constructor to set the bank reference
     constructor(address _bank) {
-        bank = IBank(_bank);
+        bank = IBankWithIncrease(_bank);
     }
 
     /// @notice Set the bank address (for testing)
     function setBank(address _bank) external {
-        bank = IBank(_bank);
+        bank = IBankWithIncrease(_bank);
     }
 
     /// @notice Enable or disable AccountControl mode for testing
@@ -105,6 +112,7 @@ contract MockAccountControl {
         }
 
         emit TBTCMinted(user, amount, satoshis);
+        emit MintExecuted(msg.sender, user, satoshis);
         return satoshis;
     }
 
@@ -129,6 +137,7 @@ contract MockAccountControl {
         }
 
         emit TBTCRedeemed(msg.sender, amount);
+        emit RedemptionProcessed(msg.sender, satoshis);
         return true;
     }
 
@@ -137,6 +146,12 @@ contract MockAccountControl {
 
     /// @notice Event emitted when TBTC is redeemed
     event TBTCRedeemed(address indexed redeemer, uint256 amount);
+    
+    /// @notice Event emitted when mint is executed (matches real AccountControl)
+    event MintExecuted(address indexed reserve, address indexed recipient, uint256 amount);
+    
+    /// @notice Event emitted when redemption is processed (matches real AccountControl)
+    event RedemptionProcessed(address indexed reserve, uint256 amount);
     
     /// @notice Authorize a reserve
     function authorizeReserve(address reserve, uint256 mintingCap) external {
@@ -174,6 +189,11 @@ contract MockAccountControl {
     /// @notice System pause state
     uint256 public systemPaused;
     
+    /// @notice Check if an address has a specific role (always returns true for testing)
+    function hasRole(bytes32 role, address account) external view returns (bool) {
+        return authorized[account];
+    }
+    
     /// @notice Core mint function
     function mint(address recipient, uint256 amount) external whenNotPaused returns (bool) {
         uint256 satoshis = amount / 1e10;
@@ -200,6 +220,7 @@ contract MockAccountControl {
         }
         
         emit TBTCMinted(recipient, amount, satoshis);
+        emit MintExecuted(msg.sender, recipient, satoshis);
         return true;
     }
     
@@ -221,6 +242,7 @@ contract MockAccountControl {
         }
 
         emit TBTCRedeemed(msg.sender, amount);
+        emit RedemptionProcessed(msg.sender, satoshis);
         return true;
     }
     

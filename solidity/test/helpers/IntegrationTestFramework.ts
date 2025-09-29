@@ -104,7 +104,7 @@ export class IntegrationTestFramework {
     // Deploy MockAccountControl for integration testing
     // This avoids the complexity of tracking minted amounts across different contracts
     const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl")
-    const accountControl = await MockAccountControlFactory.deploy() as AccountControl
+    const accountControl = await MockAccountControlFactory.deploy(mockBank.address) as AccountControl
 
     // Deploy MockQCManager for integration testing (avoids library compilation issues)
     const MockQCManagerFactory = await ethers.getContractFactory("MockQCManager")
@@ -357,19 +357,46 @@ export class IntegrationTestFramework {
   generateValidSPVProof(): { txInfo: any, proof: any } {
     const testData = SPVTestData.VALID_BITCOIN_TX
     
-    return {
+    // Ensure all hex strings start with 0x
+    const ensureHexPrefix = (hex: string | undefined) => {
+      if (!hex) return '0x'
+      return hex.startsWith('0x') ? hex : '0x' + hex
+    }
+    
+    const result = {
       txInfo: {
-        version: testData.txInfo.version, // bytes4 as hex string
-        inputVector: testData.txInfo.inputVector, // bytes as hex string
-        outputVector: testData.txInfo.outputVector, // bytes as hex string
-        locktime: testData.txInfo.locktime // bytes4 as hex string
+        version: ensureHexPrefix(testData.txInfo.version), // bytes4 as hex string
+        inputVector: ensureHexPrefix(testData.txInfo.inputVector), // bytes as hex string
+        outputVector: ensureHexPrefix(testData.txInfo.outputVector), // bytes as hex string
+        locktime: ensureHexPrefix(testData.txInfo.locktime) // bytes4 as hex string
       },
       proof: {
-        merkleProof: testData.proof.merkleProof, // bytes as hex string
-        txIndexInBlock: testData.proof.txIndexInBlock, // uint256
-        bitcoinHeaders: testData.proof.bitcoinHeaders, // bytes as hex string
-        coinbasePreimage: ethers.utils.formatBytes32String("") // bytes32 - required field
+        merkleProof: ensureHexPrefix(testData.proof.merkleProof), // bytes as hex string
+        txIndexInBlock: testData.proof.txIndexInBlock || 0, // uint256
+        bitcoinHeaders: ensureHexPrefix(testData.proof.bitcoinHeaders), // bytes as hex string
+        coinbasePreimage: testData.proof.coinbasePreimage ? ensureHexPrefix(testData.proof.coinbasePreimage) : ethers.utils.hexZeroPad("0x00", 32) // bytes32
       }
+    }
+    
+    // Log for debugging
+    console.log("SPV Proof generated:", JSON.stringify(result, null, 2))
+    
+    return result
+  }
+
+  /**
+   * Capture current system state for comparison
+   */
+  async captureSystemState() {
+    const totalMinted = await this.contracts.accountControl.totalMinted()
+    const isMintingPaused = await this.contracts.systemState.isMintingPaused()
+    const isRedemptionPaused = await this.contracts.systemState.isRedemptionPaused()
+    
+    return {
+      totalMinted,
+      systemPaused: isMintingPaused || isRedemptionPaused, // Combined pause state
+      isMintingPaused,
+      isRedemptionPaused
     }
   }
 
