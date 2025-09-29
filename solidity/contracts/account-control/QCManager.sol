@@ -622,6 +622,8 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
                 revert QCNotActive(qc);
             } else if (keccak256(bytes(errorCode)) == keccak256("SIG_FAIL")) {
                 revert SignatureVerificationFailed();
+            } else if (keccak256(bytes(errorCode)) == keccak256("ADDR_MISMATCH")) {
+                revert SignatureVerificationFailed(); // Public key doesn't match claimed address
             } else {
                 revert("Validation failed");
             }
@@ -693,6 +695,8 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
                 revert QCNotActive(msg.sender);
             } else if (keccak256(bytes(errorCode)) == keccak256("SIG_FAIL_DIRECT")) {
                 revert SignatureVerificationFailed();
+            } else if (keccak256(bytes(errorCode)) == keccak256("ADDR_MISMATCH_DIRECT")) {
+                revert SignatureVerificationFailed(); // Public key doesn't match claimed address
             } else {
                 revert("Validation failed");
             }

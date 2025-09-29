@@ -248,6 +248,70 @@ library QCManagerLib {
     }
 
     /**
+     * @notice Derive Bitcoin P2WPKH (native SegWit) address from public key
+     * @dev Derives a bech32 encoded Bitcoin address (bc1...) from an uncompressed public key
+     * @param publicKey The uncompressed public key (64 bytes, no 0x04 prefix)
+     * @return btcAddress The derived Bitcoin address in bech32 format
+     */
+    function deriveBitcoinAddressFromPublicKey(bytes memory publicKey) internal pure returns (string memory) {
+        require(publicKey.length == 64, "Invalid public key length");
+        
+        // Step 1: Compress the public key
+        // Take the X coordinate (first 32 bytes)
+        bytes memory compressed = new bytes(33);
+        // Determine prefix based on Y coordinate parity
+        // Y coordinate is the last 32 bytes of the public key
+        bytes32 yCoordBytes;
+        for (uint i = 0; i < 32; i++) {
+            yCoordBytes |= bytes32(publicKey[32 + i]) >> (i * 8);
+        }
+        uint256 yCoord = uint256(yCoordBytes);
+        compressed[0] = (yCoord % 2 == 0) ? bytes1(0x02) : bytes1(0x03);
+        // Copy X coordinate
+        for (uint i = 0; i < 32; i++) {
+            compressed[i + 1] = publicKey[i];
+        }
+        
+        // Step 2: Hash the compressed public key
+        bytes20 pubKeyHash = ripemd160(abi.encodePacked(sha256(compressed)));
+        
+        // Step 3: Witness program is implicitly version 0 with 20 bytes pubKeyHash
+        
+        // Step 4: Convert to 5-bit groups for bech32
+        uint256[] memory values = new uint256[](32);
+        values[0] = 0; // witness version
+        
+        // Convert 20 bytes to 5-bit groups
+        uint256 accumulator = 0;
+        uint256 bits = 0;
+        uint256 idx = 1;
+        
+        for (uint256 i = 0; i < 20; i++) {
+            uint8 b = uint8(pubKeyHash[i]);
+            accumulator = (accumulator << 8) | b;
+            bits += 8;
+            
+            while (bits >= 5) {
+                bits -= 5;
+                values[idx++] = (accumulator >> bits) & 0x1f;
+            }
+        }
+        if (bits > 0) {
+            values[idx++] = (accumulator << (5 - bits)) & 0x1f;
+        }
+        
+        // Step 5: Encode as bech32
+        bytes memory result = "bc1";
+        bytes memory charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+        
+        for (uint256 i = 0; i < idx; i++) {
+            result = abi.encodePacked(result, charset[values[i]]);
+        }
+        
+        return string(result);
+    }
+
+    /**
      * @notice Enhanced status transition validation with detailed reasoning
      * @param from Current QC status
      * @param to Target QC status
@@ -484,6 +548,14 @@ library QCManagerLib {
             return (false, "SIG_FAIL");
         }
 
+        // CRITICAL SECURITY FIX: Verify that the public key corresponds to the claimed Bitcoin address
+        // This prevents signature bypass attacks where an attacker signs with any key
+        // and claims ownership of any Bitcoin address
+        string memory derivedAddress = deriveBitcoinAddressFromPublicKey(walletPublicKey);
+        if (keccak256(bytes(derivedAddress)) != keccak256(bytes(btcAddress))) {
+            return (false, "ADDR_MISMATCH");
+        }
+
         return (true, "");
     }
 
@@ -545,6 +617,14 @@ library QCManagerLib {
         // Verify Bitcoin signature
         if (!verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
             return (false, challenge, "SIG_FAIL_DIRECT");
+        }
+
+        // CRITICAL SECURITY FIX: Verify that the public key corresponds to the claimed Bitcoin address
+        // This prevents signature bypass attacks where an attacker signs with any key
+        // and claims ownership of any Bitcoin address
+        string memory derivedAddress = deriveBitcoinAddressFromPublicKey(walletPublicKey);
+        if (keccak256(bytes(derivedAddress)) != keccak256(bytes(btcAddress))) {
+            return (false, challenge, "ADDR_MISMATCH_DIRECT");
         }
 
         return (true, challenge, "");

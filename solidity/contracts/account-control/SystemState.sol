@@ -48,6 +48,11 @@ contract SystemState is AccessControl {
     // Action constants for emergency events
     bytes32 public constant ACTION_QC_EMERGENCY_PAUSE = keccak256("QC_EMERGENCY_PAUSE");
     bytes32 public constant ACTION_QC_EMERGENCY_UNPAUSE = keccak256("QC_EMERGENCY_UNPAUSE");
+    
+    // Pause key constants for gas efficiency and security
+    bytes32 private constant PAUSE_KEY_MINTING = keccak256("minting");
+    bytes32 private constant PAUSE_KEY_REDEMPTION = keccak256("redemption");
+    bytes32 private constant PAUSE_KEY_WALLET_REGISTRATION = keccak256("wallet_registration");
 
     // Custom errors for gas-efficient reverts
     error MintingAlreadyPaused();
@@ -69,6 +74,7 @@ contract SystemState is AccessControl {
     error MintingIsPaused();
     error RedemptionIsPaused();
     error WalletRegistrationIsPaused();
+    error InvalidPauseKey(string functionName);
     error QCIsEmergencyPaused(address qc);
     error QCNotEmergencyPaused(address qc);
     error QCEmergencyPauseExpired(address qc);
@@ -197,12 +203,15 @@ contract SystemState is AccessControl {
     modifier notPaused(string memory functionName) {
         bytes32 pauseKey = keccak256(abi.encodePacked(functionName));
         _clearExpiredPause(pauseKey);
-        if (pauseKey == keccak256("minting")) {
+        if (pauseKey == PAUSE_KEY_MINTING) {
             if (isMintingPaused) revert MintingIsPaused();
-        } else if (pauseKey == keccak256("redemption")) {
+        } else if (pauseKey == PAUSE_KEY_REDEMPTION) {
             if (isRedemptionPaused) revert RedemptionIsPaused();
-        } else if (pauseKey == keccak256("wallet_registration")) {
+        } else if (pauseKey == PAUSE_KEY_WALLET_REGISTRATION) {
             if (isWalletRegistrationPaused) revert WalletRegistrationIsPaused();
+        } else {
+            // CRITICAL SECURITY FIX: Reject unknown pause keys to prevent bypass
+            revert InvalidPauseKey(functionName);
         }
         _;
     }

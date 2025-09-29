@@ -309,13 +309,14 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             completed: false
         });
 
-        // Verify this contract is authorized in Bank
-        if (!bank.authorizedBalanceIncreasers(address(this))) {
-            revert NotAuthorizedInBank();
-        }
-
         // Validate accountControl is configured
         require(accountControl != address(0), "AccountControl not configured");
+        
+        // CRITICAL SECURITY FIX: Verify accountControl is authorized in Bank
+        // AccountControl is the contract that actually mints, not QCMinter
+        if (!bank.authorizedBalanceIncreasers(accountControl)) {
+            revert NotAuthorizedInBank();
+        }
 
         // Use AccountControl for minting (returns satoshis for event emission)
         uint256 satoshis = AccountControl(accountControl).mintTBTC(user, amount);
