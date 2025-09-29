@@ -7,18 +7,38 @@ async function main() {
   console.log("=== Bank Authorization Script ===");
   
   // Configuration - Update these after deployment
-  const BANK_ADDRESS = process.env.BANK_ADDRESS || "0x9b1a7fC43603c5E25B21063e589FaD73B6585ccF";
+  const BANK_ADDRESS = process.env.BANK_ADDRESS; // require explicit address per environment
   const QC_MINTER_ADDRESS = process.env.QC_MINTER_ADDRESS || ""; // Will be set after deployment
   const BANK_OWNER_PRIVATE_KEY = process.env.BANK_OWNER_PRIVATE_KEY || ""; // Set this securely
-  
+
+  // Basic format validation (ethers version agnostic)
+  const isValidAddress = (a) => /^0x[a-fA-F0-9]{40}$/.test(a);
+  const isValidPrivateKey = (k) => /^0x[0-9a-fA-F]{64}$/.test(k);
+
+  if (!BANK_ADDRESS) {
+    console.error("ERROR: BANK_ADDRESS not set in environment.");
+    process.exit(1);
+  }
+  if (!isValidAddress(BANK_ADDRESS)) {
+    console.error("ERROR: BANK_ADDRESS is not a valid hex address.");
+    process.exit(1);
+  }
   if (!QC_MINTER_ADDRESS) {
     console.error("ERROR: QC_MINTER_ADDRESS not set. Deploy Account Control first.");
+    process.exit(1);
+  }
+  if (!isValidAddress(QC_MINTER_ADDRESS) || QC_MINTER_ADDRESS === "0x0000000000000000000000000000000000000000") {
+    console.error("ERROR: QC_MINTER_ADDRESS is invalid or zero address.");
     process.exit(1);
   }
   
   if (!BANK_OWNER_PRIVATE_KEY) {
     console.error("ERROR: BANK_OWNER_PRIVATE_KEY not set in environment.");
     console.error("Set it with: export BANK_OWNER_PRIVATE_KEY=0x...");
+    process.exit(1);
+  }
+  if (!isValidPrivateKey(BANK_OWNER_PRIVATE_KEY)) {
+    console.error("ERROR: BANK_OWNER_PRIVATE_KEY format invalid. Expected 0x + 64 hex chars.");
     process.exit(1);
   }
   
