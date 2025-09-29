@@ -27,13 +27,11 @@ export class LibraryLinkingHelper {
   static async deployAllLibraries(useCache: boolean = true): Promise<LibraryLinks> {
     // ✅ PERFORMANCE: Return cached libraries if available
     if (useCache && this.globalLibraryCache) {
-      console.log("🚀 Using cached libraries (fast path)")
       return this.globalLibraryCache
     }
 
     // ✅ PERFORMANCE: Prevent duplicate deployments during parallel execution
     if (this.isDeploying) {
-      console.log("⏳ Waiting for concurrent library deployment...")
       while (this.isDeploying) {
         await new Promise(resolve => setTimeout(resolve, 100))
       }
@@ -43,7 +41,6 @@ export class LibraryLinkingHelper {
     }
 
     this.isDeploying = true
-    console.log("📚 Deploying libraries in dependency order...")
 
     try {
       // Clear session cache for fresh deployment
@@ -73,9 +70,6 @@ export class LibraryLinkingHelper {
       // ✅ PERFORMANCE: Cache libraries globally for reuse
       this.globalLibraryCache = libraries
 
-      console.log("✅ All libraries deployed successfully and cached:")
-      console.log(libraries)
-
       return libraries
     } finally {
       this.isDeploying = false
@@ -102,7 +96,6 @@ export class LibraryLinkingHelper {
       await library.deployed()
 
       this.deployedLibraries.set(libraryName, library.address)
-      console.log(`  ✅ ${libraryName}: ${library.address}`)
 
       return library.address
     } catch (error) {
@@ -193,7 +186,6 @@ export class LibraryLinkingHelper {
     )
     await qcRedeemer.deployed()
 
-    console.log(`✅ QCRedeemer deployed: ${qcRedeemer.address}`)
     return qcRedeemer
   }
 
@@ -216,7 +208,6 @@ export class LibraryLinkingHelper {
     )
     await qcManager.deployed()
 
-    console.log(`✅ QCManager deployed: ${qcManager.address}`)
     return qcManager
   }
 
@@ -228,7 +219,6 @@ export class LibraryLinkingHelper {
     this.deployedLibraries.clear()
     if (clearGlobalCache) {
       this.globalLibraryCache = null
-      console.log("🧹 Global library cache cleared")
     }
   }
 
