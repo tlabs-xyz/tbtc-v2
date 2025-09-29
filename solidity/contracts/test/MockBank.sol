@@ -15,6 +15,7 @@ contract MockBank is IBank {
     uint256 public batchCallCount = 0;
     uint256 public individualCallCount = 0;
     uint256 private callCount = 0;
+    bool public paused = false;
 
     // Authorization tracking
     mapping(address => bool) private _authorizedIncreasers;
@@ -22,6 +23,17 @@ contract MockBank is IBank {
     
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only admin can call this function");
+        _;
+    }
+    
+    modifier onlyAuthorized() {
+        require(_authorizedIncreasers[msg.sender] || msg.sender == admin, 
+                "Not authorized");
+        _;
+    }
+    
+    modifier whenNotPaused() {
+        require(!paused, "Contract paused");
         _;
     }
     
@@ -41,6 +53,7 @@ contract MockBank is IBank {
     function increaseBalanceAllowance(address spender, uint256 amount)
         external
         override
+        whenNotPaused
     {
         _allowances[msg.sender][spender] += amount;
         emit BalanceApproval(
@@ -54,7 +67,7 @@ contract MockBank is IBank {
         address sender,
         address recipient,
         uint256 amount
-    ) external override returns (bool) {
+    ) external override whenNotPaused returns (bool) {
         uint256 currentAllowance = _allowances[sender][msg.sender];
         require(currentAllowance >= amount, "MockBank: insufficient allowance");
         require(_balances[sender] >= amount, "MockBank: insufficient balance");
@@ -68,8 +81,7 @@ contract MockBank is IBank {
     }
 
     // AccountControl integration methods
-    function increaseBalance(address account, uint256 amount) external {
-        require(_authorizedIncreasers[msg.sender], "Not authorized to increase balance");
+    function increaseBalance(address account, uint256 amount) external onlyAuthorized whenNotPaused {
         individualCallCount++;
         callCount++;
         
@@ -82,8 +94,7 @@ contract MockBank is IBank {
         _totalSupply += amount;
     }
     
-    function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external {
-        require(_authorizedIncreasers[msg.sender], "Not authorized to increase balances");
+    function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external onlyAuthorized whenNotPaused {
         if (!batchSupported) {
             revert("Mock Bank: Batch not supported");
         }
@@ -98,30 +109,26 @@ contract MockBank is IBank {
         }
     }
 
-    function decreaseBalance(address account, uint256 amount) external {
-        require(_authorizedIncreasers[msg.sender], "Not authorized to decrease balance");
+    function decreaseBalance(address account, uint256 amount) external onlyAuthorized whenNotPaused {
         require(_balances[account] >= amount, "Insufficient balance");
         _balances[account] -= amount;
         _totalSupply -= amount;
     }
 
     // Missing mint function that AccountControl IBank interface expects
-    function mint(address recipient, uint256 amount) external {
-        require(_authorizedIncreasers[msg.sender], "Not authorized to mint");
+    function mint(address recipient, uint256 amount) external onlyAuthorized whenNotPaused {
         _balances[recipient] += amount;
         _totalSupply += amount;
     }
 
     // Missing burn functions that AccountControl IBank interface expects
-    function burn(uint256 amount) external {
-        require(_authorizedIncreasers[msg.sender], "Not authorized to burn");
+    function burn(uint256 amount) external onlyAuthorized whenNotPaused {
         require(_balances[msg.sender] >= amount, "Insufficient balance to burn");
         _balances[msg.sender] -= amount;
         _totalSupply -= amount;
     }
 
-    function burnFrom(address account, uint256 amount) external {
-        require(_authorizedIncreasers[msg.sender], "Not authorized to burn");
+    function burnFrom(address account, uint256 amount) external onlyAuthorized whenNotPaused {
         require(_balances[account] >= amount, "Insufficient balance to burn");
         _balances[account] -= amount;
         _totalSupply -= amount;
@@ -185,5 +192,9 @@ contract MockBank is IBank {
 
     function unauthorizeBalanceIncreaser(address account) external onlyAdmin {
         _authorizedIncreasers[account] = false;
+    }
+
+    function setPaused(bool _paused) external onlyAdmin {
+        paused = _paused;
     }
 }

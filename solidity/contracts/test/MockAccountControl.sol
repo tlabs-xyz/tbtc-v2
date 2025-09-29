@@ -21,8 +21,17 @@ contract MockAccountControl {
     /// @notice Track minting caps for reserves
     mapping(address => uint256) public mintingCaps;
 
+    /// @notice Pause state for testing
+    bool public paused = false;
+
     /// @notice Custom error for insufficient minted balance
     error InsufficientMinted(uint256 available, uint256 requested);
+
+    /// @notice Modifier to check if contract is not paused
+    modifier whenNotPaused() {
+        require(!paused, "Contract paused");
+        _;
+    }
 
     /// @notice Enable or disable AccountControl mode for testing
     /// @param enabled True to enable AccountControl integration, false to disable
@@ -47,13 +56,20 @@ contract MockAccountControl {
     /// @param amount The amount of TBTC being minted
     /// @dev Tracks total minted amount globally, not per-caller
     /// @return satoshis The amount in satoshis (converted from tBTC)
-    function mintTBTC(address user, uint256 amount) external returns (uint256 satoshis) {
+    function mintTBTC(address user, uint256 amount) external whenNotPaused returns (uint256 satoshis) {
         // Convert tBTC (18 decimals) to satoshis (8 decimals)
         satoshis = amount / 1e10;
 
         // Track total minted amount globally when AccountControl is enabled
         if (accountControlEnabled) {
+            // Enforce backing >= minted invariant
+            require(
+                backing[msg.sender] >= minted[msg.sender] + satoshis,
+                "Insufficient backing for mint"
+            );
+            
             totalMinted += satoshis;
+            minted[msg.sender] += satoshis;
         }
 
         emit TBTCMinted(user, amount, satoshis);
@@ -64,19 +80,20 @@ contract MockAccountControl {
     /// @param amount The amount of TBTC being redeemed (in tBTC wei)
     /// @dev Checks against global totalMinted, as users redeem what was minted for them
     /// @return success True if redemption was successful
-    function redeemTBTC(uint256 amount) external returns (bool success) {
+    function redeemTBTC(uint256 amount) external whenNotPaused returns (bool success) {
         // Convert tBTC amount to satoshis for comparison
         uint256 satoshis = amount / 1e10;
 
         // Only enforce limits when AccountControl is enabled
         if (accountControlEnabled) {
-            // Check if system has sufficient total minted balance
-            if (totalMinted < satoshis) {
-                revert InsufficientMinted(totalMinted, satoshis);
+            // Check if reserve has sufficient minted balance
+            if (minted[msg.sender] < satoshis) {
+                revert InsufficientMinted(minted[msg.sender], satoshis);
             }
 
-            // Update global minted balance
+            // Update both global and per-reserve minted balance
             totalMinted -= satoshis;
+            minted[msg.sender] -= satoshis;
         }
 
         emit TBTCRedeemed(msg.sender, amount);
@@ -126,9 +143,15 @@ contract MockAccountControl {
     uint256 public systemPaused;
     
     /// @notice Core mint function
-    function mint(address recipient, uint256 amount) external returns (bool) {
+    function mint(address recipient, uint256 amount) external whenNotPaused returns (bool) {
         uint256 satoshis = amount / 1e10;
         if (accountControlEnabled) {
+            // Enforce backing >= minted invariant
+            require(
+                backing[msg.sender] >= minted[msg.sender] + satoshis,
+                "Insufficient backing for mint"
+            );
+            
             totalMinted += satoshis;
             minted[msg.sender] += satoshis;
         }
@@ -137,19 +160,20 @@ contract MockAccountControl {
     }
     
     /// @notice Core redeem function
-    function redeem(uint256 amount) external returns (bool) {
+    function redeem(uint256 amount) external whenNotPaused returns (bool) {
         // Convert tBTC amount to satoshis for comparison
         uint256 satoshis = amount / 1e10;
 
         // Only enforce limits when AccountControl is enabled
         if (accountControlEnabled) {
-            // Check if system has sufficient total minted balance
-            if (totalMinted < satoshis) {
-                revert InsufficientMinted(totalMinted, satoshis);
+            // Check if reserve has sufficient minted balance
+            if (minted[msg.sender] < satoshis) {
+                revert InsufficientMinted(minted[msg.sender], satoshis);
             }
 
-            // Update global minted balance
+            // Update both global and per-reserve minted balance
             totalMinted -= satoshis;
+            minted[msg.sender] -= satoshis;
         }
 
         emit TBTCRedeemed(msg.sender, amount);
@@ -157,7 +181,7 @@ contract MockAccountControl {
     }
     
     /// @notice Update backing function
-    function updateBacking(uint256 amount) external {
+    function updateBacking(uint256 amount) external whenNotPaused {
         backing[msg.sender] = amount;
     }
     
@@ -197,14 +221,14 @@ contract MockAccountControl {
     }
     
     /// @notice Credit minted amount for separated operations
-    function creditMinted(uint256 amount) external {
+    function creditMinted(uint256 amount) external whenNotPaused {
         uint256 satoshis = amount / 1e10;
         totalMinted += satoshis;
         minted[msg.sender] += satoshis;
     }
     
     /// @notice Debit minted amount for separated operations
-    function debitMinted(uint256 amount) external {
+    function debitMinted(uint256 amount) external whenNotPaused {
         uint256 satoshis = amount / 1e10;
         if (totalMinted >= satoshis) {
             totalMinted -= satoshis;
@@ -212,5 +236,10 @@ contract MockAccountControl {
         if (minted[msg.sender] >= satoshis) {
             minted[msg.sender] -= satoshis;
         }
+    }
+
+    /// @notice Set pause state for testing
+    function setPaused(bool _paused) external {
+        paused = _paused;
     }
 }

@@ -13,16 +13,22 @@ contract MockTBTCVault is ITBTCVault {
     address public override tbtcToken;
     uint32 public override optimisticMintingFeeDivisor = 1000; // 0.1% fee
     mapping(uint256 => DepositInfo) private deposits;
+    bool public paused = false;
+
+    modifier whenNotPaused() {
+        require(!paused, "Contract paused");
+        _;
+    }
 
     constructor() {
         // Will be set via setTbtcToken
     }
 
-    function setTbtcToken(address _tbtcToken) external {
+    function setTbtcToken(address _tbtcToken) external whenNotPaused {
         tbtcToken = _tbtcToken;
     }
 
-    function setOptimisticMintingFeeDivisor(uint32 _divisor) external {
+    function setOptimisticMintingFeeDivisor(uint32 _divisor) external whenNotPaused {
         optimisticMintingFeeDivisor = _divisor;
     }
 
@@ -30,7 +36,7 @@ contract MockTBTCVault is ITBTCVault {
         uint256 depositKey,
         address depositor,
         uint256 amount
-    ) external {
+    ) external whenNotPaused {
         deposits[depositKey] = DepositInfo({
             depositor: depositor,
             amount: amount,
@@ -58,5 +64,9 @@ contract MockTBTCVault is ITBTCVault {
     {
         DepositInfo memory info = deposits[uint256(depositKey)];
         return info.revealedAt != 0;
+    }
+
+    function setPaused(bool _paused) external {
+        paused = _paused;
     }
 }

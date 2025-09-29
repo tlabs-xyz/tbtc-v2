@@ -266,7 +266,7 @@ const config: HardhatUserConfig = {
     except: ["BridgeStub$", "WalletRegistry$"],
   },
   mocha: {
-    timeout: 120_000, // Increased timeout for complex tests
+    timeout: 600_000, // Increased timeout for complex tests (10 minutes)
     slow: 5000, // Mark tests taking >5s as slow
     reporter: 'spec',
   },

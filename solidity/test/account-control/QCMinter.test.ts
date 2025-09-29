@@ -29,6 +29,7 @@ describe("QCMinter", () => {
   let mockSystemState: FakeContract<SystemState>
   let mockQCData: FakeContract<QCData>
   let mockQCManager: FakeContract<QCManager>
+  let mockAccountControl: any
 
   // Test data
   const mintAmount = ethers.utils.parseEther("5")
@@ -98,7 +99,7 @@ describe("QCMinter", () => {
 
     // Deploy and configure AccountControl for QCMinter
     const MockAccountControl = await ethers.getContractFactory("MockAccountControl")
-    const mockAccountControl = await MockAccountControl.deploy()
+    mockAccountControl = await MockAccountControl.deploy()
     await mockAccountControl.deployed()
 
     // Set the AccountControl address in QCMinter
@@ -286,14 +287,14 @@ describe("QCMinter", () => {
     context("when not authorized in Bank", () => {
       beforeEach(async () => {
         mockBank.authorizedBalanceIncreasers
-          .whenCalledWith(qcMinter.address)
+          .whenCalledWith(mockAccountControl.address)
           .returns(false)
       })
 
       it("should revert", async () => {
         await expect(
           qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
-        ).to.be.revertedWith("NotAuthorizedInBank")
+        ).to.be.revertedWithCustomError(qcMinter, "NotAuthorizedInBank")
       })
     })
   })

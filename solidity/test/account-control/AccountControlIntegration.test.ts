@@ -359,6 +359,9 @@ describe("AccountControl Integration Tests", function () {
       const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
       const mockAccountControlForMinter = await MockAccountControlFactory.deploy();
       await qcMinter.connect(owner).setAccountControl(mockAccountControlForMinter.address);
+      
+      // CRITICAL: Authorize the new MockAccountControl in Bank (required for QCMinter to work)
+      await mockBank.authorizeBalanceIncreaser(mockAccountControlForMinter.address);
 
       // Mint with enabled
       let tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
