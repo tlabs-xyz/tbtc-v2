@@ -60,11 +60,15 @@ export class LibraryLinkingHelper {
       // 4. Deploy QCManagerLib (no dependencies)
       const qcManagerLib = await this.deployLibrary("QCManagerLib")
 
+      // 5. Deploy QCManagerPauseLib (no dependencies)
+      const qcManagerPauseLib = await this.deployLibrary("QCManagerPauseLib")
+
       const libraries = {
         BitcoinAddressUtils: bitcoinAddressUtils,
         SharedSPVCore: sharedSPVCore,
         QCRedeemerSPV: qcRedeemerSPV,
         QCManagerLib: qcManagerLib,
+        QCManagerPauseLib: qcManagerPauseLib,
       }
 
       // ✅ PERFORMANCE: Cache libraries globally for reuse
@@ -145,6 +149,7 @@ export class LibraryLinkingHelper {
     return ethers.getContractFactory("QCManager", {
       libraries: {
         QCManagerLib: libs.QCManagerLib,
+        QCManagerPauseLib: libs.QCManagerPauseLib,
       },
     })
   }
