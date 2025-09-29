@@ -39,7 +39,6 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     using SPVState for SPVState.Storage;
     
     // Custom errors for gas-efficient reverts
-    // InvalidQCAddress is imported from QCManagerErrors
     error InvalidAmount();
     error BitcoinAddressRequired();
     error InvalidBitcoinAddressFormat();
@@ -686,7 +685,6 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
 
         // SPV proof verification
         // Note: _verifySPVProof now reverts with RedemptionProofFailed on any error
-        // It no longer returns false, so we just call it directly
         _verifySPVProof(
             redemptionId,
             userBtcAddress,

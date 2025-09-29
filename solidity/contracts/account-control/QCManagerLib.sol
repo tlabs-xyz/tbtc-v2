@@ -313,60 +313,7 @@ library QCManagerLib {
 
     // =================== BUSINESS LOGIC FUNCTIONS ===================
 
-    /**
-     * @notice Check if QC can use self-pause based on credit availability
-     * @param hasCredit Whether QC has available pause credit
-     * @param lastUsed Timestamp of last pause credit usage
-     * @param creditRenewTime When credit becomes available again
-     * @return canPause Whether QC can self-pause
-     * @return reason Reason if pause is not allowed
-     */
-    function checkPauseEligibility(
-        bool hasCredit,
-        uint256 lastUsed,
-        uint256 creditRenewTime
-    ) internal view returns (bool canPause, string memory reason) {
-        if (hasCredit) {
-            return (true, "");
-        }
 
-        if (lastUsed == 0) {
-            return (true, "Initial credit available");
-        }
-
-        if (block.timestamp >= creditRenewTime) {
-            return (true, "Credit renewed");
-        }
-
-        return (false, "Credit exhausted - wait for renewal");
-    }
-
-    /**
-     * @notice Update pause credit after usage
-     * @param hasCredit Current credit status
-     * @param level Pause level being used
-     * @return newHasCredit Updated credit status
-     * @return newLastUsed Updated last used timestamp
-     * @return newCreditRenewTime Updated renewal time
-     */
-    function updatePauseCredit(
-        bool hasCredit,
-        QCData.PauseLevel level
-    ) external view returns (bool newHasCredit, uint256 newLastUsed, uint256 newCreditRenewTime) {
-        // Both pause levels use 90-day renewal period
-        if (level == QCData.PauseLevel.Complete) {
-            newHasCredit = false;
-            newLastUsed = block.timestamp;
-            newCreditRenewTime = block.timestamp + 90 days; // 90-day renewal period
-        } else {
-            // MintingOnly pause also uses 90-day renewal
-            newHasCredit = hasCredit;
-            newLastUsed = block.timestamp;
-            newCreditRenewTime = block.timestamp + 90 days; // 90-day renewal period
-        }
-
-        return (newHasCredit, newLastUsed, newCreditRenewTime);
-    }
 
     /**
      * @notice Calculate time until pause credit renewal
@@ -452,43 +399,6 @@ library QCManagerLib {
 
     // =================== VIEW FUNCTIONS ===================
 
-    /**
-     * @notice Get comprehensive pause information for a QC
-     * @param qc QC address
-     * @param qcData QCData contract instance
-     * @param hasCredit Whether QC has pause credit
-     * @param lastUsed Last pause credit usage timestamp
-     * @param creditRenewTime Credit renewal timestamp
-     * @param pauseReason Current pause reason
-     * @return canPause Whether QC can self-pause
-     * @return timeUntilRenewal Time until credit renewal (0 if available)
-     * @return currentStatus Current QC status
-     * @return reason Current pause reason
-     */
-    function getPauseInfoDetailed(
-        address qc,
-        QCData qcData,
-        bool hasCredit,
-        uint256 lastUsed,
-        uint256 creditRenewTime,
-        string memory pauseReason
-    ) external view returns (
-        bool canPause,
-        uint256 timeUntilRenewal,
-        QCData.QCStatus currentStatus,
-        string memory reason
-    ) {
-        // Get current status
-        currentStatus = qcData.getQCStatus(qc);
-
-        // Check pause eligibility
-        (canPause, reason) = checkPauseEligibility(hasCredit, lastUsed, creditRenewTime);
-
-        // Use existing function to calculate time until renewal
-        timeUntilRenewal = calculateTimeUntilRenewal(hasCredit, lastUsed, creditRenewTime);
-
-        return (canPause, timeUntilRenewal, currentStatus, pauseReason);
-    }
 
     /**
      * @notice Calculate available minting capacity for a QC
