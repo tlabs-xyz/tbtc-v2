@@ -773,7 +773,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         
         // 1. Validate SPV proof using library
         // First try the safe validation to check if it would fail
-        (bool spvSuccess, bytes32 txHash) = QCRedeemerSPV.validateSPVProofSafe(spvState, txInfo, proof);
+        (bool spvSuccess, ) = QCRedeemerSPV.validateSPVProofSafe(spvState, txInfo, proof);
         if (!spvSuccess) {
             revert RedemptionProofFailed("SPV proof validation failed");
         }

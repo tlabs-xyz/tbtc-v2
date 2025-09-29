@@ -206,7 +206,6 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @param recipient The address to receive the minted tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
     /// @param autoMint Whether to use automated minting (if enabled)
-    /// @param permitData Optional permit data for gasless approval (currently unused)
     /// @return mintId Unique identifier for this minting request
     function requestQCMintHybrid(
         address qc,
@@ -362,14 +361,13 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @param user The address receiving the tBTC tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
     /// @param autoMint Whether to use automated minting (if enabled)
-    /// @param permitData Optional permit data for gasless approval (currently unused)
     /// @return mintId Unique identifier for this minting request
     function _requestMintHybrid(
         address qc,
         address user,
         uint256 amount,
         bool autoMint,
-        bytes calldata permitData
+        bytes calldata /* permitData */
     ) internal returns (bytes32 mintId) {
         // Validate inputs (same as original)
         if (qc == address(0)) revert QCManagerErrors.InvalidQCAddress();

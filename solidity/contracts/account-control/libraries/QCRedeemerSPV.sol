@@ -182,7 +182,7 @@ library QCRedeemerSPV {
         }
         
         // Decode address to get type and hash
-        (bool valid, uint8 addrType, bytes memory hash) = 
+        (bool valid, , bytes memory hash) = 
             SharedSPVCore.decodeAndValidateBitcoinAddress(userBtcAddress);
         
         if (!valid) {
@@ -241,7 +241,7 @@ library QCRedeemerSPV {
     function validateRedemptionTransaction(
         uint8 redemptionStatus,
         BitcoinTx.Info memory txInfo
-    ) public view returns (bool valid) {
+    ) public pure returns (bool valid) {
         // SAFE PATTERN: All operations wrapped in try-catch to prevent unexpected reverts
         
         // Status must be Pending (1) for validation

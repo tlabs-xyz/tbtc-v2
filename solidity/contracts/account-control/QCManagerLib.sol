@@ -519,7 +519,6 @@ library QCManagerLib {
      * @param v Recovery ID from signature
      * @param r First 32 bytes of signature
      * @param s Last 32 bytes of signature
-     * @param chainId The current chain ID
      * @return success True if all validations pass
      * @return challenge The generated challenge
      * @return errorCode Error code if validation fails
@@ -533,7 +532,7 @@ library QCManagerLib {
         uint8 v,
         bytes32 r,
         bytes32 s,
-        uint256 chainId
+        uint256 /* chainId */
     ) external view returns (bool success, bytes32 challenge, string memory errorCode) {
         // Check QC registration and status
         if (!qcData.isQCRegistered(qc)) {
