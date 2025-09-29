@@ -378,6 +378,51 @@ const func: DeployFunction = async function DeployAccountControl(
     log("Roles will need to be configured manually")
   }
 
+  // Phase 9: System Configuration 
+  log("\n=== Phase 9: System Configuration ===")
+
+  // Define role constants (updated with new role structure)
+  const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero // OpenZeppelin standard admin
+  const QC_MANAGER_ROLE = ethers.utils.id("QC_MANAGER_ROLE") // Internal storage access
+  const MINTER_ROLE = ethers.utils.id("MINTER_ROLE") // Grant only to QCMinter contract
+  const DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE") // Handle disputes and enforcement
+  const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE") // Reserve attestations
+  const EMERGENCY_ROLE = ethers.utils.id("EMERGENCY_ROLE") // Emergency pause/unpause
+  const OPERATIONS_ROLE = ethers.utils.id("OPERATIONS_ROLE") // Non-critical parameter updates
+  const ENFORCEMENT_ROLE = ethers.utils.id("ENFORCEMENT_ROLE") // Automated enforcement (WatchdogEnforcer)
+
+  try {
+    // Configure SystemState permissions
+    const systemStateContract = await ethers.getContractAt("SystemState", systemState.address)
+    await systemStateContract.grantRole(EMERGENCY_ROLE, watchdogEnforcer.address)
+    log("✅ WatchdogEnforcer granted EMERGENCY_ROLE in SystemState")
+
+    // Configure QCManager permissions
+    const qcManagerContract = await ethers.getContractAt("QCManager", qcManager.address)
+    await qcManagerContract.grantRole(ENFORCEMENT_ROLE, watchdogEnforcer.address)
+    log("✅ WatchdogEnforcer granted ENFORCEMENT_ROLE in QCManager")
+
+    // Configure ReserveOracle permissions
+    const reserveOracleContract = await ethers.getContractAt("ReserveOracle", reserveOracle.address)
+    await reserveOracleContract.grantRole(ATTESTER_ROLE, deployer)
+    log("✅ Deployer granted initial ATTESTER_ROLE in ReserveOracle")
+
+    // Set initial system parameters
+    await systemStateContract.setMinMintAmount(ethers.utils.parseEther("0.01")) // 0.01 tBTC minimum
+    await systemStateContract.setMaxMintAmount(ethers.utils.parseEther("1000")) // 1000 tBTC maximum
+    await systemStateContract.setRedemptionTimeout(48 * 60 * 60) // 48 hours
+    log("✅ System parameters configured")
+
+    // Configure reserve attestation consensus parameters
+    await reserveOracleContract.setConsensusThreshold(1) // Start with 1 attester
+    log("✅ Reserve attestation consensus parameters configured (threshold: 1 attester)")
+    log("⚠️  IMPORTANT: Increase threshold to 3 after granting ATTESTER_ROLE to all attesters")
+
+  } catch (configError) {
+    log(`Warning: Could not configure system automatically: ${configError.message}`)
+    log("System configuration will need to be done manually")
+  }
+
   log("\n=== Account Control Deployment Complete ===")
   log("\nDeployed Contracts Summary:")
   log(`  QCData:           ${qcData.address}`)
@@ -393,11 +438,24 @@ const func: DeployFunction = async function DeployAccountControl(
   log(`  SharedSPVCore:       ${sharedSPVCore.address}`)
   log(`  QCRedeemerSPV:       ${qcRedeemerSPV.address}`)
   
-  log("\n✅ Deployment successful! Next steps:")
-  log("1. Configure remaining roles using 99_configure_account_control_system.ts")
-  log("2. Register qualified custodians")
-  log("3. Set up attesters for ReserveOracle")
-  log("4. Run integration tests")
+  log("\n==============================================")
+  log("✅ Account Control Deployment and Configuration Complete!")
+  log("==============================================")
+  log("")
+  log("System is ready for:")
+  log("  1. QC registration via QCManager")
+  log("  2. Minting via QCMinter (manual and automated)")
+  log("  3. Redemption via QCRedeemer")
+  log("  4. Reserve attestation via ReserveOracle")
+  log("  5. Enforcement via WatchdogEnforcer")
+  log("  6. Automated minting integrated in QCMinter")
+  log("  7. Direct on-chain Bitcoin signature verification for wallet ownership")
+  log("")
+  log("Important next steps:")
+  log("  - Grant actual attester addresses ATTESTER_ROLE in ReserveOracle")
+  log("  - Submit governance proposal to authorize QCMinter in Bank (if needed)")
+  log("  - Configure actual watchdog operators")
+  log("  - Register qualified custodians")
   
   return true
 }
