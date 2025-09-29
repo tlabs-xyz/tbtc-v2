@@ -5,6 +5,55 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { AccountControl } from "../../typechain";
 
 /**
+ * Deployment lock manager to prevent concurrent proxy deployments
+ * OpenZeppelin upgrades plugin uses lock files - we need to serialize access
+ */
+class DeploymentManager {
+  private static deploying = false;
+  private static queue: Array<() => Promise<any>> = [];
+
+  static async safeDeployProxy<T>(
+    deployFunction: () => Promise<T>
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await deployFunction();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      this.processQueue();
+    });
+  }
+
+  private static async processQueue() {
+    if (this.deploying || this.queue.length === 0) {
+      return;
+    }
+
+    this.deploying = true;
+    const nextDeployment = this.queue.shift()!;
+    
+    try {
+      await nextDeployment();
+    } finally {
+      this.deploying = false;
+      // Process next deployment if any
+      setTimeout(() => this.processQueue(), 50); // Small delay to ensure lock file cleanup
+    }
+  }
+
+  static async cleanup() {
+    // Wait for any pending deployments to complete
+    while (this.deploying || this.queue.length > 0) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+}
+
+/**
  * Contract constants interface for type safety
  */
 interface ContractConstants {
@@ -89,15 +138,38 @@ export const deployAccountControlForTest = async (
   emergencyCouncil: SignerWithAddress,
   mockBank: Contract
 ): Promise<AccountControl> => {
-  const AccountControlFactory = await ethers.getContractFactory("AccountControl");
-  const accountControl = await upgrades.deployProxy(
-    AccountControlFactory,
-    [owner.address, emergencyCouncil.address, mockBank.address],
-    { initializer: "initialize" }
-  ) as AccountControl;
+  return DeploymentManager.safeDeployProxy(async () => {
+    const AccountControlFactory = await ethers.getContractFactory("AccountControl");
+    const accountControl = await upgrades.deployProxy(
+      AccountControlFactory,
+      [owner.address, emergencyCouncil.address, mockBank.address],
+      { initializer: "initialize" }
+    ) as AccountControl;
 
-  // Authorize AccountControl to call MockBank functions
-  await mockBank.authorizeBalanceIncreaser(accountControl.address);
+    // Authorize AccountControl to call MockBank functions
+    await mockBank.authorizeBalanceIncreaser(accountControl.address);
 
-  return accountControl;
+    return accountControl;
+  });
+};
+
+/**
+ * Safe wrapper for direct upgrades.deployProxy calls
+ * Use this in test files instead of calling upgrades.deployProxy directly
+ */
+export const safeDeployProxy = async <T>(
+  factory: any,
+  initArgs: any[],
+  options: any = {}
+): Promise<T> => {
+  return DeploymentManager.safeDeployProxy(async () => {
+    return await upgrades.deployProxy(factory, initArgs, options) as T;
+  });
+};
+
+/**
+ * Call this in afterEach hooks to ensure clean deployment state
+ */
+export const cleanupDeployments = async (): Promise<void> => {
+  await DeploymentManager.cleanup();
 };

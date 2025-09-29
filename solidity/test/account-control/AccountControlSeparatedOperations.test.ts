@@ -5,7 +5,8 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { AccountControl } from "../../typechain";
 import {
     getTestAmounts,
-    deployAccountControlForTest
+    deployAccountControlForTest,
+    cleanupDeployments
 } from "../helpers/testing-utils";
 
 describe("AccountControl Separated Operations", function () {
@@ -41,6 +42,11 @@ describe("AccountControl Separated Operations", function () {
 
         // Set up backing
         await accountControl.connect(reserve).updateBacking(testCap);
+    });
+
+    afterEach(async function () {
+        // Clean up deployment locks to prevent conflicts
+        await cleanupDeployments();
     });
 
     describe("Pure token minting (mintTokens)", function () {

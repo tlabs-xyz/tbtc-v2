@@ -1,8 +1,9 @@
 import { expect } from "chai";
-import { ethers, upgrades } from "hardhat";
+import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { AccountControl } from "../../typechain";
+import { safeDeployProxy, cleanupDeployments } from "../helpers/testing-utils";
 
 describe("AccountControl Workflows", function () {
   let accountControl: AccountControl;
@@ -23,14 +24,13 @@ describe("AccountControl Workflows", function () {
     const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBank = await MockBankFactory.deploy();
 
-
-    // Deploy AccountControl
+    // Deploy AccountControl using safe deployment
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
-    accountControl = await upgrades.deployProxy(
+    accountControl = await safeDeployProxy<AccountControl>(
       AccountControlFactory,
       [owner.address, emergencyCouncil.address, mockBank.address],
       { initializer: "initialize" }
-    ) as AccountControl;
+    );
 
     // Authorize AccountControl to call MockBank functions
     await mockBank.authorizeBalanceIncreaser(accountControl.address);
@@ -40,6 +40,11 @@ describe("AccountControl Workflows", function () {
     // Setup AccountControl (QC_PERMISSIONED is initialized by default)
     await accountControl.connect(owner).authorizeReserve(qc.address, QC_MINTING_CAP);
     await accountControl.connect(qc).updateBacking(QC_BACKING_AMOUNT);
+  });
+
+  afterEach(async function () {
+    // Clean up deployment locks to prevent conflicts
+    await cleanupDeployments();
   });
 
   describe("Direct Integration Testing", function () {

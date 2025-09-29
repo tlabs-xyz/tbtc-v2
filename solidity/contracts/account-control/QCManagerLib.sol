@@ -732,6 +732,44 @@ library QCManagerLib {
 
         return currentStatus;
     }
+
+    /**
+     * @notice Handle registration error by converting error codes to appropriate reverts
+     * @dev Consolidates error handling for both registerWallet and registerWalletDirect
+     * @param errorCode The error code returned by validation functions
+     * @param qc The QC address for context-specific errors
+     */
+    function handleRegistrationError(string memory errorCode, address qc) external pure {
+        bytes32 errorHash = keccak256(bytes(errorCode));
+        
+        // Address validation errors
+        if (errorHash == keccak256("INVALID_ADDR") ||
+            errorHash == keccak256("BAD_ADDR") ||
+            errorHash == keccak256("BAD_ADDR_DIRECT")) {
+            revert QCManagerErrors.InvalidWalletAddress();
+        }
+        
+        // QC registration errors
+        if (errorHash == keccak256("QC_NOT_REG")) {
+            revert QCManagerErrors.QCNotRegistered(qc);
+        }
+        
+        // QC status errors  
+        if (errorHash == keccak256("QC_INACTIVE")) {
+            revert QCManagerErrors.QCNotActive(qc);
+        }
+        
+        // Signature verification errors
+        if (errorHash == keccak256("SIG_FAIL") ||
+            errorHash == keccak256("SIG_FAIL_DIRECT") ||
+            errorHash == keccak256("ADDR_MISMATCH") ||
+            errorHash == keccak256("ADDR_MISMATCH_DIRECT")) {
+            revert QCManagerErrors.SignatureVerificationFailed();
+        }
+        
+        // Generic fallback for unknown errors
+        revert("Validation failed");
+    }
 }
 
 interface IAccountControl {
