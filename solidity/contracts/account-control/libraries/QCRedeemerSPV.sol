@@ -128,7 +128,6 @@ library QCRedeemerSPV {
         bytes memory outputVector,
         string calldata targetAddress
     ) internal pure returns (uint64 totalAmount) {
-        // SAFE PATTERN: Comprehensive bounds checking and error prevention
         if (outputVector.length < 9) {
             return 0; // Invalid output vector
         }
@@ -211,17 +210,14 @@ library QCRedeemerSPV {
         uint64 expectedAmount,
         BitcoinTx.Info calldata txInfo
     ) external pure returns (bool valid) {
-        // SAFE PATTERN: Validate all inputs and return false on any issues
         if (bytes(userBtcAddress).length == 0 || expectedAmount == 0 || txInfo.outputVector.length == 0) {
             return false;
         }
         
-        // SAFE PATTERN: Use safe address validation (never throws)
         if (!SharedSPVCore.isValidBitcoinAddress(userBtcAddress)) {
             return false;
         }
         
-        // SAFE PATTERN: Use safe payment calculation with bounds checking to prevent reverts
         uint64 totalPayment = 0;
         
         if (txInfo.outputVector.length >= 9) {
@@ -242,8 +238,6 @@ library QCRedeemerSPV {
         uint8 redemptionStatus,
         BitcoinTx.Info memory txInfo
     ) public pure returns (bool valid) {
-        // SAFE PATTERN: All operations wrapped in try-catch to prevent unexpected reverts
-        
         // Status must be Pending (1) for validation
         if (redemptionStatus != 1) {
             return false;
@@ -254,13 +248,11 @@ library QCRedeemerSPV {
             return false;
         }
         
-        // SAFE PATTERN: Validate basic structure before parsing
         if (txInfo.outputVector.length < 1 || txInfo.inputVector.length < 1) {
             return false;
         }
         
         // 1. Validate transaction has outputs (can't redeem without outputs)
-        // SAFE PATTERN: parseVarInt is from BTCUtils and should be safe, but check bounds
         (, uint256 outputCount) = txInfo.outputVector.parseVarInt();
         if (outputCount == 0 || outputCount > 10) { // Prevent excessive outputs
             return false;
