@@ -4,9 +4,15 @@ import { DeployFunction } from "hardhat-deploy/types"
 const func: DeployFunction = async function DeployReserveOracle(
   hre: HardhatRuntimeEnvironment
 ) {
-  const { getNamedAccounts, deployments } = hre
+  const { getNamedAccounts, deployments, network } = hre
   const { deployer } = await getNamedAccounts()
   const { deploy, log } = deployments
+
+  // Skip for test networks
+  if (network.name === "hardhat" || network.name === "localhost") {
+    log("Skipping Reserve Oracle deployment for test network")
+    return
+  }
 
   log("Deploying ReserveOracle...")
 

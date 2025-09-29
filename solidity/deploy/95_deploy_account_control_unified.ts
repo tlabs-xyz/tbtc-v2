@@ -8,6 +8,12 @@ const func: DeployFunction = async function DeployAccountControlUnified(
   const { deployer } = await getNamedAccounts()
   const { deploy, log, get } = deployments
 
+  // Skip for test networks
+  if (network.name === "hardhat" || network.name === "localhost") {
+    log("Skipping Account Control Unified deployment for test network")
+    return
+  }
+
   log("=== Starting Account Control Unified Deployment ===")
   log(`Network: ${network.name}`)
   log(`Deployer: ${deployer}`)

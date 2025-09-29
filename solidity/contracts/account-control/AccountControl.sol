@@ -173,7 +173,7 @@ contract AccountControl is
     // ========== RESERVE MANAGEMENT ==========
     
     /// @notice Authorize a reserve for minting operations (QC_PERMISSIONED type)
-    /// @param reserve The address of the reserve to authorize  
+    /// @param reserve The address of the reserve to authorize
     /// @param mintingCap The maximum amount this reserve can mint
     function authorizeReserve(address reserve, uint256 mintingCap)
         external
@@ -230,7 +230,7 @@ contract AccountControl is
         
         // Prevent zero caps - use pause functionality instead
         if (newCap == 0) revert AmountTooSmall(newCap, 1);
-        
+
         uint256 currentMinted = minted[reserve];
 
         // Observe and report if cap is below current minted (emergency governance scenario)
@@ -326,7 +326,7 @@ contract AccountControl is
     ) external onlyAuthorizedReserve nonReentrant returns (bool) {
         if (recipients.length != amounts.length) revert ArrayLengthMismatch(recipients.length, amounts.length);
         if (recipients.length > MAX_BATCH_SIZE) revert BatchSizeExceeded(recipients.length, MAX_BATCH_SIZE);
-        
+
         uint256 totalAmount = 0;
         uint256 len = recipients.length; // cache once
         for (uint256 i = 0; i < len; ) {

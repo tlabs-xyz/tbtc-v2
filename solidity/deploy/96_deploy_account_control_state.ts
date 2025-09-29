@@ -8,6 +8,12 @@ const func: DeployFunction = async function DeployAccountControlState(
   const { deployer } = await getNamedAccounts()
   const { deploy, log, get } = deployments
 
+  // Skip for test networks
+  if (network.name === "hardhat" || network.name === "localhost") {
+    log("Skipping Account Control State deployment for test network")
+    return
+  }
+
   log("Deploying Account Control State Management Layer...")
 
   // Phase 2: State Management Layer

@@ -11,6 +11,9 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 contract QCData is AccessControl {
     bytes32 public constant QC_MANAGER_ROLE = keccak256("QC_MANAGER_ROLE");
 
+    /// @dev Maximum number of wallets a QC can register to prevent unbounded array growth
+    uint256 public constant MAX_WALLETS_PER_QC = 10;
+
     // Custom errors for gas-efficient reverts
     error InvalidManagerAddress();
     error InvalidQCAddress();
@@ -23,6 +26,7 @@ contract QCData is AccessControl {
     error WalletNotActive();
     error WalletNotPendingDeregistration();
     error InvalidCapacity();
+    error MaxWalletsExceeded();
 
     /// @dev QC status enumeration - enhanced 5-state model
     enum QCStatus {
@@ -227,6 +231,7 @@ contract QCData is AccessControl {
         if (!isQCRegistered(qc)) revert QCNotRegistered();
         if (bytes(btcAddress).length == 0) revert InvalidWalletAddress();
         if (isWalletRegistered(btcAddress)) revert WalletAlreadyRegistered();
+        if (custodians[qc].walletAddresses.length >= MAX_WALLETS_PER_QC) revert MaxWalletsExceeded();
 
         // Add to QC's wallet list
         custodians[qc].walletAddresses.push(btcAddress);
@@ -405,6 +410,21 @@ contract QCData is AccessControl {
         returns (string[] memory addresses)
     {
         return custodians[qc].walletAddresses;
+    }
+
+    /// @notice Get wallet count and capacity information for a QC
+    /// @param qc The address of the QC
+    /// @return current Current number of registered wallets
+    /// @return maximum Maximum allowed wallets
+    /// @return remaining Remaining wallet slots available
+    function getQCWalletCapacity(address qc)
+        external
+        view
+        returns (uint256 current, uint256 maximum, uint256 remaining)
+    {
+        current = custodians[qc].walletAddresses.length;
+        maximum = MAX_WALLETS_PER_QC;
+        remaining = maximum > current ? maximum - current : 0;
     }
 
     /// @notice Check if QC is registered
