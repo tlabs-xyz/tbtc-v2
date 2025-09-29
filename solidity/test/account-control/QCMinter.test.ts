@@ -104,6 +104,10 @@ describe("QCMinter", () => {
 
     // Set the AccountControl address in QCMinter
     await qcMinter.setAccountControl(mockAccountControl.address)
+    
+    // Authorize QCMinter in MockAccountControl with sufficient minting cap and backing
+    await mockAccountControl.authorizeReserve(qcMinter.address, ethers.utils.parseEther("10000"))
+    await mockAccountControl.setBacking(qcMinter.address, ethers.utils.parseEther("10000"))
   })
 
   afterEach(async () => {
