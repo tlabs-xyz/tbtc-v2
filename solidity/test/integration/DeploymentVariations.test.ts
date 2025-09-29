@@ -19,11 +19,10 @@ describe("v1 System Deployment Tests", () => {
         "96_deploy_account_control_state.ts",
         "97_deploy_reserve_oracle.ts",
         "98_deploy_watchdog_enforcer.ts",
-        "99_configure_account_control_system.ts",
       ]
 
       // This test verifies that the deployment structure makes sense for v1
-      expect(expectedScripts.length).to.equal(5)
+      expect(expectedScripts.length).to.equal(4)
     })
 
     it("should confirm v1 doesn't include automated framework contracts", async () => {
@@ -160,14 +159,6 @@ describe("v1 System Deployment Tests", () => {
           "TBTC",
         ],
         "98_deploy_reserve_ledger.ts": ["QCManager", "QCData", "SystemState"],
-        "99_configure_account_control_system.ts": [
-          "SimplifiedWatchdog",
-          "QCManager",
-          "QCData",
-          "QCMinter",
-          "QCRedeemer",
-          "SystemState",
-        ],
       }
 
       // The problem: TBTC dependency triggers Bridge deployment

@@ -184,7 +184,7 @@ const func: DeployFunction = async function TransferRolesToGovernance(
 
 export default func
 func.tags = ["TransferRolesToGovernance", "ProductionSetup"]
-func.dependencies = ["ConfigureAccountControl"]
+func.dependencies = ["AccountControl"]
 func.skip = async (hre: HardhatRuntimeEnvironment) => {
   // Skip this in test/development environments
   const { getNamedAccounts } = hre
