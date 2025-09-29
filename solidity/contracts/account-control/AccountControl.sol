@@ -281,11 +281,7 @@ contract AccountControl is
         emit ReserveDeauthorized(reserve);
     }
 
-    // ========== RESERVE TYPE MANAGEMENT ==========
-
-
-
-
+    // ========== MINTING CAP MANAGEMENT ==========
 
     function setMintingCap(address reserve, uint256 newCap) 
         external 
