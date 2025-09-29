@@ -38,6 +38,15 @@ contract MockAccountControl {
     /// @notice Custom error for insufficient minted balance
     error InsufficientMinted(uint256 available, uint256 requested);
 
+    /// @notice Custom errors to match real AccountControl behavior
+    error QCNotRegistered(address qc);
+    error QCNotActive(address qc);
+    error InvalidWalletAddress();
+    error WalletNotRegistered(string btcAddress);
+    error WalletNotActive(string btcAddress);
+    error SignatureVerificationFailed();
+    error MessageSignatureVerificationFailed();
+
     /// @notice Modifier to check if contract is not paused
     modifier whenNotPaused() {
         require(!paused, "Contract paused");
@@ -90,8 +99,8 @@ contract MockAccountControl {
 
         // Track total minted amount globally when AccountControl is enabled
         if (accountControlEnabled) {
-            // Check authorization
-            require(authorized[msg.sender], "Reserve not authorized");
+            // Check authorization - throw custom error instead of require
+            if (!authorized[msg.sender]) revert QCNotRegistered(msg.sender);
             
             // Check minting cap
             require(minted[msg.sender] + satoshis <= mintingCaps[msg.sender], "Minting cap exceeded");
@@ -155,6 +164,7 @@ contract MockAccountControl {
     
     /// @notice Authorize a reserve
     function authorizeReserve(address reserve, uint256 mintingCap) external {
+        if (reserve == address(0)) revert QCNotRegistered(reserve);
         authorized[reserve] = true;
         mintingCaps[reserve] = mintingCap;
     }
@@ -198,8 +208,8 @@ contract MockAccountControl {
     function mint(address recipient, uint256 amount) external whenNotPaused returns (bool) {
         uint256 satoshis = amount / 1e10;
         if (accountControlEnabled) {
-            // Check authorization
-            require(authorized[msg.sender], "Reserve not authorized");
+            // Check authorization - throw custom error instead of require
+            if (!authorized[msg.sender]) revert QCNotRegistered(msg.sender);
             
             // Check minting cap
             require(minted[msg.sender] + satoshis <= mintingCaps[msg.sender], "Minting cap exceeded");
@@ -291,8 +301,8 @@ contract MockAccountControl {
         uint256 satoshis = amount / 1e10;
         
         if (accountControlEnabled) {
-            // Check authorization
-            require(authorized[msg.sender], "Reserve not authorized");
+            // Check authorization - throw custom error instead of require
+            if (!authorized[msg.sender]) revert QCNotRegistered(msg.sender);
             
             // Check minting cap
             require(minted[msg.sender] + satoshis <= mintingCaps[msg.sender], "Minting cap exceeded");

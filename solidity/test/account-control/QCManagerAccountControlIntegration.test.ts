@@ -23,6 +23,7 @@ describe("QCManager - AccountControl Integration", function () {
 
   let accountControl: AccountControl;
   let qcManager: QCManager;
+  let pauseManager: any;
   let mockQCData: FakeContract<QCData>;
   let mockSystemState: FakeContract<SystemState>;
   let mockReserveOracle: FakeContract<ReserveOracle>;
@@ -55,17 +56,28 @@ describe("QCManager - AccountControl Integration", function () {
     const qcManagerPauseLib = await QCManagerPauseLibFactory.deploy();
     await qcManagerPauseLib.deployed();
 
-    // Deploy QCManager with libraries linked
+    // Deploy QCPauseManager with temporary addresses (circular dependency workaround for testing)
+    const QCPauseManagerFactory = await ethers.getContractFactory("QCPauseManager")
+    pauseManager = await QCPauseManagerFactory.deploy(
+      mockQCData.address,     // _qcData
+      deployer.address,       // _qcManager (temporary - will be QCManager later)
+      deployer.address,       // _admin
+      emergencyCouncil.address // _emergencyRole
+    )
+    await pauseManager.deployed()
+
+    // Deploy QCManager with libraries linked (only QCManagerLib needed)
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
         QCManagerLib: qcManagerLib.address,
-        QCManagerPauseLib: qcManagerPauseLib.address,
+        // NOTE: QCManagerPauseLib is NOT linked to QCManager - it's used by other contracts
       },
     });
     qcManager = await QCManagerFactory.deploy(
       mockQCData.address,
       mockSystemState.address,
-      mockReserveOracle.address
+      mockReserveOracle.address,
+      pauseManager.address
     );
 
     // Set up permissions

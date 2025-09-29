@@ -18,7 +18,6 @@ export interface SPVProof {
   txIndexInBlock: number
   bitcoinHeaders: string
   coinbasePreimage?: string
-  coinbaseProof?: string
 }
 
 export interface ParsedTransaction {
@@ -103,8 +102,7 @@ export class SPVTestData {
       merkleProof: "0x" + "20".repeat(32), // 32-byte merkle proof
       txIndexInBlock: 1,
       bitcoinHeaders: "0x" + "40".repeat(80), // 80-byte header
-      coinbasePreimage: "0x" + "01".repeat(32),
-      coinbaseProof: "0x" + "02".repeat(32)
+      coinbasePreimage: "0x" + "01".repeat(32)
     } as SPVProof
   }
 
@@ -130,8 +128,7 @@ export class SPVTestData {
       merkleProof: "0x" + "00".repeat(32), // Invalid proof
       txIndexInBlock: 0,
       bitcoinHeaders: "0x" + "00".repeat(80),
-      coinbasePreimage: "0x" + "00".repeat(32),
-      coinbaseProof: "0x" + "00".repeat(32)
+      coinbasePreimage: "0x" + "00".repeat(32)
     } as SPVProof
   }
 
@@ -156,8 +153,7 @@ export class SPVTestData {
         "1d00ffff" + // bits (testnet difficulty)
         "87654321" + // nonce
         "00".repeat(48), // padding to 80 bytes
-      coinbasePreimage: "0x" + "ab".repeat(32),
-      coinbaseProof: "0x" + "cd".repeat(32)
+      coinbasePreimage: "0x" + "ab".repeat(32)
     }
   }
 
@@ -169,8 +165,7 @@ export class SPVTestData {
       merkleProof: "0x" + "00".repeat(64), // All zeros (invalid)
       txIndexInBlock: 999999, // Invalid index
       bitcoinHeaders: "0x" + "ff".repeat(80), // Invalid header
-      coinbasePreimage: "0x" + "00".repeat(32),
-      coinbaseProof: "0x" + "00".repeat(32)
+      coinbasePreimage: "0x" + "00".repeat(32)
     }
   }
 
@@ -304,6 +299,10 @@ export class SPVTestHelpers {
   /**
    * Generate proper BitcoinTx.Info and BitcoinTx.Proof structures for contract calls
    * This is what should be used when calling recordRedemptionFulfillment
+   * 
+   * IMPORTANT: This matches the exact contract structs:
+   * - BitcoinTx.Info: version, inputVector, outputVector, locktime  
+   * - BitcoinTx.Proof: merkleProof, txIndexInBlock, bitcoinHeaders, coinbasePreimage
    */
   static generateBitcoinTxStructures(): {
     txInfo: {
@@ -317,7 +316,6 @@ export class SPVTestHelpers {
       txIndexInBlock: number
       bitcoinHeaders: string
       coinbasePreimage: string
-      coinbaseProof: string
     }
   } {
     return {
@@ -341,8 +339,7 @@ export class SPVTestHelpers {
           "1d00ffff" + // bits (testnet difficulty)
           "87654321" + // nonce
           "00".repeat(48), // padding to 80 bytes
-        coinbasePreimage: "0x" + "ab".repeat(32),
-        coinbaseProof: "0x" + "cd".repeat(32)
+        coinbasePreimage: "0x" + "ab".repeat(32)
       }
     }
   }

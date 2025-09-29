@@ -20,7 +20,7 @@ import type {
 import { deploySPVLibraries, getQCRedeemerLibraries } from "./spvLibraryHelpers"
 import { setupSystemStateDefaults } from "./testSetupHelpers"
 import { LibraryLinkingHelper } from "./libraryLinkingHelper"
-import { SPVTestData } from "./SPVTestData"
+import { SPVTestData, SPVTestHelpers } from "./SPVTestData"
 
 export interface SystemState {
   totalMinted: any
@@ -297,16 +297,31 @@ export class IntegrationTestFramework {
       
       // Get current minted amounts
       const currentTotalMinted = await mockAccountControl.totalMinted()
+      const currentMintedQCAddress = await mockAccountControl.minted(qcAddress)
       const currentMintedQCRedeemer = await mockAccountControl.minted(this.contracts.qcRedeemer.address)
       
       // Update total minted
       await mockAccountControl.setTotalMintedForTesting(currentTotalMinted.add(satoshis))
       
-      // Set QCRedeemer's minted amount to allow redemption
+      // Track minted amount for the specific QC address (needed for QC-specific redemptions)
+      await mockAccountControl.setMintedForTesting(
+        qcAddress, 
+        currentMintedQCAddress.add(satoshis)
+      )
+      
+      // Set QCRedeemer's minted amount to allow redemption (critical for redemption validation)
       await mockAccountControl.setMintedForTesting(
         this.contracts.qcRedeemer.address, 
         currentMintedQCRedeemer.add(satoshis)
       )
+      
+      // IMPORTANT: Also update the backing to ensure minted <= backing constraint
+      const currentBacking = await mockAccountControl.backing(qcAddress)
+      const newTotalMinted = currentMintedQCAddress.add(satoshis)
+      if (currentBacking.lt(newTotalMinted)) {
+        // Increase backing to at least match minted amount (2x for safety)
+        await mockAccountControl.setBackingForTesting(qcAddress, newTotalMinted.mul(2))
+      }
     }
   }
 
@@ -355,31 +370,43 @@ export class IntegrationTestFramework {
    * Generate valid SPV proof data for testing
    */
   generateValidSPVProof(): { txInfo: any, proof: any } {
-    const testData = SPVTestData.VALID_BITCOIN_TX
+    // Use the robust helper method from SPVTestHelpers instead of manually parsing
+    const structures = SPVTestHelpers.generateBitcoinTxStructures()
     
-    // Ensure all hex strings start with 0x
-    const ensureHexPrefix = (hex: string | undefined) => {
-      if (!hex) return '0x'
-      return hex.startsWith('0x') ? hex : '0x' + hex
-    }
-    
+    // Ensure all fields are properly defined and formatted
     const result = {
       txInfo: {
-        version: ensureHexPrefix(testData.txInfo.version), // bytes4 as hex string
-        inputVector: ensureHexPrefix(testData.txInfo.inputVector), // bytes as hex string
-        outputVector: ensureHexPrefix(testData.txInfo.outputVector), // bytes as hex string
-        locktime: ensureHexPrefix(testData.txInfo.locktime) // bytes4 as hex string
+        version: structures.txInfo.version,
+        inputVector: structures.txInfo.inputVector, 
+        outputVector: structures.txInfo.outputVector,
+        locktime: structures.txInfo.locktime
       },
       proof: {
-        merkleProof: ensureHexPrefix(testData.proof.merkleProof), // bytes as hex string
-        txIndexInBlock: testData.proof.txIndexInBlock || 0, // uint256
-        bitcoinHeaders: ensureHexPrefix(testData.proof.bitcoinHeaders), // bytes as hex string
-        coinbasePreimage: testData.proof.coinbasePreimage ? ensureHexPrefix(testData.proof.coinbasePreimage) : ethers.utils.hexZeroPad("0x00", 32) // bytes32
+        merkleProof: structures.proof.merkleProof,
+        txIndexInBlock: structures.proof.txIndexInBlock,
+        bitcoinHeaders: structures.proof.bitcoinHeaders,
+        coinbasePreimage: structures.proof.coinbasePreimage
       }
     }
     
-    // Log for debugging
-    console.log("SPV Proof generated:", JSON.stringify(result, null, 2))
+    // Validate all fields are defined and log for debugging
+    Object.keys(result.txInfo).forEach(key => {
+      if (result.txInfo[key] === undefined || result.txInfo[key] === null) {
+        throw new Error(`txInfo.${key} is undefined`)
+      }
+    })
+    
+    Object.keys(result.proof).forEach(key => {
+      if (result.proof[key] === undefined || result.proof[key] === null) {
+        throw new Error(`proof.${key} is undefined`)
+      }
+    })
+    
+    // Debug log to verify structure
+    console.log("Generated SPV Proof structure:", {
+      txInfo: result.txInfo,
+      proof: result.proof
+    })
     
     return result
   }

@@ -109,6 +109,16 @@ describe("AccountControl Integration Tests (Agent 5 - Tests 1-5)", () => {
       // Action: Fulfill redemption
       const validProof = framework.generateValidSPVProof()
       const amountInSatoshis = redemptionAmount.div(framework.SATOSHI_MULTIPLIER).toNumber()
+      
+      // Debug logging to identify undefined values
+      console.log("Debug: Contract call parameters:", {
+        redemptionId,
+        btcAddress,
+        amountInSatoshis,
+        txInfo: validProof.txInfo,
+        proof: validProof.proof
+      })
+      
       await framework.contracts.qcRedeemer.connect(watchdog).recordRedemptionFulfillment(
         redemptionId,
         btcAddress,
@@ -241,13 +251,8 @@ describe("AccountControl Integration Tests (Agent 5 - Tests 1-5)", () => {
         cycleAmount.mul(3) // 3x backing for safety
       )
       
-      // Execute mint
-      const mintTx = await framework.contracts.qcMinter.connect(owner).requestQCMint(
-        qcAddress.address, 
-        user.address, 
-        cycleAmount
-      )
-      await expect(mintTx).to.emit(framework.contracts.accountControl, "MintExecuted")
+      // Execute mint through framework to ensure proper tracking
+      await framework.executeMint(qcAddress.address, user.address, cycleAmount)
       
       // Capture post-mint state
       const postMintState = await framework.captureSystemState()

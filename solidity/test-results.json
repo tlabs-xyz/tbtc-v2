@@ -1,0 +1,5 @@
+
+> @keep-network/tbtc-v2@1.9.0-dev test
+> USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test test/account-control/ --reporter json
+
+
