@@ -111,6 +111,11 @@ contract AccountControl is
     event EmergencyCouncilUpdated(address indexed oldCouncil, address indexed newCouncil);
     event RedemptionProcessed(address indexed reserve, uint256 amount);
     event ReserveDeauthorized(address indexed reserve);
+    event SystemPaused();
+    event SystemUnpaused();
+    event BackingViolationDetected(address indexed reserve, uint256 backing, uint256 minted, uint256 deficit);
+    event GlobalCapBelowMinted(uint256 cap, uint256 totalMinted, uint256 deficit);
+    event ReserveCapBelowMinted(address indexed reserve, uint256 cap, uint256 minted, uint256 deficit);
 
     // Separated operations events
     event PureTokenMint(address indexed reserve, address indexed recipient, uint256 amount);
@@ -138,6 +143,7 @@ contract AccountControl is
     error ReserveNotFound(address reserve);
     error CannotDeauthorizeWithOutstandingBalance(address reserve, uint256 outstandingAmount);
     error UnsafeOperationSequence(string operation);
+    error NotOwnerOrCouncil(address caller);
 
     // ========== MODIFIERS ==========
     modifier onlyAuthorizedReserve() {
@@ -149,10 +155,9 @@ contract AccountControl is
 
 
     modifier onlyOwnerOrEmergencyCouncil() {
-        require(
-            msg.sender == owner() || msg.sender == emergencyCouncil,
-            "Unauthorized"
-        );
+        if (msg.sender != owner() && msg.sender != emergencyCouncil) {
+            revert NotOwnerOrCouncil(msg.sender);
+        }
         _;
     }
 
@@ -254,10 +259,11 @@ contract AccountControl is
         emit ReserveTypeUpdated(reserve, ReserveType.UNINITIALIZED, rType);
     }
 
-    function deauthorizeReserve(address reserve) 
-        external 
-        onlyOwner 
+    function deauthorizeReserve(address reserve)
+        external
+        onlyOwner
     {
+        if (reserve == address(0)) revert ZeroAddress("reserve");
         if (!authorized[reserve]) revert ReserveNotFound(reserve);
         
         // Safety check: cannot deauthorize reserves with outstanding minted balances
@@ -291,11 +297,12 @@ contract AccountControl is
         
         // Prevent zero caps - use pause functionality instead
         if (newCap == 0) revert AmountTooSmall(newCap, 1);
-        
-        // Prevent reducing cap below current minted amount to maintain system invariant (minted <= cap)
-        // Use pauseReserve() for immediate risk reduction; caps can only be lowered after natural redemptions
-        if (newCap < minted[reserve]) {
-            revert ExceedsReserveCap(minted[reserve], newCap); // Minted amount exceeds cap
+
+        uint256 currentMinted = minted[reserve];
+
+        // Observe and report if cap is below current minted (emergency governance scenario)
+        if (newCap < currentMinted) {
+            emit ReserveCapBelowMinted(reserve, newCap, currentMinted, currentMinted - newCap);
         }
         
         // Validate against global cap if set
@@ -311,11 +318,17 @@ contract AccountControl is
         emit MintingCapUpdated(reserve, oldCap, newCap);
     }
 
-    function setGlobalMintingCap(uint256 cap) 
-        external 
-        onlyOwner 
+    function setGlobalMintingCap(uint256 cap)
+        external
+        onlyOwner
     {
         globalMintingCap = cap;
+
+        // Observe and report if cap is below current minted (emergency governance scenario)
+        if (cap > 0 && cap < totalMintedAmount) {
+            emit GlobalCapBelowMinted(cap, totalMintedAmount, totalMintedAmount - cap);
+        }
+
         emit GlobalMintingCapUpdated(cap);
     }
 
@@ -604,8 +617,9 @@ contract AccountControl is
             // Batch call succeeded
         } catch {
             // Fallback to individual calls if batch not supported
-            for (uint256 i = 0; i < recipients.length; i++) {
+            for (uint256 i = 0; i < len; ) {
                 IBank(bank).increaseBalance(recipients[i], amounts[i]);
+                unchecked { ++i; }
             }
         }
         
@@ -622,15 +636,20 @@ contract AccountControl is
     // ========== BACKING MANAGEMENT ==========
     
     /// @notice Allow authorized reserves to update their own backing amounts
-    /// @dev Reserves are responsible for fetching attested values from ReserveOracle
-    /// @dev AccountControl only enforces the backing >= minted invariant
+    /// @dev Reserves are responsible for providing attested backing through their own mechanisms
+    /// @dev Note: backing < minted indicates undercollateralization - emits violation for watchdog detection
     /// @param amount The new backing amount in satoshis
     function updateBacking(uint256 amount)
         external
         onlyAuthorizedReserve
     {
+        uint256 currentMinted = minted[msg.sender];
         backing[msg.sender] = amount;
 
+        // Observe and report violations without preventing them
+        if (amount < currentMinted) {
+            emit BackingViolationDetected(msg.sender, amount, currentMinted, currentMinted - amount);
+        }
         emit BackingUpdated(msg.sender, amount);
     }
 
@@ -725,18 +744,20 @@ contract AccountControl is
         emit ReserveUnpaused(reserve);
     }
 
-    function pauseSystem() 
-        external 
-        onlyOwnerOrEmergencyCouncil 
+    function pauseSystem()
+        external
+        onlyOwnerOrEmergencyCouncil
     {
         systemPaused = true;
+        emit SystemPaused();
     }
 
-    function unpauseSystem() 
-        external 
-        onlyOwner 
+    function unpauseSystem()
+        external
+        onlyOwner
     {
         systemPaused = false;
+        emit SystemUnpaused();
     }
 
 
