@@ -490,12 +490,12 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     /// @param qc The address of the QC
     /// @param newStatus The new status
     /// @param reason The reason for the change
-    /// @dev authority parameter removed to fix docstring parsing error
+    /// @param authority The authority making the status change
     function _executeStatusChange(
         address qc,
         QCData.QCStatus newStatus,
         bytes32 reason,
-        string memory /* authority */
+        string memory authority
     ) private requiresAccountControl {
         if (reason == bytes32(0)) {
             revert QCManagerPauseLib.ReasonRequired();
@@ -535,7 +535,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
             newStatus,
             reason,
             msg.sender,
-            "AUTHORITY",
+            authority,
             block.timestamp
         );
     }

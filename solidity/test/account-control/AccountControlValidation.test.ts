@@ -27,6 +27,9 @@ describe("AccountControl Input Validation", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
+    // Authorize AccountControl to call MockBank functions
+    await mockBank.authorizeBalanceIncreaser(accountControl.address);
+
     // Note: Using direct updateBacking() for unit tests (oracle integration tested separately)
 
     // Authorize test reserve (QC_PERMISSIONED is initialized by default)

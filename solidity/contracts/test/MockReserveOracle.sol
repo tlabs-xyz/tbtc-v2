@@ -49,7 +49,7 @@ contract MockReserveOracle {
         reserves[qc] = ReserveData({
             balance: balance,
             isStale: false,
-            lastUpdate: block.timestamp
+            lastUpdate: timestamp
         });
     }
     

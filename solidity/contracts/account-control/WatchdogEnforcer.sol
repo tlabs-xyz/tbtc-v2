@@ -321,10 +321,14 @@ contract WatchdogEnforcer is AccessControl, ReentrancyGuard {
         }
 
         // Re-verify violation before escalating
-        (bool stillViolating,) = _checkReserveViolation(qc);
+        (bool stillViolating, string memory reason) = _checkReserveViolation(qc);
         if (!stillViolating) {
-            delete criticalViolationTimestamps[qc];
-            emit EscalationTimerCleared(qc, msg.sender, block.timestamp);
+            // Only clear timer if data is fresh and violation genuinely resolved
+            // Do not clear if oracle data is stale (cannot determine violation state)
+            if (keccak256(abi.encodePacked(reason)) != keccak256(abi.encodePacked("Reserves are stale, cannot determine violation"))) {
+                delete criticalViolationTimestamps[qc];
+                emit EscalationTimerCleared(qc, msg.sender, block.timestamp);
+            }
             return;
         }
 

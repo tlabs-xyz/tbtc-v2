@@ -102,6 +102,15 @@ describe("QCRedeemer - Wallet Obligations (Edge Cases)", () => {
     await mockAccountControl.setTotalMintedForTesting(
       ethers.BigNumber.from("100000000000") // 1000 BTC in satoshis
     )
+    // Authorize QCRedeemer contract and set minted balance for redemptions
+    await mockAccountControl.authorizeReserve(
+      qcRedeemer.address,
+      ethers.BigNumber.from("100000000000") // 1000 BTC minting cap
+    )
+    await mockAccountControl.setMintedForTesting(
+      qcRedeemer.address,
+      ethers.BigNumber.from("100000000000") // 1000 BTC in satoshis
+    )
     await qcRedeemer.setAccountControl(mockAccountControl.address)
   })
 

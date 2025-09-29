@@ -544,8 +544,7 @@ contract QCData is AccessControl {
 
         QCStatus status = custodians[qc].status;
         return status == QCStatus.Active ||
-               status == QCStatus.MintingPaused ||
-               status == QCStatus.UnderReview;
+               status == QCStatus.MintingPaused;
     }
 
     /// @notice Get comprehensive QC information for 5-state model

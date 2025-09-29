@@ -1304,7 +1304,8 @@ describe("SystemState", () => {
         })
 
         it("should allow new pauser to unpause", async () => {
-          const [newPauser] = await ethers.getSigners()
+          const signers = await ethers.getSigners()
+          const newPauser = signers[5] // Use an unused signer instead of deployer
 
           await systemState
             .connect(pauserAccount)

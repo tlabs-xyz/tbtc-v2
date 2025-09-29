@@ -233,7 +233,7 @@ contract ReserveOracle is AccessControl {
     }
 
     /// @notice Update consensus threshold (DISPUTE_ARBITER_ROLE only)
-    /// @param newThreshold New consensus threshold (minimum 2)
+    /// @param newThreshold New consensus threshold (minimum 3, must be odd)
     function setConsensusThreshold(uint256 newThreshold)
         external
         onlyRole(DISPUTE_ARBITER_ROLE)
@@ -316,13 +316,13 @@ contract ReserveOracle is AccessControl {
         if (qc == address(0)) revert QCAddressRequired();
         if (balance > type(uint128).max) revert BalanceOverflow();
 
+        // Clean up any expired attestations first to prevent deadlock
+        _cleanExpiredAttestations(qc);
+
         // Check if this attester has already submitted for this QC
         if (pendingAttestations[qc][msg.sender].timestamp != 0) {
             revert AttesterAlreadySubmitted();
         }
-
-        // Clean up any expired attestations
-        _cleanExpiredAttestations(qc);
 
         // Get attester index
         uint64 attesterIndex = attesterToIndex[msg.sender];

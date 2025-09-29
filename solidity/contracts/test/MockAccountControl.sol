@@ -51,6 +51,13 @@ contract MockAccountControl {
     function setBackingForTesting(address reserve, uint256 amount) external {
         backing[reserve] = amount;
     }
+
+    /// @notice Set minted amount for a reserve for testing purposes
+    /// @param reserve The reserve address
+    /// @param amount The minted amount to set (in satoshis)
+    function setMintedForTesting(address reserve, uint256 amount) external {
+        minted[reserve] = amount;
+    }
     /// @notice Mock implementation of mintTBTC function
     /// @param user The user receiving minted TBTC
     /// @param amount The amount of TBTC being minted

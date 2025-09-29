@@ -167,7 +167,7 @@ contract MockBank is IBank {
         callCount = 0;
     }
 
-    function setTotalSupply(uint256 newTotalSupply) external {
+    function setTotalSupply(uint256 newTotalSupply) external onlyAuthorized {
         _totalSupply = newTotalSupply;
     }
 

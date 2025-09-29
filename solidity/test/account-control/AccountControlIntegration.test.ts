@@ -213,22 +213,24 @@ describe("AccountControl Integration Tests", function () {
       expect(await mockBank.balances(minter.address)).to.equal(expectedSatoshis);
     });
 
-    it("should bypass AccountControl when disabled", async function () {
-      // Disable AccountControl mode
-      // Direct minting mode (bypassing AccountControl)
-      
-      const initialMinted = await accountControl.minted(qc.address);
+    it("should properly track minted amount with correct reserve address", async function () {
+      // This test verifies that AccountControl tracks the correct reserve (qcMinter) not the QC
+      const initialMinted = await accountControl.minted(qcMinter.address);
+      const initialQCMinted = await accountControl.minted(qc.address);
       
       // Request mint (single-step process now)
       const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       const receipt = await tx.wait();
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
       
-      // Note: QCRedeemer uses MockAccountControl, so AccountControl state is not updated (as expected)
-      expect(await accountControl.minted(qc.address)).to.equal(initialMinted);
+      // Verify AccountControl tracks minting against the correct reserve address (qcMinter)
+      const expectedSatoshis = MINT_AMOUNT.div(SATOSHI_MULTIPLIER);
+      expect(await accountControl.minted(qcMinter.address)).to.equal(initialMinted.add(expectedSatoshis));
+      
+      // Verify QC address itself doesn't have minted amount tracked
+      expect(await accountControl.minted(qc.address)).to.equal(initialQCMinted);
       
       // But Bank balance was still created for the minter
-      const expectedSatoshis = MINT_AMOUNT.div(SATOSHI_MULTIPLIER);
       expect(await mockBank.balances(minter.address)).to.equal(expectedSatoshis);
     });
 

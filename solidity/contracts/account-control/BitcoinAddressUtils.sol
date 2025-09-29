@@ -38,13 +38,7 @@ library BitcoinAddressUtils {
         if (addr.length == 0) revert InvalidAddressLength();
 
         // Check for Bech32 addresses (P2WPKH or P2WSH)
-        if (
-            addr.length >= 3 &&
-            addr[0] == 0x62 &&
-            addr[1] == 0x63 &&
-            addr[2] == 0x31
-        ) {
-            // Address starts with "bc1"
+        if (isBech32Address(addr)) {
             return decodeBech32Address(addr);
         }
 
@@ -284,6 +278,65 @@ library BitcoinAddressUtils {
             (b & 4 != 0 ? 0x1ea119fa : 0) ^
             (b & 8 != 0 ? 0x3d4233dd : 0) ^
             (b & 16 != 0 ? 0x2a1462b3 : 0);
+    }
+
+    /// @notice Check if address is a valid Bech32 format
+    /// @param addr The address bytes to check
+    /// @return True if valid Bech32 format (bc1/BC1/tb1/TB1), rejects mixed-case per BIP-173
+    function isBech32Address(bytes memory addr) internal pure returns (bool) {
+        if (addr.length < 4) return false;
+        
+        // Check for mainnet prefixes: "bc1" or "BC1"
+        if (addr.length >= 3 && addr[2] == 0x31) { // ends with '1'
+            bool isLowercaseBC = addr[0] == 0x62 && addr[1] == 0x63; // "bc"
+            bool isUppercaseBC = addr[0] == 0x42 && addr[1] == 0x43; // "BC"
+            
+            if (isLowercaseBC || isUppercaseBC) {
+                // Verify no mixed case in the prefix and reject mixed-case per BIP-173
+                return !hasMixedCaseInAddress(addr);
+            }
+        }
+        
+        // Check for testnet prefixes: "tb1" or "TB1"
+        if (addr.length >= 3 && addr[2] == 0x31) { // ends with '1'
+            bool isLowercaseTB = addr[0] == 0x74 && addr[1] == 0x62; // "tb"
+            bool isUppercaseTB = addr[0] == 0x54 && addr[1] == 0x42; // "TB"
+            
+            if (isLowercaseTB || isUppercaseTB) {
+                // Verify no mixed case in the prefix and reject mixed-case per BIP-173
+                return !hasMixedCaseInAddress(addr);
+            }
+        }
+        
+        return false;
+    }
+
+    /// @notice Check if address has mixed case (violates BIP-173)
+    /// @param addr The address bytes to check
+    /// @return True if mixed case is detected
+    function hasMixedCaseInAddress(bytes memory addr) internal pure returns (bool) {
+        bool hasUppercase = false;
+        bool hasLowercase = false;
+        
+        for (uint256 i = 0; i < addr.length; i++) {
+            uint8 c = uint8(addr[i]);
+            
+            // Check if character is uppercase letter (A-Z: 0x41-0x5A)
+            if (c >= 0x41 && c <= 0x5A) {
+                hasUppercase = true;
+            }
+            // Check if character is lowercase letter (a-z: 0x61-0x7A)
+            else if (c >= 0x61 && c <= 0x7A) {
+                hasLowercase = true;
+            }
+            
+            // Early exit if mixed case detected
+            if (hasUppercase && hasLowercase) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /// @notice Convert between bit groups

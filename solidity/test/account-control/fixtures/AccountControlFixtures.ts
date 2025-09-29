@@ -176,6 +176,16 @@ export async function deployQCRedeemerFixture() {
   await mockAccountControl.setTotalMintedForTesting(
     ethers.BigNumber.from("100000000000") // 1000 BTC in satoshis
   )
+  
+  // Authorize QCRedeemer contract and set minted balance for redemptions
+  await mockAccountControl.authorizeReserve(
+    qcRedeemer.address,
+    ethers.BigNumber.from("100000000000") // 1000 BTC minting cap
+  )
+  await mockAccountControl.setMintedForTesting(
+    qcRedeemer.address,
+    ethers.BigNumber.from("100000000000") // 1000 BTC in satoshis
+  )
 
   return {
     // Contracts
@@ -308,19 +318,21 @@ export async function createTestRedemption(
   const amountSatoshis = options.amount || constants.MEDIUM_MINT // Use MEDIUM_MINT as default (meets minimum requirement)
   const amount = ethers.BigNumber.from(amountSatoshis).mul(ethers.BigNumber.from(10).pow(10)) // Convert to tBTC Wei
   const btcAddress = options.btcAddress || constants.VALID_LEGACY_BTC
-  const walletAddress = options.walletAddress || ethers.Wallet.createRandom().address
+  const walletAddress = options.walletAddress || constants.VALID_P2SH_BTC
 
   // Setup QC and wallet in QCData
   const isRegistered = await fixture.qcData.isQCRegistered(qcAddress.address)
   if (!isRegistered) {
     await fixture.qcData.registerQC(qcAddress.address, constants.LARGE_CAP)
   }
-  const qcWalletAddress = btcAddress
-  const isWalletRegistered = await fixture.qcData.isWalletRegistered(btcAddress)
-  if (!isWalletRegistered) {
+  const qcWalletAddress = walletAddress
+  
+  // Register QC's wallet address (the wallet that will handle the redemption)
+  const isQcWalletRegistered = await fixture.qcData.isWalletRegistered(qcWalletAddress)
+  if (!isQcWalletRegistered) {
     await fixture.qcData.registerWallet(
       qcAddress.address,
-      btcAddress
+      qcWalletAddress
     )
   }
 

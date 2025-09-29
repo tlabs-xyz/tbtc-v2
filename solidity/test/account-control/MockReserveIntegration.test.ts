@@ -320,15 +320,18 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       const recipients = [user1.address, user2.address, ethers.constants.AddressZero];
       const amounts = [constants.MIN_MINT_AMOUNT, constants.MIN_MINT_AMOUNT, constants.MIN_MINT_AMOUNT];
 
+      // Capture minted amount before the operation
+      const reserveMintedBefore = await accountControl.minted(mockReserve.address);
+
       // Should fail due to invalid recipient
       await expect(
         mockReserve.batchMint(recipients, amounts)
       ).to.be.revertedWith("InvalidRecipient");
 
       // Verify minted amount didn't change (atomic failure)
-      const reserveMinted = await accountControl.minted(mockReserve.address);
-      // Reserve should not have minted the failed batch
-      expect(reserveMinted).to.be.gte(0); // Sanity check - may have previous mints
+      const reserveMintedAfter = await accountControl.minted(mockReserve.address);
+      // Reserve should not have minted the failed batch - amounts should be equal
+      expect(reserveMintedAfter).to.equal(reserveMintedBefore);
     });
   });
 

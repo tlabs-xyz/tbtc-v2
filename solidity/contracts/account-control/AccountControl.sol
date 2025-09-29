@@ -300,9 +300,9 @@ contract AccountControl is
 
         uint256 currentMinted = minted[reserve];
 
-        // Observe and report if cap is below current minted (emergency governance scenario)
+        // Prevent setting cap below current minted amount
         if (newCap < currentMinted) {
-            emit ReserveCapBelowMinted(reserve, newCap, currentMinted, currentMinted - newCap);
+            revert ExceedsReserveCap(currentMinted, newCap);
         }
         
         // Validate against global cap if set
@@ -617,7 +617,7 @@ contract AccountControl is
             // Batch call succeeded
         } catch {
             // Fallback to individual calls if batch not supported
-            for (uint256 i = 0; i < len; ) {
+            for (uint256 i = 0; i < recipients.length; ) {
                 IBank(bank).increaseBalance(recipients[i], amounts[i]);
                 unchecked { ++i; }
             }
@@ -884,12 +884,20 @@ contract AccountControl is
         address[] calldata recipients,
         uint256[] calldata amounts
     ) internal pure returns (uint256 totalAmount) {
-        require(recipients.length == amounts.length, "Array length mismatch");
-        require(recipients.length <= MAX_BATCH_SIZE, "Batch size exceeded");
+        if (recipients.length != amounts.length) {
+            revert ArrayLengthMismatch(recipients.length, amounts.length);
+        }
+        if (recipients.length > MAX_BATCH_SIZE) {
+            revert BatchSizeExceeded(recipients.length, MAX_BATCH_SIZE);
+        }
 
         for (uint256 i = 0; i < amounts.length; i++) {
-            require(amounts[i] >= MIN_MINT_AMOUNT, "Amount too small");
-            require(amounts[i] <= MAX_SINGLE_MINT, "Amount too large");
+            if (amounts[i] < MIN_MINT_AMOUNT) {
+                revert AmountTooSmall(amounts[i], MIN_MINT_AMOUNT);
+            }
+            if (amounts[i] > MAX_SINGLE_MINT) {
+                revert AmountTooLarge(amounts[i], MAX_SINGLE_MINT);
+            }
             totalAmount += amounts[i];
         }
     }
