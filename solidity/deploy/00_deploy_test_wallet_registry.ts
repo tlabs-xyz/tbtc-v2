@@ -28,7 +28,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 export default func
 
-func.tags = ["TestWalletRegistry"]
+func.tags = ["WalletRegistry"]
+func.id = "deploy_test_wallet_registry" // unique ID to prevent conflicts
 func.skip = async (hre: HardhatRuntimeEnvironment) => {
   // Skip if not a test network
   return hre.network.name !== "hardhat" &&

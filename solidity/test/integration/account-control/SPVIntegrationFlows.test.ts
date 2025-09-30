@@ -48,10 +48,14 @@ describe("Message Signing Integration Flows", () => {
     testRelay = await TestRelay.deploy()
 
     const QCData = await ethers.getContractFactory("QCData")
-    qcData = await QCData.deploy(deployer.address)
+    qcData = await QCData.deploy()
 
     const SystemState = await ethers.getContractFactory("SystemState")
-    systemState = await SystemState.deploy(deployer.address)
+    systemState = await SystemState.deploy()
+
+    // Deploy ReserveOracle
+    const ReserveOracle = await ethers.getContractFactory("ReserveOracle")
+    const reserveOracle = await ReserveOracle.deploy()
 
     // Deploy QCManagerLib library
     const QCManagerLib = await ethers.getContractFactory("QCManagerLib")
@@ -64,9 +68,10 @@ describe("Message Signing Integration Flows", () => {
       },
     })
     qcManager = await QCManager.deploy(
-      await qcData.getAddress(),
-      await systemState.getAddress(),
-      ethers.ZeroAddress // No reserve oracle needed for this test
+      qcData.address,
+      systemState.address,
+      reserveOracle.address,
+      systemState.address // Use systemState as pauseManager for testing
     )
 
     // Deploy SharedSPVCore library for QCRedeemer
@@ -85,13 +90,14 @@ describe("Message Signing Integration Flows", () => {
     const QCRedeemer = await ethers.getContractFactory("QCRedeemer", {
       libraries: {
         QCRedeemerSPV: qcRedeemerSPV.address,
+        SharedSPVCore: sharedSPVCore.address,
       },
     })
     qcRedeemer = await QCRedeemer.deploy(
-      await tbtcToken.getAddress(),
-      await qcData.getAddress(),
-      await systemState.getAddress(),
-      await testRelay.getAddress(),
+      tbtcToken.address,
+      qcData.address,
+      systemState.address,
+      testRelay.address,
       1 // txProofDifficultyFactor
     )
 
@@ -103,7 +109,7 @@ describe("Message Signing Integration Flows", () => {
     await tbtcToken.mint(user.address, testAmount)
     await tbtcToken
       .connect(user)
-      .approve(await qcRedeemer.getAddress(), testAmount)
+      .approve(qcRedeemer.address, testAmount)
   })
 
   describe("QCManager SPV Wallet Registration Flow", () => {
@@ -111,7 +117,7 @@ describe("Message Signing Integration Flows", () => {
       const [relay, difficultyFactor, isInitialized] =
         await qcManager.getSPVState()
 
-      expect(relay).to.equal(await testRelay.getAddress())
+      expect(relay).to.equal(testRelay.address)
       expect(difficultyFactor).to.equal(1)
       expect(isInitialized).to.be.true
     })
@@ -224,7 +230,7 @@ describe("Message Signing Integration Flows", () => {
       const [relay, difficultyFactor, isInitialized] =
         await qcRedeemer.getSPVState()
 
-      expect(relay).to.equal(await testRelay.getAddress())
+      expect(relay).to.equal(testRelay.address)
       expect(difficultyFactor).to.equal(1)
       expect(isInitialized).to.be.true
     })
@@ -357,7 +363,7 @@ describe("Message Signing Integration Flows", () => {
 
       // Test that our SPV state is properly initialized with relay
       const [relay, ,] = await qcRedeemer.getSPVParameters()
-      expect(relay).to.not.equal(ethers.ZeroAddress)
+      expect(relay).to.not.equal(ethers.constants.AddressZero)
 
       // Test difficulty factor configuration (Bridge pattern)
       const [, difficultyFactor] = await qcRedeemer.getSPVParameters()
@@ -511,10 +517,10 @@ describe("Message Signing Integration Flows", () => {
       // Original contracts were over the 24KB limit, now they should be under
 
       const qcManagerBytecode = await ethers.provider.getCode(
-        await qcManager.getAddress()
+        qcManager.address
       )
       const qcRedeemerBytecode = await ethers.provider.getCode(
-        await qcRedeemer.getAddress()
+        qcRedeemer.address
       )
 
       const qcManagerSize = (qcManagerBytecode.length - 2) / 2 // Convert hex to bytes
@@ -548,12 +554,12 @@ describe("Message Signing Integration Flows", () => {
       // QCManager SPV functions
       const [relay1, factor1, init1] = await qcManager.getSPVState()
       expect(init1).to.be.true
-      expect(relay1).to.equal(await testRelay.getAddress())
+      expect(relay1).to.equal(testRelay.address)
 
       // QCRedeemer SPV functions
       const [relay2, factor2, init2] = await qcRedeemer.getSPVState()
       expect(init2).to.be.true
-      expect(relay2).to.equal(await testRelay.getAddress())
+      expect(relay2).to.equal(testRelay.address)
 
       // Both should have identical SPV configurations
       expect(relay1).to.equal(relay2)

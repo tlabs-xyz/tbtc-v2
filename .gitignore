@@ -10,3 +10,9 @@ yarn-error.log
 CLAUDE.md
 CLAUDE.local.md
 .claude/
+
+# Code review files
+coderabbit.txt
+
+# Backup files
+*.backup

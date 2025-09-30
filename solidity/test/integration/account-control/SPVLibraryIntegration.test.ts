@@ -60,41 +60,53 @@ describe("SPV Library Integration", () => {
     testRelay = await TestRelay.deploy()
 
     const QCData = await ethers.getContractFactory("QCData")
-    qcData = await QCData.deploy(deployer.address)
+    qcData = await QCData.deploy()
 
     const SystemState = await ethers.getContractFactory("SystemState")
-    systemState = await SystemState.deploy(deployer.address)
+    systemState = await SystemState.deploy()
+
+    // Deploy ReserveOracle
+    const ReserveOracle = await ethers.getContractFactory("ReserveOracle")
+    const reserveOracle = await ReserveOracle.deploy()
 
     // Deploy SPV libraries first (they're used by main contracts)
+    const SharedSPVCore = await ethers.getContractFactory("SharedSPVCore")
+    const sharedSPVCore = await SharedSPVCore.deploy()
+
     const QCManagerSPVLib = await ethers.getContractFactory("QCManagerSPV")
     const qcManagerSPVLib = await QCManagerSPVLib.deploy()
 
-    const QCRedeemerSPVLib = await ethers.getContractFactory("QCRedeemerSPV")
+    const QCRedeemerSPVLib = await ethers.getContractFactory("QCRedeemerSPV", {
+      libraries: {
+        SharedSPVCore: sharedSPVCore.address,
+      },
+    })
     const qcRedeemerSPVLib = await QCRedeemerSPVLib.deploy()
 
     // Deploy main contracts with library linking
     const QCManager = await ethers.getContractFactory("QCManager", {
       libraries: {
-        QCManagerSPV: await qcManagerSPVLib.getAddress(),
+        QCManagerSPV: qcManagerSPVLib.address,
       },
     })
     qcManager = await QCManager.deploy(
-      await qcData.getAddress(),
-      await systemState.getAddress(),
-      await testRelay.getAddress(),
-      1 // txProofDifficultyFactor
+      qcData.address,
+      systemState.address,
+      reserveOracle.address,
+      systemState.address // Use systemState as pause manager for testing
     )
 
     const QCRedeemer = await ethers.getContractFactory("QCRedeemer", {
       libraries: {
-        QCRedeemerSPV: await qcRedeemerSPVLib.getAddress(),
+        QCRedeemerSPV: qcRedeemerSPVLib.address,
+        SharedSPVCore: sharedSPVCore.address,
       },
     })
     qcRedeemer = await QCRedeemer.deploy(
-      await tbtcToken.getAddress(),
-      await qcData.getAddress(),
-      await systemState.getAddress(),
-      await testRelay.getAddress(),
+      tbtcToken.address,
+      qcData.address,
+      systemState.address,
+      testRelay.address,
       1 // txProofDifficultyFactor
     )
 
@@ -104,30 +116,30 @@ describe("SPV Library Integration", () => {
     await tbtcToken.mint(user.address, testAmount)
     await tbtcToken
       .connect(user)
-      .approve(await qcRedeemer.getAddress(), testAmount)
+      .approve(qcRedeemer.address, testAmount)
   })
 
   describe("Library Deployment and Linking", () => {
     it("should have successfully linked QCManagerSPV library", async () => {
       // Verify QCManager contract was deployed with library linking
-      expect(await qcManager.getAddress()).to.not.equal(ethers.ZeroAddress)
+      expect(qcManager.address).to.not.equal(ethers.constants.AddressZero)
 
       // Verify SPV state is initialized
       const [relay, difficultyFactor, isInitialized] =
         await qcManager.getSPVState()
-      expect(relay).to.equal(await testRelay.getAddress())
+      expect(relay).to.equal(testRelay.address)
       expect(difficultyFactor).to.equal(1)
       expect(isInitialized).to.be.true
     })
 
     it("should have successfully linked QCRedeemerSPV library", async () => {
       // Verify QCRedeemer contract was deployed with library linking
-      expect(await qcRedeemer.getAddress()).to.not.equal(ethers.ZeroAddress)
+      expect(qcRedeemer.address).to.not.equal(ethers.constants.AddressZero)
 
       // Verify SPV state is initialized
       const [relay, difficultyFactor, isInitialized] =
         await qcRedeemer.getSPVState()
-      expect(relay).to.equal(await testRelay.getAddress())
+      expect(relay).to.equal(testRelay.address)
       expect(difficultyFactor).to.equal(1)
       expect(isInitialized).to.be.true
     })
@@ -135,10 +147,10 @@ describe("SPV Library Integration", () => {
     it("should have reduced contract sizes after library extraction", async () => {
       // Get bytecode sizes
       const qcManagerBytecode = await ethers.provider.getCode(
-        await qcManager.getAddress()
+        qcManager.address
       )
       const qcRedeemerBytecode = await ethers.provider.getCode(
-        await qcRedeemer.getAddress()
+        qcRedeemer.address
       )
 
       // Contract sizes should be significantly reduced from 25.94KB and 29.45KB
@@ -611,11 +623,11 @@ describe("SPV Library Integration", () => {
       // - BytesLib for byte manipulation
 
       const [relay, difficultyFactor] = await qcManager.getSPVParameters()
-      expect(relay).to.equal(await testRelay.getAddress())
+      expect(relay).to.equal(testRelay.address)
       expect(difficultyFactor).to.equal(1)
 
       const [relay2, difficultyFactor2] = await qcRedeemer.getSPVParameters()
-      expect(relay2).to.equal(await testRelay.getAddress())
+      expect(relay2).to.equal(testRelay.address)
       expect(difficultyFactor2).to.equal(1)
     })
   })

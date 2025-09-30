@@ -494,10 +494,13 @@ describe("QCRedeemerSPV Library", () => {
       expect(result).to.be.false
     })
 
-    it.skip("should return true for valid transaction", async () => {
-      // Skip this test - there's an issue with BTCUtils library linking
-      // in the test environment that prevents parseVarInt from working correctly
-      // The validation logic is correct but the test infrastructure needs fixing
+    it.skip("should return true for valid transaction - TODO: REQUIRES Fix BTCUtils library linking issue in test environment", async () => {
+      // IMPLEMENTATION REQUIREMENTS:
+      // 1. Fix BTCUtils library linking issue in test environment
+      // 2. Ensure parseVarInt function works correctly in test context
+      // 3. Proper library deployment and linking for transaction validation tests
+      // 4. Test infrastructure setup for SPV library integration
+      // 5. Verification that transaction validation logic returns true for valid inputs
     })
   })
 

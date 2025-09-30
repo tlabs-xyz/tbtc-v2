@@ -344,13 +344,13 @@ const func: DeployFunction = async function DeployAccountControl(
   try {
     // Grant QC_MANAGER_ROLE to QCManager for storage access
     const qcDataContract = await ethers.getContractAt("QCData", qcData.address)
-    const QC_MANAGER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_MANAGER_ROLE"))
-    await qcDataContract.grantRole(QC_MANAGER_ROLE, qcManager.address)
+    const QC_MANAGER_ROLE_FOR_DATA = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_MANAGER_ROLE"))
+    await qcDataContract.grantRole(QC_MANAGER_ROLE_FOR_DATA, qcManager.address)
     log(`Granted QC_MANAGER_ROLE to QCManager`)
 
     // Grant storage access roles to operational contracts
-    await qcDataContract.grantRole(QC_MANAGER_ROLE, qcMinter.address)
-    await qcDataContract.grantRole(QC_MANAGER_ROLE, qcRedeemer.address)
+    await qcDataContract.grantRole(QC_MANAGER_ROLE_FOR_DATA, qcMinter.address)
+    await qcDataContract.grantRole(QC_MANAGER_ROLE_FOR_DATA, qcRedeemer.address)
     log(`Granted storage access to QCMinter and QCRedeemer`)
 
     // Enable auto-minting in QCMinter (consolidated functionality)
@@ -412,7 +412,7 @@ const func: DeployFunction = async function DeployAccountControl(
 
   // Define role constants (updated with new role structure)
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero // OpenZeppelin standard admin
-  const QC_MANAGER_ROLE = ethers.utils.id("QC_MANAGER_ROLE") // Internal storage access
+  const QC_MANAGER_ROLE_CONFIG = ethers.utils.id("QC_MANAGER_ROLE") // Internal storage access
   const MINTER_ROLE = ethers.utils.id("MINTER_ROLE") // Grant only to QCMinter contract
   const DISPUTE_ARBITER_ROLE = ethers.utils.id("DISPUTE_ARBITER_ROLE") // Handle disputes and enforcement
   const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE") // Reserve attestations

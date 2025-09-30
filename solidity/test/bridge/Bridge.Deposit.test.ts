@@ -67,6 +67,7 @@ describe("Bridge - Deposit", () => {
       deployBridge,
     } = await waffle.loadFixture(bridgeFixture))
 
+
     // Set the deposit dust threshold to 0.0001 BTC, i.e. 100x smaller than
     // the initial value in the Bridge in order to save test Bitcoins.
     // Scaling down deposit TX max fee as well.
