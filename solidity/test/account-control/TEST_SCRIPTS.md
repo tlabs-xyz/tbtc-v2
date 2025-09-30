@@ -1,70 +1,24 @@
 # Account-Control Test Scripts Guide
 
 ## Overview
-The account-control test suite has been reorganized into logical directories. The npm scripts have been updated to support both directory-based and tag-based test execution.
+The account-control test suite has been reorganized into logical directories with simplified test scripts.
 
 ## Available Test Scripts
 
-### Run All Tests
-```bash
-# Run all account-control tests
-yarn test:account-control
-# or
-npm run test:account-control
-```
+### Main Scripts
 
-### Run Tests by Directory
-
-#### Core Contracts
 ```bash
-# Run all core contract tests (QC Manager, Minter, Redeemer, Data, etc.)
-yarn test:ac:core
-```
+# Run ALL account-control tests
+yarn test:ac
 
-#### System Management
-```bash
-# Run system management tests (SystemState, ReserveOracle, WatchdogEnforcer)
-yarn test:ac:system
-```
+# Run only UNIT tests (marked with [unit])
+yarn test:ac:unit
 
-#### SPV Functionality
-```bash
-# Run SPV and Bitcoin integration tests
-yarn test:ac:spv
-```
-
-#### Integration Tests
-```bash
-# Run cross-contract integration tests
+# Run only INTEGRATION tests (marked with [integration])
 yarn test:ac:integration
 ```
 
-#### Security Tests
-```bash
-# Run security-focused tests
-yarn test:ac:security
-```
-
-#### Bitcoin Integration
-```bash
-# Run Bitcoin address handling tests
-yarn test:ac:bitcoin
-```
-
-### Run Tests by Tag
-
-Tests can also be filtered by tags in their describe blocks:
-
-```bash
-# Run only unit tests
-yarn test:ac:unit
-
-# Run smoke tests
-yarn test:ac:smoke
-
-# Run validation tests
-yarn test:ac:validation
-```
+That's it! Simple and clean.
 
 ## Directory Structure
 
