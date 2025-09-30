@@ -6,10 +6,12 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
 import "./SPVState.sol";
+import "./BitcoinAddressUtils.sol";
 import "../token/TBTC.sol";
 import "../bridge/BitcoinTx.sol";
 import {QCRedeemerSPV} from "./libraries/QCRedeemerSPV.sol";
 import "./AccountControl.sol";
+import "./QCManagerErrors.sol";
 
 /// @title QCRedeemer
 /// @dev Direct implementation for tBTC redemption with QC backing.
@@ -38,7 +40,6 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     using SPVState for SPVState.Storage;
     
     // Custom errors for gas-efficient reverts
-    error InvalidQCAddress();
     error InvalidAmount();
     error BitcoinAddressRequired();
     error InvalidBitcoinAddressFormat();
@@ -240,28 +241,23 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         string calldata userBtcAddress,
         string calldata qcWalletAddress
     ) external nonReentrant returns (bytes32 redemptionId) {
-        if (qc == address(0)) revert InvalidQCAddress();
+        // Check if redemptions are paused
+        if (systemState.isRedemptionPaused()) {
+            revert RedemptionsArePaused();
+        }
+        
+        if (qc == address(0)) revert QCManagerErrors.InvalidQCAddress();
         if (amount == 0) revert InvalidAmount();
         if (bytes(userBtcAddress).length == 0) revert BitcoinAddressRequired();
         if (bytes(qcWalletAddress).length == 0) revert BitcoinAddressRequired();
 
         // Bitcoin address format validation for user address
-        bytes memory addr = bytes(userBtcAddress);
-        if (
-            !(addr[0] == 0x31 ||
-                addr[0] == 0x33 ||
-                (addr[0] == 0x62 && addr.length > 1 && addr[1] == 0x63))
-        ) {
+        if (!_isValidBitcoinAddress(userBtcAddress)) {
             revert InvalidBitcoinAddressFormat();
         }
         
-        // Bitcoin address format validation for QC wallet address
-        bytes memory qcAddr = bytes(qcWalletAddress);
-        if (
-            !(qcAddr[0] == 0x31 ||
-                qcAddr[0] == 0x33 ||
-                (qcAddr[0] == 0x62 && qcAddr.length > 1 && qcAddr[1] == 0x63))
-        ) {
+        // Bitcoin address format validation for QC wallet address  
+        if (!_isValidBitcoinAddress(qcWalletAddress)) {
             revert InvalidBitcoinAddressFormat();
         }
         
@@ -309,8 +305,12 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Burn the tBTC tokens
         tbtcToken.burnFrom(msg.sender, amount);
 
-        // Notify AccountControl of redemption
-        AccountControl(accountControl).redeemTBTC(amount);
+        // Notify AccountControl of redemption only if AccountControl mode is enabled
+        if (systemState.isAccountControlEnabled()) {
+            require(accountControl != address(0), "AccountControl not set");
+            AccountControl(accountControl).redeemTBTC(amount);
+        }
+        // If AccountControl mode is disabled, redemption proceeds without AccountControl notification
 
         // Calculate deadline
         uint256 redemptionTimeout = systemState.redemptionTimeout();
@@ -370,6 +370,11 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         BitcoinTx.Info calldata txInfo,
         BitcoinTx.Proof calldata proof
     ) external onlyRole(DISPUTE_ARBITER_ROLE) nonReentrant {
+        // Check if redemptions are paused
+        if (systemState.isRedemptionPaused()) {
+            revert RedemptionsArePaused();
+        }
+        
         if (redemptions[redemptionId].status != RedemptionStatus.Pending) {
             revert RedemptionNotPending();
         }
@@ -390,7 +395,10 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Fulfilled;
         
-        // No action needed here
+        // Note: Redemption accounting happens during initiateRedemption (when tokens are burned)
+        // This function only records the fulfillment proof that BTC was actually sent
+        // No additional AccountControl state changes needed here
+        
         // Tokens were already burned during initiation (tbtcToken.burnFrom)
         // Backing will be updated in ReserveOracle when BTC reserves decrease
         // This maintains proper invariant: backing >= minted
@@ -656,6 +664,14 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             revert InvalidBitcoinAddress(userBtcAddress);
         }
 
+        // Validate BTC address matches the originally requested address
+        if (
+            keccak256(bytes(userBtcAddress)) !=
+            keccak256(bytes(redemptions[redemptionId].userBtcAddress))
+        ) {
+            revert RedemptionProofFailed("USER_ADDRESS_MISMATCH");
+        }
+
         if (expectedAmount == 0) {
             revert InvalidAmount();
         }
@@ -675,17 +691,14 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         }
 
         // SPV proof verification
-        if (
-            !_verifySPVProof(
-                redemptionId,
-                userBtcAddress,
-                expectedAmount,
-                txInfo,
-                proof
-            )
-        ) {
-            revert SPVVerificationFailed(redemptionId);
-        }
+        // Note: _verifySPVProof now reverts with RedemptionProofFailed on any error
+        _verifySPVProof(
+            redemptionId,
+            userBtcAddress,
+            expectedAmount,
+            txInfo,
+            proof
+        );
 
         // State update - mark as fulfilled
         fulfilledRedemptions[redemptionId] = true;
@@ -766,7 +779,11 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Complete SPV validation using library
         
         // 1. Validate SPV proof using library
-        QCRedeemerSPV.validateSPVProof(spvState, txInfo, proof);
+        // First try the safe validation to check if it would fail
+        (bool spvSuccess, ) = QCRedeemerSPV.validateSPVProofSafe(spvState, txInfo, proof);
+        if (!spvSuccess) {
+            revert RedemptionProofFailed("SPV proof validation failed");
+        }
         
         // 2. Verify transaction contains expected payment to userBtcAddress
         if (!QCRedeemerSPV.verifyRedemptionPayment(userBtcAddress, expectedAmount, txInfo)) {
@@ -966,5 +983,39 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         address oldAddress = accountControl;
         accountControl = _accountControl;
         emit AccountControlUpdated(oldAddress, _accountControl, msg.sender, block.timestamp);
+    }
+
+    // =================== BITCOIN ADDRESS VALIDATION ===================
+
+    /// @dev Validate Bitcoin address format supporting P2PKH, P2SH, P2WPKH, P2WSH
+    /// @param btcAddress The Bitcoin address to validate
+    /// @return valid True if the address is in a valid format
+    function _isValidBitcoinAddress(string memory btcAddress) internal pure returns (bool valid) {
+        bytes memory addr = bytes(btcAddress);
+        if (addr.length == 0) return false;
+        
+        // Check Base58 addresses (P2PKH and P2SH)
+        // P2PKH addresses start with '1' (0x31)
+        // P2SH addresses start with '3' (0x33)  
+        if (addr[0] == 0x31 || addr[0] == 0x33) {
+            // Basic length check for Base58 addresses (25-34 characters typical)
+            return addr.length >= 26 && addr.length <= 35;
+        }
+        
+        // Check Bech32 addresses (P2WPKH and P2WSH)
+        // Mainnet: bc1... (0x62 0x63 0x31)
+        // Testnet: tb1... (0x74 0x62 0x31)
+        if (addr.length >= 14) {
+            // Check for bc1 (mainnet)
+            if (addr[0] == 0x62 && addr[1] == 0x63 && addr[2] == 0x31) {
+                return addr.length <= 74; // Max length for bech32
+            }
+            // Check for tb1 (testnet)  
+            if (addr[0] == 0x74 && addr[1] == 0x62 && addr[2] == 0x31) {
+                return addr.length <= 74; // Max length for bech32
+            }
+        }
+        
+        return false;
     }
 }

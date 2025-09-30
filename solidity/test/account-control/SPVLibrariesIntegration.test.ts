@@ -186,56 +186,6 @@ describe("SPV Libraries Integration", () => {
     })
   })
 
-  describe("QCManagerSPV Integration", () => {
-    const testChallenge = ethers.utils.keccak256(
-      ethers.utils.toUtf8Bytes("wallet_control_test_challenge")
-    )
-    const testBitcoinAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-
-    it.skip("should validate wallet control with real Bitcoin data", async () => {
-      // Create a transaction with OP_RETURN containing our challenge
-      const challengeBytes = testChallenge.slice(2)
-      const opReturnOutput = `0x01${"00".repeat(
-        8
-      )}${"22"}${"6a"}${"20"}${challengeBytes}`
-
-      const txInfoWithChallenge = {
-        ...validBitcoinTx.txInfo,
-        outputVector: opReturnOutput,
-      }
-
-      const result = await qcRedeemerSPVTest.validateWalletControlProof(
-        testBitcoinAddress,
-        testChallenge,
-        txInfoWithChallenge
-      )
-
-      expect(result).to.be.true
-    })
-
-    it.skip("should detect challenge in OP_RETURN outputs", async () => {
-      const challengeBytes = testChallenge.slice(2)
-      const opReturnOutput = `0x01${"00".repeat(
-        8
-      )}${"22"}${"6a"}${"20"}${challengeBytes}`
-
-      const found = await qcRedeemerSPVTest.findChallengeInOpReturn(
-        opReturnOutput,
-        testChallenge
-      )
-
-      expect(found).to.be.true
-    })
-
-    it.skip("should verify transaction signatures correctly", async () => {
-      const result = await qcRedeemerSPVTest.verifyTransactionSignature(
-        testBitcoinAddress,
-        validBitcoinTx.txInfo
-      )
-
-      expect(result).to.be.true
-    })
-  })
 
   describe("QCRedeemerSPV Integration", () => {
     const userBtcAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
@@ -275,11 +225,11 @@ describe("SPV Libraries Integration", () => {
 
     it("should match output hashes correctly", async () => {
       // Test address matching logic
-      const outputHash = `0x${"00".repeat(20)}` // Mock output hash
+      const mockOutput = `0x${"00".repeat(34)}` // Mock transaction output (8 bytes value + 1 byte script len + 25 bytes script)
 
-      const matches = await qcRedeemerSPVTest.testAddressMatchesOutputHash(
-        userBtcAddress,
-        outputHash
+      const matches = await qcRedeemerSPVTest.testIsPaymentToAddress(
+        mockOutput,
+        userBtcAddress
       )
 
       expect(matches).to.be.a("boolean")

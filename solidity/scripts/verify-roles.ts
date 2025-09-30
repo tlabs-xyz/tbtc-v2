@@ -217,10 +217,11 @@ async function getRoleHolders(
     const memberCount = contract.getRoleMemberCount
       ? await contract.getRoleMemberCount(role)
       : 0
+    const count = typeof memberCount === 'bigint' ? Number(memberCount) : (memberCount.toNumber ? memberCount.toNumber() : memberCount)
 
-    if (memberCount > 0) {
+    if (count > 0) {
       // Use getRoleMember to enumerate
-      for (let i = 0; i < memberCount; i++) {
+      for (let i = 0; i < count; i++) {
         const member = await contract.getRoleMember(role, i)
         holders.push(member)
       }

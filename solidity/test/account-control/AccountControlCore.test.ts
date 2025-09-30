@@ -3,7 +3,6 @@ import { ethers, upgrades } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { AccountControl } from "../../typechain";
-import { getContractConstants, expectBalanceChange, getTestAmounts, deployAccountControlForTest } from "../helpers/testing-utils";
 
 describe("AccountControl Core Functionality", function () {
   let accountControl: AccountControl;
@@ -12,7 +11,6 @@ describe("AccountControl Core Functionality", function () {
   let mockBank: any;
   let reserve: SignerWithAddress;
   let user: SignerWithAddress;
-  let amounts: any;
 
   beforeEach(async function () {
     [owner, emergencyCouncil, reserve, user] = await ethers.getSigners();
@@ -21,16 +19,20 @@ describe("AccountControl Core Functionality", function () {
     const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBank = await MockBankFactory.deploy();
 
-    // Deploy AccountControl using helper
-    accountControl = await deployAccountControlForTest(owner, emergencyCouncil, mockBank) as AccountControl;
+    const AccountControlFactory = await ethers.getContractFactory("AccountControl");
+    accountControl = await upgrades.deployProxy(
+      AccountControlFactory,
+      [owner.address, emergencyCouncil.address, mockBank.address],
+      { initializer: "initialize" }
+    ) as AccountControl;
 
-    // Get dynamic test amounts
-    amounts = await getTestAmounts(accountControl);
+    // Authorize AccountControl to call MockBank functions
+    await mockBank.authorizeBalanceIncreaser(accountControl.address);
 
     // Note: Using direct updateBacking() for unit tests (oracle integration tested separately)
 
     // Authorize a reserve for testing (QC_PERMISSIONED is initialized by default)
-    await accountControl.connect(owner).authorizeReserve(reserve.address, amounts.SMALL_CAP); // 0.01 BTC cap
+    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000); // 0.01 BTC cap in satoshis
   });
 
   describe("Optimized totalMinted calculation", function () {
@@ -40,14 +42,14 @@ describe("AccountControl Core Functionality", function () {
 
     it("should track total minted amount efficiently", async function () {
       // Reserve updates its own backing (federated model)
-      await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP); // 0.02 BTC
+      await accountControl.connect(reserve).updateBacking(2000000); // 0.02 BTC
 
       // Mock Bank.increaseBalance call (normally would be called)
-      const amount = amounts.SMALL_MINT; // 0.005 BTC in satoshis
+      const amount = 500000; // 0.005 BTC in satoshis
       
       // This would normally fail because we can't call mint from non-reserve
       // but we're testing the state tracking logic
-      expect(await accountControl.totalMintedAmount()).to.equal(0);
+      expect(await accountControl.totalMinted()).to.equal(0);
     });
   });
 
@@ -80,8 +82,8 @@ describe("AccountControl Core Functionality", function () {
 
     it("should revert when deauthorizing reserve with outstanding balance", async function () {
       // Reserve sets backing and mint some tokens to create outstanding balance
-      await accountControl.connect(reserve).updateBacking(amounts.SMALL_CAP);
-      await accountControl.connect(reserve).mint(user.address, amounts.SMALL_MINT);
+      await accountControl.connect(reserve).updateBacking(1000000);
+      await accountControl.connect(reserve).mint(user.address, 500000);
       
       await expect(
         accountControl.connect(owner).deauthorizeReserve(reserve.address)
@@ -90,9 +92,9 @@ describe("AccountControl Core Functionality", function () {
 
     it("should clear backing when deauthorizing clean reserve", async function () {
       // Reserve sets backing but no minted balance
-      await accountControl.connect(reserve).updateBacking(amounts.SMALL_CAP);
-
-      expect(await accountControl.backing(reserve.address)).to.equal(amounts.SMALL_CAP);
+      await accountControl.connect(reserve).updateBacking(1000000);
+      
+      expect(await accountControl.backing(reserve.address)).to.equal(1000000);
       
       await accountControl.connect(owner).deauthorizeReserve(reserve.address);
       
@@ -103,9 +105,9 @@ describe("AccountControl Core Functionality", function () {
   describe("redeem function", function () {
     beforeEach(async function () {
       // Reserve sets up backing and perform a previous mint
-      await accountControl.connect(reserve).updateBacking(amounts.SMALL_CAP);
+      await accountControl.connect(reserve).updateBacking(1000000);
       // Mint some tokens to create minted balance for testing redemption
-      await accountControl.connect(reserve).mint(user.address, amounts.SMALL_MINT); // Mint 0.005 BTC
+      await accountControl.connect(reserve).mint(user.address, 500000); // Mint 0.005 BTC
     });
 
     it("should decrease minted amount on redemption", async function () {
@@ -128,7 +130,7 @@ describe("AccountControl Core Functionality", function () {
 
     it("should revert when redeeming more than minted", async function () {
       await expect(
-        accountControl.connect(reserve).redeem(amounts.SMALL_CAP) // More than minted
+        accountControl.connect(reserve).redeem(1000000) // More than minted
       ).to.be.revertedWith("InsufficientMinted");
     });
   });

@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.17;
 
 import "./QCData.sol";
+import "./QCManagerErrors.sol";
 import "./ReserveOracle.sol";
 import "./AccountControl.sol";
 import "./SystemState.sol";
+import {BitcoinAddressUtils} from "./BitcoinAddressUtils.sol";
+import {CheckBitcoinSigs} from "@keep-network/bitcoin-spv-sol/contracts/CheckBitcoinSigs.sol";
 // MessageSigning import removed - not used in this library
 
 /**
@@ -23,41 +26,7 @@ library QCManagerLib {
     // Note: Events are defined in main QCManager contract as libraries cannot emit events directly
 
     // ========== ERRORS ==========
-
-    /// @notice Thrown when QC address is zero address
-    error InvalidQCAddress();
-
-    /// @notice Thrown when minting capacity is invalid (zero or exceeds limits)
-    error InvalidMintingCapacity();
-
-    /// @notice Thrown when wallet address validation fails
-    error InvalidWalletAddress();
-
-    /// @notice Thrown when attempting to register an already registered QC
-    /// @param qc The address that is already registered
-    error QCAlreadyRegistered(address qc);
-
-    /// @notice Thrown when operating on a non-registered QC
-    /// @param qc The address that is not registered
-    error QCNotRegistered(address qc);
-
-    /// @notice Thrown when QC is not in ACTIVE status
-    /// @param qc The address of the inactive QC
-    error QCNotActive(address qc);
-
-    /// @notice Thrown when new capacity is not higher than current
-    /// @param current Current capacity
-    /// @param requested Requested new capacity
-    error NewCapMustBeHigher(uint256 current, uint256 requested);
-
-    /// @notice Thrown when status transition is invalid
-    /// @param from Current status
-    /// @param to Requested new status
-    error InvalidStatusTransition(QCData.QCStatus from, QCData.QCStatus to);
-
-    /// @notice Thrown when caller is not authorized for status change
-    /// @param caller The unauthorized caller address
-    error UnauthorizedStatusChange(address caller);
+    // All error definitions are imported from QCManagerErrors.sol to avoid duplicates
 
     // ========== REGISTRATION LOGIC ==========
 
@@ -74,16 +43,19 @@ library QCManagerLib {
         address qc,
         uint256 maxMintingCap
     ) external {
+        // Validate qcData parameter
+        require(address(qcData) != address(0), "QCData cannot be zero");
+
         // Input validation
         if (qc == address(0)) {
-            revert InvalidQCAddress();
+            revert QCManagerErrors.InvalidQCAddress();
         }
         if (maxMintingCap == 0) {
-            revert InvalidMintingCapacity();
+            revert QCManagerErrors.InvalidMintingCapacity();
         }
 
         if (qcData.isQCRegistered(qc)) {
-            revert QCAlreadyRegistered(qc);
+            revert QCManagerErrors.QCAlreadyRegistered(qc);
         }
 
         // Register QC with provided minting capacity
@@ -158,14 +130,14 @@ library QCManagerLib {
         address accountControl
     ) external {
         if (!qcData.isQCRegistered(qc)) {
-            revert QCNotRegistered(qc);
+            revert QCManagerErrors.QCNotRegistered(qc);
         }
 
         uint256 currentCap = qcData.getMaxMintingCapacity(qc);
 
         // Only allow increases
         if (newCap <= currentCap) {
-            revert NewCapMustBeHigher(currentCap, newCap);
+            revert QCManagerErrors.NewCapMustBeHigher(currentCap, newCap);
         }
 
         // Update in QCData
@@ -178,12 +150,16 @@ library QCManagerLib {
     }
 
     /**
-     * @notice Sync backing from oracle to AccountControl
-     * @param reserveOracle ReserveOracle contract instance
-     * @param accountControl AccountControl address
-     * @param qc The QC address to sync backing for
-     * @return balance The synced balance
-     * @return isStale Whether the balance is stale
+     * @notice Sync reserve backing from oracle to AccountControl
+     * @dev Fetches the latest attested reserve balance from the oracle and updates AccountControl.
+     *      This ensures AccountControl has the most recent backing information for solvency checks.
+     *      Critical for maintaining consistency between oracle attestations and operational controls.
+     *      Should be called when QC status changes or before critical operations.
+     * @param reserveOracle ReserveOracle contract providing reserve attestations
+     * @param accountControl AccountControl contract to update with backing information
+     * @param qc QC address whose backing to sync
+     * @return balance The synced reserve balance in satoshis
+     * @return isStale True if balance is older than 6 hours, may affect minting capacity
      */
     function syncBackingFromOracle(
         ReserveOracle reserveOracle,
@@ -197,20 +173,348 @@ library QCManagerLib {
         (balance, isStale) = reserveOracle.getReserveBalanceAndStaleness(qc);
 
         // Update AccountControl with the oracle-attested balance
-        // TODO: Implement automatic AccountControl backing sync after oracle verification
-        // Requirements: Add access controls, staleness validation, and error handling
-        // Timeline: Q1 2025 after oracle attestation system is fully tested
-        // For now, this function only reads from the oracle and returns the data
+        AccountControl(accountControl).setBacking(qc, balance);
 
         return (balance, isStale);
     }
 
+    // =================== VALIDATION FUNCTIONS ===================
+
+    /**
+     * @notice Validate Bitcoin address format using BitcoinAddressUtils
+     * @dev Validates Bitcoin addresses for supported formats:
+     *      - P2PKH (Pay-to-PubKey-Hash): Starts with '1', 26-35 chars
+     *      - P2SH (Pay-to-Script-Hash): Starts with '3', 26-35 chars
+     *      - Bech32 (SegWit): Starts with 'bc1', 42-62 chars
+     *      This validation is critical for wallet registration security.
+     * @param bitcoinAddress The Bitcoin address string to validate
+     * @return valid True if address matches a valid Bitcoin format, false otherwise
+     */
+    function isValidBitcoinAddress(string memory bitcoinAddress)
+        public
+        pure
+        returns (bool valid)
+    {
+        if (bytes(bitcoinAddress).length == 0) return false;
+
+        // Basic Bitcoin address format validation (matching original QCManager logic)
+        bytes memory addr = bytes(bitcoinAddress);
+        if (addr.length < 25 || addr.length > 62) {
+            return false;
+        }
+
+        // Basic validation: P2PKH starts with '1', P2SH with '3', Bech32 with 'bc1'
+        if (addr[0] == 0x31) return true; // '1' - P2PKH
+        if (addr[0] == 0x33) return true; // '3' - P2SH
+        if (addr.length >= 3 && addr[0] == 0x62 && addr[1] == 0x63 && addr[2] == 0x31) {
+            return true; // 'bc1' - Bech32
+        }
+
+        return false;
+    }
+
+    /**
+     * @notice Verify Bitcoin signature using CheckBitcoinSigs library
+     * @dev Uses the same ECDSA verification logic as Bridge contracts (Fraud.sol).
+     *      This function is critical for proving wallet ownership during registration.
+     *      The signature must be created with the Bitcoin private key corresponding to the public key.
+     * @param walletPublicKey The Bitcoin public key in uncompressed format (64 bytes, no 0x04 prefix)
+     * @param messageHash The keccak256 hash of the message that was signed
+     * @param v Recovery ID from the ECDSA signature (typically 27 or 28)
+     * @param r First 32 bytes of the ECDSA signature
+     * @param s Last 32 bytes of the ECDSA signature
+     * @return valid True if signature is valid and matches the public key, false otherwise
+     */
+    function verifyBitcoinSignature(
+        bytes memory walletPublicKey,
+        bytes32 messageHash,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) internal pure returns (bool valid) {
+        // Validate public key length (64 bytes for uncompressed key without prefix)
+        if (walletPublicKey.length != 64) {
+            return false;
+        }
+
+        // Use CheckBitcoinSigs library for signature verification
+        return CheckBitcoinSigs.checkSig(
+            walletPublicKey,
+            messageHash,
+            v,
+            r,
+            s
+        );
+    }
+
+    /**
+     * @notice Derive Bitcoin P2WPKH (native SegWit) address from public key
+     * @dev Derives a bech32 encoded Bitcoin address (bc1...) from an uncompressed public key
+     * @param publicKey The uncompressed public key (64 bytes, no 0x04 prefix)
+     * @return btcAddress The derived Bitcoin address in bech32 format
+     */
+    function deriveBitcoinAddressFromPublicKey(bytes memory publicKey) internal pure returns (string memory) {
+        require(publicKey.length == 64, "Invalid public key length");
+        
+        // Step 1: Compress the public key
+        // Take the X coordinate (first 32 bytes)
+        bytes memory compressed = new bytes(33);
+        // Determine prefix based on Y coordinate parity
+        // Y coordinate is the last 32 bytes of the public key
+        bytes32 yCoordBytes;
+        for (uint i = 0; i < 32; i++) {
+            yCoordBytes |= bytes32(publicKey[32 + i]) >> (i * 8);
+        }
+        uint256 yCoord = uint256(yCoordBytes);
+        compressed[0] = (yCoord % 2 == 0) ? bytes1(0x02) : bytes1(0x03);
+        // Copy X coordinate
+        for (uint i = 0; i < 32; i++) {
+            compressed[i + 1] = publicKey[i];
+        }
+        
+        // Step 2: Hash the compressed public key
+        bytes20 pubKeyHash = ripemd160(abi.encodePacked(sha256(compressed)));
+        
+        // Step 3: Witness program is implicitly version 0 with 20 bytes pubKeyHash
+        
+        // Step 4: Convert to 5-bit groups for bech32
+        // Need 33 entries: 1 witness version + 32 payload groups (20 bytes * 8 bits / 5 bits = 32)
+        uint256[] memory values = new uint256[](39); // Extra space for checksum calculation
+        values[0] = 0; // witness version
+        
+        // Convert 20 bytes to 5-bit groups
+        uint256 accumulator = 0;
+        uint256 bits = 0;
+        uint256 idx = 1;
+        
+        for (uint256 i = 0; i < 20; i++) {
+            uint8 b = uint8(pubKeyHash[i]);
+            accumulator = (accumulator << 8) | b;
+            bits += 8;
+            
+            while (bits >= 5) {
+                bits -= 5;
+                values[idx++] = (accumulator >> bits) & 0x1f;
+            }
+        }
+        if (bits > 0) {
+            values[idx++] = (accumulator << (5 - bits)) & 0x1f;
+        }
+        
+        // Step 5: Calculate bech32 checksum
+        uint256 checksum = _bech32Checksum("bc", values, idx);
+        
+        // Append checksum (6 characters)
+        for (uint256 i = 0; i < 6; i++) {
+            values[idx++] = (checksum >> (5 * (5 - i))) & 0x1f;
+        }
+        
+        // Step 6: Encode as bech32
+        bytes memory result = "bc1";
+        bytes memory charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+        
+        for (uint256 i = 0; i < idx; i++) {
+            result = abi.encodePacked(result, charset[values[i]]);
+        }
+        
+        return string(result);
+    }
+
+    /**
+     * @notice Calculate bech32 checksum according to BIP 173
+     * @param hrp Human readable part (e.g., "bc")
+     * @param data The data part in 5-bit groups
+     * @param dataLen Length of data array to process
+     * @return checksum The 30-bit checksum
+     */
+    function _bech32Checksum(string memory hrp, uint256[] memory data, uint256 dataLen) internal pure returns (uint256) {
+        uint256 chk = 1;
+        
+        // Process HRP
+        bytes memory hrpBytes = bytes(hrp);
+        for (uint256 i = 0; i < hrpBytes.length; i++) {
+            chk = _bech32Polymod(chk) ^ (uint256(uint8(hrpBytes[i])) >> 5);
+        }
+        chk = _bech32Polymod(chk);
+        
+        for (uint256 i = 0; i < hrpBytes.length; i++) {
+            chk = _bech32Polymod(chk) ^ (uint256(uint8(hrpBytes[i])) & 0x1f);
+        }
+        
+        // Process data
+        for (uint256 i = 0; i < dataLen; i++) {
+            chk = _bech32Polymod(chk) ^ data[i];
+        }
+        
+        // Process 6 zeros for checksum
+        for (uint256 i = 0; i < 6; i++) {
+            chk = _bech32Polymod(chk);
+        }
+        
+        return chk ^ 1;
+    }
+
+    /**
+     * @notice Bech32 polymod function for checksum calculation
+     * @param pre Previous checksum state
+     * @return Updated checksum state
+     */
+    function _bech32Polymod(uint256 pre) internal pure returns (uint256) {
+        uint256 b = pre >> 25;
+        uint256 chk = (pre & 0x1ffffff) << 5;
+        
+        if (b & 1 != 0) chk ^= 0x3b6a57b2;
+        if (b & 2 != 0) chk ^= 0x26508e6d;
+        if (b & 4 != 0) chk ^= 0x1ea119fa;
+        if (b & 8 != 0) chk ^= 0x3d4233dd;
+        if (b & 16 != 0) chk ^= 0x2a1462b3;
+        
+        return chk;
+    }
+
+    /**
+     * @notice Enhanced status transition validation with detailed reasoning
+     * @param from Current QC status
+     * @param to Target QC status
+     * @param hasUnfulfilledRedemptions Whether QC has pending redemptions
+     * @return valid Whether transition is allowed
+     * @return reason Detailed reason if transition is invalid
+     */
+    function validateStatusTransitionDetailed(
+        QCData.QCStatus from,
+        QCData.QCStatus to,
+        bool hasUnfulfilledRedemptions
+    ) external pure returns (bool valid, string memory reason) {
+        // Self-transitions always allowed
+        if (from == to) return (true, "");
+
+        // Cannot transition from Revoked (terminal state)
+        if (from == QCData.QCStatus.Revoked) {
+            return (false, "Cannot transition from Revoked status");
+        }
+
+        // Check redemption constraints
+        if (hasUnfulfilledRedemptions && to == QCData.QCStatus.Revoked) {
+            return (false, "Cannot revoke QC with unfulfilled redemptions");
+        }
+
+        // Active can transition to any state except itself
+        if (from == QCData.QCStatus.Active) {
+            return (true, "");
+        }
+
+        // MintingPaused transitions
+        if (from == QCData.QCStatus.MintingPaused) {
+            if (to == QCData.QCStatus.Active ||
+                to == QCData.QCStatus.Paused ||
+                to == QCData.QCStatus.UnderReview ||
+                to == QCData.QCStatus.Revoked) {
+                return (true, "");
+            }
+            return (false, "Invalid transition from MintingPaused");
+        }
+
+        // Paused transitions
+        if (from == QCData.QCStatus.Paused) {
+            if (to == QCData.QCStatus.Active ||
+                to == QCData.QCStatus.MintingPaused ||
+                to == QCData.QCStatus.UnderReview ||
+                to == QCData.QCStatus.Revoked) {
+                return (true, "");
+            }
+            return (false, "Invalid transition from Paused");
+        }
+
+        // UnderReview transitions (only to Active or Revoked)
+        if (from == QCData.QCStatus.UnderReview) {
+            if (to == QCData.QCStatus.Active || to == QCData.QCStatus.Revoked) {
+                return (true, "");
+            }
+            return (false, "UnderReview can only transition to Active or Revoked");
+        }
+
+        return (false, "Invalid status transition");
+    }
+
+    // =================== BUSINESS LOGIC FUNCTIONS ===================
+
+
+
+    // calculateTimeUntilRenewal moved to QCManagerPauseLib
+
+    /**
+     * @notice Get reserve balance and staleness from oracle
+     * @dev Retrieves the most recent attested reserve balance for a QC.
+     *      Balance is considered stale if older than 6 hours (STALENESS_THRESHOLD).
+     *      Stale balances may affect minting capacity and require fresh attestations.
+     * @param reserveOracle ReserveOracle contract providing reserve attestations
+     * @param qc QC address to query balance for
+     * @return balance Current reserve balance in satoshis
+     * @return isStale True if balance is older than 6 hours, false if fresh
+     */
+    function getReserveBalanceAndStaleness(
+        ReserveOracle reserveOracle,
+        address qc
+    ) external view returns (uint256 balance, bool isStale) {
+        return reserveOracle.getReserveBalanceAndStaleness(qc);
+    }
+
+    /**
+     * @notice Verify QC solvency by comparing backing to obligations
+     * @dev Performs critical solvency check by comparing attested reserves to minted tBTC.
+     *      A QC is considered solvent if reserves >= minted amount.
+     *      This function ignores staleness - solvency is based on last known balance.
+     *      Used by DISPUTE_ARBITER_ROLE to detect undercollateralization.
+     * @param qc QC address to verify solvency for
+     * @param qcData QCData contract for minted amount information
+     * @param reserveOracle ReserveOracle contract for reserve attestations
+     * @return isSolvent True if reserves cover minted amount, false if undercollateralized
+     * @return backing Current attested backing amount in satoshis
+     * @return obligations Total minted tBTC amount in satoshis
+     * @return deficit Undercollateralization amount if insolvent, 0 if solvent
+     */
+    function verifyQCSolvency(
+        address qc,
+        QCData qcData,
+        ReserveOracle reserveOracle
+    ) external view returns (
+        bool isSolvent,
+        uint256 backing,
+        uint256 obligations,
+        uint256 deficit
+    ) {
+        // Get current backing from oracle
+        (backing,) = reserveOracle.getReserveBalanceAndStaleness(qc);
+
+        // Get obligations (minted amount)
+        obligations = qcData.getQCMintedAmount(qc);
+
+        // Calculate solvency
+        if (backing >= obligations) {
+            isSolvent = true;
+            deficit = 0;
+        } else {
+            isSolvent = false;
+            deficit = obligations - backing;
+        }
+
+        return (isSolvent, backing, obligations, deficit);
+    }
+
+    // =================== VIEW FUNCTIONS ===================
+
+
     /**
      * @notice Calculate available minting capacity for a QC
-     * @param qcData QCData contract instance
-     * @param reserveOracle ReserveOracle contract instance
-     * @param qc QC address
-     * @return availableCapacity Available minting capacity in satoshis
+     * @dev Determines how much more tBTC a QC can mint based on:
+     *      1. Governance-set minting cap minus already minted amount
+     *      2. Attested reserve balance minus already minted amount
+     *      Returns the minimum of these two values.
+     *      Returns 0 if QC is not active or reserves are stale (>6 hours old).
+     * @param qcData QCData contract instance for QC information
+     * @param reserveOracle ReserveOracle contract for reserve attestations
+     * @param qc QC address to calculate capacity for
+     * @return availableCapacity Available minting capacity in satoshis (0 if unavailable)
      */
     function calculateAvailableMintingCapacity(
         QCData qcData,
@@ -247,10 +551,191 @@ library QCManagerLib {
                 return capBasedCapacity < reserveBasedCapacity
                     ? capBasedCapacity
                     : reserveBasedCapacity;
+            } else {
+                // Reserves are exhausted - return 0 capacity
+                return 0;
             }
         }
 
         return capBasedCapacity;
     }
 
+    /**
+     * @notice Comprehensive wallet registration validation
+     * @dev Performs all validation checks for wallet registration
+     * @param qcData QCData contract instance
+     * @param qc The QC address
+     * @param btcAddress The Bitcoin address to register
+     * @param challenge The challenge that was signed
+     * @param walletPublicKey The Bitcoin public key
+     * @param v Recovery ID from signature
+     * @param r First 32 bytes of signature
+     * @param s Last 32 bytes of signature
+     * @return success True if all validations pass
+     * @return errorCode Error code if validation fails (for event emission)
+     */
+    function validateWalletRegistrationFull(
+        QCData qcData,
+        address qc,
+        string calldata btcAddress,
+        bytes32 challenge,
+        bytes calldata walletPublicKey,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external view returns (bool success, string memory errorCode) {
+        // Check address length
+        if (bytes(btcAddress).length == 0) {
+            return (false, "INVALID_ADDR");
+        }
+
+        // Check QC registration
+        if (!qcData.isQCRegistered(qc)) {
+            return (false, "QC_NOT_REG");
+        }
+
+        // Check QC status
+        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
+            return (false, "QC_INACTIVE");
+        }
+
+        // Validate Bitcoin address format
+        if (!isValidBitcoinAddress(btcAddress)) {
+            return (false, "BAD_ADDR");
+        }
+
+        // Verify Bitcoin signature
+        if (!verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
+            return (false, "SIG_FAIL");
+        }
+
+        // CRITICAL SECURITY FIX: Verify that the public key corresponds to the claimed Bitcoin address
+        // This prevents signature bypass attacks where an attacker signs with any key
+        // and claims ownership of any Bitcoin address
+        string memory derivedAddress = deriveBitcoinAddressFromPublicKey(walletPublicKey);
+        if (keccak256(bytes(derivedAddress)) != keccak256(bytes(btcAddress))) {
+            return (false, "ADDR_MISMATCH");
+        }
+
+        return (true, "");
+    }
+
+    /**
+     * @notice Validate direct wallet registration by QC
+     * @dev Validates direct registration with challenge generation
+     * @param qcData QCData contract instance
+     * @param qc The QC address (msg.sender)
+     * @param btcAddress The Bitcoin address to register
+     * @param nonce The nonce for challenge generation
+     * @param walletPublicKey The Bitcoin public key
+     * @param v Recovery ID from signature
+     * @param r First 32 bytes of signature
+     * @param s Last 32 bytes of signature
+     * @return success True if all validations pass
+     * @return challenge The generated challenge
+     * @return errorCode Error code if validation fails
+     */
+    function validateDirectWalletRegistration(
+        QCData qcData,
+        address qc,
+        string calldata btcAddress,
+        uint256 nonce,
+        bytes calldata walletPublicKey,
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        uint256 /* chainId */
+    ) external view returns (bool success, bytes32 challenge, string memory errorCode) {
+        // Check QC registration and status
+        if (!qcData.isQCRegistered(qc)) {
+            return (false, bytes32(0), "QC_NOT_REG");
+        }
+        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
+            return (false, bytes32(0), "QC_INACTIVE");
+        }
+
+        // Check address length
+        if (bytes(btcAddress).length == 0) {
+            return (false, bytes32(0), "INVALID_ADDR");
+        }
+
+        // Generate deterministic challenge
+        challenge = keccak256(
+            abi.encodePacked(
+                "TBTC_QC_WALLET_DIRECT:",
+                qc,
+                btcAddress,
+                nonce,
+                block.chainid
+            )
+        );
+
+        // Validate Bitcoin address format
+        if (!isValidBitcoinAddress(btcAddress)) {
+            return (false, challenge, "BAD_ADDR_DIRECT");
+        }
+
+        // Verify Bitcoin signature
+        if (!verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
+            return (false, challenge, "SIG_FAIL_DIRECT");
+        }
+
+        // CRITICAL SECURITY FIX: Verify that the public key corresponds to the claimed Bitcoin address
+        // This prevents signature bypass attacks where an attacker signs with any key
+        // and claims ownership of any Bitcoin address
+        string memory derivedAddress = deriveBitcoinAddressFromPublicKey(walletPublicKey);
+        if (keccak256(bytes(derivedAddress)) != keccak256(bytes(btcAddress))) {
+            return (false, challenge, "ADDR_MISMATCH_DIRECT");
+        }
+
+        return (true, challenge, "");
+    }
+
+    function syncAccountControlWithStatus(
+        address accountControl,
+        address qc,
+        QCData.QCStatus oldStatus,
+        QCData.QCStatus newStatus
+    ) external {
+        if (oldStatus == newStatus) return;
+
+        IAccountControl ac = IAccountControl(accountControl);
+
+        if (newStatus == QCData.QCStatus.Active) {
+            ac.unpauseReserve(qc);
+        } else if (
+            newStatus == QCData.QCStatus.MintingPaused ||
+            newStatus == QCData.QCStatus.Paused ||
+            newStatus == QCData.QCStatus.UnderReview
+        ) {
+            ac.pauseReserve(qc);
+        } else if (newStatus == QCData.QCStatus.Revoked) {
+            ac.deauthorizeReserve(qc);
+        }
+    }
+
+    function performAutoEscalationLogic(
+        QCData qcData,
+        address qc,
+        bytes32 autoEscalationReason
+    ) external returns (QCData.QCStatus newStatus) {
+        QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
+
+        if (currentStatus == QCData.QCStatus.MintingPaused ||
+            currentStatus == QCData.QCStatus.Paused) {
+
+            newStatus = QCData.QCStatus.UnderReview;
+            qcData.setQCStatus(qc, newStatus, autoEscalationReason);
+
+            return newStatus;
+        }
+
+        return currentStatus;
+    }
+}
+
+interface IAccountControl {
+    function pauseReserve(address reserve) external;
+    function unpauseReserve(address reserve) external;
+    function deauthorizeReserve(address reserve) external;
 }

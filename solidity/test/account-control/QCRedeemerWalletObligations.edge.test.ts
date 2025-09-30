@@ -2,14 +2,14 @@ import chai, { expect } from "chai"
 import { ethers, helpers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
-import { QCRedeemer, QCData, SystemState, TBTC } from "../../typechain"
+import { QCRedeemer, QCData, SystemState, TBTC, TestRelay, MockAccountControl } from "../../typechain"
 import { deploySPVLibraries, getQCRedeemerLibraries } from "../helpers/spvLibraryHelpers"
 
 chai.use(smock.matchers)
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
-describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
+describe("QCRedeemer - Wallet Obligations (Edge Cases)", () => {
   let deployer: SignerWithAddress
   let user1: SignerWithAddress
   let user2: SignerWithAddress
@@ -20,6 +20,8 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
   let mockQCData: FakeContract<QCData>
   let mockSystemState: FakeContract<SystemState>
   let mockTBTC: FakeContract<TBTC>
+  let testRelay: TestRelay
+  let mockAccountControl: MockAccountControl
 
   // Test data
   const qcAddress = "0x1234567890123456789012345678901234567890"
@@ -51,6 +53,11 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
     mockSystemState = await smock.fake<SystemState>("SystemState")
     mockTBTC = await smock.fake<TBTC>("TBTC")
 
+    // Deploy test relay (required by SPVState)
+    const TestRelayFactory = await ethers.getContractFactory("TestRelay")
+    testRelay = await TestRelayFactory.deploy()
+    await testRelay.deployed()
+
     // Deploy SPV libraries for QCRedeemer
     const libraries = await deploySPVLibraries()
 
@@ -60,8 +67,8 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
       mockTBTC.address,
       mockQCData.address,
       mockSystemState.address,
-      ethers.constants.AddressZero,
-      0
+      testRelay.address,
+      1 // txProofDifficultyFactor
     )
     await qcRedeemer.deployed()
 
@@ -82,11 +89,33 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
 
     mockQCData.getWalletOwner.whenCalledWith(qcWallet1).returns(qcAddress)
     mockQCData.getWalletOwner.whenCalledWith(qcWallet2).returns(qcAddress)
-    mockQCData.getWalletStatus.whenCalledWith(qcWallet1).returns(0)
-    mockQCData.getWalletStatus.whenCalledWith(qcWallet2).returns(0)
+    mockQCData.getWalletStatus.whenCalledWith(qcWallet1).returns(1) // Active
+    mockQCData.getWalletStatus.whenCalledWith(qcWallet2).returns(1) // Active
 
     mockTBTC.balanceOf.returns(ethers.utils.parseEther("100"))
     mockTBTC.burnFrom.returns(true)
+
+    // Deploy MockBank first for MockAccountControl dependency
+    const MockBankFactory = await ethers.getContractFactory("MockBank")
+    const mockBank = await MockBankFactory.deploy()
+
+    // Deploy MockAccountControl and configure QCRedeemer
+    const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl")
+    mockAccountControl = await MockAccountControlFactory.deploy(mockBank.address)
+    await mockAccountControl.deployed()
+    await mockAccountControl.setTotalMintedForTesting(
+      ethers.BigNumber.from("100000000000") // 1000 BTC in satoshis
+    )
+    // Authorize QCRedeemer contract and set minted balance for redemptions
+    await mockAccountControl.authorizeReserve(
+      qcRedeemer.address,
+      ethers.BigNumber.from("100000000000") // 1000 BTC minting cap
+    )
+    await mockAccountControl.setMintedForTesting(
+      qcRedeemer.address,
+      ethers.BigNumber.from("100000000000") // 1000 BTC in satoshis
+    )
+    await qcRedeemer.setAccountControl(mockAccountControl.address)
   })
 
   afterEach(async () => {
@@ -97,7 +126,7 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
     it("should reject QC wallet with invalid Bitcoin address format", async () => {
       const invalidWallet = "0x1234567890123456789012345678901234567890" // Ethereum address
       mockQCData.getWalletOwner.whenCalledWith(invalidWallet).returns(qcAddress)
-      mockQCData.getWalletStatus.whenCalledWith(invalidWallet).returns(0)
+      mockQCData.getWalletStatus.whenCalledWith(invalidWallet).returns(1) // Active
 
       await expect(
         qcRedeemer
@@ -108,14 +137,14 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
             userBtcAddress,
             invalidWallet
           )
-      ).to.be.revertedWith("InvalidBitcoinAddressFormat")
+      ).to.be.revertedWithCustomError(qcRedeemer, "InvalidBitcoinAddressFormat")
     })
 
     it("should accept various valid Bitcoin address formats", async () => {
       // Test P2PKH (starts with 1)
       const p2pkhWallet = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
       mockQCData.getWalletOwner.whenCalledWith(p2pkhWallet).returns(qcAddress)
-      mockQCData.getWalletStatus.whenCalledWith(p2pkhWallet).returns(0)
+      mockQCData.getWalletStatus.whenCalledWith(p2pkhWallet).returns(1) // Active
 
       await qcRedeemer
         .connect(user1)
@@ -129,7 +158,7 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
       // Test P2SH (starts with 3)
       const p2shWallet = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy"
       mockQCData.getWalletOwner.whenCalledWith(p2shWallet).returns(qcAddress)
-      mockQCData.getWalletStatus.whenCalledWith(p2shWallet).returns(0)
+      mockQCData.getWalletStatus.whenCalledWith(p2shWallet).returns(1) // Active
 
       await qcRedeemer
         .connect(user2)
@@ -143,7 +172,7 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
       // Test Bech32 (starts with bc1)
       const bech32Wallet = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
       mockQCData.getWalletOwner.whenCalledWith(bech32Wallet).returns(qcAddress)
-      mockQCData.getWalletStatus.whenCalledWith(bech32Wallet).returns(0)
+      mockQCData.getWalletStatus.whenCalledWith(bech32Wallet).returns(1) // Active
 
       await qcRedeemer
         .connect(user3)
@@ -250,7 +279,7 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
             redemptionId,
             ethers.utils.formatBytes32String("DUPLICATE")
           )
-      ).to.be.revertedWith("RedemptionNotPending")
+      ).to.be.revertedWithCustomError(qcRedeemer, "RedemptionNotPending")
 
       // Counter should be zero and not underflowed
       expect(
@@ -354,7 +383,7 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
   describe("Edge Case: Wallet Status Transitions", () => {
     it("should prevent redemption with wallet that becomes inactive", async () => {
       // Initially active
-      mockQCData.getWalletStatus.whenCalledWith(qcWallet1).returns(0)
+      mockQCData.getWalletStatus.whenCalledWith(qcWallet1).returns(1) // Active
 
       // Create first redemption - succeeds
       await qcRedeemer
@@ -367,7 +396,7 @@ describe("QCRedeemer - Wallet Obligations Edge Cases", () => {
         )
 
       // Wallet becomes inactive
-      mockQCData.getWalletStatus.whenCalledWith(qcWallet1).returns(1)
+      mockQCData.getWalletStatus.whenCalledWith(qcWallet1).returns(0)
 
       // Second redemption should fail
       await expect(

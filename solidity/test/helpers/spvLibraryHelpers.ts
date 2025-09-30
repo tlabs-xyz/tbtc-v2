@@ -1,30 +1,17 @@
 import { ethers } from "hardhat"
+import { LibraryLinkingHelper } from "./libraryLinkingHelper"
 
 /**
  * Helper function to deploy SPV libraries in correct dependency order
  * Returns deployed library instances for linking
  */
 export async function deploySPVLibraries() {
-  // Deploy base library first
-  const SharedSPVCoreFactory = await ethers.getContractFactory("SharedSPVCore")
-  const sharedSPVCore = await SharedSPVCoreFactory.deploy()
-  await sharedSPVCore.deployed()
-
-  // Deploy QCRedeemerSPV library (depends on SharedSPVCore)
-  const QCRedeemerSPVFactory = await ethers.getContractFactory("QCRedeemerSPV", {
-    libraries: {
-      SharedSPVCore: sharedSPVCore.address,
-    },
-  })
-  const qcRedeemerSPV = await QCRedeemerSPVFactory.deploy()
-  await qcRedeemerSPV.deployed()
-
-  // QCRedeemerSPV library for SPV verification logic
-
-  // Deploy BitcoinAddressUtils (utility library)
-  const BitcoinAddressUtilsFactory = await ethers.getContractFactory("BitcoinAddressUtils")
-  const bitcoinAddressUtils = await BitcoinAddressUtilsFactory.deploy()
-  await bitcoinAddressUtils.deployed()
+  const libraries = await LibraryLinkingHelper.deployAllLibraries()
+  
+  // Get deployed library contracts for backward compatibility
+  const sharedSPVCore = await ethers.getContractAt("SharedSPVCore", libraries.SharedSPVCore)
+  const qcRedeemerSPV = await ethers.getContractAt("QCRedeemerSPV", libraries.QCRedeemerSPV)
+  const bitcoinAddressUtils = await ethers.getContractAt("BitcoinAddressUtils", libraries.BitcoinAddressUtils)
 
   return {
     sharedSPVCore,
@@ -34,21 +21,7 @@ export async function deploySPVLibraries() {
 }
 
 /**
- * Helper function to deploy MessageSigning library
- */
-/**
- * Helper function to deploy MessageSigning library
- * @deprecated MessageSigning library has been removed for security reasons
- */
-export async function deployMessageSigning() {
-  throw new Error("MessageSigning library has been removed for security reasons. Use BitcoinAddressUtils for address validation instead.")
-}
-
-/**
- * Helper function to deploy QCManagerLib library
- */
-/**
- * Helper function to deploy QCManagerLib library
+ * Helper function to deploy QCManager libraries
  */
 export async function deployQCManagerLib() {
   // Deploy QCManagerLib (no linking needed - it's a library)
@@ -56,18 +29,40 @@ export async function deployQCManagerLib() {
   const qcManagerLib = await QCManagerLibFactory.deploy()
   await qcManagerLib.deployed()
 
-  return { qcManagerLib }
+  // Deploy QCManagerPauseLib (no linking needed - it's a library)
+  const QCManagerPauseLibFactory = await ethers.getContractFactory("QCManagerPauseLib")
+  const qcManagerPauseLib = await QCManagerPauseLibFactory.deploy()
+  await qcManagerPauseLib.deployed()
+
+  return { qcManagerLib, qcManagerPauseLib }
 }
 
 /**
  * Helper function to get library linking configuration for QCRedeemer
+ * @deprecated Use LibraryLinkingHelper.getQCRedeemerFactory() instead
  */
+export async function getQCRedeemerLinkingConfig() {
+  const libraries = await LibraryLinkingHelper.deployAllLibraries()
+  return {
+    QCRedeemerSPV: libraries.QCRedeemerSPV,
+    SharedSPVCore: libraries.SharedSPVCore,
+  }
+}
+
+/**
+ * Enhanced helper to get QCRedeemer factory with proper library linking
+ */
+export async function getQCRedeemerFactory() {
+  return LibraryLinkingHelper.getQCRedeemerFactory()
+}
 export function getQCRedeemerLibraries(libraries: {
   qcRedeemerSPV: any
+  sharedSPVCore: any
 }) {
   return {
     libraries: {
       QCRedeemerSPV: libraries.qcRedeemerSPV.address,
+      SharedSPVCore: libraries.sharedSPVCore.address,
     },
   }
 }
@@ -75,15 +70,16 @@ export function getQCRedeemerLibraries(libraries: {
 /**
  * Helper function to get library linking configuration for QCManager
  */
-/**
- * Helper function to get library linking configuration for QCManager
- */
 export function getQCManagerLibraries(libraries: {
   qcManagerLib: any
+  qcManagerPauseLib?: any
 }) {
   return {
     libraries: {
       QCManagerLib: libraries.qcManagerLib.address,
+      ...(libraries.qcManagerPauseLib && {
+        QCManagerPauseLib: libraries.qcManagerPauseLib.address,
+      }),
     },
   }
 }

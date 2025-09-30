@@ -1,6 +1,7 @@
 import { ethers, deployments, helpers } from "hardhat"
 import { expect } from "chai"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
+import { LibraryLinkingHelper } from "../helpers/libraryLinkingHelper"
 
 describe("v1 System Deployment Tests", () => {
   let deployer: SignerWithAddress
@@ -18,11 +19,10 @@ describe("v1 System Deployment Tests", () => {
         "96_deploy_account_control_state.ts",
         "97_deploy_reserve_oracle.ts",
         "98_deploy_watchdog_enforcer.ts",
-        "99_configure_account_control_system.ts",
       ]
 
       // This test verifies that the deployment structure makes sense for v1
-      expect(expectedScripts.length).to.equal(5)
+      expect(expectedScripts.length).to.equal(4)
     })
 
     it("should confirm v1 doesn't include automated framework contracts", async () => {
@@ -74,18 +74,19 @@ describe("v1 System Deployment Tests", () => {
 
   describe("v1 Contract Factory Tests", () => {
     it("should be able to get contract factories for v1 contracts", async () => {
-      // Test that we can get factories for the actual implemented contracts
-      const contractsToTest = [
+      // Deploy libraries first for contracts that need them
+      const libraries = await LibraryLinkingHelper.deployAllLibraries()
+      
+      // Test simple contracts (no library dependencies)
+      const simpleContracts = [
         "QCMinter",
-        "QCRedeemer",
         "QCData",
         "SystemState",
-        "QCManager",
         "ReserveOracle",
         "WatchdogEnforcer",
       ]
 
-      for (const contractName of contractsToTest) {
+      for (const contractName of simpleContracts) {
         try {
           const factory = await ethers.getContractFactory(contractName)
           expect(factory).to.not.be.undefined
@@ -96,6 +97,26 @@ describe("v1 System Deployment Tests", () => {
           )
           throw error
         }
+      }
+
+      // Test QCRedeemer with library dependencies
+      try {
+        const qcRedeemerFactory = await LibraryLinkingHelper.getQCRedeemerFactory(libraries)
+        expect(qcRedeemerFactory).to.not.be.undefined
+        expect(qcRedeemerFactory.deploy).to.be.a("function")
+      } catch (error) {
+        console.log(`Failed to get factory for QCRedeemer: ${error.message}`)
+        throw error
+      }
+
+      // Test QCManager with library dependencies
+      try {
+        const qcManagerFactory = await LibraryLinkingHelper.getQCManagerFactory(libraries)
+        expect(qcManagerFactory).to.not.be.undefined
+        expect(qcManagerFactory.deploy).to.be.a("function")
+      } catch (error) {
+        console.log(`Failed to get factory for QCManager: ${error.message}`)
+        throw error
       }
     })
 
@@ -138,14 +159,6 @@ describe("v1 System Deployment Tests", () => {
           "TBTC",
         ],
         "98_deploy_reserve_ledger.ts": ["QCManager", "QCData", "SystemState"],
-        "99_configure_account_control_system.ts": [
-          "SimplifiedWatchdog",
-          "QCManager",
-          "QCData",
-          "QCMinter",
-          "QCRedeemer",
-          "SystemState",
-        ],
       }
 
       // The problem: TBTC dependency triggers Bridge deployment

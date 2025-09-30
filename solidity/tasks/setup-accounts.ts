@@ -1,7 +1,6 @@
 import { task } from "hardhat/config"
-import { HDNode } from "@ethersproject/hdnode"
-import { Wallet } from "@ethersproject/wallet"
-import { formatEther, parseEther } from "@ethersproject/units"
+import { ethers } from "hardhat"
+import { HDNodeWallet, formatEther, parseEther } from "ethers"
 import * as fs from "fs"
 import * as path from "path"
 
@@ -48,7 +47,7 @@ interface DerivedAccount {
   index: number
   address: string
   privateKey: string
-  wallet: Wallet
+  wallet: HDNodeWallet
   targetBalance: string
   currentBalance?: string
 }
@@ -64,7 +63,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
 
     // Validate seed phrase
     try {
-      HDNode.fromMnemonic(seedPhrase)
+      HDNodeWallet.fromPhrase(seedPhrase)
     } catch (error) {
       console.log("❌ Error: Invalid seed phrase")
       console.log("Please provide a valid 12 or 24 word BIP39 seed phrase")
@@ -90,7 +89,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
     console.log("🔑 Deriving accounts from seed phrase...")
     console.log(`📊 Deriving ${ACCOUNT_COUNT} accounts\n`)
 
-    const masterNode = HDNode.fromMnemonic(seedPhrase)
+    const masterNode = HDNodeWallet.fromPhrase(seedPhrase)
     const accounts: DerivedAccount[] = []
     const actorNames = Object.keys(ACTOR_ACCOUNTS) as Array<
       keyof typeof ACTOR_ACCOUNTS
@@ -98,8 +97,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
 
     for (let i = 0; i < ACCOUNT_COUNT; i++) {
       const derivationPath = `${DERIVATION_PATH_BASE}${i}`
-      const childNode = masterNode.derivePath(derivationPath)
-      const wallet = new Wallet(childNode.privateKey, ethers.provider)
+      const wallet = masterNode.derivePath(derivationPath).connect(ethers.provider)
 
       const actorName = actorNames[i]
       const targetBalance = FUNDING_AMOUNTS[actorName]

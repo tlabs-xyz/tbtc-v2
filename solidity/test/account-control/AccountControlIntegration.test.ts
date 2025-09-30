@@ -51,6 +51,9 @@ describe("AccountControl Integration Tests", function () {
 
     // Configure SystemState with test defaults to prevent AmountOutsideAllowedRange errors
     await setupSystemStateDefaults(mockSystemState, owner);
+    
+    // Enable AccountControl mode in SystemState for integration tests
+    await mockSystemState.connect(owner).setAccountControlMode(true);
 
     // Deploy minimal mock contracts for QCMinter requirements
     const MockTBTCVaultFactory = await ethers.getContractFactory("contracts/test/MockTBTCVault.sol:MockTBTCVault");
@@ -83,11 +86,15 @@ describe("AccountControl Integration Tests", function () {
     const MockQCManagerFactory = await ethers.getContractFactory("MockQCManager");
     mockQcManager = await MockQCManagerFactory.deploy();
 
+    // Register QC in MockQCManager (required for consumeMintCapacity to work)
+    await mockQcManager.registerQC(qc.address, QC_MINTING_CAP);
+    
     // Set up minting capacity for the QC
     await mockQcManager.setMintingCapacity(qc.address, QC_MINTING_CAP);
 
-    // Create simple mock address for relay
-    mockRelay = owner; // Reuse existing signer as mock
+    // Deploy TestRelay for SPV validation
+    const TestRelayFactory = await ethers.getContractFactory("TestRelay");
+    mockRelay = await TestRelayFactory.deploy();
 
     // Deploy QCMinter with constructor (not upgradeable)
     const QCMinterFactory = await ethers.getContractFactory("QCMinter");
@@ -116,6 +123,9 @@ describe("AccountControl Integration Tests", function () {
       100 // txProofDifficultyFactor
     ) as QCRedeemer;
 
+    // Authorize AccountControl to call MockBank functions
+    await mockBank.authorizeBalanceIncreaser(accountControl.address);
+
     // Setup AccountControl (QC_PERMISSIONED is initialized by default)
     await accountControl.connect(owner).authorizeReserve(qc.address, QC_BACKING_AMOUNT); // ReserveType.QC_PERMISSIONED (backing in satoshis)
 
@@ -140,25 +150,28 @@ describe("AccountControl Integration Tests", function () {
     const GOVERNANCE_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("GOVERNANCE_ROLE"));
     await qcMinter.connect(owner).grantRole(GOVERNANCE_ROLE, owner.address);
     await qcRedeemer.connect(owner).grantRole(GOVERNANCE_ROLE, owner.address);
+    
+    // Grant QC_MANAGER_ROLE to owner on AccountControl for setBacking calls
+    await accountControl.connect(owner).grantQCManagerRole(owner.address);
 
     // Set AccountControl address in QCMinter (critical for integration!)
     await qcMinter.connect(owner).setAccountControl(accountControl.address);
 
     // Deploy MockAccountControl for backing functionality in QCMinter
     const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
-    mockAccountControlForMinter = await MockAccountControlFactory.deploy();
+    mockAccountControlForMinter = await MockAccountControlFactory.deploy(mockBank.address);
 
     // For integration tests, use MockAccountControl for QCRedeemer to avoid minted balance tracking issues
     // The real AccountControl integration will be tested separately for complex cross-contract scenarios
-    mockAccountControlForRedeemer = await MockAccountControlFactory.deploy();
+    mockAccountControlForRedeemer = await MockAccountControlFactory.deploy(mockBank.address);
 
     // Set MockAccountControl address in QCRedeemer (allows simple integration testing)
     await qcRedeemer.connect(owner).setAccountControl(mockAccountControlForRedeemer.address);
 
-    // Set backing for QCMinter using real AccountControl (with test function)
+    // Set backing for QCMinter using real AccountControl 
     // In production, this backing would come from actual QC deposits
     // Need 3x backing for toggle test that mints 3 times
-    await accountControl.setBackingForTesting(qcMinter.address, QC_BACKING_AMOUNT * 3);
+    await accountControl.connect(owner).setBacking(qcMinter.address, QC_BACKING_AMOUNT * 3);
 
     // Set backing for QCRedeemer using MockAccountControl
     await mockAccountControlForRedeemer.setBackingForTesting(qcRedeemer.address, QC_BACKING_AMOUNT);
@@ -186,7 +199,7 @@ describe("AccountControl Integration Tests", function () {
       const initialTotal = await accountControl.totalMinted();
       
       // Request mint through QCMinter (this completes the mint immediately)
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       const receipt = await tx.wait();
 
       // Get mintId from event
@@ -206,22 +219,24 @@ describe("AccountControl Integration Tests", function () {
       expect(await mockBank.balances(minter.address)).to.equal(expectedSatoshis);
     });
 
-    it("should bypass AccountControl when disabled", async function () {
-      // Disable AccountControl mode
-      // Direct minting mode (bypassing AccountControl)
-      
-      const initialMinted = await accountControl.minted(qc.address);
+    it("should properly track minted amount with correct reserve address", async function () {
+      // This test verifies that AccountControl tracks the correct reserve (qcMinter) not the QC
+      const initialMinted = await accountControl.minted(qcMinter.address);
+      const initialQCMinted = await accountControl.minted(qc.address);
       
       // Request mint (single-step process now)
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       const receipt = await tx.wait();
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
       
-      // Note: QCRedeemer uses MockAccountControl, so AccountControl state is not updated (as expected)
-      expect(await accountControl.minted(qc.address)).to.equal(initialMinted);
+      // Verify AccountControl tracks minting against the correct reserve address (qcMinter)
+      const expectedSatoshis = MINT_AMOUNT.div(SATOSHI_MULTIPLIER);
+      expect(await accountControl.minted(qcMinter.address)).to.equal(initialMinted.add(expectedSatoshis));
+      
+      // Verify QC address itself doesn't have minted amount tracked
+      expect(await accountControl.minted(qc.address)).to.equal(initialQCMinted);
       
       // But Bank balance was still created for the minter
-      const expectedSatoshis = MINT_AMOUNT.div(SATOSHI_MULTIPLIER);
       expect(await mockBank.balances(minter.address)).to.equal(expectedSatoshis);
     });
 
@@ -232,19 +247,19 @@ describe("AccountControl Integration Tests", function () {
       // The mint request might succeed but the actual mint will fail
       // Let's check if the request succeeds and then the actual mint fails
       try {
-        const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+        const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
         // If it succeeds, the enforcement happens during the actual mint operation
         // Check that the minted amount doesn't increase
         const mintedBefore = await accountControl.minted(qc.address);
         expect(mintedBefore).to.equal(0);
       } catch (error: any) {
         // If it reverts, check the error message contains something about insufficient backing
-        expect(error.message).to.include("Insufficient");
+        expect(error.message).to.include("InsufficientBacking");
       }
 
       // Verify that with sufficient backing it would succeed
       await accountControl.connect(qc).updateBacking(MINT_AMOUNT.mul(2)); // Set backing higher than mint amount
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       await expect(tx).to.emit(qcMinter, "QCMintRequested");
     });
 
@@ -256,7 +271,7 @@ describe("AccountControl Integration Tests", function () {
       // Test that normal minting within allowed ranges works
       const validAmount = ethers.utils.parseEther("0.001"); // Valid amount for minting
       await accountControl.connect(owner).setMintingCap(qc.address, ethers.utils.parseEther("0.01"));
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, validAmount);
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, validAmount);
       await expect(tx).to.emit(qcMinter, "QCMintRequested");
     });
   });
@@ -264,7 +279,7 @@ describe("AccountControl Integration Tests", function () {
   describe("QCRedeemer Integration", function () {
     beforeEach(async function () {
       // First mint some tokens through the system
-      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      const tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       const receipt = await tx.wait();
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
 
@@ -277,6 +292,9 @@ describe("AccountControl Integration Tests", function () {
       // Set the totalMinted to match what was minted through QCMinter
       const expectedSatoshis = MINT_AMOUNT.div(SATOSHI_MULTIPLIER);
       await mockAccountControlForRedeemer.setTotalMintedForTesting(expectedSatoshis);
+      
+      // Also set the minted amount for QCRedeemer address (since it's the one calling redeem)
+      await mockAccountControlForRedeemer.setMintedForTesting(qcRedeemer.address, expectedSatoshis);
 
       // Setup redemption timeout
       await mockSystemState.setRedemptionTimeout(86400); // 24 hours
@@ -350,11 +368,21 @@ describe("AccountControl Integration Tests", function () {
     it("should handle AccountControl mode toggling mid-operation", async function () {
       // For this test, use MockAccountControl for QCMinter to enable toggle functionality
       const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
-      const mockAccountControlForMinter = await MockAccountControlFactory.deploy();
+      const mockAccountControlForMinter = await MockAccountControlFactory.deploy(mockBank.address);
       await qcMinter.connect(owner).setAccountControl(mockAccountControlForMinter.address);
+      
+      // Increase QC minting capacity for this test (needs 3x MINT_AMOUNT)
+      await mockQcManager.setMintingCapacity(qc.address, MINT_AMOUNT.mul(3));
+      
+      // CRITICAL: Authorize the new MockAccountControl in Bank (required for QCMinter to work)
+      await mockBank.authorizeBalanceIncreaser(mockAccountControlForMinter.address);
+      
+      // Authorize QCMinter as a reserve in the new MockAccountControl
+      await mockAccountControlForMinter.authorizeReserve(qcMinter.address, QC_BACKING_AMOUNT * 3);
+      await mockAccountControlForMinter.setBackingForTesting(qcMinter.address, QC_BACKING_AMOUNT * 3);
 
       // Mint with enabled
-      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       let receipt = await tx.wait();
       let mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
@@ -365,7 +393,7 @@ describe("AccountControl Integration Tests", function () {
       await mockAccountControlForMinter.setAccountControlEnabled(false);
 
       // Mint again with disabled - should not track minted amounts
-      tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       receipt = await tx.wait();
       mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
@@ -377,7 +405,7 @@ describe("AccountControl Integration Tests", function () {
       await mockAccountControlForMinter.setAccountControlEnabled(true);
 
       // Mint again with AccountControl re-enabled
-      tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       receipt = await tx.wait();
       mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
@@ -393,7 +421,7 @@ describe("AccountControl Integration Tests", function () {
       const mintAmount = MINT_AMOUNT;
       
       // Execute mint through QCMinter
-      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, mintAmount);
+      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, mintAmount);
       let receipt = await tx.wait();
       let mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
@@ -410,6 +438,7 @@ describe("AccountControl Integration Tests", function () {
       const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
       const mockAccountControlForRedeemer = MockAccountControlFactory.attach(mockAccountControlAddress);
       await mockAccountControlForRedeemer.setTotalMintedForTesting(expectedSatoshis);
+      await mockAccountControlForRedeemer.setMintedForTesting(qcRedeemer.address, expectedSatoshis);
 
       // Execute partial redemption
       const redeemAmount = mintAmount.div(2);
@@ -441,6 +470,9 @@ describe("AccountControl Integration Tests", function () {
       const testBtcAddress2 = "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"; // Different valid Bitcoin address
       await mockQcData.connect(owner).registerWallet(qc2.address, testBtcAddress2);
 
+      // Register qc2 in MockQCManager (required for consumeMintCapacity to work)
+      await mockQcManager.registerQC(qc2.address, QC_MINTING_CAP);
+      
       // Set minting capacity for qc2 in MockQCManager
       await mockQcManager.setMintingCapacity(qc2.address, QC_MINTING_CAP);
 
@@ -449,14 +481,14 @@ describe("AccountControl Integration Tests", function () {
       await accountControl.connect(qc2).updateBacking(QC_BACKING_AMOUNT);
 
       // Set backing for QCMinter to handle qc2 (needs more backing for two QCs)
-      await accountControl.setBackingForTesting(qcMinter.address, QC_BACKING_AMOUNT * 2);
+      await accountControl.connect(owner).setBacking(qcMinter.address, QC_BACKING_AMOUNT * 2);
       
       // Mint from both QCs
-      let tx1 = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      let tx1 = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       let receipt1 = await tx1.wait();
       let mintId1 = receipt1.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       
-      let tx2 = await qcMinter.connect(minter).requestQCMint(qc2.address, MINT_AMOUNT);
+      let tx2 = await qcMinter.connect(minter).requestQCMint(qc2.address, minter.address, MINT_AMOUNT);
       let receipt2 = await tx2.wait();
       let mintId2 = receipt2.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       
@@ -481,7 +513,7 @@ describe("AccountControl Integration Tests", function () {
       expect(initialSupply).to.be.at.least(MINT_AMOUNT); // At least the amount minted in beforeEach
       
       // 1. Request and execute mint
-      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, MINT_AMOUNT);
+      let tx = await qcMinter.connect(minter).requestQCMint(qc.address, minter.address, MINT_AMOUNT);
       let receipt = await tx.wait();
       let mintId = receipt.events?.find(e => e.event === "QCMintRequested")?.args?.mintId;
       // Note: executeQCMint no longer exists - minting happens in requestQCMint
@@ -499,6 +531,7 @@ describe("AccountControl Integration Tests", function () {
       const MockAccountControlFactory = await ethers.getContractFactory("MockAccountControl");
       const mockAccountControlForRedeemer = MockAccountControlFactory.attach(mockAccountControlAddress);
       await mockAccountControlForRedeemer.setTotalMintedForTesting(expectedSatoshis);
+      await mockAccountControlForRedeemer.setMintedForTesting(qcRedeemer.address, expectedSatoshis);
 
       // 3. Execute redemption
       await qcRedeemer.connect(user).initiateRedemption(

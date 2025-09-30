@@ -79,7 +79,26 @@ library SharedSPVCore {
             revert SPVErr(5); // Invalid merkle proof
         }
         
-        // Validate coinbase proof
+        // Validate coinbase proof - IMPORTANT IMPLEMENTATION DECISION
+        // 
+        // COINBASE VALIDATION METHODOLOGY:
+        // The coinbasePreimage field contains the SHA-256 hash of the coinbase transaction (32 bytes).
+        // Bitcoin uses double SHA-256 for transaction IDs, but the tBTC v2 Bridge contract and 
+        // associated test data expect single SHA-256 hashing of the coinbasePreimage.
+        //
+        // ALIGNMENT WITH TBTC V2:
+        // This implementation uses single SHA-256 to maintain compatibility with:
+        // 1. Bridge contract SPV validation logic
+        // 2. ValidMainnetProof test data format from bitcoin-spv library
+        // 3. Existing tBTC v2 ecosystem expectations
+        //
+        // SECURITY IMPLICATIONS:
+        // Single SHA-256 is sufficient for coinbase validation as:
+        // - The coinbasePreimage is already a hash (not raw transaction data)  
+        // - Merkle proof verification provides cryptographic security
+        // - This aligns with established tBTC Bridge patterns
+        //
+        // If raw coinbase transaction data were used, double SHA-256 would be required.
         bytes32 coinbaseHash = sha256(abi.encodePacked(proof.coinbasePreimage));
         if (!coinbaseHash.prove(root, proof.coinbaseProof, 0)) {
             revert SPVErr(6); // Invalid coinbase proof

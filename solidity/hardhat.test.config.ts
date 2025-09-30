@@ -2,6 +2,7 @@ import { HardhatUserConfig } from "hardhat/config"
 
 import "dotenv/config"
 import "@nomiclabs/hardhat-waffle"
+import "@nomicfoundation/hardhat-chai-matchers"
 import "@typechain/hardhat"
 import "hardhat-deploy"
 import "hardhat-dependency-compiler"
@@ -65,6 +66,20 @@ const config: HardhatUserConfig = {
   },
 
   external: {
+    contracts: [
+      {
+        artifacts: "node_modules/@keep-network/tbtc/artifacts",
+      },
+      {
+        artifacts: "node_modules/@threshold-network/solidity-contracts/export/artifacts",
+      },
+      {
+        artifacts: "node_modules/@keep-network/random-beacon/export/artifacts",
+      },
+      {
+        artifacts: "node_modules/@keep-network/ecdsa/export/artifacts",
+      },
+    ],
     deployments: {
       hardhat: ["./external/npm"],
       localhost: ["./external/npm"],
@@ -72,7 +87,12 @@ const config: HardhatUserConfig = {
   },
 
   dependencyCompiler: {
-    paths: [],
+    paths: [
+      "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol",
+      "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
+      "@keep-network/ecdsa/contracts/WalletRegistry.sol",
+    ],
+    keep: true,
   },
 }
 

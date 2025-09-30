@@ -4,11 +4,14 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./QCData.sol";
+import "./QCManagerErrors.sol";
 import "./SystemState.sol";
 import "./ReserveOracle.sol";
 import {BitcoinAddressUtils} from "./BitcoinAddressUtils.sol";
+import {CheckBitcoinSigs} from "@keep-network/bitcoin-spv-sol/contracts/CheckBitcoinSigs.sol";
 import "./AccountControl.sol";
 import "./QCManagerLib.sol";
+import "./libraries/QCManagerPauseLib.sol";
 
 // =================== CONSOLIDATED INTERFACES ===================
 // Interfaces for contracts that will be removed in consolidation
@@ -53,7 +56,7 @@ interface IQCRedeemer {
 /// - ENFORCEMENT_ROLE: Can request status changes to UnderReview (limited authority)
 /// - MONITOR_ROLE: Can check QC escalations and trigger auto-escalation
 /// - EMERGENCY_ROLE: Can clear emergency pauses and restore credits
-contract QCManager is AccessControl, ReentrancyGuard {
+contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
@@ -62,6 +65,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         keccak256("ENFORCEMENT_ROLE");
     bytes32 public constant MONITOR_ROLE = keccak256("MONITOR_ROLE");
     bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     // =================== STATE MANAGEMENT CONSTANTS ===================
     
@@ -74,76 +78,22 @@ contract QCManager is AccessControl, ReentrancyGuard {
     bytes32 public constant AUTO_ESCALATION = keccak256("AUTO_ESCALATION");
     bytes32 public constant DEFAULT_ESCALATION = keccak256("DEFAULT_ESCALATION");
     bytes32 public constant BACKLOG_CLEARED = keccak256("BACKLOG_CLEARED");
+    bytes32 public constant UNDERCOLLATERALIZED_REASON = keccak256("UNDERCOLLATERALIZED");
     
     // =================== PAUSE CREDIT CONSTANTS ===================
-    
-    uint256 public constant PAUSE_DURATION = 48 hours;
-    uint256 public constant RENEWAL_PERIOD = 90 days;
-    uint256 public constant MIN_REDEMPTION_BUFFER = 8 hours;
+    // Constants moved to QCManagerPauseLib
+    using QCManagerPauseLib for mapping(address => QCManagerPauseLib.PauseCredit);
 
-    // Custom errors for gas-efficient reverts
-    // Note: Some errors moved to QCManagerLib
-    error MessageSignatureVerificationFailed();
-    error NonceAlreadyUsed(address qc, uint256 nonce);
-    error NotAuthorizedForSolvency(address caller);
-    error QCNotRegisteredForSolvency(address qc);
-    error ReasonRequired();
-    // Moved to QCManagerLib
-    error WalletNotRegistered(string btcAddress);
-    error NotAuthorizedForWalletDeregistration(address caller);
-    error WalletNotActive(string btcAddress);
-    error WalletNotPendingDeregistration(string btcAddress);
-    error QCWouldBecomeInsolvent(uint256 newBalance, uint256 mintedAmount);
-    error QCReserveLedgerNotAvailable();
-
-    error ServiceNotAvailable(string service);
-    error InvalidRelayAddress();
-
-    
-    // =================== STATE MANAGEMENT ERRORS ===================
-    
-    error NoPauseCredit();
-    error AlreadyPaused();
-    error NotSelfPaused();
-    error CannotEarlyResume();
-    error InvalidPauseLevel();
-    error HasPendingRedemptions();
-    error InvalidStatus();
-    error NotEligibleForEscalation();
-    
-    // =================== PAUSE CREDIT ERRORS ===================
-    
-    error NoPauseCreditAvailable();
-    error PauseReasonRequired();
-    error WouldBreachRedemptionDeadline();
-    error NotPaused();
-    error PauseNotExpired();
-    error CreditAlreadyAvailable();
-    error NeverUsedCredit();
-    error RenewalPeriodNotMet();
-    error QCAlreadyInitialized();
+    // Additional errors not in QCManagerErrors
     error QCNotEligibleForEscalation();
     error EscalationPeriodNotReached();
     error OnlyStateManager();
+    // WouldBreachRedemptionDeadline moved to QCManagerPauseLib
     
 
-    // =================== ENUMS AND STRUCTS ===================
+    // =================== STRUCTS ===================
     
-    /// @dev Pause level selection for QC self-pause
-    enum PauseLevel {
-        MintingOnly,    // Pause minting but allow fulfillment
-        Complete        // Pause all operations
-    }
-    
-    /// @dev Pause credit information for each QC
-    struct PauseCredit {
-        bool hasCredit;              // Can QC pause themselves?
-        uint256 lastUsed;            // When last used (0 = never)
-        uint256 creditRenewTime;     // When credit can be renewed
-        bool isPaused;               // Currently paused?
-        uint256 pauseEndTime;        // When pause expires
-        bytes32 pauseReason;         // Why paused
-    }
+    // PauseCredit struct moved to QCManagerPauseLib
 
     QCData public immutable qcData;
     SystemState public immutable systemState;
@@ -165,7 +115,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     
     // =================== PAUSE CREDIT STORAGE ===================
     
-    mapping(address => PauseCredit) public pauseCredits;
+    mapping(address => QCManagerPauseLib.PauseCredit) public pauseCredits;
     
     // =================== WALLET REGISTRATION STORAGE ===================
     
@@ -293,7 +243,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     
     event QCSelfPaused(
         address indexed qc,
-        PauseLevel level,
+        QCData.PauseLevel level,
         QCData.QCStatus newStatus,
         uint256 timeout
     );
@@ -336,7 +286,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         uint256 nextRenewalTime
     );
     
-    event PauseExpired(
+    event PauseCreditExpired(
         address indexed qc
     );
     
@@ -374,7 +324,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @notice Ensures AccountControl is configured
     /// @dev Reverts if accountControl is not set (address(0))
     modifier requiresAccountControl() {
-        require(accountControl != address(0), "AccountControl not configured");
+        require(accountControl != address(0), "AccountControl not set");
         _;
     }
 
@@ -383,6 +333,10 @@ contract QCManager is AccessControl, ReentrancyGuard {
         address _systemState,
         address _reserveOracle
     ) {
+        require(_qcData != address(0), "Invalid QCData address");
+        require(_systemState != address(0), "Invalid SystemState address");
+        require(_reserveOracle != address(0), "Invalid ReserveOracle address");
+
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
         reserveOracle = ReserveOracle(_reserveOracle);
@@ -449,10 +403,10 @@ contract QCManager is AccessControl, ReentrancyGuard {
         nonReentrant
     {
         if (qc == address(0)) {
-            revert QCManagerLib.InvalidQCAddress();
+            revert InvalidQCAddress();
         }
         if (newCap == 0) {
-            revert QCManagerLib.InvalidMintingCapacity();
+            revert InvalidMintingCapacity();
         }
 
         uint256 currentCap = qcData.getMaxMintingCapacity(qc);
@@ -520,7 +474,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         // AUTHORITY VALIDATION: WatchdogEnforcer can only set QCs to UnderReview
         require(
             newStatus == QCData.QCStatus.UnderReview,
-            "WatchdogEnforcer can only set UnderReview status"
+            "WatchdogEnforcer: UnderReview only"
         );
 
         emit QCStatusChangeRequested(
@@ -537,26 +491,38 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param qc The address of the QC
     /// @param newStatus The new status
     /// @param reason The reason for the change
-    /// @dev authority parameter removed to fix docstring parsing error
+    /// @param authority The authority making the status change
     function _executeStatusChange(
         address qc,
         QCData.QCStatus newStatus,
         bytes32 reason,
-        string memory /* authority */
+        string memory authority
     ) private requiresAccountControl {
         if (reason == bytes32(0)) {
-            revert ReasonRequired();
+            revert QCManagerPauseLib.ReasonRequired();
         }
 
         if (!qcData.isQCRegistered(qc)) {
-            revert QCManagerLib.QCNotRegistered(qc);
+            revert QCNotRegistered(qc);
         }
 
         QCData.QCStatus oldStatus = qcData.getQCStatus(qc);
 
-        // Validate status transitions according to state machine rules
-        if (!_isValidStatusTransition(oldStatus, newStatus)) {
-            revert QCManagerLib.InvalidStatusTransition(oldStatus, newStatus);
+        // Check if QC has unfulfilled redemptions for enhanced validation
+        bool hasRedemptions = false;
+        if (address(qcRedeemer) != address(0)) {
+            hasRedemptions = qcRedeemer.hasUnfulfilledRedemptions(qc);
+        }
+
+        // Validate status transitions with detailed reasoning
+        (bool isValid,) = QCManagerLib.validateStatusTransitionDetailed(
+            oldStatus,
+            newStatus,
+            hasRedemptions
+        );
+
+        if (!isValid) {
+            revert InvalidStatusTransition(uint8(oldStatus), uint8(newStatus));
         }
 
         qcData.setQCStatus(qc, newStatus, reason);
@@ -570,7 +536,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
             newStatus,
             reason,
             msg.sender,
-            "AUTHORITY",
+            authority,
             block.timestamp
         );
     }
@@ -589,97 +555,80 @@ contract QCManager is AccessControl, ReentrancyGuard {
         QCData.QCStatus oldStatus,
         QCData.QCStatus newStatus
     ) private {
-        // Only sync if status actually changed
         if (oldStatus == newStatus) return;
 
-        // Always sync backing first when status changes (except for revoked QCs)
         if (newStatus != QCData.QCStatus.Revoked) {
             try this.syncBackingFromOracle(qc) {
-                // Backing synced successfully
             } catch {
-                // Oracle data not available - continue with status sync
             }
         }
 
-        if (newStatus == QCData.QCStatus.Active) {
-            // Resume operations - unpause the reserve
-            AccountControl(accountControl).unpauseReserve(qc);
-        } else if (
-            newStatus == QCData.QCStatus.MintingPaused ||
-            newStatus == QCData.QCStatus.Paused ||
-            newStatus == QCData.QCStatus.UnderReview
-        ) {
-            // Suspend operations - pause the reserve
-            AccountControl(accountControl).pauseReserve(qc);
-        } else if (newStatus == QCData.QCStatus.Revoked) {
-            // Terminal state - deauthorize the reserve completely
-            AccountControl(accountControl).deauthorizeReserve(qc);
-        }
+        QCManagerLib.syncAccountControlWithStatus(
+            accountControl,
+            qc,
+            oldStatus,
+            newStatus
+        );
     }
 
-    /// @notice Register a wallet for a QC using message signature verification
+    /// @notice Register a wallet for a QC using Bitcoin signature verification
     /// @dev SECURITY: nonReentrant protects against reentrancy via ReserveOracle and QCData external calls
     /// @param qc The address of the QC
     /// @param btcAddress The Bitcoin address to register
     /// @param challenge The challenge message that was signed
-    /// @param signature The Bitcoin message signature from the QC
+    /// @param walletPublicKey The Bitcoin public key in uncompressed format (64 bytes)
+    /// @param v Recovery ID from signature
+    /// @param r First 32 bytes of signature
+    /// @param s Last 32 bytes of signature
     function registerWallet(
         address qc,
         string calldata btcAddress,
         bytes32 challenge,
-        bytes calldata signature
+        bytes calldata walletPublicKey,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
     )
         external
         onlyRole(REGISTRAR_ROLE)
-        onlyWhenNotPaused("wallet_registration")
+        onlyWhenNotPaused("wallet_reg")
         nonReentrant
     {
-        if (bytes(btcAddress).length == 0) {
+        // Use library for comprehensive validation
+        (bool success, string memory errorCode) = QCManagerLib.validateWalletRegistrationFull(
+            qcData,
+            qc,
+            btcAddress,
+            challenge,
+            walletPublicKey,
+            v,
+            r,
+            s
+        );
+
+        if (!success) {
             emit WalletRegistrationFailed(
                 qc,
                 btcAddress,
-                "INVALID_WALLET_ADDRESS",
+                errorCode,
                 msg.sender
             );
-            revert QCManagerLib.InvalidWalletAddress();
+            // Convert error code to appropriate revert
+            if (keccak256(bytes(errorCode)) == keccak256("INVALID_ADDR") ||
+                keccak256(bytes(errorCode)) == keccak256("BAD_ADDR")) {
+                revert InvalidWalletAddress();
+            } else if (keccak256(bytes(errorCode)) == keccak256("QC_NOT_REG")) {
+                revert QCNotRegistered(qc);
+            } else if (keccak256(bytes(errorCode)) == keccak256("QC_INACTIVE")) {
+                revert QCNotActive(qc);
+            } else if (keccak256(bytes(errorCode)) == keccak256("SIG_FAIL")) {
+                revert SignatureVerificationFailed();
+            } else if (keccak256(bytes(errorCode)) == keccak256("ADDR_MISMATCH")) {
+                revert SignatureVerificationFailed(); // Public key doesn't match claimed address
+            } else {
+                revert("Validation failed");
+            }
         }
-
-        // Cache QCData service to avoid redundant SLOAD operations
-        if (!qcData.isQCRegistered(qc)) {
-            emit WalletRegistrationFailed(
-                qc,
-                btcAddress,
-                "QC_NOT_REGISTERED",
-                msg.sender
-            );
-            revert QCManagerLib.QCNotRegistered(qc);
-        }
-        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
-            emit WalletRegistrationFailed(
-                qc,
-                btcAddress,
-                "QC_NOT_ACTIVE",
-                msg.sender
-            );
-            revert QCManagerLib.QCNotActive(qc);
-        }
-
-        // SECURITY NOTICE: Bitcoin signature verification has been disabled due to critical vulnerability
-        // in the previous MessageSigning implementation. This allows registration without signature verification.
-        // TODO: Implement proper Bitcoin message signature verification using CheckBitcoinSigs by Q2 2025
-
-        // For now, we only validate the Bitcoin address format
-        if (!_isValidBitcoinAddress(btcAddress)) {
-            emit WalletRegistrationFailed(
-                qc,
-                btcAddress,
-                "INVALID_BITCOIN_ADDRESS_FORMAT",
-                msg.sender
-            );
-            revert QCManagerLib.InvalidWalletAddress();
-        }
-
-        // NOTE: Signature verification bypassed - address format validation only
 
         qcData.registerWallet(qc, btcAddress);
 
@@ -701,54 +650,58 @@ contract QCManager is AccessControl, ReentrancyGuard {
     ///      4. Submit the signature with a unique nonce
     /// @param btcAddress The Bitcoin address to register
     /// @param nonce A unique nonce to prevent replay attacks (QC must track their nonces)
-    /// @param signature The Bitcoin message signature proving ownership
+    /// @param walletPublicKey The Bitcoin public key in uncompressed format (64 bytes)
+    /// @param v Recovery ID from signature
+    /// @param r First 32 bytes of signature
+    /// @param s Last 32 bytes of signature
     function registerWalletDirect(
         string calldata btcAddress,
         uint256 nonce,
-        bytes calldata signature
+        bytes calldata walletPublicKey,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
     )
         external
-        onlyWhenNotPaused("wallet_registration")
+        onlyWhenNotPaused("wallet_reg")
         nonReentrant
     {
-        // Gate: Only registered, active QCs can register their own wallets
-        if (!qcData.isQCRegistered(msg.sender)) {
-            revert QCManagerLib.QCNotRegistered(msg.sender);
-        }
-        if (qcData.getQCStatus(msg.sender) != QCData.QCStatus.Active) {
-            revert QCManagerLib.QCNotActive(msg.sender);
-        }
-
-        // Validate Bitcoin address
-        if (bytes(btcAddress).length == 0) {
-            revert QCManagerLib.InvalidWalletAddress();
-        }
-
-        // Generate deterministic challenge on-chain
-        // QCs can compute this same challenge off-chain before signing
-        bytes32 challenge = keccak256(
-            abi.encodePacked(
-                "TBTC_QC_WALLET_DIRECT:",
-                msg.sender,
-                btcAddress,
-                nonce,
-                block.chainid  // Prevent cross-chain replay
-            )
+        // Use library for comprehensive validation and challenge generation
+        (bool success, bytes32 challenge, string memory errorCode) = QCManagerLib.validateDirectWalletRegistration(
+            qcData,
+            msg.sender,
+            btcAddress,
+            nonce,
+            walletPublicKey,
+            v,
+            r,
+            s,
+            block.chainid
         );
 
-        // SECURITY NOTICE: Bitcoin signature verification disabled (see registerWallet for details)
-        // For now, we only validate the Bitcoin address format
-        if (!_isValidBitcoinAddress(btcAddress)) {
+        if (!success) {
             emit WalletRegistrationFailed(
                 msg.sender,
                 btcAddress,
-                "INVALID_BITCOIN_ADDRESS_FORMAT_DIRECT",
+                errorCode,
                 msg.sender
             );
-            revert QCManagerLib.InvalidWalletAddress();
+            // Convert error code to appropriate revert
+            if (keccak256(bytes(errorCode)) == keccak256("INVALID_ADDR") ||
+                keccak256(bytes(errorCode)) == keccak256("BAD_ADDR_DIRECT")) {
+                revert InvalidWalletAddress();
+            } else if (keccak256(bytes(errorCode)) == keccak256("QC_NOT_REG")) {
+                revert QCNotRegistered(msg.sender);
+            } else if (keccak256(bytes(errorCode)) == keccak256("QC_INACTIVE")) {
+                revert QCNotActive(msg.sender);
+            } else if (keccak256(bytes(errorCode)) == keccak256("SIG_FAIL_DIRECT")) {
+                revert SignatureVerificationFailed();
+            } else if (keccak256(bytes(errorCode)) == keccak256("ADDR_MISMATCH_DIRECT")) {
+                revert SignatureVerificationFailed(); // Public key doesn't match claimed address
+            } else {
+                revert("Validation failed");
+            }
         }
-
-        // NOTE: Signature verification bypassed - address format validation only
 
         // Check and mark nonce as used to prevent replay
         if (usedNonces[msg.sender][nonce]) {
@@ -788,15 +741,15 @@ contract QCManager is AccessControl, ReentrancyGuard {
         else if (hasRole(REGISTRAR_ROLE, msg.sender)) {
             // For registrars, the QC address should be derived from context or passed separately
             // For now, revert with clear message
-            revert("REGISTRAR_MUST_USE_REGISTER_WALLET");
+            revert("Use registerWallet");
         }
         else {
-            revert("UNAUTHORIZED_WALLET_VERIFICATION");
+            revert("Unauthorized");
         }
 
         // Validate Bitcoin address format
-        if (bytes(bitcoinAddress).length == 0) revert QCManagerLib.InvalidWalletAddress();
-        if (!_isValidBitcoinAddress(bitcoinAddress)) revert QCManagerLib.InvalidWalletAddress();
+        if (bytes(bitcoinAddress).length == 0) revert InvalidWalletAddress();
+        if (!QCManagerLib.isValidBitcoinAddress(bitcoinAddress)) revert InvalidWalletAddress();
 
         // Generate unique challenge (simplified version without MessageSigning)
         challenge = keccak256(
@@ -824,10 +777,9 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param btcAddress The Bitcoin address to deregister
     function requestWalletDeRegistration(string calldata btcAddress)
         external
-        onlyWhenNotPaused("wallet_registration")
+        onlyWhenNotPaused("wallet_reg")
         nonReentrant
     {
-        // Cache QCData service to avoid redundant SLOAD operations
         address qc = qcData.getWalletOwner(btcAddress);
 
         if (qc == address(0)) {
@@ -850,7 +802,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         if (address(qcRedeemer) != address(0)) {
             require(
                 !IQCRedeemer(address(qcRedeemer)).hasWalletObligations(btcAddress),
-                "Cannot deregister: wallet has pending redemptions"
+                "Wallet has pending redemptions"
             );
         }
 
@@ -867,10 +819,9 @@ contract QCManager is AccessControl, ReentrancyGuard {
     )
         external
         onlyRole(REGISTRAR_ROLE)
-        onlyWhenNotPaused("wallet_registration")
+        onlyWhenNotPaused("wallet_reg")
         nonReentrant
     {
-        // Cache QCData service to avoid redundant SLOAD operations
         address qc = qcData.getWalletOwner(btcAddress);
 
         if (qc == address(0)) {
@@ -884,7 +835,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         }
 
         // Get old balance before updating
-        (uint256 oldBalance, ) = _getReserveBalanceAndStaleness(qc);
+        (uint256 oldBalance, ) = QCManagerLib.getReserveBalanceAndStaleness(reserveOracle, qc);
 
         // Update reserve balance and perform solvency check
         _updateReserveBalanceAndCheckSolvency(qc, newReserveBalance);
@@ -917,6 +868,76 @@ contract QCManager is AccessControl, ReentrancyGuard {
         );
     }
 
+    /// @notice Atomically consume minting capacity for a QC
+    /// @dev This function atomically checks capacity and updates minted amount to prevent TOCTOU vulnerabilities
+    ///      SECURITY: This is the critical fix for the race condition where multiple mints could exceed capacity
+    /// @param qc The address of the QC
+    /// @param amount The amount to mint (in satoshis)
+    /// @return success True if capacity was successfully consumed
+    function consumeMintCapacity(address qc, uint256 amount)
+        external
+        onlyRole(MINTER_ROLE)
+        nonReentrant
+        returns (bool success)
+    {
+        // Validate inputs
+        if (qc == address(0)) {
+            revert InvalidQCAddress();
+        }
+        if (amount == 0) {
+            return false;
+        }
+
+        // Check QC is registered
+        if (!qcData.isQCRegistered(qc)) {
+            revert QCNotRegistered(qc);
+        }
+
+        // Check QC is active
+        if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
+            return false;
+        }
+
+        // Get current state
+        uint256 mintingCap = qcData.getMaxMintingCapacity(qc);
+        uint256 currentMinted = qcData.getQCMintedAmount(qc);
+        
+        // Calculate capacity from minting cap
+        if (currentMinted + amount > mintingCap) {
+            return false;
+        }
+
+        // Check reserve balance if oracle is available
+        if (address(reserveOracle) != address(0)) {
+            (uint256 reserveBalance, bool isStale) = reserveOracle.getReserveBalanceAndStaleness(qc);
+            
+            // If reserves are stale, no capacity available
+            if (isStale) {
+                return false;
+            }
+            
+            // Check if new minted amount would exceed reserves
+            if (currentMinted + amount > reserveBalance) {
+                return false;
+            }
+        }
+
+        // Atomically update the minted amount
+        uint256 newMintedAmount = currentMinted + amount;
+        qcData.updateQCMintedAmount(qc, newMintedAmount);
+
+        // Emit event for tracking
+        emit QCMintedAmountUpdated(
+            qc,
+            currentMinted,
+            newMintedAmount,
+            msg.sender,
+            block.timestamp
+        );
+
+        return true;
+    }
+
     /// @notice Verify QC solvency
     /// @param qc The address of the QC to verify
     /// @return solvent True if QC is solvent
@@ -939,14 +960,14 @@ contract QCManager is AccessControl, ReentrancyGuard {
             revert QCNotRegisteredForSolvency(qc);
         }
 
-        (uint256 reserveBalance, ) = _getReserveBalanceAndStaleness(qc);
+        (uint256 reserveBalance, ) = QCManagerLib.getReserveBalanceAndStaleness(reserveOracle, qc);
         uint256 mintedAmount = qcData.getQCMintedAmount(qc);
 
         solvent = reserveBalance >= mintedAmount;
 
         // If insolvent, change status to UnderReview
         if (!solvent && qcData.getQCStatus(qc) == QCData.QCStatus.Active) {
-            bytes32 reason = keccak256("UNDERCOLLATERALIZED");
+            bytes32 reason = UNDERCOLLATERALIZED_REASON;
             _executeStatusChange(
                 qc,
                 QCData.QCStatus.UnderReview,
@@ -977,7 +998,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         nonReentrant
     {
         if (!qcData.isQCRegistered(qc)) {
-            revert QCManagerLib.QCNotRegistered(qc);
+            revert QCNotRegistered(qc);
         }
 
         uint256 oldAmount = qcData.getQCMintedAmount(qc);
@@ -993,22 +1014,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
     }
 
 
-    /// @notice Validate status transitions according to business state machine rules
-    /// @dev STATE MACHINE RULES:
-    ///      - Active ↔ UnderReview (bidirectional)
-    ///      - Active → Revoked (terminal)
-    ///      - UnderReview → Revoked (terminal)
-    ///      - Revoked → (nothing) (terminal state)
-    /// @param oldStatus The current status
-    /// @param newStatus The requested new status
-    /// @return valid True if the transition is allowed
-    function _isValidStatusTransition(
-        QCData.QCStatus oldStatus,
-        QCData.QCStatus newStatus
-    ) private pure returns (bool valid) {
-        // Delegate to library for validation
-        return QCManagerLib.isValidStatusTransition(oldStatus, newStatus);
-    }
 
 
 
@@ -1016,13 +1021,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param qc The QC address
     /// @return balance The reserve balance
     /// @return isStale True if the balance is stale
-    function _getReserveBalanceAndStaleness(address qc)
-        private
-        view
-        returns (uint256 balance, bool isStale)
-    {
-        return reserveOracle.getReserveBalanceAndStaleness(qc);
-    }
     
 
 
@@ -1037,7 +1035,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         uint256 mintedAmount = qcData.getQCMintedAmount(qc);
 
         // Get old balance before updating
-        (uint256 oldBalance, ) = _getReserveBalanceAndStaleness(qc);
+        (uint256 oldBalance, ) = QCManagerLib.getReserveBalanceAndStaleness(reserveOracle, qc);
 
         // Check solvency before updating
         if (newBalance < mintedAmount) {
@@ -1061,31 +1059,33 @@ contract QCManager is AccessControl, ReentrancyGuard {
     
     /// @notice QC initiates self-pause with chosen level
     /// @param level PauseLevel.MintingOnly or PauseLevel.Complete
-    function selfPause(PauseLevel level) external nonReentrant {
+    function selfPause(QCData.PauseLevel level) external nonReentrant {
         address qc = msg.sender;
         
         // Validate QC status
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
         if (currentStatus != QCData.QCStatus.Active) {
-            revert QCManagerLib.QCNotActive(qc);
+            revert QCNotActive(qc);
         }
         
         // Check pause credit availability
         if (!canSelfPause(qc)) {
-            revert NoPauseCredit();
+            revert QCManagerPauseLib.NoPauseCredit();
         }
         
         // Use renewable pause credit
         _useEmergencyPause(qc, "SELF_MAINTENANCE");
         
         // Set appropriate state based on pause level
-        QCData.QCStatus newStatus = (level == PauseLevel.MintingOnly) ? 
+        QCData.QCStatus newStatus = (level == QCData.PauseLevel.MintingOnly) ? 
             QCData.QCStatus.MintingPaused : 
             QCData.QCStatus.Paused;
         
         // Update QC status
+        QCData.QCStatus oldStatus = qcData.getQCStatus(qc);
         qcData.setQCStatus(qc, newStatus, SELF_PAUSE);
         qcData.setQCSelfPaused(qc, true);
+        _syncAccountControlWithStatus(qc, oldStatus, newStatus);
         
         // Track timeout for auto-escalation
         qcPauseTimestamp[qc] = block.timestamp;
@@ -1100,13 +1100,13 @@ contract QCManager is AccessControl, ReentrancyGuard {
         address qc = msg.sender;
         
         if (!qcCanEarlyResume[qc]) {
-            revert CannotEarlyResume();
+            revert QCManagerPauseLib.CannotEarlyResume();
         }
         
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
         if (currentStatus != QCData.QCStatus.MintingPaused && 
             currentStatus != QCData.QCStatus.Paused) {
-            revert NotSelfPaused();
+            revert QCManagerPauseLib.NotSelfPaused();
         }
         
         // Clear pause tracking
@@ -1117,11 +1117,10 @@ contract QCManager is AccessControl, ReentrancyGuard {
         // Return to Active status
         qcData.setQCStatus(qc, QCData.QCStatus.Active, EARLY_RESUME);
         qcData.setQCSelfPaused(qc, false);
-        
-        // Notify pause credit system
+        _syncAccountControlWithStatus(qc, currentStatus, QCData.QCStatus.Active);
+
+        // Notify pause credit system (emits EarlyResumed event)
         _resumeEarly(qc);
-        
-        emit EarlyResumed(qc, qc);
     }
     
     // =================== WATCHDOG INTEGRATION ===================
@@ -1147,11 +1146,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
             
             uint256 timeElapsed = block.timestamp - qcPauseTimestamp[qc];
             
-            // Check if escalation period has been reached
-            if (timeElapsed < SELF_PAUSE_TIMEOUT) {
-                revert EscalationPeriodNotReached();
-            }
-            
             // Check for warning period (1 hour before escalation) but only if not yet escalated
             if (timeElapsed >= SELF_PAUSE_TIMEOUT - ESCALATION_WARNING_PERIOD && 
                 timeElapsed < SELF_PAUSE_TIMEOUT &&
@@ -1159,6 +1153,11 @@ contract QCManager is AccessControl, ReentrancyGuard {
                 uint256 timeRemaining = SELF_PAUSE_TIMEOUT - timeElapsed;
                 emit ApproachingEscalation(qc, timeRemaining);
                 escalationWarningEmitted[qc] = true;
+            }
+            
+            // Skip if escalation period has not been reached yet
+            if (timeElapsed < SELF_PAUSE_TIMEOUT) {
+                continue; // Skip this QC, check others
             }
             
             // Perform auto-escalation after 48h
@@ -1191,7 +1190,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
         
         if (newStatus != currentStatus) {
             qcData.setQCStatus(qc, newStatus, DEFAULT_ESCALATION);
-            
+            _syncAccountControlWithStatus(qc, currentStatus, newStatus);
+
             // Clear any self-pause tracking if escalating
             if (qcCanEarlyResume[qc]) {
                 delete qcCanEarlyResume[qc];
@@ -1212,21 +1212,23 @@ contract QCManager is AccessControl, ReentrancyGuard {
     {
         // Check for pending redemptions
         if (hasUnfulfilledRedemptions(qc)) {
-            revert HasPendingRedemptions();
+            revert QCManagerPauseLib.HasPendingRedemptions();
         }
         
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
         
         // Only UnderReview QCs can be cleared back to Active
         if (currentStatus == QCData.QCStatus.UnderReview) {
+            QCData.QCStatus oldStatus = currentStatus;
             qcData.setQCStatus(qc, QCData.QCStatus.Active, BACKLOG_CLEARED);
-            
+            _syncAccountControlWithStatus(qc, oldStatus, QCData.QCStatus.Active);
+
             // Clear any remaining timeout tracking
             delete qcPauseTimestamp[qc];
             delete qcCanEarlyResume[qc];
             delete escalationWarningEmitted[qc];
             qcData.setQCSelfPaused(qc, false);
-            
+
             emit BacklogCleared(qc, QCData.QCStatus.Active);
         } else {
             revert InvalidStatus();
@@ -1239,65 +1241,26 @@ contract QCManager is AccessControl, ReentrancyGuard {
     /// @param qc QC address
     /// @return canPause Whether QC can self-pause
     function canSelfPause(address qc) public view returns (bool canPause) {
-        PauseCredit memory credit = pauseCredits[qc];
-        
-        // Must have credit and not be currently paused
-        if (!credit.hasCredit || credit.isPaused) {
-            return false;
-        }
-        
-        // Check QC is active
-        try qcData.getQCStatus(qc) returns (QCData.QCStatus status) {
-            if (status != QCData.QCStatus.Active) {
-                return false;
-            }
-        } catch {
-            return false;
-        }
-        
-        // Check redemption deadline protection
-        uint256 earliestDeadline = getEarliestRedemptionDeadline(qc);
-        if (earliestDeadline > 0 && 
-            earliestDeadline < block.timestamp + PAUSE_DURATION + MIN_REDEMPTION_BUFFER) {
-            return false;
-        }
-        
-        return true;
+        return QCManagerPauseLib.canSelfPause(
+            pauseCredits,
+            qcData,
+            qc,
+            this.getEarliestRedemptionDeadline
+        );
     }
     
     /// @notice Renew pause credit after 90 days
     function renewPauseCredit() external {
         address qc = msg.sender;
-        PauseCredit storage credit = pauseCredits[qc];
-        
-        // Validate conditions
-        QCData.QCStatus status = qcData.getQCStatus(qc);
-        if (status != QCData.QCStatus.Active) revert QCManagerLib.QCNotActive(qc);
-        if (credit.hasCredit) revert CreditAlreadyAvailable();
-        if (credit.lastUsed == 0) revert NeverUsedCredit();
-        if (block.timestamp < credit.creditRenewTime) revert RenewalPeriodNotMet();
-        
-        // Renew credit
-        credit.hasCredit = true;
-        credit.creditRenewTime = 0;
-        
-        emit PauseCreditRenewed(qc, block.timestamp + RENEWAL_PERIOD);
+        QCManagerPauseLib.renewPauseCredit(pauseCredits, qcData, qc);
+        emit PauseCreditRenewed(qc, block.timestamp + QCManagerPauseLib.RENEWAL_PERIOD);
     }
     
     /// @notice Check and auto-resume if pause expired
     /// @param qc QC address
     function resumeIfExpired(address qc) external {
-        PauseCredit storage credit = pauseCredits[qc];
-        
-        if (!credit.isPaused) revert NotPaused();
-        if (block.timestamp < credit.pauseEndTime) revert PauseNotExpired();
-        
-        // Clear pause state
-        credit.isPaused = false;
-        credit.pauseEndTime = 0;
-        credit.pauseReason = bytes32(0);
-        
-        emit PauseExpired(qc);
+        QCManagerPauseLib.resumeIfExpired(pauseCredits, qc);
+        emit PauseCreditExpired(qc);
     }
     
     /// @notice Emergency council can clear pause and restore credit
@@ -1307,20 +1270,8 @@ contract QCManager is AccessControl, ReentrancyGuard {
         external 
         onlyRole(EMERGENCY_ROLE) 
     {
-        PauseCredit storage credit = pauseCredits[qc];
-        
-        // Clear pause state
-        credit.isPaused = false;
-        credit.pauseEndTime = 0;
-        credit.pauseReason = bytes32(0);
-        
-        // Optionally restore credit if it was consumed
-        if (!credit.hasCredit && credit.lastUsed > 0) {
-            credit.hasCredit = true;
-            credit.creditRenewTime = 0;
-        }
-        
-        emit EmergencyCleared(qc, msg.sender, keccak256(bytes(reason)));
+        bytes32 reasonHash = QCManagerPauseLib.emergencyClearPause(pauseCredits, qc, reason);
+        emit EmergencyCleared(qc, msg.sender, reasonHash);
     }
     
     /// @notice Grant initial credit to new QC
@@ -1329,15 +1280,7 @@ contract QCManager is AccessControl, ReentrancyGuard {
         external 
         onlyRole(EMERGENCY_ROLE) 
     {
-        // Verify QC is registered
-        if (!qcData.isQCRegistered(qc)) {
-            revert QCManagerLib.QCNotRegistered(qc);
-        }
-        
-        if (pauseCredits[qc].lastUsed != 0) revert QCAlreadyInitialized();
-        
-        pauseCredits[qc].hasCredit = true;
-        
+        QCManagerPauseLib.grantInitialCredit(pauseCredits, qcData, qc);
         emit InitialCreditGranted(qc, msg.sender);
     }
     
@@ -1407,122 +1350,58 @@ contract QCManager is AccessControl, ReentrancyGuard {
         bool hasCredit,
         uint256 creditRenewTime
     ) {
-        PauseCredit memory credit = pauseCredits[qc];
-        return (
-            credit.isPaused,
-            credit.pauseEndTime,
-            credit.pauseReason,
-            credit.hasCredit,
-            credit.creditRenewTime
-        );
+        return QCManagerPauseLib.getPauseInfo(pauseCredits, qc);
     }
     
     /// @notice Get time until credit renewal is available
     /// @param qc QC address
     /// @return timeUntilRenewal Seconds until renewal (0 if available now)
-    function getTimeUntilRenewal(address qc) 
-        external 
-        view 
-        returns (uint256 timeUntilRenewal) 
+    function getTimeUntilRenewal(address qc)
+        external
+        view
+        returns (uint256 timeUntilRenewal)
     {
-        PauseCredit memory credit = pauseCredits[qc];
-        
-        if (credit.hasCredit || credit.lastUsed == 0) {
-            return 0;
-        }
-        
-        if (block.timestamp >= credit.creditRenewTime) {
-            return 0;
-        }
-        
-        return credit.creditRenewTime - block.timestamp;
+        return QCManagerPauseLib.getTimeUntilRenewal(pauseCredits, qc);
     }
     
     // =================== INTERNAL HELPER FUNCTIONS ===================
 
-    /// @dev Validate Bitcoin address format using basic validation
-    /// @param bitcoinAddress The Bitcoin address to validate
-    /// @return valid True if address has valid format
-    function _isValidBitcoinAddress(string memory bitcoinAddress)
-        private
-        pure
-        returns (bool valid)
-    {
-        bytes memory addr = bytes(bitcoinAddress);
-        if (addr.length == 0 || addr.length < 25 || addr.length > 62) {
-            return false;
-        }
 
-        // Basic validation: P2PKH starts with '1', P2SH with '3', Bech32 with 'bc1'
-        if (addr[0] == 0x31) return true; // '1' - P2PKH
-        if (addr[0] == 0x33) return true; // '3' - P2SH
-        if (addr.length >= 3 && addr[0] == 0x62 && addr[1] == 0x63 && addr[2] == 0x31) {
-            return true; // 'bc1' - Bech32
-        }
-
-        return false;
-    }
 
     /// @dev Internal function to perform auto-escalation
     function _performAutoEscalation(address qc) private {
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
-        
-        // Auto-escalate based on current state
-        if (currentStatus == QCData.QCStatus.MintingPaused || 
-            currentStatus == QCData.QCStatus.Paused) {
-            
-            // Escalate to UnderReview
-            qcData.setQCStatus(qc, QCData.QCStatus.UnderReview, AUTO_ESCALATION);
-            
-            // Clear early resume capability
+
+        QCData.QCStatus newStatus = QCManagerLib.performAutoEscalationLogic(
+            qcData,
+            qc,
+            AUTO_ESCALATION
+        );
+
+        if (newStatus != currentStatus) {
             delete qcCanEarlyResume[qc];
             delete qcPauseTimestamp[qc];
             qcData.setQCSelfPaused(qc, false);
-            
-            emit AutoEscalated(qc, currentStatus, QCData.QCStatus.UnderReview);
+
+            emit AutoEscalated(qc, currentStatus, newStatus);
         }
     }
     
     /// @dev Internal function to use emergency pause credit
     function _useEmergencyPause(address qc, string memory reason) private {
-        PauseCredit storage credit = pauseCredits[qc];
-        
-        // Validate conditions
-        if (!credit.hasCredit) revert NoPauseCreditAvailable();
-        if (credit.isPaused) revert AlreadyPaused();
-        if (bytes(reason).length == 0) revert ReasonRequired();
-        
-        // Check QC status
-        QCData.QCStatus status = qcData.getQCStatus(qc);
-        if (status != QCData.QCStatus.Active) revert QCManagerLib.QCNotActive(qc);
-        
-        // Deadline protection
-        uint256 earliestDeadline = getEarliestRedemptionDeadline(qc);
-        if (earliestDeadline > 0 && 
-            earliestDeadline < block.timestamp + PAUSE_DURATION + MIN_REDEMPTION_BUFFER) {
-            revert WouldBreachRedemptionDeadline();
-        }
-        
-        // Consume credit and set pause
-        credit.hasCredit = false;
-        credit.lastUsed = block.timestamp;
-        credit.creditRenewTime = block.timestamp + RENEWAL_PERIOD;
-        credit.isPaused = true;
-        credit.pauseEndTime = block.timestamp + PAUSE_DURATION;
-        credit.pauseReason = keccak256(bytes(reason));
-        
-        emit PauseCreditUsed(qc, credit.pauseReason, PAUSE_DURATION);
+        bytes32 reasonHash = QCManagerPauseLib.useEmergencyPause(
+            pauseCredits, 
+            qcData, 
+            qc, 
+            reason, 
+            this.getEarliestRedemptionDeadline
+        );
+        emit PauseCreditUsed(qc, reasonHash, QCManagerPauseLib.PAUSE_DURATION);
     }
     
     /// @dev Internal function for early resume from pause credit system
     function _resumeEarly(address qc) private {
-        PauseCredit storage credit = pauseCredits[qc];
-        
-        // Clear pause state
-        credit.isPaused = false;
-        credit.pauseEndTime = 0;
-        credit.pauseReason = bytes32(0);
-        
+        QCManagerPauseLib.resumeEarly(pauseCredits, qc);
         emit EarlyResumed(qc, msg.sender);
     }
 
@@ -1535,12 +1414,6 @@ contract QCManager is AccessControl, ReentrancyGuard {
             address(accountControl),
             qc
         );
-
-        // Update AccountControl with the oracle-attested balance
-        if (address(accountControl) != address(0)) {
-            AccountControl(accountControl).setBacking(qc, balance);
-        }
-
         emit BackingSyncedFromOracle(qc, balance, isStale);
     }
 

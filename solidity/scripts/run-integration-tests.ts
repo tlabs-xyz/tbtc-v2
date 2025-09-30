@@ -24,7 +24,12 @@ class IntegrationTestRunner {
     ]
 
     for (const testFile of testFiles) {
-      await this.runTest(testFile)
+      try {
+        await this.runTest(testFile)
+      } catch {
+        // Keep going so the summary covers every test
+        // Error is already recorded in this.results by runTest
+      }
     }
 
     this.printSummary()
@@ -50,8 +55,14 @@ class IntegrationTestRunner {
         throw new Error(stderr)
       }
 
-      // Parse output for test results
-      const passed = stdout.includes("passing") && !stdout.includes("failing")
+      // Parse output for test results - improved parsing logic
+      const failingMatch = stdout.match(/(\d+) failing/)
+      const passingMatch = stdout.match(/(\d+) passing/)
+      const failingCount = failingMatch ? parseInt(failingMatch[1]) : 0
+      const passingCount = passingMatch ? parseInt(passingMatch[1]) : 0
+      
+      // Test passes if there are passing tests and no failing tests
+      const passed = passingCount > 0 && failingCount === 0
 
       this.results.push({
         name: testName,
@@ -62,24 +73,27 @@ class IntegrationTestRunner {
       console.log(chalk.green(`✅ ${testName} - PASSED (${duration}ms)`))
 
       // Show test details
-      if (stdout.includes("passing")) {
-        const passingMatch = stdout.match(/(\d+) passing/)
-        if (passingMatch) {
-          console.log(chalk.gray(`   ${passingMatch[1]} tests passed`))
-        }
+      if (passingCount > 0) {
+        console.log(chalk.gray(`   ${passingCount} tests passed`))
       }
-    } catch (error) {
+      if (failingCount > 0) {
+        console.log(chalk.red(`   ${failingCount} tests failed`))
+      }
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error))
       const duration = Date.now() - startTime
 
       this.results.push({
         name: testName,
         passed: false,
         duration,
-        error: error.message,
+        error: err.message,
       })
 
       console.log(chalk.red(`❌ ${testName} - FAILED (${duration}ms)`))
-      console.log(chalk.red(`   Error: ${error.message.split("\n")[0]}`))
+      console.log(chalk.red(`   Error: ${err.message.split("\n")[0]}`))
+      
+      throw err
     }
   }
 
@@ -173,7 +187,10 @@ Options:
 
 // Run if called directly
 if (require.main === module) {
-  main().catch(console.error)
+  main().catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
 }
 
 export { IntegrationTestRunner }

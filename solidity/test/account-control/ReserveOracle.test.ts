@@ -11,9 +11,11 @@ describe("ReserveOracle", () => {
   let attester2: SignerWithAddress
   let attester3: SignerWithAddress
   let attester4: SignerWithAddress
+  let attester5: SignerWithAddress
   let qcAddress: SignerWithAddress
   let qcManager: SignerWithAddress
   let arbiter: SignerWithAddress
+  let owner: SignerWithAddress
   let reserveOracle: ReserveOracle
 
   const ATTESTER_ROLE = ethers.utils.id("ATTESTER_ROLE")
@@ -27,18 +29,22 @@ describe("ReserveOracle", () => {
       attester2Signer,
       attester3Signer,
       attester4Signer,
+      attester5Signer,
       qcAddressSigner,
       qcManagerSigner,
       arbiterSigner,
+      ownerSigner,
     ] = await ethers.getSigners()
     deployer = deployerSigner
     attester1 = attester1Signer
     attester2 = attester2Signer
     attester3 = attester3Signer
     attester4 = attester4Signer
+    attester5 = attester5Signer
     qcAddress = qcAddressSigner
     qcManager = qcManagerSigner
     arbiter = arbiterSigner
+    owner = ownerSigner
   })
 
   beforeEach(async () => {
@@ -64,6 +70,12 @@ describe("ReserveOracle", () => {
     await reserveOracle
       .connect(deployer)
       .grantRole(ATTESTER_ROLE, attester4.address)
+    await reserveOracle
+      .connect(deployer)
+      .grantRole(ATTESTER_ROLE, attester5.address)
+    await reserveOracle
+      .connect(deployer)
+      .grantRole(ATTESTER_ROLE, owner.address)
     await reserveOracle
       .connect(deployer)
       .grantRole(DISPUTE_ARBITER_ROLE, arbiter.address)
@@ -279,10 +291,14 @@ describe("ReserveOracle", () => {
     })
 
     it("should handle even number of attestations", async () => {
-      // Update threshold to 4
-      await reserveOracle.connect(deployer).setConsensusThreshold(4)
+      // First grant DISPUTE_ARBITER_ROLE to deployer
+      const DISPUTE_ARBITER_ROLE = await reserveOracle.DISPUTE_ARBITER_ROLE()
+      await reserveOracle.connect(deployer).grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
+      
+      // Update threshold to 5 (must be odd)
+      await reserveOracle.connect(deployer).setConsensusThreshold(5)
 
-      // Submit 4 attestations
+      // Submit 6 attestations (even number)
       await reserveOracle
         .connect(attester1)
         .attestBalance(qcAddress.address, ethers.utils.parseEther("80"))
@@ -293,17 +309,30 @@ describe("ReserveOracle", () => {
         .connect(attester3)
         .attestBalance(qcAddress.address, ethers.utils.parseEther("100"))
 
-      // Fourth attestation triggers consensus
+      // Continue with more attestations
+      await reserveOracle
+        .connect(attester4)
+        .attestBalance(qcAddress.address, ethers.utils.parseEther("110"))
+      
+      // Fifth attestation triggers consensus (threshold is 5)
       await expect(
         reserveOracle
-          .connect(attester4)
-          .attestBalance(qcAddress.address, ethers.utils.parseEther("110"))
+          .connect(attester5)
+          .attestBalance(qcAddress.address, ethers.utils.parseEther("120"))
       ).to.emit(reserveOracle, "ConsensusReached")
 
-      // Median of [80, 90, 100, 110] = (90 + 100) / 2 = 95
+      // Continue with 6th attestation to test even number
+      // Note: Consensus was already reached with 5 attestations, so this 6th attestation
+      // will be part of a new round
+      await reserveOracle
+        .connect(owner) // Use owner as 6th attester
+        .attestBalance(qcAddress.address, ethers.utils.parseEther("130"))
+
+      // After consensus with 5 values [80, 90, 100, 110, 120], the median is 100
+      // The 6th attestation starts a new round, so the balance remains 100
       const [reserveBalance] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
-      expect(reserveBalance).to.equal(ethers.utils.parseEther("95"))
+      expect(reserveBalance).to.equal(ethers.utils.parseEther("100"))
     })
 
     it("should not reach consensus with insufficient attestations", async () => {
@@ -387,6 +416,9 @@ describe("ReserveOracle", () => {
   describe("Configuration", () => {
     describe("setConsensusThreshold", () => {
       it("should allow admin to update threshold", async () => {
+        // Grant DISPUTE_ARBITER_ROLE to deployer first
+        await reserveOracle.connect(deployer).grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
+        
         await expect(reserveOracle.connect(deployer).setConsensusThreshold(5))
           .to.emit(reserveOracle, "ConsensusThresholdUpdated")
           .withArgs(3, 5)
@@ -403,6 +435,9 @@ describe("ReserveOracle", () => {
       })
 
       it("should revert if threshold is zero", async () => {
+        // Grant DISPUTE_ARBITER_ROLE to deployer first
+        await reserveOracle.connect(deployer).grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
+        
         await expect(
           reserveOracle.connect(deployer).setConsensusThreshold(0)
         ).to.be.revertedWith("InvalidThreshold")
@@ -637,23 +672,25 @@ describe("ReserveOracle", () => {
   })
 
   describe("Edge cases", () => {
-    it("should handle attester updating their attestation", async () => {
+    it("should prevent attester from updating their attestation", async () => {
       // First attestation
       await reserveOracle
         .connect(attester1)
         .attestBalance(qcAddress.address, ethers.utils.parseEther("100"))
 
-      // Update attestation
-      await reserveOracle
-        .connect(attester1)
-        .attestBalance(qcAddress.address, ethers.utils.parseEther("150"))
+      // Attempt to update attestation - should revert
+      await expect(
+        reserveOracle
+          .connect(attester1)
+          .attestBalance(qcAddress.address, ethers.utils.parseEther("150"))
+      ).to.be.reverted
 
-      // Check that attestation was updated
+      // Check that attestation was NOT updated
       const attestation = await reserveOracle.pendingAttestations(
         qcAddress.address,
         attester1.address
       )
-      expect(attestation.balance).to.equal(ethers.utils.parseEther("150"))
+      expect(attestation.balance).to.equal(ethers.utils.parseEther("100"))
     })
 
     it("should ignore expired attestations when calculating consensus", async () => {

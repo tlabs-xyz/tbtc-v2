@@ -3,8 +3,9 @@
 pragma solidity ^0.8.17;
 
 import "../integrator/IBank.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MockBankWithSeparatedOps is IBank {
+contract MockBankWithSeparatedOps is IBank, Ownable {
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
     uint256 private _totalSupply;
@@ -59,6 +60,10 @@ contract MockBankWithSeparatedOps is IBank {
 
     // AccountControl integration methods
     function increaseBalance(address account, uint256 amount) external {
+        require(
+            _authorizedIncreasers[msg.sender],
+            "Mock Bank: unauthorized increaser"
+        );
         individualCallCount++;
         callCount++;
 
@@ -72,6 +77,10 @@ contract MockBankWithSeparatedOps is IBank {
     }
 
     function increaseBalances(address[] calldata accounts, uint256[] calldata amounts) external {
+        require(
+            _authorizedIncreasers[msg.sender],
+            "Mock Bank: unauthorized increaser"
+        );
         if (!batchSupported) {
             revert("Mock Bank: Batch not supported");
         }
@@ -86,25 +95,11 @@ contract MockBankWithSeparatedOps is IBank {
         }
     }
 
-    // NEW: Separated operations support
-    function mint(address recipient, uint256 amount) external {
-        _balances[recipient] += amount;
-        _totalSupply += amount;
-    }
-
-    function burn(uint256 amount) external {
-        require(_balances[msg.sender] >= amount, "MockBank: Insufficient balance to burn");
-        _balances[msg.sender] -= amount;
-        _totalSupply -= amount;
-    }
-
-    function burnFrom(address account, uint256 amount) external {
-        require(_balances[account] >= amount, "MockBank: Insufficient balance to burn");
-        _balances[account] -= amount;
-        _totalSupply -= amount;
-    }
-
     function decreaseBalance(address account, uint256 amount) external {
+        require(
+            _authorizedIncreasers[msg.sender],
+            "Mock Bank: unauthorized decreaser"
+        );
         require(_balances[account] >= amount, "Insufficient balance");
         _balances[account] -= amount;
         _totalSupply -= amount;
@@ -115,15 +110,15 @@ contract MockBankWithSeparatedOps is IBank {
     }
 
     // Mock-specific functions for testing setup
-    function setBalance(address account, uint256 amount) external {
-        uint256 oldBalance = _balances[account];
+    function setBalance(address account, uint256 amount) external onlyOwner {
+        uint256 currentBalance = _balances[account];
         _balances[account] = amount;
-
-        // Adjust total supply
-        if (amount > oldBalance) {
-            _totalSupply += (amount - oldBalance);
+        
+        // Update total supply to maintain invariant
+        if (amount > currentBalance) {
+            _totalSupply += (amount - currentBalance);
         } else {
-            _totalSupply -= (oldBalance - amount);
+            _totalSupply -= (currentBalance - amount);
         }
     }
 
@@ -136,30 +131,31 @@ contract MockBankWithSeparatedOps is IBank {
     }
 
     // Testing configuration functions
-    function setBatchSupported(bool supported) external {
+    function setBatchSupported(bool supported) external onlyOwner {
         batchSupported = supported;
     }
 
-    function setFailOnSecondCall(bool shouldFail) external {
+    function setFailOnSecondCall(bool shouldFail) external onlyOwner {
         failOnSecondCall = shouldFail;
         callCount = 0; // Reset call count
     }
 
-    function resetCounters() external {
+    function resetCounters() external onlyOwner {
         batchCallCount = 0;
         individualCallCount = 0;
         callCount = 0;
     }
 
-    function setTotalSupply(uint256 newTotalSupply) external {
+    function setTotalSupply(uint256 newTotalSupply) external onlyOwner {
         _totalSupply = newTotalSupply;
     }
 
-    // Convenience getter for external access to balances - compatible with original MockBank
+    // Convenience getter for external access to balances
     function balances(address account) external view returns (uint256) {
         return _balances[account];
     }
 
+    // Also expose it as balanceOf for ERC20 compatibility
     function balanceOf(address account) external view returns (uint256) {
         return _balances[account];
     }
@@ -169,11 +165,42 @@ contract MockBankWithSeparatedOps is IBank {
         return _authorizedIncreasers[account];
     }
 
-    function authorizeBalanceIncreaser(address account) external {
+    function authorizeBalanceIncreaser(address account) external onlyOwner {
         _authorizedIncreasers[account] = true;
     }
 
-    function unauthorizeBalanceIncreaser(address account) external {
+    function unauthorizeBalanceIncreaser(address account) external onlyOwner {
         _authorizedIncreasers[account] = false;
+    }
+
+    // ====== Separated Operations Support ======
+
+    // Pure mint - creates new tokens for an address
+    function mint(address to, uint256 amount) external {
+        require(
+            _authorizedIncreasers[msg.sender],
+            "Mock Bank: unauthorized minter"
+        );
+        _balances[to] += amount;
+        _totalSupply += amount;
+    }
+
+    // Pure burn - destroys tokens from the caller
+    function burn(uint256 amount) external {
+        require(_balances[msg.sender] >= amount, "Insufficient balance");
+        require(_totalSupply >= amount, "Mock Bank: totalSupply underflow");
+        _balances[msg.sender] -= amount;
+        _totalSupply -= amount;
+    }
+
+    // Pure burnFrom - destroys tokens from a specific address
+    function burnFrom(address from, uint256 amount) external {
+        require(_balances[from] >= amount, "Insufficient balance");
+        uint256 currentAllowance = _allowances[from][msg.sender];
+        require(currentAllowance >= amount, "Mock Bank: insufficient allowance");
+        require(_totalSupply >= amount, "Mock Bank: totalSupply underflow");
+        _allowances[from][msg.sender] = currentAllowance - amount;
+        _balances[from] -= amount;
+        _totalSupply -= amount;
     }
 }
