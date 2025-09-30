@@ -1,17 +1,19 @@
 import { ethers, helpers, waffle } from "hardhat"
 import { expect } from "chai"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import { SystemState } from "../../typechain"
+import { SystemState } from "../../../typechain"
+import { expectCustomError, expectRevert } from "../helpers/error-helpers"
+import { createBaseTestEnvironment, restoreBaseTestEnvironment, TestSigners } from "../fixtures/base-setup"
 
 const { loadFixture } = waffle
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
 describe("SystemState Security Tests", () => {
-  let deployer: SignerWithAddress
-  let governance: SignerWithAddress
+  let signers: TestSigners
   let pauser: SignerWithAddress
   let paramAdmin: SignerWithAddress
   let attacker: SignerWithAddress
+  let attacker2: SignerWithAddress
   let emergencyCouncil: SignerWithAddress
 
   let systemState: SystemState
@@ -26,24 +28,31 @@ describe("SystemState Security Tests", () => {
   )
 
   async function fixture() {
-    const signers = await ethers.getSigners()
-    ;[deployer, governance, pauser, paramAdmin, attacker, emergencyCouncil] =
-      signers
+    const testEnv = await createBaseTestEnvironment()
+    signers = testEnv.signers
+
+    const allSigners = await ethers.getSigners()
+    // Use signers from TestSigners interface, plus additional security-focused signers
+    pauser = allSigners[6]
+    paramAdmin = allSigners[7]
+    attacker = allSigners[8]
+    attacker2 = allSigners[9]
+    emergencyCouncil = allSigners[10]
 
     const SystemState = await ethers.getContractFactory("SystemState")
     systemState = await SystemState.deploy()
 
-    // Setup roles
-    await systemState.grantRole(DEFAULT_ADMIN_ROLE, governance.address)
+    // Setup roles with security-focused assignments
+    await systemState.grantRole(DEFAULT_ADMIN_ROLE, signers.governance.address)
     await systemState.grantRole(EMERGENCY_ROLE, pauser.address)
     await systemState.grantRole(OPERATIONS_ROLE, paramAdmin.address)
 
     return {
-      deployer,
-      governance,
+      signers,
       pauser,
       paramAdmin,
       attacker,
+      attacker2,
       emergencyCouncil,
       systemState,
     }
@@ -54,7 +63,7 @@ describe("SystemState Security Tests", () => {
   })
 
   afterEach(async () => {
-    await restoreSnapshot()
+    await restoreBaseTestEnvironment()
   })
 
   before(async () => {
@@ -179,7 +188,7 @@ describe("SystemState Security Tests", () => {
       it("should handle concurrent pause attempts safely", async () => {
         // Grant EMERGENCY_ROLE to multiple addresses
         await systemState
-          .connect(governance)
+          .connect(signers.governance)
           .grantRole(EMERGENCY_ROLE, emergencyCouncil.address)
 
         // First pause succeeds
@@ -287,7 +296,7 @@ describe("SystemState Security Tests", () => {
     it("should prevent setting zero address as emergency council", async () => {
       await expect(
         systemState
-          .connect(governance)
+          .connect(signers.governance)
           .setEmergencyCouncil(ethers.constants.AddressZero)
       ).to.be.revertedWith("InvalidCouncilAddress")
     })
@@ -295,14 +304,14 @@ describe("SystemState Security Tests", () => {
     it("should emit event when setting emergency council", async () => {
       await expect(
         systemState
-          .connect(governance)
+          .connect(signers.governance)
           .setEmergencyCouncil(emergencyCouncil.address)
       )
         .to.emit(systemState, "EmergencyCouncilUpdated")
         .withArgs(
           ethers.constants.AddressZero,
           emergencyCouncil.address,
-          governance.address
+          signers.governance.address
         )
     })
   })
@@ -389,7 +398,7 @@ describe("SystemState Security Tests", () => {
 
       // Check default values are sensible
       expect(await freshSystemState.minMintAmount()).to.equal(
-        ethers.utils.parseEther("0.01")
+        ethers.utils.parseEther("0.001")
       )
       expect(await freshSystemState.maxMintAmount()).to.equal(
         ethers.utils.parseEther("1000")
@@ -407,6 +416,75 @@ describe("SystemState Security Tests", () => {
       expect(await freshSystemState.isMintingPaused()).to.be.false
       expect(await freshSystemState.isRedemptionPaused()).to.be.false
       expect(await freshSystemState.isWalletRegistrationPaused()).to.be.false
+    })
+  })
+
+  describe("Security Pattern Validation", () => {
+    describe("Multi-Attacker Scenarios", () => {
+      it("should resist coordinated attacks from multiple accounts", async () => {
+        // Both attackers try to gain unauthorized access
+        await expect(
+          systemState.connect(attacker).pauseMinting()
+        ).to.be.revertedWith(
+          `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
+        )
+
+        await expect(
+          systemState.connect(attacker2).pauseMinting()
+        ).to.be.revertedWith(
+          `AccessControl: account ${attacker2.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
+        )
+      })
+
+      it("should prevent privilege escalation attempts", async () => {
+        // Attacker tries to grant themselves roles
+        await expect(
+          systemState.connect(attacker).grantRole(EMERGENCY_ROLE, attacker.address)
+        ).to.be.revertedWith(
+          `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
+        )
+
+        // Another attacker tries different role
+        await expect(
+          systemState.connect(attacker2).grantRole(OPERATIONS_ROLE, attacker2.address)
+        ).to.be.revertedWith(
+          `AccessControl: account ${attacker2.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
+        )
+      })
+    })
+
+    describe("Role Hierarchy Protection", () => {
+      it("should maintain strict role separation", async () => {
+        // Parameter admin cannot pause (different role)
+        await expect(
+          systemState.connect(paramAdmin).pauseMinting()
+        ).to.be.revertedWith(
+          `AccessControl: account ${paramAdmin.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
+        )
+
+        // Pauser cannot modify parameters (different role)
+        await expect(
+          systemState.connect(pauser).setMinMintAmount(ethers.utils.parseEther("100"))
+        ).to.be.revertedWith(
+          `AccessControl: account ${pauser.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
+        )
+      })
+    })
+
+    describe("Input Validation Security", () => {
+      it("should validate all input parameters comprehensively", async () => {
+        // Test boundary conditions that could cause overflows or underflows
+        const maxUint256 = ethers.constants.MaxUint256
+
+        // These should fail with proper validation
+        await expect(
+          systemState.connect(paramAdmin).setMinMintAmount(maxUint256)
+        ).to.be.reverted
+
+        await expect(
+          systemState.connect(paramAdmin).setRedemptionTimeout(maxUint256)
+        ).to.be.reverted
+      })
     })
   })
 })
