@@ -53,20 +53,20 @@ contract MockReserve is Ownable {
 
     /// @notice Update reserve backing directly (federated model)
     /// @param newBacking The new backing amount in satoshis
-    function setBacking(uint256 newBacking) external {
+    function setBacking(uint256 newBacking) external onlyOwner {
         _setBacking(newBacking);
     }
 
     /// @notice Increase backing by a specific amount
     /// @param amount The amount to increase backing by
-    function increaseBacking(uint256 amount) external {
+    function increaseBacking(uint256 amount) external onlyOwner {
         uint256 newBacking = reserveBacking + amount;
         _setBacking(newBacking);
     }
 
     /// @notice Decrease backing by a specific amount
     /// @param amount The amount to decrease backing by
-    function decreaseBacking(uint256 amount) external {
+    function decreaseBacking(uint256 amount) external onlyOwner {
         if (reserveBacking < amount) {
             revert InsufficientBacking(reserveBacking, amount);
         }
@@ -74,7 +74,7 @@ contract MockReserve is Ownable {
         _setBacking(newBacking);
     }
 
-    /// @notice Internal function to update backing (prevents reentrancy)
+    /// @notice Internal function to update backing (follows CEI pattern; reentrancy protection enforced by AccountControl)
     /// @param newBacking The new backing amount in satoshis
     function _setBacking(uint256 newBacking) internal {
         if (failOnNext) {
@@ -97,23 +97,17 @@ contract MockReserve is Ownable {
     /// @notice Mint tokens to a recipient
     /// @param recipient The address to mint tokens to
     /// @param amount The amount of tokens to mint (in satoshis)
-    function mintTokens(address recipient, uint256 amount) external {
+    function mintTokens(address recipient, uint256 amount) external onlyOwner {
         if (recipient == address(0)) {
             revert InvalidRecipient();
         }
 
-        // Test reentrancy if enabled
-        if (simulateReentrancy) {
-            simulateReentrancy = false;
-            // Attempt reentrant call - should be blocked by AccountControl's ReentrancyGuard
-            accountControl.mint(recipient, amount);
-        }
+        // Update state before external call (CEI pattern)
+        userBalances[recipient] += amount;
+        totalUserBalances += amount;
 
         // AccountControl checks backing >= minted + amount
         accountControl.mint(recipient, amount);
-
-        userBalances[recipient] += amount;
-        totalUserBalances += amount;
 
         emit TokensMinted(recipient, amount);
     }
@@ -124,11 +118,12 @@ contract MockReserve is Ownable {
     function batchMint(
         address[] calldata recipients,
         uint256[] calldata amounts
-    ) external {
+    ) external onlyOwner {
         if (recipients.length != amounts.length) {
             revert InvalidArrayLengths();
         }
 
+        // Update state before external calls (CEI pattern)
         uint256 total = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
             if (recipients[i] == address(0)) {
@@ -155,6 +150,7 @@ contract MockReserve is Ownable {
     /// @param user The user redeeming tokens
     /// @param amount The amount to redeem
     function redeemTokens(address user, uint256 amount) external {
+        require(msg.sender == user || msg.sender == owner(), "Not authorized");
         if (userBalances[user] < amount) {
             revert InsufficientUserBalance(user, amount, userBalances[user]);
         }

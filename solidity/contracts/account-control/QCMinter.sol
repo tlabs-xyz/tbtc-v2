@@ -10,6 +10,7 @@ import "../bank/Bank.sol";
 import "../vault/TBTCVault.sol";
 import "../token/TBTC.sol";
 import "./AccountControl.sol";
+import "./QCManagerErrors.sol";
 
 
 /// @title QCMinter
@@ -21,16 +22,16 @@ import "./AccountControl.sol";
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - MINTER_ROLE: Can request minting of tBTC tokens
 contract QCMinter is AccessControl, ReentrancyGuard {
-    error InvalidQCAddress();
+    // InvalidQCAddress and QCNotActive are imported from QCManagerErrors
     error InvalidUserAddress();
     error InvalidAmount();
     error MintingPaused();
     error AmountOutsideAllowedRange();
-    error QCNotActive();
     error InsufficientMintingCapacity();
     error NotAuthorizedInBank();
     error InsufficientBalance();
     error ZeroAmount();
+    error AutoMintDisabled();
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
@@ -167,6 +168,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(GOVERNANCE_ROLE, msg.sender);
     }
 
     /// @notice Enable or disable auto-minting feature
@@ -181,6 +183,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @notice Set AccountControl address
     /// @param _accountControl Address of the AccountControl contract
     function setAccountControl(address _accountControl) external onlyRole(GOVERNANCE_ROLE) {
+        require(_accountControl != address(0), "Invalid AccountControl address");
         accountControl = _accountControl;
         emit AccountControlUpdated(_accountControl);
     }
@@ -188,30 +191,32 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @dev Validates QC capacity and creates Bank balance
     ///      SECURITY: nonReentrant protects against reentrancy
     /// @param qc The address of the Qualified Custodian
+    /// @param recipient The address to receive the minted tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
     /// @return mintId Unique identifier for this minting request
-    function requestQCMint(address qc, uint256 amount)
+    function requestQCMint(address qc, address recipient, uint256 amount)
         external
         onlyRole(MINTER_ROLE)
         nonReentrant
         returns (bytes32 mintId)
     {
-        return _requestMint(qc, msg.sender, amount);
+        return _requestMint(qc, recipient, amount);
     }
 
     /// @notice Request QC-backed minting with hybrid options
     /// @param qc The address of the Qualified Custodian
+    /// @param recipient The address to receive the minted tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
     /// @param autoMint Whether to use automated minting (if enabled)
-    /// @param permitData Optional permit data for gasless approval (currently unused)
     /// @return mintId Unique identifier for this minting request
     function requestQCMintHybrid(
         address qc,
+        address recipient,
         uint256 amount,
         bool autoMint,
         bytes calldata permitData
     ) external onlyRole(MINTER_ROLE) nonReentrant returns (bytes32 mintId) {
-        return _requestMintHybrid(qc, msg.sender, amount, autoMint, permitData);
+        return _requestMintHybrid(qc, recipient, amount, autoMint, permitData);
     }
 
     /// @notice Internal minting logic
@@ -225,7 +230,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         uint256 amount
     ) internal returns (bytes32 mintId) {
         // Validate inputs
-        if (qc == address(0)) revert InvalidQCAddress();
+        if (qc == address(0)) revert QCManagerErrors.InvalidQCAddress();
         if (user == address(0)) revert InvalidUserAddress();
         if (amount == 0) revert InvalidAmount();
 
@@ -277,12 +282,12 @@ contract QCMinter is AccessControl, ReentrancyGuard {
                 msg.sender,
                 block.timestamp
             );
-            revert QCNotActive();
+            revert QCManagerErrors.QCNotActive(qc);
         }
 
-        // Check minting capacity
-        uint256 availableCapacity = getAvailableMintingCapacity(qc);
-        if (amount > availableCapacity) {
+        // Atomically check and consume minting capacity
+        bool capacityConsumed = qcManager.consumeMintCapacity(qc, amount);
+        if (!capacityConsumed) {
             emit MintRejected(
                 qc,
                 user,
@@ -306,19 +311,37 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             completed: false
         });
 
-        // Verify this contract is authorized in Bank
-        if (!bank.authorizedBalanceIncreasers(address(this))) {
-            revert NotAuthorizedInBank();
+        uint256 satoshis;
+        
+        // Check if AccountControl mode is enabled in SystemState
+        if (systemState.isAccountControlEnabled()) {
+            // Validate accountControl is configured
+            require(accountControl != address(0), "AccountControl not configured");
+            
+            // CRITICAL SECURITY FIX: Verify accountControl is authorized in Bank
+            // AccountControl is the contract that actually mints, not QCMinter
+            if (!bank.authorizedBalanceIncreasers(accountControl)) {
+                revert NotAuthorizedInBank();
+            }
+
+            // Use AccountControl for minting (returns satoshis for event emission)
+            satoshis = AccountControl(accountControl).mintTBTC(user, amount);
+        } else {
+            // AccountControl mode is disabled - mint directly via Bank
+            // Check if QCMinter itself is authorized to increase balances
+            if (!bank.authorizedBalanceIncreasers(address(this))) {
+                revert NotAuthorizedInBank();
+            }
+            
+            satoshis = amount / SATOSHI_MULTIPLIER;
+            bank.increaseBalance(user, satoshis);
         }
 
-        // Use AccountControl for minting (returns satoshis for event emission)
-        uint256 satoshis = AccountControl(accountControl).mintTBTC(user, amount);
-        
+        // Note: Auto-mint removed from here - users must call executeAutoMint() separately
+        // after approving this contract to spend their Bank balance
+
         // Emit event for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
-
-        // Update QC minted amount
-        _updateQCMintedAmount(qc, amount);
 
         // Mark mint as completed
         mintRequests[mintId].completed = true;
@@ -350,17 +373,16 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     /// @param user The address receiving the tBTC tokens
     /// @param amount The amount of tBTC to mint (in wei, 1e18 = 1 tBTC)
     /// @param autoMint Whether to use automated minting (if enabled)
-    /// @param permitData Optional permit data for gasless approval (currently unused)
     /// @return mintId Unique identifier for this minting request
     function _requestMintHybrid(
         address qc,
         address user,
         uint256 amount,
         bool autoMint,
-        bytes calldata permitData
+        bytes calldata /* permitData */
     ) internal returns (bytes32 mintId) {
         // Validate inputs (same as original)
-        if (qc == address(0)) revert InvalidQCAddress();
+        if (qc == address(0)) revert QCManagerErrors.InvalidQCAddress();
         if (user == address(0)) revert InvalidUserAddress();
         if (amount == 0) revert InvalidAmount();
 
@@ -412,12 +434,12 @@ contract QCMinter is AccessControl, ReentrancyGuard {
                 msg.sender,
                 block.timestamp
             );
-            revert QCNotActive();
+            revert QCManagerErrors.QCNotActive(qc);
         }
 
-        // Check minting capacity (same as original)
-        uint256 availableCapacity = getAvailableMintingCapacity(qc);
-        if (amount > availableCapacity) {
+        // Atomically check and consume minting capacity (same as mintWithQC)
+        bool capacityConsumed = qcManager.consumeMintCapacity(qc, amount);
+        if (!capacityConsumed) {
             emit MintRejected(
                 qc,
                 user,
@@ -441,18 +463,47 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             completed: false
         });
 
-        // No need to check authorization here - Bank will check when we call increaseBalance
+        // CRITICAL SECURITY FIX: Verify accountControl is authorized in Bank
+        // AccountControl is the contract that actually mints, not QCMinter
+        // Validate accountControl is configured
+        require(accountControl != address(0), "AccountControl not configured");
+        
+        if (!bank.authorizedBalanceIncreasers(accountControl)) {
+            revert NotAuthorizedInBank();
+        }
 
         // HYBRID LOGIC: Choose between manual and automated minting
+
         uint256 satoshis;
+        bool autoMintExecuted = false;
+        
         if (autoMint && autoMintEnabled) {
             // Option 1: Automated minting - create balance and immediately mint tBTC
             satoshis = AccountControl(accountControl).mintTBTC(user, amount);
             
-            // Execute automated minting directly
-            _executeAutoMint(user, satoshis);
+            // Auto-mint: Check user has sufficient allowance and balance
+            uint256 userBalance = bank.balanceOf(user);
+            uint256 userAllowance = bank.allowance(user, address(this));
             
-            // Emit event for automated completion
+            if (userBalance >= satoshis && userAllowance >= satoshis) {
+                // Transfer Bank balance to this contract
+                bank.transferBalanceFrom(user, address(this), satoshis);
+                
+                // Mint tBTC tokens via vault
+                uint256 tbtcAmount = satoshis * SATOSHI_MULTIPLIER;
+                tbtcVault.mint(tbtcAmount);
+                
+                // Transfer tBTC to user
+                tbtc.transfer(user, tbtcAmount);
+                
+                autoMintExecuted = true;
+                emit AutoMintCompleted(user, satoshis, tbtcAmount);
+            } else {
+                // User doesn't have sufficient balance/allowance
+                revert InsufficientBalance();
+            }
+            
+            // Emit event indicating automated mint completed
             emit QCMintCompleted(user, satoshis, true);
         } else {
             // Option 2: Manual process - just create Bank balance
@@ -465,14 +516,11 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         // Emit event for QC attribution (same as original)
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
 
-        // Update QC minted amount (same as original)
-        _updateQCMintedAmount(qc, amount);
-
         // Mark mint as completed (same as original)
         mintRequests[mintId].completed = true;
 
         // Emit completion events (same as original)
-        emit QCBackedDepositCredited(user, satoshis, qc, mintId, autoMint);
+        emit QCBackedDepositCredited(user, satoshis, qc, mintId, autoMintExecuted);
         emit MintCompleted(
             mintId,
             qc,
@@ -584,16 +632,23 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         hasAllowance = allowance >= balance;
     }
 
-    /// @dev Execute automated minting for user
-    /// @param user The user receiving tBTC tokens
-    /// @param satoshis Amount of satoshis to convert to tBTC
-    function _executeAutoMint(address user, uint256 satoshis) internal {
+    /// @notice Execute automated minting of tBTC from Bank balance
+    /// @dev User must have approved this contract to spend their Bank balance before calling
+    /// @param satoshis The amount of satoshis to convert to tBTC
+    function executeAutoMint(uint256 satoshis) external nonReentrant {
+        if (systemState.isMintingPaused()) revert MintingPaused();
+        if (!autoMintEnabled) revert AutoMintDisabled();
+        address user = msg.sender;
         if (user == address(0)) revert InvalidUserAddress();
         if (satoshis == 0) revert ZeroAmount();
-        if (bank.balanceOf(user) < satoshis) revert InsufficientBalance();
+        
+        // Check if user has sufficient Bank balance
+        uint256 userBalance = bank.balanceOf(user);
+        if (userBalance < satoshis) revert InsufficientBalance();
 
         // Check user has approved this contract to spend their balance
-        if (bank.allowance(user, address(this)) < satoshis) {
+        uint256 userAllowance = bank.allowance(user, address(this));
+        if (userAllowance < satoshis) {
             revert InsufficientBalance(); // Reusing error for insufficient allowance
         }
 
@@ -627,9 +682,4 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             );
     }
 
-    /// @dev Helper to update QC minted amount to avoid stack too deep errors
-    function _updateQCMintedAmount(address qc, uint256 amount) private {
-        uint256 currentMinted = qcData.getQCMintedAmount(qc);
-        qcManager.updateQCMintedAmount(qc, currentMinted + amount);
-    }
 }

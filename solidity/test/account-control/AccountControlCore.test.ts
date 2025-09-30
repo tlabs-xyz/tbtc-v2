@@ -26,6 +26,9 @@ describe("AccountControl Core Functionality", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
+    // Authorize AccountControl to call MockBank functions
+    await mockBank.authorizeBalanceIncreaser(accountControl.address);
+
     // Note: Using direct updateBacking() for unit tests (oracle integration tested separately)
 
     // Authorize a reserve for testing (QC_PERMISSIONED is initialized by default)
@@ -46,7 +49,7 @@ describe("AccountControl Core Functionality", function () {
       
       // This would normally fail because we can't call mint from non-reserve
       // but we're testing the state tracking logic
-      expect(await accountControl.totalMintedAmount()).to.equal(0);
+      expect(await accountControl.totalMinted()).to.equal(0);
     });
   });
 

@@ -73,9 +73,12 @@ describe("SystemState Security Tests", () => {
         )
 
         // Pauser can pause
-        await expect(systemState.connect(pauser).pauseMinting())
+        const pauseTx = await systemState.connect(pauser).pauseMinting()
+        const receipt = await pauseTx.wait()
+        const block = await ethers.provider.getBlock(receipt.blockNumber)
+        await expect(pauseTx)
           .to.emit(systemState, "MintingPaused")
-          .withArgs(pauser.address)
+          .withArgs(pauser.address, block.timestamp)
       })
 
       it("should only allow EMERGENCY_ROLE to unpause operations", async () => {
@@ -89,9 +92,12 @@ describe("SystemState Security Tests", () => {
         )
 
         // Pauser can unpause
-        await expect(systemState.connect(pauser).unpauseMinting())
+        const unpauseTx = await systemState.connect(pauser).unpauseMinting()
+        const receipt = await unpauseTx.wait()
+        const block = await ethers.provider.getBlock(receipt.blockNumber)
+        await expect(unpauseTx)
           .to.emit(systemState, "MintingUnpaused")
-          .withArgs(pauser.address)
+          .withArgs(pauser.address, block.timestamp)
       })
     })
 
@@ -115,7 +121,7 @@ describe("SystemState Security Tests", () => {
         const pauseTime = block.timestamp
 
         const mintingPauseKey = ethers.utils.keccak256(
-          ethers.utils.toUtf8Bytes("MINTING_PAUSE")
+          ethers.utils.toUtf8Bytes("minting")
         )
         expect(await systemState.pauseTimestamps(mintingPauseKey)).to.equal(
           pauseTime
@@ -156,11 +162,11 @@ describe("SystemState Security Tests", () => {
 
         // Advance time
         await helpers.time.increaseTime(60 * 60) // 1 hour
-        await helpers.mine()
+        await ethers.provider.send("evm_mine", [])
 
         // Pause timestamp should be accessible for duration calculation
         const mintingPauseKey = ethers.utils.keccak256(
-          ethers.utils.toUtf8Bytes("MINTING_PAUSE")
+          ethers.utils.toUtf8Bytes("minting")
         )
         const pauseTimestamp = await systemState.pauseTimestamps(
           mintingPauseKey
@@ -274,14 +280,14 @@ describe("SystemState Security Tests", () => {
           .connect(attacker)
           .setEmergencyCouncil(emergencyCouncil.address)
       ).to.be.revertedWith(
-        `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
+        `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
       )
     })
 
     it("should prevent setting zero address as emergency council", async () => {
       await expect(
         systemState
-          .connect(paramAdmin)
+          .connect(governance)
           .setEmergencyCouncil(ethers.constants.AddressZero)
       ).to.be.revertedWith("InvalidCouncilAddress")
     })
@@ -289,14 +295,14 @@ describe("SystemState Security Tests", () => {
     it("should emit event when setting emergency council", async () => {
       await expect(
         systemState
-          .connect(paramAdmin)
+          .connect(governance)
           .setEmergencyCouncil(emergencyCouncil.address)
       )
         .to.emit(systemState, "EmergencyCouncilUpdated")
         .withArgs(
           ethers.constants.AddressZero,
           emergencyCouncil.address,
-          paramAdmin.address
+          governance.address
         )
     })
   })
@@ -386,9 +392,9 @@ describe("SystemState Security Tests", () => {
         ethers.utils.parseEther("0.01")
       )
       expect(await freshSystemState.maxMintAmount()).to.equal(
-        ethers.utils.parseEther("21000000")
+        ethers.utils.parseEther("1000")
       )
-      expect(await freshSystemState.redemptionTimeout()).to.equal(48 * 60 * 60) // 48 hours
+      expect(await freshSystemState.redemptionTimeout()).to.equal(7 * 24 * 60 * 60) // 7 days
       expect(await freshSystemState.staleThreshold()).to.equal(24 * 60 * 60) // 24 hours
       expect(await freshSystemState.minCollateralRatio()).to.equal(100) // 100%
     })

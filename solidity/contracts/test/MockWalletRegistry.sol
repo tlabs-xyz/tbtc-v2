@@ -5,6 +5,11 @@ pragma solidity 0.8.17;
 contract MockWalletRegistry {
     // Minimal implementation - just needs to exist
     address public constant ecdsaWalletRegistry = address(0x1);
+    address public walletOwner;
+
+    constructor() {
+        walletOwner = msg.sender;
+    }
 
     function requestNewWallet() external pure returns (bytes32) {
         return bytes32(uint256(1));

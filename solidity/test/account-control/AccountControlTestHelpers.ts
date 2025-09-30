@@ -1,6 +1,7 @@
 import { ethers } from "hardhat"
 import type { BytesLike, BigNumberish } from "ethers"
 import { ValidMainnetProof } from "../data/bitcoin/spv/valid-spv-proofs"
+import { TEST_CONSTANTS } from "./fixtures/AccountControlFixtures"
 
 /**
  * Bitcoin transaction info structure matching BitcoinTx.sol
@@ -22,10 +23,6 @@ export interface BitcoinTxProof {
   coinbasePreimage: BytesLike
   coinbaseProof: BytesLike
 }
-
-/**
- * Helper utilities for Account Control testing
- */
 
 /**
  * Creates mock SPV data for testing redemption fulfillment
@@ -77,11 +74,6 @@ export function createRealSpvData(): {
 }
 
 /**
- * Creates a valid Bitcoin address for testing purposes
- */
-export const validLegacyBtc = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-
-/**
  * Creates mock wallet control proof for wallet registration testing
  */
 export function createMockWalletControlProof(
@@ -112,7 +104,9 @@ export async function setupMockRelayForSpv(
   mockRelay.getBlockDifficulty.returns(difficulty)
 
   // Mock getCurrentAndPrevEpochDifficulty if it exists
-  mockRelay.getCurrentAndPrevEpochDifficulty.returns([difficulty, difficulty])
+  if (typeof mockRelay.getCurrentAndPrevEpochDifficulty?.returns === "function") {
+    mockRelay.getCurrentAndPrevEpochDifficulty.returns([difficulty, difficulty])
+  }
 
   // Mock ready status
   mockRelay.ready.returns(true)
@@ -137,8 +131,8 @@ export function createCompleteSpvTestData(): {
 
   return {
     ...realSpvData,
-    userBtcAddress: validLegacyBtc, // Use a valid test address
-    expectedAmount: 50000, // 0.0005 BTC in satoshis
+    userBtcAddress: TEST_CONSTANTS.VALID_LEGACY_BTC,
+    expectedAmount: TEST_CONSTANTS.SMALL_MINT,
   }
 }
 
@@ -186,20 +180,24 @@ export async function fulfillRedemptionForTest(
 
 /**
  * Creates various Bitcoin addresses for testing different formats
+ * Now references centralized constants
  */
 export const bitcoinTestAddresses = {
-  validP2PKH: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", // Starts with '1'
-  validP2SH: "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", // Starts with '3'
-  validBech32: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", // Starts with 'bc1'
+  validP2PKH: TEST_CONSTANTS.VALID_LEGACY_BTC,
+  validP2SH: TEST_CONSTANTS.VALID_P2SH_BTC,
+  validBech32: TEST_CONSTANTS.VALID_BECH32_BTC,
   invalid: "not_a_bitcoin_address",
   empty: "",
 }
+
+let testIdCounter = 0
 
 /**
  * Helper to generate deterministic test data
  */
 export function generateTestId(prefix: string): string {
-  return ethers.utils.id(`${prefix}_${Date.now()}`)
+  testIdCounter += 1
+  return ethers.utils.id(`${prefix}_${testIdCounter}`)
 }
 
 /**
@@ -218,3 +216,6 @@ export function createMockSpvValidationResult(isValid = true): {
     confirmations: 6,
   }
 }
+
+// Export legacy constants for backward compatibility (will phase out)
+export const validLegacyBtc = TEST_CONSTANTS.VALID_LEGACY_BTC

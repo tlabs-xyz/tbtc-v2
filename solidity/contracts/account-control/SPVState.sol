@@ -11,6 +11,14 @@ import "../bridge/IRelay.sol";
 ///      that need to validate Bitcoin transactions using the same infrastructure
 ///      as the Bridge.
 library SPVState {
+    // Custom errors for initialization states
+    error RelayAddressZero();
+    error DifficultyFactorZero();
+    error AlreadyInitialized();
+    error RelayNotContract();
+
+    // Events
+    event SPVInitialized(address relay, uint96 txProofDifficultyFactor);
     /// @notice SPV validation storage structure
     struct Storage {
         /// @notice Bitcoin relay providing the current Bitcoin network difficulty.
@@ -20,13 +28,15 @@ library SPVState {
         ///         successfully evaluate an SPV proof. This should match the
         ///         Bridge's txProofDifficultyFactor for security consistency.
         uint96 txProofDifficultyFactor;
+        /// @notice Flag indicating whether the SPV state has been initialized
+        bool initialized;
     }
 
     /// @notice Validates that the SPV state is properly initialized
     /// @param self The SPV storage reference
-    /// @return isValid True if relay is set and difficulty factor is non-zero
+    /// @return isValid True if initialization flag is set
     function isInitialized(Storage storage self) internal view returns (bool isValid) {
-        return address(self.relay) != address(0) && self.txProofDifficultyFactor > 0;
+        return self.initialized;
     }
 
     /// @notice Initializes the SPV state with relay and difficulty parameters
@@ -38,11 +48,16 @@ library SPVState {
         address _relay,
         uint96 _txProofDifficultyFactor
     ) internal {
-        require(_relay != address(0), "SPVState: relay address cannot be zero");
-        require(_txProofDifficultyFactor > 0, "SPVState: difficulty factor must be positive");
-        
+        if (_relay == address(0)) revert RelayAddressZero();
+        if (_txProofDifficultyFactor == 0) revert DifficultyFactorZero();
+        if (isInitialized(self)) revert AlreadyInitialized();
+        if (_relay.code.length == 0) revert RelayNotContract();
+
         self.relay = IRelay(_relay);
         self.txProofDifficultyFactor = _txProofDifficultyFactor;
+        self.initialized = true;
+        
+        emit SPVInitialized(_relay, _txProofDifficultyFactor);
     }
 
     /// @notice Updates the relay address

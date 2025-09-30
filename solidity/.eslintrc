@@ -34,7 +34,7 @@
         "no-await-in-loop": "off",
         "no-restricted-syntax": "off",
         "import/prefer-default-export": "off",
-        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-explicit-any": "warn",
         "@typescript-eslint/explicit-module-boundary-types": "off",
         "class-methods-use-this": "off",
         "no-console": "off",

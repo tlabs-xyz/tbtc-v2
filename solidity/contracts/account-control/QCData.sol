@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./QCManagerErrors.sol";
 
 /// @title QCData
 /// @dev Dedicated storage layer for all data related to Qualified Custodians
@@ -15,17 +16,17 @@ contract QCData is AccessControl {
     uint256 public constant MAX_WALLETS_PER_QC = 10;
 
     // Custom errors for gas-efficient reverts
+    // Errors imported from QCManagerErrors: InvalidQCAddress, InvalidMintingCapacity, InvalidWalletAddress
+    // QCNotRegistered is kept local as it has different signature (no params vs address param in QCManagerErrors)
     error InvalidManagerAddress();
-    error InvalidQCAddress();
     error QCAlreadyRegistered();
-    error InvalidMintingCapacity();
-    error QCNotRegistered();
-    error InvalidWalletAddress();
+    error QCNotRegistered(); // Different from QCManagerErrors.QCNotRegistered(address)
     error WalletAlreadyRegistered();
     error WalletNotRegistered();
     error WalletNotActive();
     error WalletNotPendingDeregistration();
     error InvalidCapacity();
+    error CapacityBelowTotalMinted();
     error MaxWalletsExceeded();
 
     /// @dev QC status enumeration - enhanced 5-state model
@@ -45,6 +46,12 @@ contract QCData is AccessControl {
         Deregistered // Wallet has been permanently deregistered
     }
 
+    /// @dev Pause level enumeration for QC self-pause functionality
+    enum PauseLevel {
+        MintingOnly,    // Pause minting but allow fulfillment
+        Complete        // Pause all operations
+    }
+
     /// @dev Qualified Custodian data structure - optimized for gas efficiency
     struct Custodian {
         uint256 totalMintedAmount; // Total tBTC minted by this QC
@@ -53,8 +60,8 @@ contract QCData is AccessControl {
         QCStatus status; // Current operational status
         bool selfPaused; // True if QC initiated the pause
         string[] walletAddresses; // Array of registered wallet addresses
-        mapping(string => WalletStatus) walletStatuses;
-        mapping(string => uint256) walletRegistrationTimes;
+        mapping(bytes32 => WalletStatus) walletStatuses;
+        mapping(bytes32 => uint256) walletRegistrationTimes;
     }
 
     /// @dev Wallet information structure
@@ -68,7 +75,7 @@ contract QCData is AccessControl {
     mapping(address => Custodian) private custodians;
 
     /// @dev Maps wallet addresses to their information
-    mapping(string => WalletInfo) private wallets;
+    mapping(bytes32 => WalletInfo) private wallets;
 
     /// @dev Array of all registered QC addresses
     address[] private registeredQCs;
@@ -154,6 +161,13 @@ contract QCData is AccessControl {
         _grantRole(QC_MANAGER_ROLE, msg.sender);
     }
 
+    /// @dev Helper function to convert string wallet address to bytes32 key
+    /// @param btcAddress The Bitcoin address as string
+    /// @return key The bytes32 key for mapping lookups
+    function _getWalletKey(string calldata btcAddress) private pure returns (bytes32 key) {
+        return keccak256(bytes(btcAddress));
+    }
+
     /// @notice Grant QC_MANAGER_ROLE to an address (typically QCManager contract)
     /// @param manager The address to grant the role to
     /// @dev Only callable by DEFAULT_ADMIN_ROLE
@@ -185,9 +199,9 @@ contract QCData is AccessControl {
         external
         onlyRole(QC_MANAGER_ROLE)
     {
-        if (qc == address(0)) revert InvalidQCAddress();
+        if (qc == address(0)) revert QCManagerErrors.InvalidQCAddress();
         if (custodians[qc].registeredAt != 0) revert QCAlreadyRegistered();
-        if (maxMintingCapacity == 0) revert InvalidMintingCapacity();
+        if (maxMintingCapacity == 0) revert QCManagerErrors.InvalidMintingCapacity();
 
         custodians[qc].status = QCStatus.Active;
         custodians[qc].maxMintingCapacity = maxMintingCapacity;
@@ -229,17 +243,18 @@ contract QCData is AccessControl {
         onlyRole(QC_MANAGER_ROLE)
     {
         if (!isQCRegistered(qc)) revert QCNotRegistered();
-        if (bytes(btcAddress).length == 0) revert InvalidWalletAddress();
+        if (bytes(btcAddress).length == 0) revert QCManagerErrors.InvalidWalletAddress();
         if (isWalletRegistered(btcAddress)) revert WalletAlreadyRegistered();
         if (custodians[qc].walletAddresses.length >= MAX_WALLETS_PER_QC) revert MaxWalletsExceeded();
 
         // Add to QC's wallet list
+        bytes32 walletKey = _getWalletKey(btcAddress);
         custodians[qc].walletAddresses.push(btcAddress);
-        custodians[qc].walletStatuses[btcAddress] = WalletStatus.Active;
-        custodians[qc].walletRegistrationTimes[btcAddress] = block.timestamp;
+        custodians[qc].walletStatuses[walletKey] = WalletStatus.Active;
+        custodians[qc].walletRegistrationTimes[walletKey] = block.timestamp;
 
         // Store wallet info
-        wallets[btcAddress] = WalletInfo({
+        wallets[walletKey] = WalletInfo({
             qc: qc,
             status: WalletStatus.Active,
             registeredAt: block.timestamp
@@ -257,10 +272,11 @@ contract QCData is AccessControl {
         if (!isWalletRegistered(btcAddress)) revert WalletNotRegistered();
         if (!isWalletActive(btcAddress)) revert WalletNotActive();
 
-        address qc = wallets[btcAddress].qc;
-        custodians[qc].walletStatuses[btcAddress] = WalletStatus
+        bytes32 walletKey = _getWalletKey(btcAddress);
+        address qc = wallets[walletKey].qc;
+        custodians[qc].walletStatuses[walletKey] = WalletStatus
             .PendingDeRegistration;
-        wallets[btcAddress].status = WalletStatus.PendingDeRegistration;
+        wallets[walletKey].status = WalletStatus.PendingDeRegistration;
 
         emit WalletDeRegistrationRequested(
             qc,
@@ -277,13 +293,14 @@ contract QCData is AccessControl {
         onlyRole(QC_MANAGER_ROLE)
     {
         if (!isWalletRegistered(btcAddress)) revert WalletNotRegistered();
-        if (wallets[btcAddress].status != WalletStatus.PendingDeRegistration) {
+        bytes32 walletKey = _getWalletKey(btcAddress);
+        if (wallets[walletKey].status != WalletStatus.PendingDeRegistration) {
             revert WalletNotPendingDeregistration();
         }
 
-        address qc = wallets[btcAddress].qc;
-        custodians[qc].walletStatuses[btcAddress] = WalletStatus.Deregistered;
-        wallets[btcAddress].status = WalletStatus.Deregistered;
+        address qc = wallets[walletKey].qc;
+        custodians[qc].walletStatuses[walletKey] = WalletStatus.Deregistered;
+        wallets[walletKey].status = WalletStatus.Deregistered;
         // Note: Keep qc address for audit trail instead of zeroing it
 
         // Remove wallet from QC's active list - cache storage array in memory for gas optimization
@@ -316,6 +333,9 @@ contract QCData is AccessControl {
     {
         if (!isQCRegistered(qc)) revert QCNotRegistered();
 
+        // Validate new amount doesn't exceed capacity
+        require(newAmount <= custodians[qc].maxMintingCapacity, "Exceeds minting capacity");
+
         uint256 oldAmount = custodians[qc].totalMintedAmount;
         custodians[qc].totalMintedAmount = newAmount;
 
@@ -337,6 +357,7 @@ contract QCData is AccessControl {
     {
         if (!isQCRegistered(qc)) revert QCNotRegistered();
         if (newCapacity == 0) revert InvalidCapacity();
+        if (newCapacity < custodians[qc].totalMintedAmount) revert CapacityBelowTotalMinted();
 
         uint256 oldCapacity = custodians[qc].maxMintingCapacity;
         custodians[qc].maxMintingCapacity = newCapacity;
@@ -354,6 +375,7 @@ contract QCData is AccessControl {
     /// @param qc The address of the QC
     /// @return status The current status of the QC
     function getQCStatus(address qc) external view returns (QCStatus status) {
+        if (!isQCRegistered(qc)) revert QCNotRegistered();
         return custodians[qc].status;
     }
 
@@ -387,7 +409,8 @@ contract QCData is AccessControl {
         view
         returns (WalletStatus status)
     {
-        return wallets[btcAddress].status;
+        bytes32 walletKey = _getWalletKey(btcAddress);
+        return wallets[walletKey].status;
     }
 
     /// @notice Get wallet owner QC
@@ -398,7 +421,8 @@ contract QCData is AccessControl {
         view
         returns (address qc)
     {
-        return wallets[btcAddress].qc;
+        bytes32 walletKey = _getWalletKey(btcAddress);
+        return wallets[walletKey].qc;
     }
 
     /// @notice Get QC wallet addresses
@@ -442,7 +466,8 @@ contract QCData is AccessControl {
         view
         returns (bool active)
     {
-        return wallets[btcAddress].status == WalletStatus.Active;
+        bytes32 walletKey = _getWalletKey(btcAddress);
+        return wallets[walletKey].status == WalletStatus.Active;
     }
 
     /// @notice Check if wallet has been deregistered
@@ -453,7 +478,8 @@ contract QCData is AccessControl {
         view
         returns (bool deregistered)
     {
-        return wallets[btcAddress].status == WalletStatus.Deregistered;
+        bytes32 walletKey = _getWalletKey(btcAddress);
+        return wallets[walletKey].status == WalletStatus.Deregistered;
     }
 
     /// @notice Check if wallet is registered
@@ -464,7 +490,8 @@ contract QCData is AccessControl {
         view
         returns (bool registered)
     {
-        return wallets[btcAddress].registeredAt != 0;
+        bytes32 walletKey = _getWalletKey(btcAddress);
+        return wallets[walletKey].registeredAt != 0;
     }
 
     /// @notice Check if wallet can be activated (is inactive but not deregistered)
@@ -475,9 +502,10 @@ contract QCData is AccessControl {
         view
         returns (bool canActivate)
     {
+        bytes32 walletKey = _getWalletKey(btcAddress);
         return
-            wallets[btcAddress].status == WalletStatus.Inactive &&
-            wallets[btcAddress].registeredAt != 0;
+            wallets[walletKey].status == WalletStatus.Inactive &&
+            wallets[walletKey].registeredAt != 0;
     }
 
     // =================== 5-STATE MODEL FUNCTIONS ===================
@@ -496,6 +524,11 @@ contract QCData is AccessControl {
     /// @param qc QC address
     /// @return canMint True if QC can mint new tokens
     function canQCMint(address qc) external view returns (bool canMint) {
+        // Unregistered QCs cannot mint
+        if (!isQCRegistered(qc)) {
+            return false;
+        }
+
         QCStatus status = custodians[qc].status;
         return status == QCStatus.Active;
     }
@@ -504,10 +537,14 @@ contract QCData is AccessControl {
     /// @param qc QC address  
     /// @return canFulfill True if QC can fulfill redemptions
     function canQCFulfill(address qc) external view returns (bool canFulfill) {
+        // Unregistered QCs cannot fulfill
+        if (!isQCRegistered(qc)) {
+            return false;
+        }
+
         QCStatus status = custodians[qc].status;
-        return status == QCStatus.Active || 
-               status == QCStatus.MintingPaused || 
-               status == QCStatus.UnderReview;
+        return status == QCStatus.Active ||
+               status == QCStatus.MintingPaused;
     }
 
     /// @notice Get comprehensive QC information for 5-state model
@@ -524,6 +561,7 @@ contract QCData is AccessControl {
         uint256 registeredAt,
         bool selfPaused
     ) {
+        if (!isQCRegistered(qc)) revert QCNotRegistered();
         Custodian storage custodian = custodians[qc];
         return (
             custodian.status,

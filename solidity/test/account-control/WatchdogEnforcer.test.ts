@@ -146,7 +146,7 @@ describe("WatchdogEnforcer", () => {
         it("should call requestStatusChange on QCManager", async () => {
           expect(mockQcManager.requestStatusChange).to.have.been.calledWith(
             qcAddress.address,
-            1, // UnderReview
+            3, // UnderReview
             INSUFFICIENT_RESERVES
           )
         })
@@ -246,7 +246,7 @@ describe("WatchdogEnforcer", () => {
         it("should call requestStatusChange on QCManager", async () => {
           expect(mockQcManager.requestStatusChange).to.have.been.calledWith(
             qcAddress.address,
-            1, // UnderReview
+            3, // UnderReview
             STALE_ATTESTATIONS
           )
         })
@@ -590,7 +590,7 @@ describe("WatchdogEnforcer", () => {
 
         expect(mockQcManager.requestStatusChange).to.have.been.calledWith(
           qcAddress.address,
-          1,
+          3,
           STALE_ATTESTATIONS
         )
 

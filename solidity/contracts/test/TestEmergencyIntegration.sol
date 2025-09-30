@@ -14,13 +14,14 @@ contract TestEmergencyIntegration {
     event ModifierPassed(address qc);
 
     constructor(address _systemState) {
+        require(_systemState != address(0), "SystemState address cannot be zero");
         systemState = SystemState(_systemState);
     }
 
-    /// @notice Test function that uses the emergency pause modifier
+    /// @notice Test function that performs an inline emergency pause check
     /// @param qc The QC address to check for emergency pause
     function testFunction(address qc) external {
-        // Use the modifier from SystemState
+        // Perform inline runtime check for QC emergency pause
         if (systemState.isQCEmergencyPaused(qc)) {
             revert SystemState.QCIsEmergencyPaused(qc);
         }

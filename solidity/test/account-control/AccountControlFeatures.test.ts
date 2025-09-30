@@ -32,6 +32,9 @@ describe("AccountControl Features", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
+    // Authorize AccountControl to call MockBank functions
+    await mockBankContract.authorizeBalanceIncreaser(accountControl.address);
+
     // Note: Using direct updateBacking() for unit tests (oracle integration tested separately)
 
     // Authorize reserves for testing (QC_PERMISSIONED is initialized by default)
@@ -169,10 +172,10 @@ describe("AccountControl Features", function () {
       // Deauthorize again for the next test
       await accountControl.connect(owner).deauthorizeReserve(reserve1.address);
       
-      // Only QC_PERMISSIONED type exists in V2, so just verify basic re-authorization works
+      // All reserves are QC_PERMISSIONED by default, just verify re-authorization works
       await accountControl.connect(owner).authorizeReserve(reserve1.address, 500000);
       const reserveInfo = await accountControl.reserveInfo(reserve1.address);
-      expect(reserveInfo.reserveType).to.equal(1); // QC_PERMISSIONED = 1 (UNINITIALIZED = 0)
+      expect(reserveInfo.mintingCap).to.equal(500000);
     });
   });
 

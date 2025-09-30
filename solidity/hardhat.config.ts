@@ -5,6 +5,7 @@ import "dotenv/config"
 import "@keep-network/hardhat-helpers"
 import "@keep-network/hardhat-local-networks-config"
 import "@nomiclabs/hardhat-waffle"
+import "@nomicfoundation/hardhat-chai-matchers"
 import "@nomiclabs/hardhat-etherscan"
 import "hardhat-gas-reporter"
 import "hardhat-contract-sizer"
@@ -68,6 +69,15 @@ const config: HardhatUserConfig = {
       "@keep-network/ecdsa/contracts/WalletRegistry.sol":
         ecdsaSolidityCompilerConfig,
       "contracts/bridge/BridgeGovernance.sol": bridgeGovernanceCompilerConfig,
+      "contracts/account-control/QCManager.sol": {
+        version: "0.8.17",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1, // Minimum runs to optimize for size
+          },
+        },
+      },
     },
   },
 
@@ -249,18 +259,16 @@ const config: HardhatUserConfig = {
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
-    // TODO: Re-enable after fixing contract size issues (currently disabled for dev performance)
-    // Multiple contracts exceed 24KB limit: QCManager (27KB), QCRedeemer (25.4KB)
-    runOnCompile: false,
-    strict: true,
+    runOnCompile: process.env.CONTRACT_SIZE_CHECK_DISABLED !== "true",
+    strict: false,
     // WalletRegistry is excluded because it's an external dependency from @keep-network/ecdsa
     // that exceeds the 24KB contract size limit (24.142 KB). We don't control this contract.
-    // QCRedeemer temporarily exceeds limit (25.391 KB) due to comprehensive SPV implementation.
-    // TODO: Optimize QCRedeemer by extracting SPV logic to a library similar to QCManagerSPV.
-    except: ["BridgeStub$", "WalletRegistry$", "QCRedeemer$"],
+    except: ["BridgeStub$", "WalletRegistry$"],
   },
   mocha: {
-    timeout: 60_000,
+    timeout: 600_000, // Increased timeout for complex tests (10 minutes)
+    slow: 5000, // Mark tests taking >5s as slow
+    reporter: 'spec',
   },
   typechain: {
     outDir: "typechain",

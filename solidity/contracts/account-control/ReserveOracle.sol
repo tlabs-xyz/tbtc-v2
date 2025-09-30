@@ -178,7 +178,11 @@ contract ReserveOracle is AccessControl {
     {
         ReserveData memory data = reserves[qc];
         balance = data.balance;
-        isStale = block.timestamp > data.lastUpdateTimestamp + maxStaleness;
+        if (data.lastUpdateTimestamp == 0) {
+            isStale = true;
+        } else {
+            isStale = block.timestamp - data.lastUpdateTimestamp > maxStaleness;
+        }
     }
 
     /// @notice Get current reserve balance for a QC
@@ -196,9 +200,9 @@ contract ReserveOracle is AccessControl {
     /// @param qc The address of the Qualified Custodian
     /// @return isStale True if the reserve data is stale
     function isReserveDataStale(address qc) external view returns (bool) {
-        return
-            block.timestamp >
-            reserves[qc].lastUpdateTimestamp + maxStaleness;
+        uint256 ts = reserves[qc].lastUpdateTimestamp;
+        if (ts == 0) return true;
+        return block.timestamp - ts > maxStaleness;
     }
 
     /// @notice Get pending attestation count for a QC
@@ -229,12 +233,12 @@ contract ReserveOracle is AccessControl {
     }
 
     /// @notice Update consensus threshold (DISPUTE_ARBITER_ROLE only)
-    /// @param newThreshold New consensus threshold (minimum 2)
+    /// @param newThreshold New consensus threshold (minimum 3, must be odd)
     function setConsensusThreshold(uint256 newThreshold)
         external
         onlyRole(DISPUTE_ARBITER_ROLE)
     {
-        if (newThreshold < 2) revert InvalidThreshold();
+        if (newThreshold < 3 || newThreshold % 2 == 0) revert InvalidThreshold();
 
         uint256 oldThreshold = consensusThreshold;
         consensusThreshold = newThreshold;
@@ -284,6 +288,7 @@ contract ReserveOracle is AccessControl {
         external
         onlyRole(DISPUTE_ARBITER_ROLE)
     {
+        if (qc == address(0)) revert QCAddressRequired();
         uint256 oldBalance = reserves[qc].balance;
         reserves[qc] = ReserveData({
             balance: balance,
@@ -311,13 +316,13 @@ contract ReserveOracle is AccessControl {
         if (qc == address(0)) revert QCAddressRequired();
         if (balance > type(uint128).max) revert BalanceOverflow();
 
+        // Clean up any expired attestations first to prevent deadlock
+        _cleanExpiredAttestations(qc);
+
         // Check if this attester has already submitted for this QC
         if (pendingAttestations[qc][msg.sender].timestamp != 0) {
             revert AttesterAlreadySubmitted();
         }
-
-        // Clean up any expired attestations
-        _cleanExpiredAttestations(qc);
 
         // Get attester index
         uint64 attesterIndex = attesterToIndex[msg.sender];
@@ -423,7 +428,7 @@ contract ReserveOracle is AccessControl {
         }
     }
 
-    /// @dev Clean up expired attestations for a QC
+    /// @dev Clean up expired attestations and revoked attesters for a QC
     function _cleanExpiredAttestations(address qc) private {
         address[] storage attesters = pendingAttesters[qc];
         uint256 i = 0;
@@ -434,13 +439,17 @@ contract ReserveOracle is AccessControl {
                 attester
             ];
 
-            if (
-                attestation.timestamp != 0 &&
-                block.timestamp > uint256(attestation.timestamp) + attestationTimeout
-            ) {
-                emit AttestationExpired(qc, attester, uint256(attestation.balance));
+            bool isExpired = attestation.timestamp != 0 &&
+                block.timestamp > uint256(attestation.timestamp) + attestationTimeout;
+            bool isRevoked = attestation.timestamp != 0 &&
+                !hasRole(ATTESTER_ROLE, attester);
 
-                // Remove expired attestation
+            if (isExpired || isRevoked) {
+                if (isExpired) {
+                    emit AttestationExpired(qc, attester, uint256(attestation.balance));
+                }
+
+                // Remove attestation
                 delete pendingAttestations[qc][attester];
 
                 // Remove attester from array by swapping with last element

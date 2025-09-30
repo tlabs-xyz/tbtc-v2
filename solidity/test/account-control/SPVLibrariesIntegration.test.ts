@@ -2,11 +2,11 @@ import { ethers } from "hardhat"
 import { expect } from "chai"
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers"
 import type {
-  QCManagerSPVTest,
   QCRedeemerSPVTest,
   TestRelay,
   SharedSPVCore,
 } from "../../typechain"
+import { deploySPVLibraries } from "../helpers/spvLibraryHelpers"
 
 /**
  * Comprehensive integration tests for refactored SPV libraries
@@ -15,7 +15,6 @@ import type {
  */
 describe("SPV Libraries Integration", () => {
   let deployer: HardhatEthersSigner
-  let qcManagerSPVTest: QCManagerSPVTest
   let qcRedeemerSPVTest: QCRedeemerSPVTest
   let testRelay: TestRelay
   let sharedSPVCore: SharedSPVCore
@@ -95,47 +94,18 @@ describe("SPV Libraries Integration", () => {
     const TestRelay = await ethers.getContractFactory("TestRelay")
     testRelay = await TestRelay.deploy()
 
-    // Deploy SharedSPVCore library
-    const SharedSPVCore = await ethers.getContractFactory("SharedSPVCore")
-    sharedSPVCore = await SharedSPVCore.deploy()
+    // Deploy SPV libraries using standardized helper
+    const spvLibraries = await deploySPVLibraries()
+    sharedSPVCore = spvLibraries.sharedSPVCore
 
-    // Deploy QCManagerSPV library with SharedSPVCore linked
-    const QCManagerSPV = await ethers.getContractFactory("QCManagerSPV", {
-      libraries: {
-        SharedSPVCore: sharedSPVCore.address,
-      },
-    })
-    const qcManagerSPV = await QCManagerSPV.deploy()
-
-    // Deploy QCRedeemerSPV library with SharedSPVCore linked
-    const QCRedeemerSPV = await ethers.getContractFactory("QCRedeemerSPV", {
-      libraries: {
-        SharedSPVCore: sharedSPVCore.address,
-      },
-    })
-    const qcRedeemerSPV = await QCRedeemerSPV.deploy()
-
-    // Deploy test contracts with all libraries linked
-    const QCManagerSPVTest = await ethers.getContractFactory(
-      "QCManagerSPVTest",
-      {
-        libraries: {
-          SharedSPVCore: sharedSPVCore.address,
-          QCManagerSPV: qcManagerSPV.address,
-        },
-      }
-    )
-    qcManagerSPVTest = await QCManagerSPVTest.deploy(
-      testRelay.address,
-      1 // txProofDifficultyFactor for testing
-    )
+    // Deploy QCRedeemerSPV test contract
 
     const QCRedeemerSPVTest = await ethers.getContractFactory(
       "QCRedeemerSPVTest",
       {
         libraries: {
-          SharedSPVCore: sharedSPVCore.address,
-          QCRedeemerSPV: qcRedeemerSPV.address,
+          SharedSPVCore: spvLibraries.sharedSPVCore.address,
+          QCRedeemerSPV: spvLibraries.qcRedeemerSPV.address,
         },
       }
     )
@@ -158,8 +128,8 @@ describe("SPV Libraries Integration", () => {
 
   describe("SharedSPVCore Integration", () => {
     it("should validate real Bitcoin transaction using SharedSPVCore", async () => {
-      // Test SharedSPVCore.validateCoreSPVProof directly through QCManagerSPV
-      const result = await qcManagerSPVTest.validateSPVProof(
+      // Test SharedSPVCore.validateCoreSPVProof directly through QCRedeemerSPV
+      const result = await qcRedeemerSPVTest.validateSPVProof(
         validBitcoinTx.txInfo,
         validBitcoinTx.proof
       )
@@ -192,7 +162,7 @@ describe("SPV Libraries Integration", () => {
 
       await Promise.all(
         testAddresses.map(async (test) => {
-          const isValid = await qcManagerSPVTest.isValidBitcoinAddress(
+          const isValid = await qcRedeemerSPVTest.isValidBitcoinAddress(
             test.address
           )
           expect(isValid).to.equal(
@@ -206,7 +176,7 @@ describe("SPV Libraries Integration", () => {
     it("should decode Bitcoin addresses correctly", async () => {
       // Test address decoding through SharedSPVCore
       const [valid, scriptType, scriptHash] =
-        await qcManagerSPVTest.decodeAndValidateBitcoinAddress(
+        await qcRedeemerSPVTest.decodeAndValidateBitcoinAddress(
           "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
         )
 
@@ -216,56 +186,6 @@ describe("SPV Libraries Integration", () => {
     })
   })
 
-  describe("QCManagerSPV Integration", () => {
-    const testChallenge = ethers.utils.keccak256(
-      ethers.utils.toUtf8Bytes("wallet_control_test_challenge")
-    )
-    const testBitcoinAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-
-    it("should validate wallet control with real Bitcoin data", async () => {
-      // Create a transaction with OP_RETURN containing our challenge
-      const challengeBytes = testChallenge.slice(2)
-      const opReturnOutput = `0x01${"00".repeat(
-        8
-      )}${"22"}${"6a"}${"20"}${challengeBytes}`
-
-      const txInfoWithChallenge = {
-        ...validBitcoinTx.txInfo,
-        outputVector: opReturnOutput,
-      }
-
-      const result = await qcManagerSPVTest.validateWalletControlProof(
-        testBitcoinAddress,
-        testChallenge,
-        txInfoWithChallenge
-      )
-
-      expect(result).to.be.true
-    })
-
-    it("should detect challenge in OP_RETURN outputs", async () => {
-      const challengeBytes = testChallenge.slice(2)
-      const opReturnOutput = `0x01${"00".repeat(
-        8
-      )}${"22"}${"6a"}${"20"}${challengeBytes}`
-
-      const found = await qcManagerSPVTest.findChallengeInOpReturn(
-        opReturnOutput,
-        testChallenge
-      )
-
-      expect(found).to.be.true
-    })
-
-    it("should verify transaction signatures correctly", async () => {
-      const result = await qcManagerSPVTest.verifyTransactionSignature(
-        testBitcoinAddress,
-        validBitcoinTx.txInfo
-      )
-
-      expect(result).to.be.true
-    })
-  })
 
   describe("QCRedeemerSPV Integration", () => {
     const userBtcAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
@@ -305,11 +225,11 @@ describe("SPV Libraries Integration", () => {
 
     it("should match output hashes correctly", async () => {
       // Test address matching logic
-      const outputHash = `0x${"00".repeat(20)}` // Mock output hash
+      const mockOutput = `0x${"00".repeat(34)}` // Mock transaction output (8 bytes value + 1 byte script len + 25 bytes script)
 
-      const matches = await qcRedeemerSPVTest.testAddressMatchesOutputHash(
-        userBtcAddress,
-        outputHash
+      const matches = await qcRedeemerSPVTest.testIsPaymentToAddress(
+        mockOutput,
+        userBtcAddress
       )
 
       expect(matches).to.be.a("boolean")
@@ -362,7 +282,7 @@ describe("SPV Libraries Integration", () => {
       // Test that function exists and throws an error (specific error testing requires chai extensions)
       let errorOccurred = false
       try {
-        await qcManagerSPVTest.validateSPVProof(
+        await qcRedeemerSPVTest.validateSPVProof(
           validBitcoinTx.txInfo,
           invalidProof
         )

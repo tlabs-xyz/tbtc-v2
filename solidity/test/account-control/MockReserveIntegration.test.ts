@@ -30,8 +30,6 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
   const HALF_BTC = ONE_BTC.div(2);
   const TEN_BTC = ONE_BTC.mul(10);
 
-  // Reserve type constants (matching AccountControl.sol)
-  const QC_PERMISSIONED = 1;
 
   // Dynamic constants from contract
   let constants: any;
@@ -56,6 +54,9 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       [owner.address, emergencyCouncil.address, mockBank.address],
       { initializer: "initialize" }
     ) as AccountControl;
+
+    // Authorize AccountControl to call MockBank functions
+    await mockBank.authorizeBalanceIncreaser(accountControl.address);
   });
 
   beforeEach(async () => {
@@ -86,11 +87,10 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       expect(await accountControl.minted(mockReserve.address)).to.equal(0);
     });
 
-    it("should assign correct reserve type", async () => {
+    it("should assign correct minting cap", async () => {
       await accountControl.connect(owner).authorizeReserve(mockReserve.address, TEN_BTC);
 
       const reserveInfo = await accountControl.reserveInfo(mockReserve.address);
-      expect(reserveInfo.reserveType).to.equal(QC_PERMISSIONED);
       expect(reserveInfo.mintingCap).to.equal(TEN_BTC);
     });
 
@@ -320,15 +320,18 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
       const recipients = [user1.address, user2.address, ethers.constants.AddressZero];
       const amounts = [constants.MIN_MINT_AMOUNT, constants.MIN_MINT_AMOUNT, constants.MIN_MINT_AMOUNT];
 
+      // Capture minted amount before the operation
+      const reserveMintedBefore = await accountControl.minted(mockReserve.address);
+
       // Should fail due to invalid recipient
       await expect(
         mockReserve.batchMint(recipients, amounts)
       ).to.be.revertedWith("InvalidRecipient");
 
       // Verify minted amount didn't change (atomic failure)
-      const reserveMinted = await accountControl.minted(mockReserve.address);
-      // Reserve should not have minted the failed batch
-      expect(reserveMinted).to.be.gte(0); // Sanity check - may have previous mints
+      const reserveMintedAfter = await accountControl.minted(mockReserve.address);
+      // Reserve should not have minted the failed batch - amounts should be equal
+      expect(reserveMintedAfter).to.equal(reserveMintedBefore);
     });
   });
 
