@@ -185,8 +185,22 @@ const func: DeployFunction = async function DeployAccountControl(
   })
   log(`ReserveOracle deployed at: ${reserveOracle.address}`)
 
-  // Phase 5: Deploy QCManager (depends on QCData, SystemState, ReserveOracle)
-  log("\n=== Phase 5: Business Logic (QCManager) ===")
+  // Phase 5: Deploy QCPauseManager first, then QCManager
+  log("\n=== Phase 5: Business Logic (QCPauseManager & QCManager) ===")
+
+  // Deploy QCPauseManager first
+  const qcPauseManager = await deploy("QCPauseManager", {
+    from: deployer,
+    args: [
+      qcData.address,
+      deployer, // Temporary QCManager address, will be updated after QCManager deployment
+      deployer, // Admin address
+      deployer  // Emergency role address
+    ],
+    log: true,
+    waitConfirmations: network.live ? 5 : 1,
+  })
+  log(`QCPauseManager deployed at: ${qcPauseManager.address}`)
 
   // Ensure QCManagerLib library is available
   if (!qcManagerLib.address) {
@@ -202,6 +216,7 @@ const func: DeployFunction = async function DeployAccountControl(
         qcData.address,
         systemState.address,
         reserveOracle.address,
+        qcPauseManager.address,
       ],
       libraries: {
         QCManagerLib: qcManagerLib.address,
@@ -226,7 +241,8 @@ const func: DeployFunction = async function DeployAccountControl(
     const qcManagerContract = await QCManagerFactory.deploy(
       qcData.address,
       systemState.address,
-      reserveOracle.address
+      reserveOracle.address,
+      qcPauseManager.address
     )
     await qcManagerContract.deployed()
 
@@ -245,6 +261,19 @@ const func: DeployFunction = async function DeployAccountControl(
     })
     qcManager = { address: qcManagerContract.address }
   }
+
+  // Setup access control between QCManager and QCPauseManager
+  log("\n=== Setting up QCPauseManager Access Control ===")
+  const pauseManagerContract = await ethers.getContractAt("QCPauseManager", qcPauseManager.address)
+  
+  // Grant QC_MANAGER_ROLE to the deployed QCManager
+  const QC_MANAGER_ROLE = await pauseManagerContract.QC_MANAGER_ROLE()
+  await pauseManagerContract.grantRole(QC_MANAGER_ROLE, qcManager.address)
+  log(`Granted QC_MANAGER_ROLE to QCManager: ${qcManager.address}`)
+  
+  // Revoke temporary QC_MANAGER_ROLE from deployer
+  await pauseManagerContract.revokeRole(QC_MANAGER_ROLE, deployer)
+  log(`Revoked temporary QC_MANAGER_ROLE from deployer: ${deployer}`)
 
   // Phase 6: Deploy operational contracts
   log("\n=== Phase 6: Operational Contracts ===")

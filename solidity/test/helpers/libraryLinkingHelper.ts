@@ -149,7 +149,7 @@ export class LibraryLinkingHelper {
     return ethers.getContractFactory("QCManager", {
       libraries: {
         QCManagerLib: libs.QCManagerLib,
-        QCManagerPauseLib: libs.QCManagerPauseLib,
+        // Note: QCManagerPauseLib removed - now uses QCPauseManager contract instead
       },
     })
   }
@@ -202,6 +202,7 @@ export class LibraryLinkingHelper {
     qcDataAddress: string,
     systemStateAddress: string,
     reserveOracleAddress: string,
+    pauseManagerAddress: string,
     libraries?: LibraryLinks
   ): Promise<Contract> {
     const factory = await this.getQCManagerFactory(libraries)
@@ -209,7 +210,8 @@ export class LibraryLinkingHelper {
     const qcManager = await factory.deploy(
       qcDataAddress,
       systemStateAddress,
-      reserveOracleAddress
+      reserveOracleAddress,
+      pauseManagerAddress
     )
     await qcManager.deployed()
 

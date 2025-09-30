@@ -11,7 +11,7 @@ import {BitcoinAddressUtils} from "./BitcoinAddressUtils.sol";
 import {CheckBitcoinSigs} from "@keep-network/bitcoin-spv-sol/contracts/CheckBitcoinSigs.sol";
 import "./AccountControl.sol";
 import "./QCManagerLib.sol";
-import "./libraries/QCManagerPauseLib.sol";
+import "./IQCPauseManager.sol";
 
 // =================== CONSOLIDATED INTERFACES ===================
 // Interfaces for contracts that will be removed in consolidation
@@ -80,9 +80,8 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     bytes32 public constant BACKLOG_CLEARED = keccak256("BACKLOG_CLEARED");
     bytes32 public constant UNDERCOLLATERALIZED_REASON = keccak256("UNDERCOLLATERALIZED");
     
-    // =================== PAUSE CREDIT CONSTANTS ===================
-    // Constants moved to QCManagerPauseLib
-    using QCManagerPauseLib for mapping(address => QCManagerPauseLib.PauseCredit);
+    // =================== PAUSE CREDIT INTEGRATION ===================
+    // Pause credit system managed by QCPauseManager contract
 
     // Additional errors not in QCManagerErrors
     error QCNotEligibleForEscalation();
@@ -113,9 +112,10 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     /// @dev Track if escalation warning has been emitted
     mapping(address => bool) public escalationWarningEmitted;
     
-    // =================== PAUSE CREDIT STORAGE ===================
+    // =================== EXTERNAL CONTRACTS ===================
     
-    mapping(address => QCManagerPauseLib.PauseCredit) public pauseCredits;
+    /// @notice QCPauseManager contract for pause credit management
+    IQCPauseManager public immutable pauseManager;
     
     // =================== WALLET REGISTRATION STORAGE ===================
     
@@ -273,38 +273,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         QCData.QCStatus newStatus
     );
     
-    // =================== PAUSE CREDIT EVENTS ===================
-    
-    event PauseCreditUsed(
-        address indexed qc,
-        bytes32 reason,
-        uint256 duration
-    );
-    
-    event PauseCreditRenewed(
-        address indexed qc,
-        uint256 nextRenewalTime
-    );
-    
-    event PauseCreditExpired(
-        address indexed qc
-    );
-    
-    event EmergencyCleared(
-        address indexed qc,
-        address indexed clearedBy,
-        bytes32 reason
-    );
-    
-    event EarlyResumed(
-        address indexed qc,
-        address indexed resumedBy  // Added for consolidation
-    );
-    
-    event InitialCreditGranted(
-        address indexed qc,
-        address indexed grantedBy
-    );
+    // Pause credit events now emitted by QCPauseManager contract
 
     // Account Control Events
     /// @dev Emitted when Account Control address is updated
@@ -331,15 +300,18 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     constructor(
         address _qcData,
         address _systemState,
-        address _reserveOracle
+        address _reserveOracle,
+        address _pauseManager
     ) {
         require(_qcData != address(0), "Invalid QCData address");
         require(_systemState != address(0), "Invalid SystemState address");
         require(_reserveOracle != address(0), "Invalid ReserveOracle address");
+        require(_pauseManager != address(0), "Invalid PauseManager address");
 
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
         reserveOracle = ReserveOracle(_reserveOracle);
+        pauseManager = IQCPauseManager(_pauseManager);
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(GOVERNANCE_ROLE, msg.sender);
@@ -499,7 +471,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         string memory authority
     ) private requiresAccountControl {
         if (reason == bytes32(0)) {
-            revert QCManagerPauseLib.ReasonRequired();
+            revert("Reason required");
         }
 
         if (!qcData.isQCRegistered(qc)) {
@@ -613,21 +585,8 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
                 errorCode,
                 msg.sender
             );
-            // Convert error code to appropriate revert
-            if (keccak256(bytes(errorCode)) == keccak256("INVALID_ADDR") ||
-                keccak256(bytes(errorCode)) == keccak256("BAD_ADDR")) {
-                revert InvalidWalletAddress();
-            } else if (keccak256(bytes(errorCode)) == keccak256("QC_NOT_REG")) {
-                revert QCNotRegistered(qc);
-            } else if (keccak256(bytes(errorCode)) == keccak256("QC_INACTIVE")) {
-                revert QCNotActive(qc);
-            } else if (keccak256(bytes(errorCode)) == keccak256("SIG_FAIL")) {
-                revert SignatureVerificationFailed();
-            } else if (keccak256(bytes(errorCode)) == keccak256("ADDR_MISMATCH")) {
-                revert SignatureVerificationFailed(); // Public key doesn't match claimed address
-            } else {
-                revert("Validation failed");
-            }
+            // Delegate error handling to library
+            QCManagerLib.handleRegistrationError(errorCode, qc);
         }
 
         qcData.registerWallet(qc, btcAddress);
@@ -686,21 +645,8 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
                 errorCode,
                 msg.sender
             );
-            // Convert error code to appropriate revert
-            if (keccak256(bytes(errorCode)) == keccak256("INVALID_ADDR") ||
-                keccak256(bytes(errorCode)) == keccak256("BAD_ADDR_DIRECT")) {
-                revert InvalidWalletAddress();
-            } else if (keccak256(bytes(errorCode)) == keccak256("QC_NOT_REG")) {
-                revert QCNotRegistered(msg.sender);
-            } else if (keccak256(bytes(errorCode)) == keccak256("QC_INACTIVE")) {
-                revert QCNotActive(msg.sender);
-            } else if (keccak256(bytes(errorCode)) == keccak256("SIG_FAIL_DIRECT")) {
-                revert SignatureVerificationFailed();
-            } else if (keccak256(bytes(errorCode)) == keccak256("ADDR_MISMATCH_DIRECT")) {
-                revert SignatureVerificationFailed(); // Public key doesn't match claimed address
-            } else {
-                revert("Validation failed");
-            }
+            // Delegate error handling to library
+            QCManagerLib.handleRegistrationError(errorCode, msg.sender);
         }
 
         // Check and mark nonce as used to prevent replay
@@ -1070,7 +1016,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         
         // Check pause credit availability
         if (!canSelfPause(qc)) {
-            revert QCManagerPauseLib.NoPauseCredit();
+            revert("No pause credit available");
         }
         
         // Use renewable pause credit
@@ -1100,13 +1046,13 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         address qc = msg.sender;
         
         if (!qcCanEarlyResume[qc]) {
-            revert QCManagerPauseLib.CannotEarlyResume();
+            revert("Cannot early resume");
         }
         
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
         if (currentStatus != QCData.QCStatus.MintingPaused && 
             currentStatus != QCData.QCStatus.Paused) {
-            revert QCManagerPauseLib.NotSelfPaused();
+            revert("Not self-paused");
         }
         
         // Clear pause tracking
@@ -1212,7 +1158,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     {
         // Check for pending redemptions
         if (hasUnfulfilledRedemptions(qc)) {
-            revert QCManagerPauseLib.HasPendingRedemptions();
+            revert("Has pending redemptions");
         }
         
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
@@ -1241,26 +1187,19 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     /// @param qc QC address
     /// @return canPause Whether QC can self-pause
     function canSelfPause(address qc) public view returns (bool canPause) {
-        return QCManagerPauseLib.canSelfPause(
-            pauseCredits,
-            qcData,
-            qc,
-            this.getEarliestRedemptionDeadline
-        );
+        return pauseManager.canSelfPause(qc);
     }
     
     /// @notice Renew pause credit after 90 days
     function renewPauseCredit() external {
         address qc = msg.sender;
-        QCManagerPauseLib.renewPauseCredit(pauseCredits, qcData, qc);
-        emit PauseCreditRenewed(qc, block.timestamp + QCManagerPauseLib.RENEWAL_PERIOD);
+        pauseManager.renewPauseCredit(qc);
     }
     
     /// @notice Check and auto-resume if pause expired
     /// @param qc QC address
     function resumeIfExpired(address qc) external {
-        QCManagerPauseLib.resumeIfExpired(pauseCredits, qc);
-        emit PauseCreditExpired(qc);
+        pauseManager.resumeIfExpired(qc);
     }
     
     /// @notice Emergency council can clear pause and restore credit
@@ -1270,8 +1209,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         external 
         onlyRole(EMERGENCY_ROLE) 
     {
-        bytes32 reasonHash = QCManagerPauseLib.emergencyClearPause(pauseCredits, qc, reason);
-        emit EmergencyCleared(qc, msg.sender, reasonHash);
+        pauseManager.emergencyClearPause(qc, reason);
     }
     
     /// @notice Grant initial credit to new QC
@@ -1280,8 +1218,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         external 
         onlyRole(EMERGENCY_ROLE) 
     {
-        QCManagerPauseLib.grantInitialCredit(pauseCredits, qcData, qc);
-        emit InitialCreditGranted(qc, msg.sender);
+        pauseManager.grantInitialCredit(qc);
     }
     
     // =================== VIEW FUNCTIONS FOR CONSOLIDATED STATE ===================
@@ -1350,7 +1287,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         bool hasCredit,
         uint256 creditRenewTime
     ) {
-        return QCManagerPauseLib.getPauseInfo(pauseCredits, qc);
+        return pauseManager.getPauseInfo(qc);
     }
     
     /// @notice Get time until credit renewal is available
@@ -1361,7 +1298,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         view
         returns (uint256 timeUntilRenewal)
     {
-        return QCManagerPauseLib.getTimeUntilRenewal(pauseCredits, qc);
+        return pauseManager.getTimeUntilRenewal(qc);
     }
     
     // =================== INTERNAL HELPER FUNCTIONS ===================
@@ -1389,20 +1326,12 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     
     /// @dev Internal function to use emergency pause credit
     function _useEmergencyPause(address qc, string memory reason) private {
-        bytes32 reasonHash = QCManagerPauseLib.useEmergencyPause(
-            pauseCredits, 
-            qcData, 
-            qc, 
-            reason, 
-            this.getEarliestRedemptionDeadline
-        );
-        emit PauseCreditUsed(qc, reasonHash, QCManagerPauseLib.PAUSE_DURATION);
+        pauseManager.useEmergencyPause(qc, reason);
     }
     
     /// @dev Internal function for early resume from pause credit system
     function _resumeEarly(address qc) private {
-        QCManagerPauseLib.resumeEarly(pauseCredits, qc);
-        emit EarlyResumed(qc, msg.sender);
+        pauseManager.resumeEarly(qc);
     }
 
     // =================== ACCOUNT CONTROL FUNCTIONS ===================

@@ -68,13 +68,28 @@ export async function deployQCManagerFixture() {
   // Deploy libraries using the helper
   const libraries = await LibraryLinkingHelper.deployAllLibraries()
 
-  // Deploy QCManager using the helper
+  // Deploy QCPauseManager first with deployer as temporary QCManager
+  const QCPauseManagerFactory = await ethers.getContractFactory("QCPauseManager")
+  const pauseManager = await QCPauseManagerFactory.deploy(
+    qcData.address,
+    deployer.address, // Temporary QCManager address
+    deployer.address, // Admin
+    deployer.address  // Emergency role
+  )
+
+  // Deploy QCManager using the helper with new signature
   const qcManager = await LibraryLinkingHelper.deployQCManager(
     qcData.address,
     systemState.address,
     reserveOracle.address,
+    pauseManager.address,
     libraries
   )
+
+  // Grant QC_MANAGER_ROLE to the real QCManager and revoke from deployer
+  const QC_MANAGER_ROLE = await pauseManager.QC_MANAGER_ROLE()
+  await pauseManager.grantRole(QC_MANAGER_ROLE, qcManager.address)
+  await pauseManager.revokeRole(QC_MANAGER_ROLE, deployer.address)
 
   // Deploy MockBank for AccountControl
   const MockBankFactory = await ethers.getContractFactory("MockBank")

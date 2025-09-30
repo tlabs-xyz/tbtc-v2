@@ -18,15 +18,10 @@ describe("QCManagerLib - Integration Tests", function () {
   beforeEach(async function () {
     [deployer, qc, governance, registrar] = await ethers.getSigners();
 
-    // Deploy QCManagerLib first (required for linking)
+    // Deploy libraries first (required for linking)
     const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib");
     qcManagerLib = await QCManagerLibFactory.deploy();
     await qcManagerLib.deployed();
-
-    // Deploy QCManagerPauseLib (required for linking)
-    const QCManagerPauseLibFactory = await ethers.getContractFactory("QCManagerPauseLib");
-    const qcManagerPauseLib = await QCManagerPauseLibFactory.deploy();
-    await qcManagerPauseLib.deployed();
 
     // Deploy mock dependencies
     const MockQCData = await ethers.getContractFactory("MockQCData");
@@ -38,21 +33,34 @@ describe("QCManagerLib - Integration Tests", function () {
     const MockReserveOracle = await ethers.getContractFactory("MockReserveOracle");
     reserveOracle = await MockReserveOracle.deploy();
 
-    const MockAccountControl = await ethers.getContractFactory("MockAccountControl");
-    accountControl = await MockAccountControl.deploy();
+    // Deploy mock Bank first (required for MockAccountControl constructor)
+    const MockBank = await ethers.getContractFactory("MockBank");
+    const mockBank = await MockBank.deploy();
 
-    // Deploy QCManager with library linking
+    const MockAccountControl = await ethers.getContractFactory("MockAccountControl");
+    accountControl = await MockAccountControl.deploy(mockBank.address);
+
+    // Deploy QCManager with only QCManagerLib linking (not QCManagerPauseLib)
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
         QCManagerLib: qcManagerLib.address,
-        QCManagerPauseLib: qcManagerPauseLib.address,
       },
     });
+
+    // Deploy QCPauseManager (required for QCManager constructor)
+    const QCPauseManagerFactory = await ethers.getContractFactory("QCPauseManager");
+    const pauseManager = await QCPauseManagerFactory.deploy(
+      qcData.address,
+      deployer.address, // Temporary QCManager address
+      deployer.address, // Admin
+      deployer.address  // Emergency role
+    );
 
     qcManager = await QCManagerFactory.deploy(
       qcData.address,
       systemState.address,
-      reserveOracle.address
+      reserveOracle.address,
+      pauseManager.address
     );
 
     // Set up roles

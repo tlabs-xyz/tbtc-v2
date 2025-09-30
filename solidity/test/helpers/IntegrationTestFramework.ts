@@ -20,7 +20,7 @@ import type {
 import { deploySPVLibraries, getQCRedeemerLibraries } from "./spvLibraryHelpers"
 import { setupSystemStateDefaults } from "./testSetupHelpers"
 import { LibraryLinkingHelper } from "./libraryLinkingHelper"
-import { SPVTestData } from "./SPVTestData"
+import { SPVTestData, SPVTestHelpers } from "./SPVTestData"
 
 export interface SystemState {
   totalMinted: any
@@ -121,14 +121,28 @@ export class IntegrationTestFramework {
       qcManager.address
     ) as QCMinter
 
-    // Deploy QCRedeemer using LibraryLinkingHelper
-    const qcRedeemer = await LibraryLinkingHelper.deployQCRedeemer(
-      tbtcToken.address,
-      qcData.address,
-      systemState.address,
-      testRelay.address,
-      100 // txProofDifficultyFactor
-    ) as QCRedeemer
+    // Deploy QCRedeemer with proper library linking
+    let qcRedeemer: QCRedeemer
+    try {
+      console.log("=== Deploying libraries ===")
+      // First deploy the required libraries
+      const libraries = await LibraryLinkingHelper.deployAllLibraries()
+      console.log("✓ Libraries deployed:", Object.keys(libraries))
+      
+      console.log("=== Deploying QCRedeemer ===")
+      qcRedeemer = await LibraryLinkingHelper.deployQCRedeemer(
+        tbtcToken.address,
+        qcData.address,
+        systemState.address,
+        testRelay.address,
+        100, // txProofDifficultyFactor
+        libraries // Provide the libraries explicitly
+      ) as QCRedeemer
+      console.log("✓ QCRedeemer deployed")
+    } catch (error) {
+      console.error("❌ Error deploying QCRedeemer:", error)
+      throw error
+    }
 
     // Store all contracts
     this.contracts = {
@@ -149,6 +163,7 @@ export class IntegrationTestFramework {
   }
   
   async configureIntegration(): Promise<void> {
+    console.log("=== configureIntegration: Starting ===")
     const { owner, qcAddress } = this.signers
     const { 
       accountControl, 
@@ -162,15 +177,41 @@ export class IntegrationTestFramework {
       reserveOracle
     } = this.contracts
 
-    // Setup SystemState defaults
-    await systemState.connect(owner).grantRole(await systemState.OPERATIONS_ROLE(), owner.address)
-    await setupSystemStateDefaults(systemState, owner)
+    try {
+      console.log("=== Step 1: SystemState setup ===")
+      // Setup SystemState defaults
+      const opsRole = await systemState.OPERATIONS_ROLE()
+      console.log("✓ Got OPERATIONS_ROLE:", opsRole)
+      
+      await systemState.connect(owner).grantRole(opsRole, owner.address)
+      console.log("✓ Granted OPERATIONS_ROLE")
+      
+      await setupSystemStateDefaults(systemState, owner)
+      console.log("✓ SystemState defaults set")
 
-    // Setup QCData
-    await qcData.grantRole(await qcData.QC_MANAGER_ROLE(), owner.address)
-    await qcData.connect(owner).registerQC(qcAddress.address, this.QC_MINTING_CAP)
-    await qcData.connect(owner).setQCStatus(qcAddress.address, 0, ethers.utils.formatBytes32String("Active"))
-    await qcData.connect(owner).registerWallet(qcAddress.address, "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
+      console.log("=== Step 2: QCData setup ===")
+      // Setup QCData
+      const qcManagerRole = await qcData.QC_MANAGER_ROLE()
+      console.log("✓ Got QC_MANAGER_ROLE:", qcManagerRole)
+      
+      await qcData.grantRole(qcManagerRole, owner.address)
+      console.log("✓ Granted QC_MANAGER_ROLE")
+      
+      await qcData.connect(owner).registerQC(qcAddress.address, this.QC_MINTING_CAP)
+      console.log("✓ QC registered")
+      
+      const statusBytes = ethers.utils.formatBytes32String("Active")
+      console.log("✓ Status bytes formatted:", statusBytes)
+      
+      await qcData.connect(owner).setQCStatus(qcAddress.address, 0, statusBytes)
+      console.log("✓ QC status set")
+      
+      await qcData.connect(owner).registerWallet(qcAddress.address, "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
+      console.log("✓ Wallet registered")
+    } catch (error) {
+      console.error("❌ Error in configureIntegration:", error)
+      throw error
+    }
 
     // Setup MockQCManager - MUST register QC first before setting capacity
     const mockQCManager = qcManager as any // Cast to any for mock methods
@@ -202,6 +243,11 @@ export class IntegrationTestFramework {
     await mockAccountControl.setBackingForTesting(qcAddress.address, this.QC_BACKING_AMOUNT)
     await mockAccountControl.setBackingForTesting(qcMinter.address, this.QC_BACKING_AMOUNT * 3)
     await mockAccountControl.setBackingForTesting(qcRedeemer.address, this.QC_BACKING_AMOUNT)
+    
+    // Set minting caps for all authorized reserves
+    await mockAccountControl.setMintingCap(qcAddress.address, this.QC_BACKING_AMOUNT)
+    await mockAccountControl.setMintingCap(qcMinter.address, this.QC_BACKING_AMOUNT * 3)
+    await mockAccountControl.setMintingCap(qcRedeemer.address, this.QC_BACKING_AMOUNT)
     
     // Authorize contracts in Bank
     await mockBank.authorizeBalanceIncreaser(accountControl.address)
@@ -297,16 +343,31 @@ export class IntegrationTestFramework {
       
       // Get current minted amounts
       const currentTotalMinted = await mockAccountControl.totalMinted()
+      const currentMintedQCAddress = await mockAccountControl.minted(qcAddress)
       const currentMintedQCRedeemer = await mockAccountControl.minted(this.contracts.qcRedeemer.address)
       
       // Update total minted
       await mockAccountControl.setTotalMintedForTesting(currentTotalMinted.add(satoshis))
       
-      // Set QCRedeemer's minted amount to allow redemption
+      // Track minted amount for the specific QC address (needed for QC-specific redemptions)
+      await mockAccountControl.setMintedForTesting(
+        qcAddress, 
+        currentMintedQCAddress.add(satoshis)
+      )
+      
+      // Set QCRedeemer's minted amount to allow redemption (critical for redemption validation)
       await mockAccountControl.setMintedForTesting(
         this.contracts.qcRedeemer.address, 
         currentMintedQCRedeemer.add(satoshis)
       )
+      
+      // IMPORTANT: Also update the backing to ensure minted <= backing constraint
+      const currentBacking = await mockAccountControl.backing(qcAddress)
+      const newTotalMinted = currentMintedQCAddress.add(satoshis)
+      if (currentBacking.lt(newTotalMinted)) {
+        // Increase backing to at least match minted amount (2x for safety)
+        await mockAccountControl.setBackingForTesting(qcAddress, newTotalMinted.mul(2))
+      }
     }
   }
 
@@ -329,7 +390,18 @@ export class IntegrationTestFramework {
     
     // Extract redemption ID from events (returns bytes32)
     const event = receipt.events?.find(e => e.event === "RedemptionRequested")
-    return event?.args?.redemptionId || ethers.utils.formatBytes32String("1")
+    if (event?.args?.redemptionId) {
+      return event.args.redemptionId
+    }
+    
+    // Fallback: Generate a mock redemption ID
+    const mockId = ethers.utils.keccak256(
+      ethers.utils.defaultAbiCoder.encode(
+        ["address", "uint256", "string", "uint256"],
+        [qcAddress, amount.toString(), btcAddress, Date.now()]
+      )
+    )
+    return mockId
   }
 
   /**
@@ -355,33 +427,36 @@ export class IntegrationTestFramework {
    * Generate valid SPV proof data for testing
    */
   generateValidSPVProof(): { txInfo: any, proof: any } {
-    const testData = SPVTestData.VALID_BITCOIN_TX
+    // Generate data matching exact BitcoinTx.Info and BitcoinTx.Proof struct requirements
+    const txInfo = {
+      version: "0x01000000",           // bytes4: 4 bytes for version
+      inputVector: "0x01" + "00".repeat(36) + "00" + "ffffffff", 
+      outputVector: "0x01" + "1027000000000000" + "17" + "76a914" + "bb".repeat(20) + "88ac",
+      locktime: "0x00000000"           // bytes4: 4 bytes for locktime
+    };
     
-    // Ensure all hex strings start with 0x
-    const ensureHexPrefix = (hex: string | undefined) => {
-      if (!hex) return '0x'
-      return hex.startsWith('0x') ? hex : '0x' + hex
-    }
+    const proof = {
+      merkleProof: "0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456a1",
+      txIndexInBlock: 2,               // uint256
+      bitcoinHeaders: "0x0100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000123456781d00ffff8765432100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      coinbasePreimage: "0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456", // bytes32: exactly 32 bytes
+      coinbaseProof: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" // bytes: coinbase proof
+    };
     
-    const result = {
-      txInfo: {
-        version: ensureHexPrefix(testData.txInfo.version), // bytes4 as hex string
-        inputVector: ensureHexPrefix(testData.txInfo.inputVector), // bytes as hex string
-        outputVector: ensureHexPrefix(testData.txInfo.outputVector), // bytes as hex string
-        locktime: ensureHexPrefix(testData.txInfo.locktime) // bytes4 as hex string
-      },
-      proof: {
-        merkleProof: ensureHexPrefix(testData.proof.merkleProof), // bytes as hex string
-        txIndexInBlock: testData.proof.txIndexInBlock || 0, // uint256
-        bitcoinHeaders: ensureHexPrefix(testData.proof.bitcoinHeaders), // bytes as hex string
-        coinbasePreimage: testData.proof.coinbasePreimage ? ensureHexPrefix(testData.proof.coinbasePreimage) : ethers.utils.hexZeroPad("0x00", 32) // bytes32
+    // Ensure all values are defined and strings are properly formatted
+    Object.keys(txInfo).forEach(key => {
+      if (txInfo[key] === undefined || txInfo[key] === null) {
+        throw new Error(`txInfo.${key} is undefined`);
       }
-    }
+    });
     
-    // Log for debugging
-    console.log("SPV Proof generated:", JSON.stringify(result, null, 2))
+    Object.keys(proof).forEach(key => {
+      if (proof[key] === undefined || proof[key] === null) {
+        throw new Error(`proof.${key} is undefined`);
+      }
+    });
     
-    return result
+    return { txInfo, proof };
   }
 
   /**

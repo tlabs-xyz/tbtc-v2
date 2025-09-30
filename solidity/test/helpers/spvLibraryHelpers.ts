@@ -69,6 +69,7 @@ export function getQCRedeemerLibraries(libraries: {
 
 /**
  * Helper function to get library linking configuration for QCManager
+ * NOTE: QCManager only uses QCManagerLib, not QCManagerPauseLib
  */
 export function getQCManagerLibraries(libraries: {
   qcManagerLib: any
@@ -77,9 +78,7 @@ export function getQCManagerLibraries(libraries: {
   return {
     libraries: {
       QCManagerLib: libraries.qcManagerLib.address,
-      ...(libraries.qcManagerPauseLib && {
-        QCManagerPauseLib: libraries.qcManagerPauseLib.address,
-      }),
+      // NOTE: QCManagerPauseLib is NOT linked to QCManager - it's used by other contracts
     },
   }
 }

@@ -269,6 +269,8 @@ const config: HardhatUserConfig = {
     timeout: 600_000, // Increased timeout for complex tests (10 minutes)
     slow: 5000, // Mark tests taking >5s as slow
     reporter: 'spec',
+    // Reduce parallel execution to help with lock file conflicts
+    parallel: false,
   },
   typechain: {
     outDir: "typechain",

@@ -101,7 +101,7 @@ describe("QCMinter", () => {
 
     // Deploy and configure AccountControl for QCMinter
     const MockAccountControl = await ethers.getContractFactory("MockAccountControl")
-    mockAccountControl = await MockAccountControl.deploy()
+    mockAccountControl = await MockAccountControl.deploy(mockBank.address)
     await mockAccountControl.deployed()
 
     // Set the AccountControl address in QCMinter

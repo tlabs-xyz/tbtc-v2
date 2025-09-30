@@ -4,6 +4,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
   QCData,
   QCManager,
+  QCPauseManager,
   AccountControl,
   SystemState,
   ReserveOracle,
@@ -48,22 +49,32 @@ describe("QCManagerLib", function () {
     const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib");
     const qcManagerLib = await QCManagerLibFactory.deploy();
 
-    // Deploy QCManagerPauseLib library
-    const QCManagerPauseLibFactory = await ethers.getContractFactory("QCManagerPauseLib");
-    const qcManagerPauseLib = await QCManagerPauseLibFactory.deploy();
+    // Deploy QCPauseManager first
+    const QCPauseManagerFactory = await ethers.getContractFactory("QCPauseManager");
+    const pauseManager = await QCPauseManagerFactory.deploy(
+      qcData.address,
+      owner.address, // Temporary QCManager address
+      owner.address, // Admin
+      owner.address  // Emergency role
+    );
 
     // Deploy QCManager with libraries linked
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
         QCManagerLib: qcManagerLib.address,
-        QCManagerPauseLib: qcManagerPauseLib.address,
       },
     });
     qcManager = await QCManagerFactory.deploy(
       qcData.address,
       systemState.address,
-      reserveOracle.address
+      reserveOracle.address,
+      pauseManager.address
     );
+
+    // Grant QC_MANAGER_ROLE to the real QCManager
+    const QC_MANAGER_ROLE = await pauseManager.QC_MANAGER_ROLE();
+    await pauseManager.grantRole(QC_MANAGER_ROLE, qcManager.address);
+    await pauseManager.revokeRole(QC_MANAGER_ROLE, owner.address);
 
     // Deploy AccountControl using upgrades proxy
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
@@ -73,9 +84,9 @@ describe("QCManagerLib", function () {
       { initializer: "initialize" }
     ) as AccountControl;
 
-    // Setup roles
-    const QC_MANAGER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_MANAGER_ROLE"));
-    await qcData.grantRole(QC_MANAGER_ROLE, qcManager.address);
+    // Setup roles for QCData
+    const QC_MANAGER_ROLE_DATA = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_MANAGER_ROLE"));
+    await qcData.grantRole(QC_MANAGER_ROLE_DATA, qcManager.address);
 
     // Grant governance role to owner for QCManager operations
     const GOVERNANCE_ROLE = await qcManager.GOVERNANCE_ROLE();
@@ -159,8 +170,8 @@ describe("QCManagerLib", function () {
 
     it("should authorize QC in AccountControl when enabled", async function () {
       // Grant QC_MANAGER_ROLE to qcManager in AccountControl
-      const QC_MANAGER_ROLE = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_MANAGER_ROLE"));
-      await accountControl.grantRole(QC_MANAGER_ROLE, qcManager.address);
+      const QC_MANAGER_ROLE_AC = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_MANAGER_ROLE"));
+      await accountControl.grantRole(QC_MANAGER_ROLE_AC, qcManager.address);
 
       await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
 

@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { ethers, upgrades } from "hardhat";
+import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
   AccountControl,
@@ -8,7 +8,7 @@ import {
   MockTBTCToken,
   MockTBTCVault
 } from "../../typechain";
-import { getContractConstants, expectBalanceChange } from "../helpers/testing-utils";
+import { getContractConstants, expectBalanceChange, safeDeployProxy, cleanupDeployments } from "../helpers/testing-utils";
 
 describe("MockReserve - AccountControl Direct Backing Integration", () => {
   let accountControl: AccountControl;
@@ -47,13 +47,13 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
     const MockTBTCVaultFactory = await ethers.getContractFactory("contracts/test/MockTBTCVault.sol:MockTBTCVault");
     mockTbtcVault = await MockTBTCVaultFactory.deploy() as MockTBTCVault;
 
-    // Deploy AccountControl
+    // Deploy AccountControl using safe deployment
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
-    accountControl = await upgrades.deployProxy(
+    accountControl = await safeDeployProxy<AccountControl>(
       AccountControlFactory,
       [owner.address, emergencyCouncil.address, mockBank.address],
       { initializer: "initialize" }
-    ) as AccountControl;
+    );
 
     // Authorize AccountControl to call MockBank functions
     await mockBank.authorizeBalanceIncreaser(accountControl.address);
@@ -66,6 +66,11 @@ describe("MockReserve - AccountControl Direct Backing Integration", () => {
 
     // Get dynamic constants from contract
     constants = await getContractConstants(accountControl);
+  });
+
+  afterEach(async () => {
+    // Clean up deployment locks to prevent conflicts
+    await cleanupDeployments();
   });
 
   describe("1. Reserve Authorization & Setup", () => {

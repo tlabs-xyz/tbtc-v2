@@ -1,8 +1,9 @@
 import { expect } from "chai";
-import { ethers, upgrades } from "hardhat";
+import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { AccountControl } from "../../typechain";
+import { safeDeployProxy, cleanupDeployments } from "../helpers/testing-utils";
 
 describe("AccountControl Input Validation", function () {
   let accountControl: AccountControl;
@@ -19,13 +20,13 @@ describe("AccountControl Input Validation", function () {
     const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBank = await MockBankFactory.deploy();
 
-    // Deploy AccountControl
+    // Deploy AccountControl using safe deployment
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
-    accountControl = await upgrades.deployProxy(
+    accountControl = await safeDeployProxy<AccountControl>(
       AccountControlFactory,
       [owner.address, emergencyCouncil.address, mockBank.address],
       { initializer: "initialize" }
-    ) as AccountControl;
+    );
 
     // Authorize AccountControl to call MockBank functions
     await mockBank.authorizeBalanceIncreaser(accountControl.address);
@@ -35,6 +36,11 @@ describe("AccountControl Input Validation", function () {
     // Authorize test reserve (QC_PERMISSIONED is initialized by default)
     await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000);
     await accountControl.connect(reserve).updateBacking(1000000);
+  });
+
+  afterEach(async function () {
+    // Clean up deployment locks to prevent conflicts
+    await cleanupDeployments();
   });
 
   describe("System Pause Enforcement", function () {
