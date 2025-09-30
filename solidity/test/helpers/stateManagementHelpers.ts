@@ -29,7 +29,7 @@ export async function resetAccountControlState(
       // Get the current owner signer to transfer back
       const currentOwnerSigner = await ethers.getSigner(currentOwner);
       await accountControl.connect(currentOwnerSigner).transferOwnership(owner.address);
-      console.log(`🔄 Reset AccountControl ownership from ${currentOwner} to ${owner.address}`);
+      // console.log(`🔄 Reset AccountControl ownership from ${currentOwner} to ${owner.address}`);
     }
 
     // Clear all existing reserve authorizations to start fresh
@@ -40,12 +40,12 @@ export async function resetAccountControlState(
         const isAuthorized = await accountControl.authorized(signers[i].address);
         if (isAuthorized) {
           await accountControl.connect(owner).deauthorizeReserve(signers[i].address);
-          console.log(`🔄 Deauthorized ${signers[i].address} in AccountControl`);
+          // console.log(`🔄 Deauthorized ${signers[i].address} in AccountControl`);
         }
       } catch (error) {
         // Ignore errors for reserves with outstanding balances
         if (!error.message?.includes("OutstandingBalance")) {
-          console.log(`⚠️ Could not deauthorize ${signers[i].address}:`, error.message);
+          // console.log(`⚠️ Could not deauthorize ${signers[i].address}:`, error.message);
         }
       }
     }
@@ -55,11 +55,11 @@ export async function resetAccountControlState(
       const currentEmergencyCouncil = await accountControl.emergencyCouncil();
       if (currentEmergencyCouncil.toLowerCase() !== emergencyCouncil.address.toLowerCase()) {
         await accountControl.connect(owner).updateEmergencyCouncil(emergencyCouncil.address);
-        console.log(`🔄 Reset emergency council to ${emergencyCouncil.address}`);
+        // console.log(`🔄 Reset emergency council to ${emergencyCouncil.address}`);
       }
     } catch (error) {
       // Method might not exist in all versions
-      console.log("⚠️ updateEmergencyCouncil not available");
+      // console.log("⚠️ updateEmergencyCouncil not available");
     }
 
     // Reset system pause state
@@ -67,15 +67,15 @@ export async function resetAccountControlState(
       const isPaused = await accountControl.systemPaused();
       if (isPaused) {
         await accountControl.connect(emergencyCouncil).unpauseSystem();
-        console.log("🔄 Unpaused AccountControl system");
+        // console.log("🔄 Unpaused AccountControl system");
       }
     } catch (error) {
-      console.log("⚠️ Could not reset pause state:", error.message);
+      // console.log("⚠️ Could not reset pause state:", error.message);
     }
 
-    console.log("✅ AccountControl state reset completed");
+    // console.log("✅ AccountControl state reset completed");
   } catch (error) {
-    console.log("⚠️ AccountControl state reset failed:", error.message);
+    // console.log("⚠️ AccountControl state reset failed:", error.message);
   }
 }
 
@@ -101,16 +101,16 @@ export async function resetQCDataState(
             4, // Revoked status
             ethers.utils.formatBytes32String("Test cleanup")
           );
-          console.log(`🔄 Revoked QC ${signers[i].address} in QCData`);
+          // console.log(`🔄 Revoked QC ${signers[i].address} in QCData`);
         }
       } catch (error) {
-        console.log(`⚠️ Could not reset QC ${signers[i].address}:`, error.message);
+        // console.log(`⚠️ Could not reset QC ${signers[i].address}:`, error.message);
       }
     }
 
-    console.log("✅ QCData state reset completed");
+    // console.log("✅ QCData state reset completed");
   } catch (error) {
-    console.log("⚠️ QCData state reset failed:", error.message);
+    // console.log("⚠️ QCData state reset failed:", error.message);
   }
 }
 
@@ -138,16 +138,16 @@ export async function resetOracleState(
             0, // Zero timestamp effectively invalidates
             ethers.utils.formatBytes32String("test-cleanup")
           );
-          console.log(`🔄 Cleared oracle attestation for ${signers[i].address}`);
+          // console.log(`🔄 Cleared oracle attestation for ${signers[i].address}`);
         }
       } catch (error) {
-        console.log(`⚠️ Could not clear attestation for ${signers[i].address}:`, error.message);
+        // console.log(`⚠️ Could not clear attestation for ${signers[i].address}:`, error.message);
       }
     }
 
-    console.log("✅ Oracle state reset completed");
+    // console.log("✅ Oracle state reset completed");
   } catch (error) {
-    console.log("⚠️ Oracle state reset failed:", error.message);
+    // console.log("⚠️ Oracle state reset failed:", error.message);
   }
 }
 
@@ -166,23 +166,23 @@ export async function resetQCManagerState(
       const currentAccountControl = await qcManager.accountControl();
       if (currentAccountControl !== ethers.constants.AddressZero) {
         await qcManager.connect(owner).setAccountControl(ethers.constants.AddressZero);
-        console.log("🔄 Reset AccountControl reference in QCManager");
+        // console.log("🔄 Reset AccountControl reference in QCManager");
       }
     } catch (error) {
-      console.log("⚠️ Could not reset AccountControl reference:", error.message);
+      // console.log("⚠️ Could not reset AccountControl reference:", error.message);
     }
 
     // Reset QCRedeemer reference if it was set
     try {
       await qcManager.connect(owner).setQCRedeemer(ethers.constants.AddressZero);
-      console.log("🔄 Reset QCRedeemer reference in QCManager");
+      // console.log("🔄 Reset QCRedeemer reference in QCManager");
     } catch (error) {
-      console.log("⚠️ Could not reset QCRedeemer reference:", error.message);
+      // console.log("⚠️ Could not reset QCRedeemer reference:", error.message);
     }
 
-    console.log("✅ QCManager state reset completed");
+    // console.log("✅ QCManager state reset completed");
   } catch (error) {
-    console.log("⚠️ QCManager state reset failed:", error.message);
+    // console.log("⚠️ QCManager state reset failed:", error.message);
   }
 }
 
@@ -195,12 +195,12 @@ export async function resetMockContractStates(mocks: { [name: string]: any }) {
     for (const [name, mock] of Object.entries(mocks)) {
       if (mock && typeof mock.reset === 'function') {
         mock.reset();
-        console.log(`🔄 Reset mock ${name}`);
+        // console.log(`🔄 Reset mock ${name}`);
       }
     }
-    console.log("✅ Mock contract states reset completed");
+    // console.log("✅ Mock contract states reset completed");
   } catch (error) {
-    console.log("⚠️ Mock state reset failed:", error.message);
+    // console.log("⚠️ Mock state reset failed:", error.message);
   }
 }
 
@@ -237,7 +237,7 @@ export async function resetAllTestState(
     resetMocks = true,
   } = options;
 
-  console.log("🔄 Starting comprehensive test state reset...");
+  // console.log("🔄 Starting comprehensive test state reset...");
 
   try {
     // Reset in dependency order (most dependent first)
@@ -266,9 +266,9 @@ export async function resetAllTestState(
       );
     }
 
-    console.log("✅ Comprehensive test state reset completed successfully");
+    // console.log("✅ Comprehensive test state reset completed successfully");
   } catch (error) {
-    console.log("⚠️ Comprehensive test state reset encountered errors:", error.message);
+    // console.log("⚠️ Comprehensive test state reset encountered errors:", error.message);
   }
 }
 
@@ -325,15 +325,15 @@ export async function verifyCleanTestState(contracts: any): Promise<boolean> {
     }
 
     if (issues.length > 0) {
-      console.log("🚨 State contamination detected:");
-      issues.forEach(issue => console.log(`  - ${issue}`));
+      // console.log("🚨 State contamination detected:");
+      issues.forEach(issue => // console.log(`  - ${issue}`));
       return false;
     }
 
-    console.log("✅ Test state is clean");
+    // console.log("✅ Test state is clean");
     return true;
   } catch (error) {
-    console.log("⚠️ Could not verify test state:", error.message);
+    // console.log("⚠️ Could not verify test state:", error.message);
     return false;
   }
 }

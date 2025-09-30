@@ -125,12 +125,9 @@ export class IntegrationTestFramework {
     // Deploy QCRedeemer with proper library linking
     let qcRedeemer: QCRedeemer
     try {
-      console.log("=== Deploying libraries ===")
       // First deploy the required libraries
       const libraries = await LibraryLinkingHelper.deployAllLibraries()
-      console.log("✓ Libraries deployed:", Object.keys(libraries))
-      
-      console.log("=== Deploying QCRedeemer ===")
+
       qcRedeemer = await LibraryLinkingHelper.deployQCRedeemer(
         tbtcToken.address,
         qcData.address,
@@ -139,7 +136,6 @@ export class IntegrationTestFramework {
         100, // txProofDifficultyFactor
         libraries // Provide the libraries explicitly
       ) as QCRedeemer
-      console.log("✓ QCRedeemer deployed")
     } catch (error) {
       console.error("❌ Error deploying QCRedeemer:", error)
       throw error
@@ -164,7 +160,7 @@ export class IntegrationTestFramework {
   }
   
   async configureIntegration(): Promise<void> {
-    console.log("=== configureIntegration: Starting ===")
+    // Configuring integration components
     const { owner, qcAddress } = this.signers
     const { 
       accountControl, 
@@ -179,36 +175,27 @@ export class IntegrationTestFramework {
     } = this.contracts
 
     try {
-      console.log("=== Step 1: SystemState setup ===")
+      // Setup SystemState defaults
       // Setup SystemState defaults
       const opsRole = await systemState.OPERATIONS_ROLE()
-      console.log("✓ Got OPERATIONS_ROLE:", opsRole)
       
       await systemState.connect(owner).grantRole(opsRole, owner.address)
-      console.log("✓ Granted OPERATIONS_ROLE")
       
       await setupSystemStateDefaults(systemState, owner)
-      console.log("✓ SystemState defaults set")
 
-      console.log("=== Step 2: QCData setup ===")
+      // Setup QCData
       // Setup QCData
       const qcManagerRole = await qcData.QC_MANAGER_ROLE()
-      console.log("✓ Got QC_MANAGER_ROLE:", qcManagerRole)
       
       await qcData.grantRole(qcManagerRole, owner.address)
-      console.log("✓ Granted QC_MANAGER_ROLE")
       
       await qcData.connect(owner).registerQC(qcAddress.address, this.QC_MINTING_CAP)
-      console.log("✓ QC registered")
       
       const statusBytes = ethers.utils.formatBytes32String("Active")
-      console.log("✓ Status bytes formatted:", statusBytes)
       
       await qcData.connect(owner).setQCStatus(qcAddress.address, 0, statusBytes)
-      console.log("✓ QC status set")
       
       await qcData.connect(owner).registerWallet(qcAddress.address, "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
-      console.log("✓ Wallet registered")
     } catch (error) {
       console.error("❌ Error in configureIntegration:", error)
       throw error
@@ -265,7 +252,7 @@ export class IntegrationTestFramework {
     await systemState.setRedemptionTimeout(86400) // 24 hours
     
     // Configure TestRelay with proper difficulty from valid mainnet proof
-    console.log("=== Configuring TestRelay ===" )
+    // Configure TestRelay with proper difficulty from valid mainnet proof
     await this.contracts.testRelay.setCurrentEpochDifficultyFromHeaders(ValidMainnetProof.proof.bitcoinHeaders)
     await this.contracts.testRelay.setPrevEpochDifficultyFromHeaders(ValidMainnetProof.proof.bitcoinHeaders)
     
@@ -275,16 +262,12 @@ export class IntegrationTestFramework {
     // we need to return an accumulated difficulty that represents 6 headers worth of work
     // For testing, we'll return a large enough value to pass validation
     const currentDiff = await this.contracts.testRelay.getCurrentEpochDifficulty()
-    console.log("Current epoch difficulty:", currentDiff.toString())
     const accumulatedDiff = currentDiff.mul(6).mul(120) // 6 headers * 120 for safety margin
-    console.log("Setting accumulated difficulty to:", accumulatedDiff.toString())
     await this.contracts.testRelay.setValidateHeaderChainResult(accumulatedDiff.toString())
     
     // Verify the values were set
     const verifyCurrentDiff = await this.contracts.testRelay.getCurrentEpochDifficulty()
     const verifyResult = await this.contracts.testRelay.validateHeaderChain("0x00")
-    console.log("Verified current difficulty:", verifyCurrentDiff.toString())
-    console.log("Verified validateHeaderChain result:", verifyResult.toString())
   }
   
   async enableAccountControlMode(): Promise<void> {
