@@ -26,8 +26,8 @@ if [ $# -gt 0 ]; then
     echo "Environment: USE_EXTERNAL_DEPLOY=${USE_EXTERNAL_DEPLOY}, TEST_USE_STUBS_TBTC=${TEST_USE_STUBS_TBTC}"
     echo ""
     
-    # Run with timeout and error handling
-    timeout 3600 npx hardhat test $TEST_FILES "$@" || {
+    # Run with timeout and error handling using test config for unlimited contract size
+    timeout 3600 npx hardhat test $TEST_FILES --config hardhat.test.config.ts "$@" || {
         EXIT_CODE=$?
         echo ""
         echo "❌ Tests failed with exit code: $EXIT_CODE"
@@ -45,8 +45,8 @@ else
     echo "Environment: USE_EXTERNAL_DEPLOY=${USE_EXTERNAL_DEPLOY}, TEST_USE_STUBS_TBTC=${TEST_USE_STUBS_TBTC}"
     echo ""
     
-    # Run with timeout and error handling
-    timeout 3600 npx hardhat test $TEST_FILES || {
+    # Run with timeout and error handling using test config for unlimited contract size
+    timeout 3600 npx hardhat test $TEST_FILES --config hardhat.test.config.ts || {
         EXIT_CODE=$?
         echo ""
         echo "❌ Tests failed with exit code: $EXIT_CODE"
