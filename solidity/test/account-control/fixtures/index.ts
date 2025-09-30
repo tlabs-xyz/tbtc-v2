@@ -1,0 +1,95 @@
+/**
+ * Account Control Test Fixtures
+ *
+ * This barrel file exports all test constants, factory functions, and utilities
+ * for account-control testing. Import from this file for easy access to all
+ * test data and utilities.
+ *
+ * @example
+ * ```typescript
+ * import {
+ *   ROLE_CONSTANTS,
+ *   BITCOIN_ADDRESSES,
+ *   createMintingScenario,
+ *   createRedemptionScenario
+ * } from "../fixtures"
+ * ```
+ */
+
+// Export all constants and utilities from test-data
+export {
+  // Constant groups
+  ROLE_CONSTANTS,
+  BITCOIN_ADDRESSES,
+  ETHEREUM_ADDRESSES,
+  AMOUNT_CONSTANTS,
+  TIMING_CONSTANTS,
+  SPV_CONSTANTS,
+  GAS_CONSTANTS,
+
+  // Basic factory functions
+  createTestWalletRegistration,
+  createTestRedemptionScenario,
+  createTestSPVProof,
+  createMockBitcoinTxInfo,
+  createMockBitcoinTxProof,
+  generateTestId,
+  createRoleConfiguration,
+
+  // Legacy exports (for backward compatibility)
+  TEST_CONSTANTS,
+} from "./test-data"
+
+// Export all advanced factory functions from test-factories
+export {
+  // Advanced scenario factories
+  createQCRegistrationScenario,
+  createMintingScenario,
+  createRedemptionScenario,
+  createUndercollateralizationScenario,
+  createReserveOracleScenario,
+  createDisputeScenario,
+  createWalletManagementScenario,
+  createSystemStateScenario,
+
+  // Utility functions
+  createQCBatch,
+  createTimeBasedScenario,
+  createIntegrationTestScenario,
+} from "./test-factories"
+
+// =============================================================================
+// CONVENIENCE IMPORTS
+// =============================================================================
+
+/**
+ * Most commonly used constants grouped for convenience
+ */
+export const COMMON_TEST_DATA = {
+  // Most used roles
+  GOVERNANCE_ROLE: "0x71840dc4906352362b0cdaf79870196c8e42acafade72d5d5a6d59291253ceb1",
+  DISPUTE_ARBITER_ROLE: "0x4c42c6eb7a0c1a6a8f1e4b4d0c5e9e8e2e6e4f8f4c4e8e2e6e4f8f4c4e8e2e6",
+
+  // Most used addresses
+  VALID_BTC_ADDRESS: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+  TEST_QC_ADDRESS: "0x1234567890123456789012345678901234567890",
+
+  // Most used amounts
+  STANDARD_MINT: "1000000000000000000", // 1 ETH in wei
+  REDEMPTION_AMOUNT: "5000000000000000000", // 5 ETH in wei
+} as const
+
+/**
+ * Quick factory function that creates a minimal test setup
+ */
+export function createQuickTestSetup() {
+  return {
+    qcAddress: COMMON_TEST_DATA.TEST_QC_ADDRESS,
+    btcAddress: COMMON_TEST_DATA.VALID_BTC_ADDRESS,
+    amount: COMMON_TEST_DATA.STANDARD_MINT,
+    roles: {
+      governance: "0x0000000000000000000000000000000000000001",
+      arbiter: "0x0000000000000000000000000000000000000002",
+    },
+  }
+}

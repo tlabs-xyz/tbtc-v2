@@ -1,7 +1,7 @@
 import { ethers } from "hardhat"
 import type { BytesLike, BigNumberish } from "ethers"
 import { ValidMainnetProof } from "../data/bitcoin/spv/valid-spv-proofs"
-import { TEST_CONSTANTS } from "./fixtures/AccountControlFixtures"
+import { TEST_CONSTANTS } from "./fixtures/test-data"
 
 /**
  * Bitcoin transaction info structure matching BitcoinTx.sol
