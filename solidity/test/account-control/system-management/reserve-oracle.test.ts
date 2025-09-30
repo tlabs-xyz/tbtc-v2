@@ -1,7 +1,7 @@
 import { expect } from "chai"
 import { ethers, helpers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import { ReserveOracle } from "../../typechain"
+import { ReserveOracle } from "../../../typechain"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 

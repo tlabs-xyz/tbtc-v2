@@ -10,7 +10,7 @@ import {
   SystemState,
   QCData,
   QCManager,
-} from "../../typechain"
+} from "../../../typechain"
 
 chai.use(smock.matchers)
 

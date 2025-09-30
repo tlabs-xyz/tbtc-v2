@@ -5,7 +5,7 @@ import {
   deployQCManagerFixture,
   setupTestQC,
   TEST_CONSTANTS,
-} from "./fixtures/AccountControlFixtures"
+} from "../fixtures/AccountControlFixtures"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
