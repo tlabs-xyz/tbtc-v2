@@ -1,6 +1,8 @@
-import { ethers } from "hardhat"
+import { ethers, helpers } from "hardhat"
 import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { spvTestConfig } from "./test-data"
+
+const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
 /**
  * Common test environment setup utilities
@@ -16,13 +18,16 @@ export interface TestSigners {
   watchdog: SignerWithAddress
   user: SignerWithAddress
   liquidator: SignerWithAddress
+  qcAddress: SignerWithAddress
+  thirdParty: SignerWithAddress
 }
 
 /**
  * Sets up standard test signers with predictable roles
  */
 export async function setupTestSigners(): Promise<TestSigners> {
-  const [deployer, governance, watchdog, user, liquidator] = await ethers.getSigners()
+  const [deployer, governance, watchdog, user, liquidator, qcAddress, thirdParty] =
+    await ethers.getSigners()
 
   return {
     deployer,
@@ -30,6 +35,8 @@ export async function setupTestSigners(): Promise<TestSigners> {
     watchdog,
     user,
     liquidator,
+    qcAddress,
+    thirdParty,
   }
 }
 
@@ -72,6 +79,23 @@ export async function setupRelayForTesting(
   if ("setReady" in relay) {
     await relay.setReady(true)
   }
+}
+
+/**
+ * Creates a standardized test environment with snapshot management
+ * This function should be used in beforeEach hooks for consistent setup
+ */
+export async function createBaseTestEnvironment(): Promise<TestEnvironment> {
+  await createSnapshot()
+  return await setupTestEnvironment()
+}
+
+/**
+ * Restores test environment from snapshot
+ * This function should be used in afterEach hooks for consistent cleanup
+ */
+export async function restoreBaseTestEnvironment(): Promise<void> {
+  await restoreSnapshot()
 }
 
 /**

@@ -1,6 +1,5 @@
 import chai, { expect } from "chai"
-import { ethers, helpers } from "hardhat"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
+import { ethers } from "hardhat"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 import {
   QCMinter,
@@ -11,17 +10,22 @@ import {
   QCData,
   QCManager,
 } from "../../../typechain"
+import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  TestSigners
+} from "../fixtures/base-setup"
+import {
+  createMockContract,
+  createMockSigner
+} from "../fixtures/mock-factory"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
 chai.use(smock.matchers)
 
-const { createSnapshot, restoreSnapshot } = helpers.snapshot
-
 describe("QCMinter", () => {
-  let deployer: SignerWithAddress
-  let user: SignerWithAddress
-  let qcAddress: SignerWithAddress
-  let thirdParty: SignerWithAddress
-
+  let signers: TestSigners
   let qcMinter: QCMinter
   let mockBank: FakeContract<Bank>
   let mockTBTCVault: FakeContract<TBTCVault>
@@ -37,18 +41,13 @@ describe("QCMinter", () => {
   const maxMintingCapacity = ethers.utils.parseEther("100")
 
   before(async () => {
-    const [deployerSigner, userSigner, qcAddressSigner, thirdPartySigner] =
-      await ethers.getSigners()
-    deployer = deployerSigner
-    user = userSigner
-    qcAddress = qcAddressSigner
-    thirdParty = thirdPartySigner
+    signers = await setupTestSigners()
   })
 
   beforeEach(async () => {
-    await createSnapshot()
+    await createBaseTestEnvironment()
 
-    // Create mocks
+    // Create mocks using standardized patterns
     mockBank = await smock.fake<Bank>("Bank")
     mockTBTCVault = await smock.fake<TBTCVault>("TBTCVault")
     mockTBTC = await smock.fake<TBTC>("TBTC")
@@ -70,11 +69,11 @@ describe("QCMinter", () => {
 
     // Grant MINTER_ROLE to user
     const MINTER_ROLE = await qcMinter.MINTER_ROLE()
-    await qcMinter.grantRole(MINTER_ROLE, user.address)
-    
+    await qcMinter.grantRole(MINTER_ROLE, signers.signers.user.address)
+
     // Grant GOVERNANCE_ROLE to deployer for governance functions
     const GOVERNANCE_ROLE = await qcMinter.GOVERNANCE_ROLE()
-    await qcMinter.grantRole(GOVERNANCE_ROLE, deployer.address)
+    await qcMinter.grantRole(GOVERNANCE_ROLE, signers.deployer.address)
 
     // Setup default mock behaviors
     mockSystemState.isMintingPaused.returns(false)
@@ -113,7 +112,7 @@ describe("QCMinter", () => {
   })
 
   afterEach(async () => {
-    await restoreSnapshot()
+    await restoreBaseTestEnvironment()
   })
 
   describe("Deployment", () => {
@@ -134,33 +133,33 @@ describe("QCMinter", () => {
     context("when called with valid parameters", () => {
       it("should check system state", async () => {
         await qcMinter
-          .connect(user)
-          .requestQCMint(qcAddress.address, user.address, mintAmount)
+          .connect(signers.user)
+          .requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
 
         expect(mockSystemState.isMintingPaused).to.have.been.called
         expect(mockSystemState.isQCEmergencyPaused).to.have.been.calledWith(
-          qcAddress.address
+          signers.qcAddress.address
         )
       })
 
       it("should verify QC status", async () => {
         await qcMinter
-          .connect(user)
-          .requestQCMint(qcAddress.address, user.address, mintAmount)
+          .connect(signers.user)
+          .requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
 
         expect(mockQCData.getQCStatus).to.have.been.calledWith(
-          qcAddress.address
+          signers.qcAddress.address
         )
       })
 
       it("should atomically consume minting capacity", async () => {
         await qcMinter
-          .connect(user)
-          .requestQCMint(qcAddress.address, user.address, mintAmount)
+          .connect(signers.user)
+          .requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
 
         expect(
           mockQCManager.consumeMintCapacity
-        ).to.have.been.calledWith(qcAddress.address, mintAmount)
+        ).to.have.been.calledWith(signers.qcAddress.address, mintAmount)
       })
 
       it("should call AccountControl to mint TBTC", async () => {
@@ -170,20 +169,20 @@ describe("QCMinter", () => {
         )
 
         const tx = await qcMinter
-          .connect(user)
-          .requestQCMint(qcAddress.address, user.address, mintAmount)
+          .connect(signers.user)
+          .requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
 
         // Verify AccountControl.mintTBTC was called via event
         await expect(tx)
           .to.emit(mockAccountControl, "TBTCMinted")
-          .withArgs(user.address, mintAmount, satoshis)
+          .withArgs(signers.user.address, mintAmount, satoshis)
       })
 
 
       it("should emit QCMintRequested event", async () => {
         const tx = await qcMinter
-          .connect(user)
-          .requestQCMint(qcAddress.address, user.address, mintAmount)
+          .connect(signers.user)
+          .requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
         const receipt = await tx.wait()
 
@@ -194,11 +193,11 @@ describe("QCMinter", () => {
         expect(qcMintRequestedEvent).to.not.be.undefined
 
         // Check event parameters (mintId will be dynamically generated)
-        expect(qcMintRequestedEvent?.args?.[0]).to.equal(qcAddress.address) // qc
-        expect(qcMintRequestedEvent?.args?.[1]).to.equal(user.address) // user
+        expect(qcMintRequestedEvent?.args?.[0]).to.equal(signers.qcAddress.address) // qc
+        expect(qcMintRequestedEvent?.args?.[1]).to.equal(signers.user.address) // user
         expect(qcMintRequestedEvent?.args?.[2]).to.equal(mintAmount) // amount
         expect(qcMintRequestedEvent?.args?.[3]).to.not.equal(ethers.utils.hexZeroPad("0x", 32)) // mintId should not be zero
-        expect(qcMintRequestedEvent?.args?.[4]).to.equal(user.address) // requestedBy
+        expect(qcMintRequestedEvent?.args?.[4]).to.equal(signers.user.address) // requestedBy
         expect(qcMintRequestedEvent?.args?.[5]).to.equal(
           ethers.BigNumber.from(currentBlock.timestamp)
         ) // timestamp
@@ -206,8 +205,8 @@ describe("QCMinter", () => {
 
       it("should emit MintCompleted event", async () => {
         const tx = await qcMinter
-          .connect(user)
-          .requestQCMint(qcAddress.address, user.address, mintAmount)
+          .connect(signers.user)
+          .requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber)
 
         await expect(tx).to.emit(qcMinter, "MintCompleted")
@@ -218,14 +217,14 @@ describe("QCMinter", () => {
       it("should revert with zero QC address", async () => {
         await expect(
           qcMinter
-            .connect(user)
-            .requestQCMint(ethers.constants.AddressZero, user.address, mintAmount)
+            .connect(signers.user)
+            .requestQCMint(ethers.constants.AddressZero, signers.user.address, mintAmount)
         ).to.be.revertedWith("InvalidQCAddress")
       })
 
       it("should revert with zero amount", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, 0)
+          qcMinter.connect(signers.user).requestQCMint(signers.qcAddress.address, signers.user.address, 0)
         ).to.be.revertedWith("InvalidAmount")
       })
     })
@@ -237,7 +236,7 @@ describe("QCMinter", () => {
 
       it("should revert", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
+          qcMinter.connect(signers.user).requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
         ).to.be.revertedWith("MintingPaused")
       })
     })
@@ -245,13 +244,13 @@ describe("QCMinter", () => {
     context("when QC is emergency paused", () => {
       beforeEach(async () => {
         mockSystemState.isQCEmergencyPaused
-          .whenCalledWith(qcAddress.address)
+          .whenCalledWith(signers.qcAddress.address)
           .returns(true)
       })
 
       it("should revert", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
+          qcMinter.connect(signers.user).requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
         ).to.be.revertedWith("QCIsEmergencyPaused")
       })
     })
@@ -263,7 +262,7 @@ describe("QCMinter", () => {
 
       it("should revert", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
+          qcMinter.connect(signers.user).requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
         ).to.be.revertedWith("QCNotActive")
       })
     })
@@ -276,7 +275,7 @@ describe("QCMinter", () => {
 
       it("should revert", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
+          qcMinter.connect(signers.user).requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
         ).to.be.revertedWith("InsufficientMintingCapacity")
       })
     })
@@ -290,7 +289,7 @@ describe("QCMinter", () => {
 
       it("should revert", async () => {
         await expect(
-          qcMinter.connect(user).requestQCMint(qcAddress.address, user.address, mintAmount)
+          qcMinter.connect(signers.user).requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
         ).to.be.revertedWithCustomError(qcMinter, "NotAuthorizedInBank")
       })
     })
@@ -301,17 +300,17 @@ describe("QCMinter", () => {
 
     beforeEach(async () => {
       mockQCManager.getAvailableMintingCapacity
-        .whenCalledWith(qcAddress.address)
+        .whenCalledWith(signers.qcAddress.address)
         .returns(availableCapacity)
     })
 
     it("should delegate to QCManager", async () => {
       const result = await qcMinter.getAvailableMintingCapacity(
-        qcAddress.address
+        signers.qcAddress.address
       )
 
       expect(mockQCManager.getAvailableMintingCapacity).to.have.been.calledWith(
-        qcAddress.address
+        signers.qcAddress.address
       )
       expect(result).to.equal(availableCapacity)
     })
@@ -320,14 +319,14 @@ describe("QCMinter", () => {
   describe("checkMintingEligibility", () => {
     beforeEach(async () => {
       mockQCManager.getAvailableMintingCapacity
-        .whenCalledWith(qcAddress.address)
+        .whenCalledWith(signers.qcAddress.address)
         .returns(maxMintingCapacity)
     })
 
     context("when all checks pass", () => {
       it("should return true", async () => {
         const result = await qcMinter.checkMintingEligibility(
-          qcAddress.address,
+          signers.qcAddress.address,
           mintAmount
         )
         expect(result).to.be.true
@@ -341,7 +340,7 @@ describe("QCMinter", () => {
 
       it("should return false", async () => {
         const result = await qcMinter.checkMintingEligibility(
-          qcAddress.address,
+          signers.qcAddress.address,
           mintAmount
         )
         expect(result).to.be.false
@@ -353,7 +352,7 @@ describe("QCMinter", () => {
         mockSystemState.minMintAmount.returns(mintAmount.add(1))
 
         const result = await qcMinter.checkMintingEligibility(
-          qcAddress.address,
+          signers.qcAddress.address,
           mintAmount
         )
         expect(result).to.be.false
@@ -363,7 +362,7 @@ describe("QCMinter", () => {
         mockSystemState.maxMintAmount.returns(mintAmount.sub(1))
 
         const result = await qcMinter.checkMintingEligibility(
-          qcAddress.address,
+          signers.qcAddress.address,
           mintAmount
         )
         expect(result).to.be.false
@@ -377,7 +376,7 @@ describe("QCMinter", () => {
 
       it("should return false", async () => {
         const result = await qcMinter.checkMintingEligibility(
-          qcAddress.address,
+          signers.qcAddress.address,
           mintAmount
         )
         expect(result).to.be.false
@@ -386,12 +385,12 @@ describe("QCMinter", () => {
 
     context("when amount exceeds capacity", () => {
       beforeEach(async () => {
-        mockQCManager.getAvailableMintingCapacity.whenCalledWith(qcAddress.address).returns(mintAmount.sub(1))
+        mockQCManager.getAvailableMintingCapacity.whenCalledWith(signers.qcAddress.address).returns(mintAmount.sub(1))
       })
 
       it("should return false", async () => {
         const result = await qcMinter.checkMintingEligibility(
-          qcAddress.address,
+          signers.qcAddress.address,
           mintAmount
         )
         expect(result).to.be.false
@@ -419,7 +418,7 @@ describe("QCMinter", () => {
 
       it("should revert when called by non-governance", async () => {
         await expect(
-          qcMinter.connect(user).setAutoMintEnabled(true)
+          qcMinter.connect(signers.user).setAutoMintEnabled(true)
         ).to.be.reverted
       })
     })
@@ -435,58 +434,58 @@ describe("QCMinter", () => {
       })
 
       it("should check user has Bank balance", async () => {
-        await qcMinter.connect(user).manualMint(user.address)
+        await qcMinter.connect(signers.user).manualMint(signers.user.address)
         
-        expect(mockBank.balanceOf).to.have.been.calledWith(user.address)
+        expect(mockBank.balanceOf).to.have.been.calledWith(signers.user.address)
       })
 
       it("should check user has sufficient allowance", async () => {
-        await qcMinter.connect(user).manualMint(user.address)
+        await qcMinter.connect(signers.user).manualMint(signers.user.address)
         
         // The allowance check is implicit in transferBalanceFrom call
         expect(mockBank.transferBalanceFrom).to.have.been.calledWith(
-          user.address,
+          signers.user.address,
           qcMinter.address,
           satoshis
         )
       })
 
       it("should transfer balance from user", async () => {
-        await qcMinter.connect(user).manualMint(user.address)
+        await qcMinter.connect(signers.user).manualMint(signers.user.address)
         
         expect(mockBank.transferBalanceFrom).to.have.been.calledWith(
-          user.address,
+          signers.user.address,
           qcMinter.address,
           satoshis
         )
       })
 
       it("should mint tBTC", async () => {
-        await qcMinter.connect(user).manualMint(user.address)
+        await qcMinter.connect(signers.user).manualMint(signers.user.address)
         
         expect(mockTBTCVault.mint).to.have.been.calledWith(mintAmount)
       })
 
       it("should transfer tBTC to user", async () => {
-        await qcMinter.connect(user).manualMint(user.address)
+        await qcMinter.connect(signers.user).manualMint(signers.user.address)
         
         expect(mockTBTC.transfer).to.have.been.calledWith(
-          user.address,
+          signers.user.address,
           mintAmount
         )
       })
 
       it("should emit ManualMintCompleted event", async () => {
-        await expect(qcMinter.connect(user).manualMint(user.address))
+        await expect(qcMinter.connect(signers.user).manualMint(signers.user.address))
           .to.emit(qcMinter, "ManualMintCompleted")
-          .withArgs(user.address, satoshis, mintAmount)
+          .withArgs(signers.user.address, satoshis, mintAmount)
       })
 
       it("should revert when user has no balance", async () => {
         mockBank.balanceOf.returns(0)
         
         await expect(
-          qcMinter.connect(user).manualMint(user.address)
+          qcMinter.connect(signers.user).manualMint(signers.user.address)
         ).to.be.revertedWith("ZeroAmount")
       })
 
@@ -499,7 +498,7 @@ describe("QCMinter", () => {
         mockBank.transferBalanceFrom.reverts()
 
         await expect(
-          qcMinter.connect(user).manualMint(user.address)
+          qcMinter.connect(signers.user).manualMint(signers.user.address)
         ).to.be.reverted
       })
     })
@@ -511,7 +510,7 @@ describe("QCMinter", () => {
       })
 
       it("should return balance and allowance info", async () => {
-        const result = await qcMinter.checkMintEligibility(user.address)
+        const result = await qcMinter.checkMintEligibility(signers.user.address)
         
         expect(result.hasBalance).to.be.true
         expect(result.hasAllowance).to.be.true
@@ -522,7 +521,7 @@ describe("QCMinter", () => {
       it("should return false when no balance", async () => {
         mockBank.balanceOf.returns(0)
         
-        const result = await qcMinter.checkMintEligibility(user.address)
+        const result = await qcMinter.checkMintEligibility(signers.user.address)
         
         expect(result.hasBalance).to.be.false
         expect(result.balance).to.equal(0)
@@ -531,7 +530,7 @@ describe("QCMinter", () => {
       it("should return false when insufficient allowance", async () => {
         mockBank.allowance.returns(0)
         
-        const result = await qcMinter.checkMintEligibility(user.address)
+        const result = await qcMinter.checkMintEligibility(signers.user.address)
         
         expect(result.hasAllowance).to.be.false
         expect(result.allowance).to.equal(0)
@@ -582,23 +581,23 @@ describe("QCMinter", () => {
         )
 
         const tx = await qcMinter
-          .connect(user)
-          .requestQCMintHybrid(qcAddress.address, user.address, mintAmount, true, permitData)
+          .connect(signers.user)
+          .requestQCMintHybrid(signers.qcAddress.address, signers.user.address, mintAmount, true, permitData)
 
         // Should call AccountControl.mintTBTC via event
         await expect(tx)
           .to.emit(mockAccountControl, "TBTCMinted")
-          .withArgs(user.address, mintAmount, satoshis)
+          .withArgs(signers.user.address, mintAmount, satoshis)
         
         // Should also call auto-mint flow
         expect(mockBank.transferBalanceFrom).to.have.been.calledWith(
-          user.address,
+          signers.user.address,
           qcMinter.address,
           satoshis
         )
         expect(mockTBTCVault.mint).to.have.been.calledWith(mintAmount)
         expect(mockTBTC.transfer).to.have.been.calledWith(
-          user.address,
+          signers.user.address,
           mintAmount
         )
       })
@@ -608,10 +607,10 @@ describe("QCMinter", () => {
         
         await expect(
           qcMinter
-            .connect(user)
-            .requestQCMintHybrid(qcAddress.address, user.address, mintAmount, true, permitData)
+            .connect(signers.user)
+            .requestQCMintHybrid(signers.qcAddress.address, signers.user.address, mintAmount, true, permitData)
         ).to.emit(qcMinter, "AutoMintCompleted")
-          .withArgs(user.address, satoshis, mintAmount)
+          .withArgs(signers.user.address, satoshis, mintAmount)
       })
 
       it("should not auto-mint when autoMint flag is false", async () => {
@@ -623,13 +622,13 @@ describe("QCMinter", () => {
         )
 
         const tx = await qcMinter
-          .connect(user)
-          .requestQCMintHybrid(qcAddress.address, user.address, mintAmount, false, permitData)
+          .connect(signers.user)
+          .requestQCMintHybrid(signers.qcAddress.address, signers.user.address, mintAmount, false, permitData)
 
         // Should call AccountControl.mintTBTC
         await expect(tx)
           .to.emit(mockAccountControl, "TBTCMinted")
-          .withArgs(user.address, mintAmount, satoshis)
+          .withArgs(signers.user.address, mintAmount, satoshis)
         
         // Should NOT call auto-mint flow
         expect(mockBank.transferBalanceFrom).to.not.have.been.called
@@ -647,13 +646,13 @@ describe("QCMinter", () => {
         )
 
         const tx = await qcMinter
-          .connect(user)
-          .requestQCMintHybrid(qcAddress.address, user.address, mintAmount, true, permitData)
+          .connect(signers.user)
+          .requestQCMintHybrid(signers.qcAddress.address, signers.user.address, mintAmount, true, permitData)
 
         // Should call AccountControl.mintTBTC
         await expect(tx)
           .to.emit(mockAccountControl, "TBTCMinted")
-          .withArgs(user.address, mintAmount, satoshis)
+          .withArgs(signers.user.address, mintAmount, satoshis)
         
         // Should NOT call auto-mint flow
         expect(mockBank.transferBalanceFrom).to.not.have.been.called
@@ -665,8 +664,8 @@ describe("QCMinter", () => {
         
         await expect(
           qcMinter
-            .connect(user)
-            .requestQCMintHybrid(qcAddress.address, user.address, mintAmount, true, permitData)
+            .connect(signers.user)
+            .requestQCMintHybrid(signers.qcAddress.address, signers.user.address, mintAmount, true, permitData)
         ).to.be.revertedWith("InsufficientBalance")
       })
     })
@@ -677,8 +676,8 @@ describe("QCMinter", () => {
       it("should revert requestQCMint", async () => {
         await expect(
           qcMinter
-            .connect(thirdParty)
-            .requestQCMint(qcAddress.address, user.address, mintAmount)
+            .connect(signers.thirdParty)
+            .requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
         ).to.be.reverted
       })
     })
@@ -686,14 +685,14 @@ describe("QCMinter", () => {
     context("when caller has MINTER_ROLE", () => {
       beforeEach(async () => {
         const MINTER_ROLE = await qcMinter.MINTER_ROLE()
-        await qcMinter.grantRole(MINTER_ROLE, thirdParty.address)
+        await qcMinter.grantRole(MINTER_ROLE, signers.thirdParty.address)
       })
 
       it("should allow requestQCMint", async () => {
         await expect(
           qcMinter
-            .connect(thirdParty)
-            .requestQCMint(qcAddress.address, user.address, mintAmount)
+            .connect(signers.thirdParty)
+            .requestQCMint(signers.qcAddress.address, signers.user.address, mintAmount)
         ).to.not.be.reverted
       })
     })

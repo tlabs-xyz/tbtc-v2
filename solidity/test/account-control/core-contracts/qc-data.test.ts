@@ -1,18 +1,18 @@
 import { expect } from "chai"
-import { ethers, helpers } from "hardhat"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
+import { ethers } from "hardhat"
 import { QCData } from "../../../typechain"
-
-const { createSnapshot, restoreSnapshot } = helpers.snapshot
+import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError } from "../helpers/error-helpers"
 
 describe("QCData", () => {
-  let deployer: SignerWithAddress
-  let governance: SignerWithAddress
-  let qcAddress: SignerWithAddress
-  let qcManager: SignerWithAddress
-  let thirdParty: SignerWithAddress
-
+  let signers: TestSigners
   let qcData: QCData
+  let qcManager: any
 
   // Test data
   const testBtcAddress = "bc1qtest123456789"
@@ -21,22 +21,14 @@ describe("QCData", () => {
   const mintedAmount = ethers.utils.parseEther("5")
 
   before(async () => {
-    const [
-      deployerSigner,
-      governanceSigner,
-      qcAddressSigner,
-      qcManagerSigner,
-      thirdPartySigner,
-    ] = await ethers.getSigners()
-    deployer = deployerSigner
-    governance = governanceSigner
-    qcAddress = qcAddressSigner
-    qcManager = qcManagerSigner
-    thirdParty = thirdPartySigner
+    signers = await setupTestSigners()
+
+    // Setup qcManager as a separate signer (repurpose thirdParty for this)
+    qcManager = signers.thirdParty
   })
 
   beforeEach(async () => {
-    await createSnapshot()
+    await createBaseTestEnvironment()
 
     // Deploy QCData
     const QCDataFactory = await ethers.getContractFactory("QCData")
@@ -49,13 +41,13 @@ describe("QCData", () => {
   })
 
   afterEach(async () => {
-    await restoreSnapshot()
+    await restoreBaseTestEnvironment()
   })
 
   describe("Deployment", () => {
     it("should grant deployer default admin role", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-      expect(await qcData.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be
+      expect(await qcData.hasRole(DEFAULT_ADMIN_ROLE, signers.signers.deployer.address)).to.be
         .true
     })
 
@@ -70,16 +62,16 @@ describe("QCData", () => {
       it("should register QC successfully", async () => {
         const tx = await qcData
           .connect(qcManager)
-          .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+          .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
 
-        expect(await qcData.isQCRegistered(qcAddress.address)).to.be.true
-        expect(await qcData.getQCStatus(qcAddress.address)).to.equal(0) // Active
-        expect(await qcData.getQCMintedAmount(qcAddress.address)).to.equal(0)
+        expect(await qcData.isQCRegistered(signers.qcAddress.address)).to.be.true
+        expect(await qcData.getQCStatus(signers.qcAddress.address)).to.equal(0) // Active
+        expect(await qcData.getQCMintedAmount(signers.qcAddress.address)).to.equal(0)
 
         await expect(tx)
           .to.emit(qcData, "QCRegistered")
           .withArgs(
-            qcAddress.address,
+            signers.qcAddress.address,
             qcManager.address,
             ethers.utils.parseEther("1000"),
             await ethers.provider
@@ -91,12 +83,12 @@ describe("QCData", () => {
       it("should revert when QC already registered", async () => {
         await qcData
           .connect(qcManager)
-          .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+          .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
 
         await expect(
           qcData
             .connect(qcManager)
-            .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+            .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
         ).to.be.revertedWith("QCAlreadyRegistered")
       })
 
@@ -113,7 +105,7 @@ describe("QCData", () => {
 
       it("should revert with zero minting capacity", async () => {
         await expect(
-          qcData.connect(qcManager).registerQC(qcAddress.address, 0)
+          qcData.connect(qcManager).registerQC(signers.qcAddress.address, 0)
         ).to.be.revertedWith("InvalidMintingCapacity")
       })
     })
@@ -124,9 +116,9 @@ describe("QCData", () => {
         await expect(
           qcData
             .connect(thirdParty)
-            .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+            .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_MANAGER_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${QC_MANAGER_ROLE}`
         )
       })
     })
@@ -136,21 +128,21 @@ describe("QCData", () => {
     beforeEach(async () => {
       await qcData
         .connect(qcManager)
-        .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
     })
 
     context("when called by QC manager", () => {
       it("should update QC status successfully", async () => {
         const tx = await qcData
           .connect(qcManager)
-          .setQCStatus(qcAddress.address, 1, testReason) // Active -> UnderReview
+          .setQCStatus(signers.qcAddress.address, 1, testReason) // Active -> UnderReview
 
-        expect(await qcData.getQCStatus(qcAddress.address)).to.equal(1)
+        expect(await qcData.getQCStatus(signers.qcAddress.address)).to.equal(1)
 
         await expect(tx)
           .to.emit(qcData, "QCStatusChanged")
           .withArgs(
-            qcAddress.address,
+            signers.qcAddress.address,
             0,
             1,
             testReason,
@@ -163,40 +155,40 @@ describe("QCData", () => {
 
       it("should handle all valid status values", async () => {
         // Active (0)
-        expect(await qcData.getQCStatus(qcAddress.address)).to.equal(0)
+        expect(await qcData.getQCStatus(signers.qcAddress.address)).to.equal(0)
 
         // UnderReview (1)
         await qcData
           .connect(qcManager)
-          .setQCStatus(qcAddress.address, 1, testReason)
-        expect(await qcData.getQCStatus(qcAddress.address)).to.equal(1)
+          .setQCStatus(signers.qcAddress.address, 1, testReason)
+        expect(await qcData.getQCStatus(signers.qcAddress.address)).to.equal(1)
 
         // Revoked (2)
         await qcData
           .connect(qcManager)
-          .setQCStatus(qcAddress.address, 2, testReason)
-        expect(await qcData.getQCStatus(qcAddress.address)).to.equal(2)
+          .setQCStatus(signers.qcAddress.address, 2, testReason)
+        expect(await qcData.getQCStatus(signers.qcAddress.address)).to.equal(2)
       })
 
       it("should revert when QC not registered", async () => {
         await expect(
           qcData
             .connect(qcManager)
-            .setQCStatus(thirdParty.address, 1, testReason)
+            .setQCStatus(signers.thirdParty.address, 1, testReason)
         ).to.be.revertedWith("QCNotRegistered")
       })
 
       it("should update status to UnderReview", async () => {
         const tx = await qcData
           .connect(qcManager)
-          .setQCStatus(qcAddress.address, 3, testReason) // Status 3
+          .setQCStatus(signers.qcAddress.address, 3, testReason) // Status 3
 
-        expect(await qcData.getQCStatus(qcAddress.address)).to.equal(3)
+        expect(await qcData.getQCStatus(signers.qcAddress.address)).to.equal(3)
 
         await expect(tx)
           .to.emit(qcData, "QCStatusChanged")
           .withArgs(
-            qcAddress.address,
+            signers.qcAddress.address,
             0, // old status (Active)
             3, // new status (UnderReview)
             testReason,
@@ -214,9 +206,9 @@ describe("QCData", () => {
         await expect(
           qcData
             .connect(thirdParty)
-            .setQCStatus(qcAddress.address, 1, testReason)
+            .setQCStatus(signers.qcAddress.address, 1, testReason)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_MANAGER_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${QC_MANAGER_ROLE}`
         )
       })
     })
@@ -226,23 +218,23 @@ describe("QCData", () => {
     beforeEach(async () => {
       await qcData
         .connect(qcManager)
-        .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
     })
 
     context("when called by QC manager", () => {
       it("should update minted amount successfully", async () => {
         const tx = await qcData
           .connect(qcManager)
-          .updateQCMintedAmount(qcAddress.address, mintedAmount)
+          .updateQCMintedAmount(signers.qcAddress.address, mintedAmount)
 
-        expect(await qcData.getQCMintedAmount(qcAddress.address)).to.equal(
+        expect(await qcData.getQCMintedAmount(signers.qcAddress.address)).to.equal(
           mintedAmount
         )
 
         await expect(tx)
           .to.emit(qcData, "QCMintedAmountUpdated")
           .withArgs(
-            qcAddress.address,
+            signers.qcAddress.address,
             0,
             mintedAmount,
             qcManager.address,
@@ -255,24 +247,24 @@ describe("QCData", () => {
       it("should handle zero amount", async () => {
         await qcData
           .connect(qcManager)
-          .updateQCMintedAmount(qcAddress.address, mintedAmount)
+          .updateQCMintedAmount(signers.qcAddress.address, mintedAmount)
         await qcData
           .connect(qcManager)
-          .updateQCMintedAmount(qcAddress.address, 0)
+          .updateQCMintedAmount(signers.qcAddress.address, 0)
 
-        expect(await qcData.getQCMintedAmount(qcAddress.address)).to.equal(0)
+        expect(await qcData.getQCMintedAmount(signers.qcAddress.address)).to.equal(0)
       })
 
       it("should handle large amounts", async () => {
         const largeAmount = ethers.utils.parseEther("1000000")
         await qcData
           .connect(qcManager)
-          .updateMaxMintingCapacity(qcAddress.address, largeAmount)
+          .updateMaxMintingCapacity(signers.qcAddress.address, largeAmount)
         await qcData
           .connect(qcManager)
-          .updateQCMintedAmount(qcAddress.address, largeAmount)
+          .updateQCMintedAmount(signers.qcAddress.address, largeAmount)
 
-        expect(await qcData.getQCMintedAmount(qcAddress.address)).to.equal(
+        expect(await qcData.getQCMintedAmount(signers.qcAddress.address)).to.equal(
           largeAmount
         )
       })
@@ -281,7 +273,7 @@ describe("QCData", () => {
         await expect(
           qcData
             .connect(qcManager)
-            .updateQCMintedAmount(thirdParty.address, mintedAmount)
+            .updateQCMintedAmount(signers.thirdParty.address, mintedAmount)
         ).to.be.revertedWith("QCNotRegistered")
       })
     })
@@ -292,9 +284,9 @@ describe("QCData", () => {
         await expect(
           qcData
             .connect(thirdParty)
-            .updateQCMintedAmount(qcAddress.address, mintedAmount)
+            .updateQCMintedAmount(signers.qcAddress.address, mintedAmount)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_MANAGER_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${QC_MANAGER_ROLE}`
         )
       })
     })
@@ -304,27 +296,27 @@ describe("QCData", () => {
     beforeEach(async () => {
       await qcData
         .connect(qcManager)
-        .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
     })
 
     context("when called by QC manager", () => {
       it("should register wallet successfully", async () => {
         const tx = await qcData
           .connect(qcManager)
-          .registerWallet(qcAddress.address, testBtcAddress)
+          .registerWallet(signers.qcAddress.address, testBtcAddress)
 
         expect(await qcData.getWalletOwner(testBtcAddress)).to.equal(
-          qcAddress.address
+          signers.qcAddress.address
         )
         expect(await qcData.getWalletStatus(testBtcAddress)).to.equal(1) // Active
 
-        const wallets = await qcData.getQCWallets(qcAddress.address)
+        const wallets = await qcData.getQCWallets(signers.qcAddress.address)
         expect(wallets).to.include(testBtcAddress)
 
         await expect(tx)
           .to.emit(qcData, "WalletRegistered")
           .withArgs(
-            qcAddress.address,
+            signers.qcAddress.address,
             testBtcAddress,
             qcManager.address,
             await ethers.provider
@@ -336,12 +328,12 @@ describe("QCData", () => {
       it("should register multiple wallets for same QC", async () => {
         await qcData
           .connect(qcManager)
-          .registerWallet(qcAddress.address, testBtcAddress)
+          .registerWallet(signers.qcAddress.address, testBtcAddress)
         await qcData
           .connect(qcManager)
-          .registerWallet(qcAddress.address, testBtcAddress2)
+          .registerWallet(signers.qcAddress.address, testBtcAddress2)
 
-        const wallets = await qcData.getQCWallets(qcAddress.address)
+        const wallets = await qcData.getQCWallets(signers.qcAddress.address)
         expect(wallets).to.have.length(2)
         expect(wallets).to.include(testBtcAddress)
         expect(wallets).to.include(testBtcAddress2)
@@ -350,12 +342,12 @@ describe("QCData", () => {
       it("should revert when wallet already registered", async () => {
         await qcData
           .connect(qcManager)
-          .registerWallet(qcAddress.address, testBtcAddress)
+          .registerWallet(signers.qcAddress.address, testBtcAddress)
 
         await expect(
           qcData
             .connect(qcManager)
-            .registerWallet(qcAddress.address, testBtcAddress)
+            .registerWallet(signers.qcAddress.address, testBtcAddress)
         ).to.be.revertedWith("WalletAlreadyRegistered")
       })
 
@@ -363,13 +355,13 @@ describe("QCData", () => {
         await expect(
           qcData
             .connect(qcManager)
-            .registerWallet(thirdParty.address, testBtcAddress)
+            .registerWallet(signers.thirdParty.address, testBtcAddress)
         ).to.be.revertedWith("QCNotRegistered")
       })
 
       it("should revert with empty wallet address", async () => {
         await expect(
-          qcData.connect(qcManager).registerWallet(qcAddress.address, "")
+          qcData.connect(qcManager).registerWallet(signers.qcAddress.address, "")
         ).to.be.revertedWith("InvalidWalletAddress")
       })
 
@@ -380,24 +372,24 @@ describe("QCData", () => {
         for (let i = 0; i < maxWalletsNum; i++) {
           await qcData
             .connect(qcManager)
-            .registerWallet(qcAddress.address, `bc1qtest${i}`)
+            .registerWallet(signers.qcAddress.address, `bc1qtest${i}`)
         }
 
         // Verify we're at the limit
-        const wallets = await qcData.getQCWallets(qcAddress.address)
+        const wallets = await qcData.getQCWallets(signers.qcAddress.address)
         expect(wallets).to.have.length(maxWalletsNum)
 
         // Try to register one more - should fail
         await expect(
           qcData
             .connect(qcManager)
-            .registerWallet(qcAddress.address, "bc1qtestextra")
+            .registerWallet(signers.qcAddress.address, "bc1qtestextra")
         ).to.be.revertedWith("MaxWalletsExceeded")
       })
 
       it("should return correct wallet capacity information", async () => {
         // Initially no wallets
-        let capacity = await qcData.getQCWalletCapacity(qcAddress.address)
+        let capacity = await qcData.getQCWalletCapacity(signers.qcAddress.address)
         expect(capacity.current).to.equal(0)
         expect(capacity.maximum).to.equal(await qcData.MAX_WALLETS_PER_QC())
         expect(capacity.remaining).to.equal(await qcData.MAX_WALLETS_PER_QC())
@@ -405,12 +397,12 @@ describe("QCData", () => {
         // Register some wallets
         await qcData
           .connect(qcManager)
-          .registerWallet(qcAddress.address, testBtcAddress)
+          .registerWallet(signers.qcAddress.address, testBtcAddress)
         await qcData
           .connect(qcManager)
-          .registerWallet(qcAddress.address, testBtcAddress2)
+          .registerWallet(signers.qcAddress.address, testBtcAddress2)
 
-        capacity = await qcData.getQCWalletCapacity(qcAddress.address)
+        capacity = await qcData.getQCWalletCapacity(signers.qcAddress.address)
         expect(capacity.current).to.equal(2)
         const max = await qcData.MAX_WALLETS_PER_QC()
         expect(capacity.remaining).to.equal(max.sub(2))
@@ -423,9 +415,9 @@ describe("QCData", () => {
         await expect(
           qcData
             .connect(thirdParty)
-            .registerWallet(qcAddress.address, testBtcAddress)
+            .registerWallet(signers.qcAddress.address, testBtcAddress)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${QC_MANAGER_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${QC_MANAGER_ROLE}`
         )
       })
     })
@@ -435,10 +427,10 @@ describe("QCData", () => {
     beforeEach(async () => {
       await qcData
         .connect(qcManager)
-        .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
       await qcData
         .connect(qcManager)
-        .registerWallet(qcAddress.address, testBtcAddress)
+        .registerWallet(signers.qcAddress.address, testBtcAddress)
     })
 
     context("request deregistration", () => {
@@ -452,7 +444,7 @@ describe("QCData", () => {
         await expect(tx)
           .to.emit(qcData, "WalletDeRegistrationRequested")
           .withArgs(
-            qcAddress.address,
+            signers.qcAddress.address,
             testBtcAddress,
             qcManager.address,
             await ethers.provider
@@ -491,17 +483,17 @@ describe("QCData", () => {
           .finalizeWalletDeRegistration(testBtcAddress)
 
         expect(await qcData.getWalletOwner(testBtcAddress)).to.equal(
-          qcAddress.address // QC address preserved for audit trail
+          signers.qcAddress.address // QC address preserved for audit trail
         )
         expect(await qcData.getWalletStatus(testBtcAddress)).to.equal(3) // Deregistered
 
-        const wallets = await qcData.getQCWallets(qcAddress.address)
+        const wallets = await qcData.getQCWallets(signers.qcAddress.address)
         expect(wallets).to.not.include(testBtcAddress)
 
         await expect(tx)
           .to.emit(qcData, "WalletDeRegistrationFinalized")
           .withArgs(
-            qcAddress.address,
+            signers.qcAddress.address,
             testBtcAddress,
             qcManager.address,
             await ethers.provider
@@ -534,68 +526,68 @@ describe("QCData", () => {
     beforeEach(async () => {
       await qcData
         .connect(qcManager)
-        .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
       await qcData
         .connect(qcManager)
-        .registerWallet(qcAddress.address, testBtcAddress)
+        .registerWallet(signers.qcAddress.address, testBtcAddress)
       await qcData
         .connect(qcManager)
-        .registerWallet(qcAddress.address, testBtcAddress2)
+        .registerWallet(signers.qcAddress.address, testBtcAddress2)
     })
 
     describe("isQCRegistered", () => {
       it("should return true for registered QC", async () => {
-        expect(await qcData.isQCRegistered(qcAddress.address)).to.be.true
+        expect(await qcData.isQCRegistered(signers.qcAddress.address)).to.be.true
       })
 
       it("should return false for unregistered QC", async () => {
-        expect(await qcData.isQCRegistered(thirdParty.address)).to.be.false
+        expect(await qcData.isQCRegistered(signers.thirdParty.address)).to.be.false
       })
     })
 
     describe("getQCStatus", () => {
       it("should return correct status", async () => {
-        expect(await qcData.getQCStatus(qcAddress.address)).to.equal(0) // Active
+        expect(await qcData.getQCStatus(signers.qcAddress.address)).to.equal(0) // Active
 
         await qcData
           .connect(qcManager)
-          .setQCStatus(qcAddress.address, 1, testReason)
-        expect(await qcData.getQCStatus(qcAddress.address)).to.equal(1) // UnderReview
+          .setQCStatus(signers.qcAddress.address, 1, testReason)
+        expect(await qcData.getQCStatus(signers.qcAddress.address)).to.equal(1) // UnderReview
       })
 
       it("should revert for unregistered QC", async () => {
-        await expect(qcData.getQCStatus(thirdParty.address))
+        await expect(qcData.getQCStatus(signers.thirdParty.address))
           .to.be.revertedWithCustomError(qcData, "QCNotRegistered")
       })
     })
 
     describe("getQCMintedAmount", () => {
       it("should return correct minted amount", async () => {
-        expect(await qcData.getQCMintedAmount(qcAddress.address)).to.equal(0)
+        expect(await qcData.getQCMintedAmount(signers.qcAddress.address)).to.equal(0)
 
         await qcData
           .connect(qcManager)
-          .updateQCMintedAmount(qcAddress.address, mintedAmount)
-        expect(await qcData.getQCMintedAmount(qcAddress.address)).to.equal(
+          .updateQCMintedAmount(signers.qcAddress.address, mintedAmount)
+        expect(await qcData.getQCMintedAmount(signers.qcAddress.address)).to.equal(
           mintedAmount
         )
       })
 
       it("should return 0 for unregistered QC", async () => {
-        expect(await qcData.getQCMintedAmount(thirdParty.address)).to.equal(0)
+        expect(await qcData.getQCMintedAmount(signers.thirdParty.address)).to.equal(0)
       })
     })
 
     describe("getQCWallets", () => {
       it("should return all registered wallets", async () => {
-        const wallets = await qcData.getQCWallets(qcAddress.address)
+        const wallets = await qcData.getQCWallets(signers.qcAddress.address)
         expect(wallets).to.have.length(2)
         expect(wallets).to.include(testBtcAddress)
         expect(wallets).to.include(testBtcAddress2)
       })
 
       it("should return empty array for unregistered QC", async () => {
-        const wallets = await qcData.getQCWallets(thirdParty.address)
+        const wallets = await qcData.getQCWallets(signers.thirdParty.address)
         expect(wallets).to.have.length(0)
       })
 
@@ -607,7 +599,7 @@ describe("QCData", () => {
           .connect(qcManager)
           .finalizeWalletDeRegistration(testBtcAddress)
 
-        const wallets = await qcData.getQCWallets(qcAddress.address)
+        const wallets = await qcData.getQCWallets(signers.qcAddress.address)
         expect(wallets).to.have.length(1)
         expect(wallets).to.include(testBtcAddress2)
         expect(wallets).to.not.include(testBtcAddress)
@@ -617,7 +609,7 @@ describe("QCData", () => {
     describe("getWalletOwner", () => {
       it("should return correct owner", async () => {
         expect(await qcData.getWalletOwner(testBtcAddress)).to.equal(
-          qcAddress.address
+          signers.qcAddress.address
         )
       })
 
@@ -636,7 +628,7 @@ describe("QCData", () => {
           .finalizeWalletDeRegistration(testBtcAddress)
 
         expect(await qcData.getWalletOwner(testBtcAddress)).to.equal(
-          qcAddress.address
+          signers.qcAddress.address
         )
       })
     })
@@ -673,10 +665,10 @@ describe("QCData", () => {
       beforeEach(async () => {
         await qcData
           .connect(qcManager)
-          .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+          .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
         await qcData
           .connect(qcManager)
-          .registerWallet(qcAddress.address, testBtcAddress)
+          .registerWallet(signers.qcAddress.address, testBtcAddress)
       })
 
       it("should handle complete deregistration cycle", async () => {
@@ -699,18 +691,18 @@ describe("QCData", () => {
 
     context("multiple QCs with same wallet address", () => {
       it("should prevent registering same wallet to different QCs", async () => {
-        const qc2 = governance.address
+        const qc2 = signers.governance.address
 
         await qcData
           .connect(qcManager)
-          .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+          .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
         await qcData
           .connect(qcManager)
           .registerQC(qc2, ethers.utils.parseEther("1000"))
 
         await qcData
           .connect(qcManager)
-          .registerWallet(qcAddress.address, testBtcAddress)
+          .registerWallet(signers.qcAddress.address, testBtcAddress)
 
         await expect(
           qcData.connect(qcManager).registerWallet(qc2, testBtcAddress)
@@ -722,32 +714,32 @@ describe("QCData", () => {
       it("should handle maximum length wallet addresses", async () => {
         await qcData
           .connect(qcManager)
-          .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+          .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
 
         const longWalletAddress = `bc1q${"a".repeat(60)}` // Very long but valid format
         await qcData
           .connect(qcManager)
-          .registerWallet(qcAddress.address, longWalletAddress)
+          .registerWallet(signers.qcAddress.address, longWalletAddress)
 
         expect(await qcData.getWalletOwner(longWalletAddress)).to.equal(
-          qcAddress.address
+          signers.qcAddress.address
         )
       })
 
       it("should handle maximum minted amounts", async () => {
         await qcData
           .connect(qcManager)
-          .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+          .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
 
         const maxAmount = ethers.constants.MaxUint256
         await qcData
           .connect(qcManager)
-          .updateMaxMintingCapacity(qcAddress.address, maxAmount)
+          .updateMaxMintingCapacity(signers.qcAddress.address, maxAmount)
         await qcData
           .connect(qcManager)
-          .updateQCMintedAmount(qcAddress.address, maxAmount)
+          .updateQCMintedAmount(signers.qcAddress.address, maxAmount)
 
-        expect(await qcData.getQCMintedAmount(qcAddress.address)).to.equal(
+        expect(await qcData.getQCMintedAmount(signers.qcAddress.address)).to.equal(
           maxAmount
         )
       })
@@ -758,10 +750,10 @@ describe("QCData", () => {
     beforeEach(async () => {
       await qcData
         .connect(qcManager)
-        .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
       await qcData
         .connect(qcManager)
-        .registerWallet(qcAddress.address, testBtcAddress)
+        .registerWallet(signers.qcAddress.address, testBtcAddress)
     })
 
     describe("isWalletActive", () => {
@@ -851,10 +843,10 @@ describe("QCData", () => {
     beforeEach(async () => {
       await qcData
         .connect(qcManager)
-        .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
       await qcData
         .connect(qcManager)
-        .registerWallet(qcAddress.address, testBtcAddress)
+        .registerWallet(signers.qcAddress.address, testBtcAddress)
     })
 
     describe("comprehensive state transitions", () => {
@@ -887,7 +879,7 @@ describe("QCData", () => {
 
         // QC address should be preserved for audit trail
         expect(await qcData.getWalletOwner(testBtcAddress)).to.equal(
-          qcAddress.address
+          signers.qcAddress.address
         )
       })
 
@@ -904,7 +896,7 @@ describe("QCData", () => {
         await expect(
           qcData
             .connect(qcManager)
-            .registerWallet(qcAddress.address, testBtcAddress)
+            .registerWallet(signers.qcAddress.address, testBtcAddress)
         ).to.be.revertedWith("WalletAlreadyRegistered")
       })
 
@@ -928,7 +920,7 @@ describe("QCData", () => {
     describe("audit trail preservation", () => {
       it("should maintain complete audit trail after deregistration", async () => {
         const initialOwner = await qcData.getWalletOwner(testBtcAddress)
-        const initialWallets = await qcData.getQCWallets(qcAddress.address)
+        const initialWallets = await qcData.getQCWallets(signers.qcAddress.address)
 
         // Complete deregistration
         await qcData
@@ -947,7 +939,7 @@ describe("QCData", () => {
         expect(await qcData.getWalletStatus(testBtcAddress)).to.equal(3) // Deregistered
 
         // Wallet removed from active list
-        const finalWallets = await qcData.getQCWallets(qcAddress.address)
+        const finalWallets = await qcData.getQCWallets(signers.qcAddress.address)
         expect(finalWallets.length).to.equal(initialWallets.length - 1)
         expect(finalWallets).to.not.include(testBtcAddress)
       })
@@ -962,7 +954,7 @@ describe("QCData", () => {
           // eslint-disable-next-line no-await-in-loop
           await qcData
             .connect(qcManager)
-            .registerWallet(qcAddress.address, wallet)
+            .registerWallet(signers.qcAddress.address, wallet)
 
           // eslint-disable-next-line no-await-in-loop
           expect(await qcData.getWalletStatus(wallet)).to.equal(1) // Active
@@ -985,7 +977,7 @@ describe("QCData", () => {
         // Register multiple wallets
         await qcData
           .connect(qcManager)
-          .registerWallet(qcAddress.address, testBtcAddress2)
+          .registerWallet(signers.qcAddress.address, testBtcAddress2)
 
         const wallet1Status = await qcData.getWalletStatus(testBtcAddress)
         const wallet2Status = await qcData.getWalletStatus(testBtcAddress2)
@@ -1011,7 +1003,7 @@ describe("QCData", () => {
       // Register a QC first
       await qcData
         .connect(qcManager)
-        .registerQC(qcAddress.address, ethers.utils.parseEther("1000"))
+        .registerQC(signers.qcAddress.address, ethers.utils.parseEther("1000"))
     })
 
     describe("grantQCManagerRole", () => {
@@ -1026,7 +1018,7 @@ describe("QCData", () => {
         const currentBlock = await ethers.provider.getBlock(tx.blockNumber!)
         await expect(tx)
           .to.emit(qcData, "RoleGranted")
-          .withArgs(QC_MANAGER_ROLE, newManager.address, deployer.address)
+          .withArgs(QC_MANAGER_ROLE, newManager.address, signers.deployer.address)
       })
 
       it("should revert with zero address", async () => {
@@ -1050,7 +1042,7 @@ describe("QCData", () => {
 
       it("should only be callable by admin", async () => {
         await expect(
-          qcData.connect(thirdParty).grantQCManagerRole(governance.address)
+          qcData.connect(signers.thirdParty).grantQCManagerRole(signers.governance.address)
         ).to.be.revertedWith("AccessControl: account")
       })
     })
@@ -1058,18 +1050,18 @@ describe("QCData", () => {
     describe("revokeQCManagerRole", () => {
       beforeEach(async () => {
         // Grant role first
-        await qcData.grantQCManagerRole(thirdParty.address)
+        await qcData.grantQCManagerRole(signers.thirdParty.address)
       })
 
       it("should revoke QC_MANAGER_ROLE from address", async () => {
-        const tx = await qcData.revokeQCManagerRole(thirdParty.address)
+        const tx = await qcData.revokeQCManagerRole(signers.thirdParty.address)
 
-        expect(await qcData.hasRole(QC_MANAGER_ROLE, thirdParty.address)).to.be
+        expect(await qcData.hasRole(QC_MANAGER_ROLE, signers.thirdParty.address)).to.be
           .false
 
         await expect(tx)
           .to.emit(qcData, "RoleRevoked")
-          .withArgs(QC_MANAGER_ROLE, thirdParty.address, deployer.address)
+          .withArgs(QC_MANAGER_ROLE, signers.thirdParty.address, signers.deployer.address)
       })
 
       it("should succeed with zero address (no validation)", async () => {
@@ -1080,13 +1072,13 @@ describe("QCData", () => {
 
       it("should succeed when role not granted (no validation)", async () => {
         // OpenZeppelin _revokeRole succeeds even if role not granted
-        await expect(qcData.revokeQCManagerRole(governance.address)).to.not.be
+        await expect(qcData.revokeQCManagerRole(signers.governance.address)).to.not.be
           .reverted
       })
 
       it("should only be callable by admin", async () => {
         await expect(
-          qcData.connect(thirdParty).revokeQCManagerRole(thirdParty.address)
+          qcData.connect(signers.thirdParty).revokeQCManagerRole(signers.thirdParty.address)
         ).to.be.revertedWith("AccessControl: account")
       })
     })
@@ -1100,16 +1092,16 @@ describe("QCData", () => {
       // Register a QC first
       await qcData
         .connect(qcManager)
-        .registerQC(qcAddress.address, testCapacity)
+        .registerQC(signers.qcAddress.address, testCapacity)
     })
 
     describe("updateMaxMintingCapacity", () => {
       it("should update max minting capacity and emit event", async () => {
         const tx = await qcData
           .connect(qcManager)
-          .updateMaxMintingCapacity(qcAddress.address, testCapacity)
+          .updateMaxMintingCapacity(signers.qcAddress.address, testCapacity)
 
-        expect(await qcData.getMaxMintingCapacity(qcAddress.address)).to.equal(
+        expect(await qcData.getMaxMintingCapacity(signers.qcAddress.address)).to.equal(
           testCapacity
         )
 
@@ -1117,7 +1109,7 @@ describe("QCData", () => {
         await expect(tx)
           .to.emit(qcData, "QCMaxMintingCapacityUpdated")
           .withArgs(
-            qcAddress.address,
+            signers.qcAddress.address,
             testCapacity, // oldCapacity (set in beforeEach)
             testCapacity, // newCapacity (same as testCapacity)
             qcManager.address,
@@ -1128,13 +1120,13 @@ describe("QCData", () => {
       it("should allow updating capacity multiple times", async () => {
         await qcData
           .connect(qcManager)
-          .updateMaxMintingCapacity(qcAddress.address, testCapacity)
+          .updateMaxMintingCapacity(signers.qcAddress.address, testCapacity)
 
         const tx = await qcData
           .connect(qcManager)
-          .updateMaxMintingCapacity(qcAddress.address, updatedCapacity)
+          .updateMaxMintingCapacity(signers.qcAddress.address, updatedCapacity)
 
-        expect(await qcData.getMaxMintingCapacity(qcAddress.address)).to.equal(
+        expect(await qcData.getMaxMintingCapacity(signers.qcAddress.address)).to.equal(
           updatedCapacity
         )
 
@@ -1142,7 +1134,7 @@ describe("QCData", () => {
         await expect(tx)
           .to.emit(qcData, "QCMaxMintingCapacityUpdated")
           .withArgs(
-            qcAddress.address,
+            signers.qcAddress.address,
             testCapacity, // oldCapacity (first capacity set)
             updatedCapacity, // newCapacity
             qcManager.address,
@@ -1154,12 +1146,12 @@ describe("QCData", () => {
         await expect(
           qcData
             .connect(qcManager)
-            .updateMaxMintingCapacity(qcAddress.address, 0)
+            .updateMaxMintingCapacity(signers.qcAddress.address, 0)
         ).to.be.revertedWith("InvalidCapacity")
       })
 
       it("should revert if QC not registered", async () => {
-        const unregisteredQC = governance.address
+        const unregisteredQC = signers.governance.address
 
         await expect(
           qcData
@@ -1172,7 +1164,7 @@ describe("QCData", () => {
         await expect(
           qcData
             .connect(thirdParty)
-            .updateMaxMintingCapacity(qcAddress.address, testCapacity)
+            .updateMaxMintingCapacity(signers.qcAddress.address, testCapacity)
         ).to.be.revertedWith("AccessControl: account")
       })
     })
@@ -1181,19 +1173,19 @@ describe("QCData", () => {
       it("should return correct capacity for registered QC", async () => {
         await qcData
           .connect(qcManager)
-          .updateMaxMintingCapacity(qcAddress.address, testCapacity)
+          .updateMaxMintingCapacity(signers.qcAddress.address, testCapacity)
 
-        const capacity = await qcData.getMaxMintingCapacity(qcAddress.address)
+        const capacity = await qcData.getMaxMintingCapacity(signers.qcAddress.address)
         expect(capacity).to.equal(testCapacity)
       })
 
       it("should return initial capacity set during registration", async () => {
-        const capacity = await qcData.getMaxMintingCapacity(qcAddress.address)
+        const capacity = await qcData.getMaxMintingCapacity(signers.qcAddress.address)
         expect(capacity).to.equal(testCapacity)
       })
 
       it("should return zero for unregistered QC", async () => {
-        const unregisteredQC = governance.address
+        const unregisteredQC = signers.governance.address
         const capacity = await qcData.getMaxMintingCapacity(unregisteredQC)
         expect(capacity).to.equal(0)
       })
@@ -1201,10 +1193,10 @@ describe("QCData", () => {
       it("should be a view function with no gas cost", async () => {
         await qcData
           .connect(qcManager)
-          .updateMaxMintingCapacity(qcAddress.address, testCapacity)
+          .updateMaxMintingCapacity(signers.qcAddress.address, testCapacity)
 
         const gasEstimate = await qcData.estimateGas.getMaxMintingCapacity(
-          qcAddress.address
+          signers.qcAddress.address
         )
         expect(gasEstimate).to.be.lt(30000) // Should be very cheap
       })
