@@ -287,8 +287,7 @@ await qcData.grantRole(TEST_CONSTANTS.ROLES.QC_MANAGER, qcManager.address)
 - `AccountControl.test.ts` - Core unit tests
 - `AccountControlIntegration.test.ts` - Integration scenarios
 - `AccountControlWorkflows.test.ts` - E2E workflows
-- `QCRedeemerWalletObligations.core.test.ts` - Core wallet functionality
-- `QCRedeemerWalletObligations.edge.test.ts` - Edge cases
+- `core-contracts/qc-redeemer-wallet-obligations.test.ts` - Wallet obligations (core functionality and edge cases)
 
 ### Mock File Naming
 - Solidity mocks: `MockContractName.sol`
