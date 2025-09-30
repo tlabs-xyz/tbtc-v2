@@ -7,6 +7,9 @@ import "../bridge/IRelay.sol";
 
 /// @notice Test relay contract for SPV testing
 /// @dev Extends SystemTestRelay functionality with additional test methods
+/// TODO: This contract bypasses actual SPV validation for testing purposes.
+///       In production, proper SPV validation through a real relay is critical
+///       for security. The bypassSPVValidation flag should never exist in production code.
 contract TestRelay is IRelay {
     using BTCUtils for bytes;
     using BTCUtils for uint256;
