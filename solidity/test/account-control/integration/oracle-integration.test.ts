@@ -2,6 +2,7 @@ import { expect } from "chai"
 import { ethers, upgrades } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { deployQCManagerLib, getQCManagerLibraries } from "../helpers/spv-helpers"
+import { setupSystemStateDefaults } from "../../helpers/testSetupHelpers"
 
 import {
   AccountControl,
@@ -10,7 +11,6 @@ import {
   QCData,
   SystemState
 } from "../../../typechain"
-import { setupSystemStateDefaults } from "../helpers"
 
 /**
  * Oracle Integration Tests
