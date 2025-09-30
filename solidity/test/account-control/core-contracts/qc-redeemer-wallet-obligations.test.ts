@@ -12,7 +12,7 @@ import {
   MockAccountControl,
 } from "../../../typechain"
 import { deploySPVLibraries, getQCRedeemerLibraries } from "../../helpers/spvLibraryHelpers"
-import { createRealSpvData } from "../AccountControlTestHelpers"
+import { createRealSpvData } from "../helpers/spv-data-helpers"
 import { setupTestSigners, type TestSigners } from "../fixtures/base-setup"
 import { expectCustomError } from "../helpers/error-helpers"
 

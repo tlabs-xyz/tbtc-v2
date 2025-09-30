@@ -15,32 +15,9 @@ export NODE_OPTIONS="--max-old-space-size=8192 --max-semi-space-size=512"
 export USE_EXTERNAL_DEPLOY=true
 export TEST_USE_STUBS_TBTC=true
 
-# List of all account-control test files
-TEST_FILES=(
-    "test/account-control/AccountControl.test.ts"
-    "test/account-control/AccountControlFeatures.test.ts"
-    "test/account-control/AccountControlIntegration.test.ts"
-    "test/account-control/AccountControlMintTBTC.test.ts"
-    "test/account-control/AccountControlOracleIntegration.test.ts"
-    "test/account-control/AccountControlSeparatedOperations.test.ts"
-    "test/account-control/AccountControlWorkflows.test.ts"
-    "test/account-control/BitcoinAddressUtils.test.ts"
-    "test/account-control/BitcoinAddressValidation.test.ts"
-    "test/account-control/MockReserveIntegration.test.ts"
-    "test/account-control/QCData.test.ts"
-    "test/account-control/QCManagerAccountControlIntegration.test.ts"
-    "test/account-control/QCManagerLib.test.ts"
-    "test/account-control/QCManager.test.ts"
-    "test/account-control/QCManagerWalletDirect.test.ts"
-    "test/account-control/QCMinter.test.ts"
-    "test/account-control/QCRedeemerSPV.test.ts"
-    "test/account-control/QCRedeemer.test.ts"
-    "test/account-control/core-contracts/qc-redeemer-wallet-obligations.test.ts"
-    "test/account-control/ReserveOracle.test.ts"
-    "test/account-control/SPVLibrariesIntegration.test.ts"
-    "test/account-control/SystemState.test.ts"
-    "test/account-control/WatchdogEnforcer.test.ts"
-)
+# Run tests in the organized directory structure
+# This automatically includes all .test.ts files in subdirectories
+TEST_PATTERN="test/account-control/**/*.test.ts"
 
 # Check if any arguments are provided for specific test filtering
 if [ $# -gt 0 ]; then
@@ -50,7 +27,7 @@ if [ $# -gt 0 ]; then
     echo ""
     
     # Run with timeout and error handling
-    timeout 3600 npx hardhat test "${TEST_FILES[@]}" "$@" || {
+    timeout 3600 npx hardhat test "$TEST_PATTERN" "$@" || {
         EXIT_CODE=$?
         echo ""
         echo "❌ Tests failed with exit code: $EXIT_CODE"
@@ -69,7 +46,7 @@ else
     echo ""
     
     # Run with timeout and error handling
-    timeout 3600 npx hardhat test "${TEST_FILES[@]}" || {
+    timeout 3600 npx hardhat test "$TEST_PATTERN" || {
         EXIT_CODE=$?
         echo ""
         echo "❌ Tests failed with exit code: $EXIT_CODE"

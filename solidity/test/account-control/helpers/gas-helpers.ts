@@ -288,8 +288,8 @@ export function createGasReporter() {
  */
 export const GAS_EXPECTATIONS = {
   SPV_VALIDATION: {
-    min: spvTestConfig.gasLimits.min,
-    max: spvTestConfig.gasLimits.max,
+    min: 50000,
+    max: 100000,
   },
   WALLET_REGISTRATION: {
     min: 100000,
