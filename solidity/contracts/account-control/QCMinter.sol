@@ -481,12 +481,30 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             // Option 1: Automated minting - create balance and immediately mint tBTC
             satoshis = AccountControl(accountControl).mintTBTC(user, amount);
             
-            // Note: Auto-mint removed from here - users must call executeAutoMint() separately
-            // after approving this contract to spend their Bank balance
-            autoMintExecuted = false;
+            // Auto-mint: Check user has sufficient allowance and balance
+            uint256 userBalance = bank.balanceOf(user);
+            uint256 userAllowance = bank.allowance(user, address(this));
             
-            // Emit event indicating manual mint needed
-            emit QCMintCompleted(user, satoshis, false);
+            if (userBalance >= satoshis && userAllowance >= satoshis) {
+                // Transfer Bank balance to this contract
+                bank.transferBalanceFrom(user, address(this), satoshis);
+                
+                // Mint tBTC tokens via vault
+                uint256 tbtcAmount = satoshis * SATOSHI_MULTIPLIER;
+                tbtcVault.mint(tbtcAmount);
+                
+                // Transfer tBTC to user
+                tbtc.transfer(user, tbtcAmount);
+                
+                autoMintExecuted = true;
+                emit AutoMintCompleted(user, satoshis, tbtcAmount);
+            } else {
+                // User doesn't have sufficient balance/allowance
+                revert InsufficientBalance();
+            }
+            
+            // Emit event indicating automated mint completed
+            emit QCMintCompleted(user, satoshis, true);
         } else {
             // Option 2: Manual process - just create Bank balance
             satoshis = AccountControl(accountControl).mintTBTC(user, amount);
