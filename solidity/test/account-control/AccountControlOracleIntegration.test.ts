@@ -138,7 +138,7 @@ describe("AccountControl Oracle Integration", function () {
       // Test minting with synced backing
       const mintAmount = ONE_BTC_IN_SATOSHIS.mul(2); // 2 BTC (within 5 BTC backing)
       await expect(
-        accountControl.connect(qc).mint(user.address, mintAmount)
+        accountControl.connect(qc).atomicMint(user.address, mintAmount)
       ).to.emit(accountControl, "MintExecuted")
        .withArgs(qc.address, user.address, mintAmount);
     });
@@ -159,7 +159,7 @@ describe("AccountControl Oracle Integration", function () {
 
       // Minting should fail due to insufficient backing
       await expect(
-        accountControl.connect(qc).mint(user.address, ONE_BTC_IN_SATOSHIS)
+        accountControl.connect(qc).atomicMint(user.address, ONE_BTC_IN_SATOSHIS)
       ).to.be.revertedWith("InsufficientBacking");
     });
 
@@ -276,7 +276,7 @@ describe("AccountControl Oracle Integration", function () {
 
       // Mint 1 BTC successfully
       const mintAmount1 = ONE_BTC_IN_SATOSHIS;
-      await accountControl.connect(qc).mint(user.address, mintAmount1);
+      await accountControl.connect(qc).atomicMint(user.address, mintAmount1);
       expect(await accountControl.minted(qc.address)).to.equal(mintAmount1);
 
       // Try to mint 2 more BTC (would exceed backing)

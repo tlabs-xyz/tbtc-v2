@@ -1,207 +1,428 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { ethers, upgrades } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import { AccountControl } from "../../typechain";
-import {
-    getTestAmounts,
-    deployAccountControlForTest
-} from "../helpers/testing-utils";
+import { getContractConstants, expectBalanceChange, getTestAmounts, deployAccountControlForTest } from "../helpers/testing-utils";
 
 describe("AccountControl Separated Operations", function () {
-    let accountControl: AccountControl;
-    let owner: SignerWithAddress;
-    let emergencyCouncil: SignerWithAddress;
-    let mockBank: any;
-    let reserve: SignerWithAddress;
-    let user: SignerWithAddress;
-    let amounts: any;
+  let accountControl: AccountControl;
+  let owner: SignerWithAddress;
+  let emergencyCouncil: SignerWithAddress;
+  let mockBank: any;
+  let reserve: SignerWithAddress;
+  let user: SignerWithAddress;
+  let amounts: any;
 
-    beforeEach(async function () {
-        [owner, emergencyCouncil, reserve, user] = await ethers.getSigners();
+  beforeEach(async function () {
+    [owner, emergencyCouncil, reserve, user] = await ethers.getSigners();
 
-        // Deploy mock Bank
-        const MockBankFactory = await ethers.getContractFactory("MockBank");
-        mockBank = await MockBankFactory.deploy();
+    // Deploy mock Bank with new functions
+    const MockBankFactory = await ethers.getContractFactory("MockBankWithSeparatedOps");
+    mockBank = await MockBankFactory.deploy();
 
-        // Deploy AccountControl using helper
-        accountControl = await deployAccountControlForTest(owner, emergencyCouncil, mockBank) as AccountControl;
+    // Deploy AccountControl using helper
+    accountControl = await deployAccountControlForTest(owner, emergencyCouncil, mockBank) as AccountControl;
 
-        // Get dynamic test amounts
-        amounts = await getTestAmounts(accountControl);
+    // Get dynamic test amounts
+    amounts = await getTestAmounts(accountControl);
 
-        // Use MEDIUM_CAP for testing since LARGE_CAP isn't defined in testing utils
-        const testCap = amounts.MEDIUM_CAP.mul(5); // 5x medium cap for testing
+    // Authorize a reserve for testing
+    await accountControl.connect(owner).authorizeReserve(reserve.address, amounts.SMALL_CAP);
+  });
 
-        // Authorize a reserve for testing
-        await accountControl.connect(owner).authorizeReserve(
-            reserve.address,
-            testCap
-        );
+  describe("Pure Token Operations", function () {
 
-        // Set up backing
-        await accountControl.connect(reserve).updateBacking(testCap);
+    describe("mintTokens(address, uint256)", function () {
+      it("should mint tokens without updating accounting", async function () {
+        // Setup backing
+        await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP);
+
+        const initialMinted = await accountControl.minted(reserve.address);
+
+        // Call pure mint
+        await accountControl.connect(reserve).mintTokens(user.address, amounts.SMALL_MINT);
+
+        // Verify: tokens minted via Bank.mint(), minted[reserve] unchanged
+        expect(await mockBank.balanceOf(user.address)).to.equal(amounts.SMALL_MINT);
+        expect(await accountControl.minted(reserve.address)).to.equal(initialMinted); // No accounting update
+        expect(await accountControl.totalMintedAmount()).to.equal(initialMinted); // No change
+      });
+
+      it("should enforce backing requirements", async function () {
+        // Don't set backing - should fail
+        await expect(
+          accountControl.connect(reserve).mintTokens(user.address, amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
+      });
+
+      it("should check backing against existing minted amount", async function () {
+        // Set backing and credit some minted amount
+        await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP);
+        await accountControl.connect(reserve).creditMinted(amounts.SMALL_CAP);
+
+        // Try to mint more than remaining backing
+        const remainingBacking = amounts.MEDIUM_CAP - amounts.SMALL_CAP;
+        await expect(
+          accountControl.connect(reserve).mintTokens(user.address, remainingBacking + 1)
+        ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
+      });
+
+      it("should emit PureTokenMint event", async function () {
+        await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP);
+
+        await expect(
+          accountControl.connect(reserve).mintTokens(user.address, amounts.SMALL_MINT)
+        ).to.emit(accountControl, "PureTokenMint")
+         .withArgs(reserve.address, user.address, amounts.SMALL_MINT);
+      });
+
+      it("should require authorization", async function () {
+        await expect(
+          accountControl.connect(user).mintTokens(user.address, amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
+      });
     });
 
-    describe("Pure token minting (mintTokens)", function () {
-        it("should mint tokens and update accounting", async function () {
-            const amount = amounts.SMALL_MINT;
+    describe("burn(uint256)", function () {
+      beforeEach(async function () {
+        // Setup: give reserve some tokens first via AccountControl
+        await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP);
+        await accountControl.connect(reserve).mintTokens(reserve.address, amounts.MEDIUM_CAP); // Give reserve tokens to burn
 
-            // Track state before
-            const mintedBefore = await accountControl.minted(reserve.address);
-            const totalMintedBefore = await accountControl.totalMintedAmount();
+        // Allow AccountControl to burn reserve's tokens for separated operations
+        await mockBank.connect(reserve).increaseBalanceAllowance(accountControl.address, amounts.MEDIUM_CAP);
+      });
 
-            // Mint tokens
-            await expect(accountControl.connect(reserve).mintTokens(user.address, amount))
-                .to.emit(accountControl, "PureTokenMint")
-                .withArgs(reserve.address, user.address, amount);
+      it("should burn tokens without updating accounting", async function () {
+        // Setup accounting state
+        await accountControl.connect(reserve).creditMinted(amounts.SMALL_MINT);
+        const initialMinted = await accountControl.minted(reserve.address);
+        const initialTotal = await accountControl.totalMintedAmount();
 
-            // Check tokens were minted via Bank
-            expect(await mockBank.balanceOf(user.address)).to.equal(amount);
+        // Call pure burn
+        await accountControl.connect(reserve).burnTokens(amounts.SMALL_MINT);
 
-            // Check accounting WAS updated to enforce caps
-            expect(await accountControl.minted(reserve.address)).to.equal(mintedBefore.add(amount));
-            expect(await accountControl.totalMintedAmount()).to.equal(totalMintedBefore.add(amount));
-        });
+        // Verify: tokens burned, accounting unchanged
+        expect(await mockBank.balanceOf(reserve.address)).to.equal(amounts.MEDIUM_CAP - amounts.SMALL_MINT);
+        expect(await accountControl.minted(reserve.address)).to.equal(initialMinted); // No change
+        expect(await accountControl.totalMintedAmount()).to.equal(initialTotal); // No change
+      });
 
-        it("should enforce cap requirements", async function () {
-            const testCap = amounts.MEDIUM_CAP.mul(5);
-            const excessAmount = testCap.add(amounts.SMALL_MINT);
+      it("should emit PureTokenBurn event", async function () {
+        await expect(
+          accountControl.connect(reserve).burnTokens(amounts.SMALL_MINT)
+        ).to.emit(accountControl, "PureTokenBurn")
+         .withArgs(reserve.address, amounts.SMALL_MINT);
+      });
 
-            // Ensure backing is sufficient to test cap limit instead of backing limit
-            await accountControl.connect(reserve).updateBacking(excessAmount.mul(2));
+      it("should require authorization", async function () {
+        await expect(
+          accountControl.connect(user).burnTokens(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
+      });
+    });
+  });
 
-            await expect(accountControl.connect(reserve).mintTokens(user.address, excessAmount))
-                .to.be.revertedWithCustomError(accountControl, "ExceedsReserveCap");
-        });
+  describe("Pure Accounting Operations", function () {
 
+    describe("creditMinted(uint256)", function () {
+      it("should update accounting without minting tokens", async function () {
+        const initialBalance = await mockBank.balanceOf(user.address);
+
+        // Call pure accounting credit
+        await accountControl.connect(reserve).creditMinted(amounts.SMALL_MINT);
+
+        // Verify: accounting updated, no tokens minted
+        expect(await accountControl.minted(reserve.address)).to.equal(amounts.SMALL_MINT);
+        expect(await accountControl.totalMintedAmount()).to.equal(amounts.SMALL_MINT);
+        expect(await mockBank.balanceOf(user.address)).to.equal(initialBalance); // No tokens
+      });
+
+      it("should enforce minting caps", async function () {
+        // Try to credit more than reserve cap
+        await expect(
+          accountControl.connect(reserve).creditMinted(amounts.SMALL_CAP + 1)
+        ).to.be.revertedWith("ExceedsReserveCap");
+      });
+
+      it("should enforce global minting cap", async function () {
+        // Set global cap
+        await accountControl.connect(owner).setGlobalMintingCap(amounts.SMALL_MINT);
+
+        await expect(
+          accountControl.connect(reserve).creditMinted(amounts.SMALL_MINT + 1)
+        ).to.be.revertedWith("ExceedsGlobalCap");
+      });
+
+      it("should emit AccountingCredit event", async function () {
+        await expect(
+          accountControl.connect(reserve).creditMinted(amounts.SMALL_MINT)
+        ).to.emit(accountControl, "AccountingCredit")
+         .withArgs(reserve.address, amounts.SMALL_MINT);
+      });
+
+      it("should require authorization", async function () {
+        await expect(
+          accountControl.connect(user).creditMinted(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
+      });
     });
 
+    describe("debitMinted(uint256)", function () {
+      it("should update accounting without burning tokens", async function () {
+        // Setup: credit first
+        await accountControl.connect(reserve).creditMinted(amounts.MEDIUM_CAP);
+        const initialBalance = await mockBank.balanceOf(user.address);
 
-    describe("Pure accounting credit (creditMinted)", function () {
-        it("should update accounting without minting tokens", async function () {
-            const amount = amounts.SMALL_MINT;
+        // Call pure accounting debit
+        await accountControl.connect(reserve).debitMinted(amounts.SMALL_MINT);
 
-            // Track state before
-            const mintedBefore = await accountControl.minted(reserve.address);
-            const totalMintedBefore = await accountControl.totalMintedAmount();
-            const userBalanceBefore = await mockBank.balanceOf(user.address);
+        // Verify: accounting updated, no tokens burned
+        expect(await accountControl.minted(reserve.address)).to.equal(amounts.MEDIUM_CAP - amounts.SMALL_MINT);
+        expect(await accountControl.totalMintedAmount()).to.equal(amounts.MEDIUM_CAP - amounts.SMALL_MINT);
+        expect(await mockBank.balanceOf(user.address)).to.equal(initialBalance); // No token change
+      });
 
-            // Credit accounting only
-            await expect(accountControl.connect(reserve).creditMinted(amount))
-                .to.emit(accountControl, "AccountingCredit")
-                .withArgs(reserve.address, amount);
+      it("should enforce sufficient minted balance", async function () {
+        await expect(
+          accountControl.connect(reserve).debitMinted(amounts.SMALL_MINT)
+        ).to.be.revertedWith("InsufficientMinted");
+      });
 
-            // Check accounting was updated
-            expect(await accountControl.minted(reserve.address)).to.equal(mintedBefore.add(amount));
-            expect(await accountControl.totalMintedAmount()).to.equal(totalMintedBefore.add(amount));
+      it("should emit AccountingDebit event", async function () {
+        // Setup
+        await accountControl.connect(reserve).creditMinted(amounts.MEDIUM_CAP);
 
-            // Check no tokens were minted
-            expect(await mockBank.balanceOf(user.address)).to.equal(userBalanceBefore);
-        });
+        await expect(
+          accountControl.connect(reserve).debitMinted(amounts.SMALL_MINT)
+        ).to.emit(accountControl, "AccountingDebit")
+         .withArgs(reserve.address, amounts.SMALL_MINT);
+      });
 
-        it("should enforce minting cap limits", async function () {
-            const testCap = amounts.MEDIUM_CAP.mul(5);
-            const excessAmount = testCap.add(amounts.SMALL_MINT);
+      it("should require authorization", async function () {
+        await expect(
+          accountControl.connect(user).debitMinted(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
+      });
+    });
+  });
 
-            // Ensure backing is sufficient to test cap limit instead of backing limit
-            await accountControl.connect(reserve).updateBacking(excessAmount.mul(2));
+  describe("Backward Compatibility", function () {
 
-            await expect(accountControl.connect(reserve).creditMinted(excessAmount))
-                .to.be.revertedWith("ExceedsReserveCap");
-        });
+    describe("mintTBTC() using separated operations", function () {
+      it("should work identically to current implementation", async function () {
+        await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP);
+
+        const tbtcAmount = ethers.utils.parseEther("0.005"); // 0.005 tBTC
+        const expectedSatoshis = tbtcAmount.div(ethers.utils.parseUnits("1", 10)); // Convert to satoshis
+
+        // Call existing mintTBTC function
+        await accountControl.connect(reserve).mintTBTC(user.address, tbtcAmount);
+
+        // Verify both token minting AND accounting occurred
+        expect(await mockBank.balanceOf(user.address)).to.equal(expectedSatoshis);
+        expect(await accountControl.minted(reserve.address)).to.equal(expectedSatoshis);
+        expect(await accountControl.totalMintedAmount()).to.equal(expectedSatoshis);
+      });
+
+      it("should maintain same event emissions", async function () {
+        await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP);
+        const tbtcAmount = ethers.utils.parseEther("0.005");
+
+        const tx = await accountControl.connect(reserve).mintTBTC(user.address, tbtcAmount);
+
+        // Should emit both new events and original event for compatibility
+        await expect(tx).to.emit(accountControl, "PureTokenMint");
+        await expect(tx).to.emit(accountControl, "AccountingCredit");
+        await expect(tx).to.emit(accountControl, "MintExecuted");
+      });
     });
 
-    describe("Pure accounting debit (debitMinted)", function () {
-        beforeEach(async function () {
-            // Set up some minted amount to debit from
-            await accountControl.connect(reserve).creditMinted(amounts.MEDIUM_MINT);
-            // Mine a block to allow next operation
-            await ethers.provider.send("evm_mine", []);
-        });
+    describe("burnTBTC() new functionality", function () {
+      it("should burn tokens and update accounting", async function () {
+        // Setup: mint first
+        await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP);
+        await mockBank.mint(reserve.address, amounts.MEDIUM_CAP);
+        await accountControl.connect(reserve).creditMinted(amounts.MEDIUM_CAP);
 
-        it("should update accounting without burning tokens", async function () {
-            const amount = amounts.TINY_MINT; // Use smaller amount than what was credited
+        const tbtcAmount = ethers.utils.parseEther("0.005");
+        const expectedSatoshis = tbtcAmount.div(ethers.utils.parseUnits("1", 10));
 
-            // Track state before
-            const mintedBefore = await accountControl.minted(reserve.address);
-            const totalMintedBefore = await accountControl.totalMintedAmount();
-            const userBalanceBefore = await mockBank.balanceOf(user.address);
+        const initialBalance = await mockBank.balanceOf(reserve.address);
+        const initialMinted = await accountControl.minted(reserve.address);
 
-            // Debit accounting only
-            await expect(accountControl.connect(reserve).debitMinted(amount))
-                .to.emit(accountControl, "AccountingDebit")
-                .withArgs(reserve.address, amount);
+        // Call burnTBTC
+        await accountControl.connect(reserve).burnTBTC(tbtcAmount);
 
-            // Check accounting was updated
-            expect(await accountControl.minted(reserve.address)).to.equal(mintedBefore.sub(amount));
-            expect(await accountControl.totalMintedAmount()).to.equal(totalMintedBefore.sub(amount));
+        // Verify both token burning AND accounting occurred
+        expect(await mockBank.balanceOf(reserve.address)).to.equal(initialBalance.sub(expectedSatoshis));
+        expect(await accountControl.minted(reserve.address)).to.equal(initialMinted.sub(expectedSatoshis));
+      });
 
-            // Check no tokens were burned
-            expect(await mockBank.balanceOf(user.address)).to.equal(userBalanceBefore);
-        });
+      it("should emit separated operation events", async function () {
+        // Setup
+        await mockBank.mint(reserve.address, amounts.MEDIUM_CAP);
+        await accountControl.connect(reserve).creditMinted(amounts.MEDIUM_CAP);
 
-        it("should prevent debiting more than minted", async function () {
-            const excessAmount = amounts.MEDIUM_CAP.mul(10); // Much larger than what we minted
+        const tbtcAmount = ethers.utils.parseEther("0.005");
 
-            await expect(accountControl.connect(reserve).debitMinted(excessAmount))
-                .to.be.revertedWith("InsufficientMinted");
-        });
+        const tx = await accountControl.connect(reserve).burnTBTC(tbtcAmount);
+
+        await expect(tx).to.emit(accountControl, "PureTokenBurn");
+        await expect(tx).to.emit(accountControl, "AccountingDebit");
+      });
+    });
+  });
+
+  describe("CEX Vault Integration Scenarios", function () {
+
+    describe("Strategy Loss Handling", function () {
+      it("should handle proportional burns during strategy losses", async function () {
+        // Setup: Normal mint operation
+        await accountControl.connect(reserve).updateBacking(amounts.LARGE_CAP);
+        await accountControl.connect(reserve).mintTBTC(user.address, ethers.utils.parseEther("0.01"));
+
+        // Give reserve tokens to burn
+        await mockBank.mint(reserve.address, amounts.SMALL_MINT);
+
+        const initialMinted = await accountControl.minted(reserve.address);
+
+        // Simulate strategy loss: burn 50% of tokens without accounting update
+        const burnAmount = amounts.SMALL_MINT;
+        await accountControl.connect(reserve).burnTokens(burnAmount);
+
+        // Verify: tokens burned, accounting unchanged (for loss absorption)
+        expect(await mockBank.balanceOf(reserve.address)).to.equal(0);
+        expect(await accountControl.minted(reserve.address)).to.equal(initialMinted); // No change
+
+        // Later: Adjust accounting when loss is confirmed
+        await accountControl.connect(reserve).debitMinted(burnAmount);
+        expect(await accountControl.minted(reserve.address)).to.equal(initialMinted.sub(burnAmount));
+      });
+
+      it("should maintain system invariants during complex loss scenarios", async function () {
+        await accountControl.connect(reserve).updateBacking(amounts.LARGE_CAP);
+
+        // 1. Normal minting
+        await accountControl.connect(reserve).mintTBTC(user.address, ethers.utils.parseEther("0.01"));
+        await mockBank.mint(reserve.address, amounts.SMALL_MINT);
+
+        // 2. Strategy detects potential loss - preemptively burn tokens
+        await accountControl.connect(reserve).burnTokens(amounts.SMALL_MINT);
+
+        // 3. Loss confirmed - update accounting
+        await accountControl.connect(reserve).debitMinted(amounts.SMALL_MINT);
+
+        // 4. Strategy recovers - mint back without full accounting (gradual recovery)
+        const partialRecovery = amounts.SMALL_MINT / 2;
+        await accountControl.connect(reserve).mintTokens(user.address, partialRecovery);
+
+        // Verify system state consistency
+        const finalMinted = await accountControl.minted(reserve.address);
+        const finalTotalMinted = await accountControl.totalMintedAmount();
+        const userBalance = await mockBank.balanceOf(user.address);
+
+        // Invariants should hold
+        expect(finalTotalMinted).to.be.gte(0);
+        expect(finalMinted).to.be.lte(await accountControl.backing(reserve.address));
+      });
     });
 
-    describe("Atomic operations (safer alternatives)", function () {
-        it("atomicMint should combine token minting and accounting", async function () {
-            const amount = amounts.SMALL_MINT;
+    describe("Recovery Scenarios", function () {
+      it("should support gradual recovery from losses", async function () {
+        // Setup loss state
+        await accountControl.connect(reserve).updateBacking(amounts.LARGE_CAP);
+        await accountControl.connect(reserve).mintTBTC(user.address, ethers.utils.parseEther("0.01"));
+        await mockBank.mint(reserve.address, amounts.MEDIUM_CAP);
 
-            // Atomic mint (no sequence validation)
-            await expect(accountControl.connect(reserve).atomicMint(user.address, amount))
-                .to.emit(accountControl, "MintExecuted")
-                .withArgs(reserve.address, user.address, amount);
+        // Simulate 75% loss
+        const lossAmount = (amounts.SMALL_MINT * 3) / 4;
+        await accountControl.connect(reserve).burnTokens(lossAmount);
+        await accountControl.connect(reserve).debitMinted(lossAmount);
 
-            // Check both tokens and accounting were updated
-            expect(await mockBank.balanceOf(user.address)).to.equal(amount);
-            expect(await accountControl.minted(reserve.address)).to.equal(amount);
-        });
+        // Recovery: gradually mint back as strategy recovers
+        const recoverySteps = 5;
+        const stepAmount = Math.floor(lossAmount / recoverySteps);
 
+        for (let i = 0; i < recoverySteps; i++) {
+          await accountControl.connect(reserve).mintTokens(user.address, stepAmount);
+          await accountControl.connect(reserve).creditMinted(stepAmount);
 
-        it("atomic operations should not have sequence validation", async function () {
-            const amount = amounts.SMALL_MINT;
+          // Verify consistency at each step
+          const currentMinted = await accountControl.minted(reserve.address);
+          const currentBacking = await accountControl.backing(reserve.address);
+          expect(currentMinted).to.be.lte(currentBacking);
+        }
+      });
+    });
+  });
 
-            // Two atomic operations in sequence should both succeed
-            await accountControl.connect(reserve).atomicMint(user.address, amount);
-            await accountControl.connect(reserve).atomicMint(user.address, amount);
+  describe("Security & Edge Cases", function () {
 
-            expect(await mockBank.balanceOf(user.address)).to.equal(amount.mul(2));
-        });
+    describe("Authorization", function () {
+      it("should require authorization for all separated operations", async function () {
+        await expect(
+          accountControl.connect(user).mintTokens(user.address, amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
+
+        await expect(
+          accountControl.connect(user).burnTokens(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
+
+        await expect(
+          accountControl.connect(user).creditMinted(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
+
+        await expect(
+          accountControl.connect(user).debitMinted(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
+      });
     });
 
+    describe("State Consistency", function () {
+      it("should maintain backing invariant across operations", async function () {
+        // Setup backing
+        await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP);
 
-    describe("Integration with existing functionality", function () {
-        it("should maintain backing invariant across separated operations", async function () {
-            const amount = amounts.SMALL_MINT;
+        // Credit accounting beyond backing should work (for loss scenarios)
+        await accountControl.connect(reserve).creditMinted(amounts.LARGE_CAP);
 
-            // Pure operations that should maintain invariant
-            await accountControl.connect(reserve).mintTokens(user.address, amount);
-            await ethers.provider.send("evm_mine", []);
-            await accountControl.connect(reserve).creditMinted(amount);
+        // But minting tokens beyond backing should fail
+        await expect(
+          accountControl.connect(reserve).mintTokens(user.address, amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
+      });
 
-            // Backing should still be >= minted
-            const backing = await accountControl.backing(reserve.address);
-            const minted = await accountControl.minted(reserve.address);
-            expect(backing).to.be.gte(minted);
-        });
-
-        it("should maintain compatibility with original mint function", async function () {
-            const amount = amounts.SMALL_MINT;
-
-            // Original mint function should still work
-            await expect(accountControl.connect(reserve).mint(user.address, amount))
-                .to.emit(accountControl, "MintExecuted")
-                .withArgs(reserve.address, user.address, amount);
-
-            // Both tokens and accounting should be updated
-            expect(await mockBank.balanceOf(user.address)).to.equal(amount);
-            expect(await accountControl.minted(reserve.address)).to.equal(amount);
-        });
+      it("should handle zero amounts", async function () {
+        // All functions should handle zero amounts gracefully
+        await expect(accountControl.connect(reserve).mintTokens(user.address, 0)).to.not.be.reverted;
+        await expect(accountControl.connect(reserve).burnTokens(0)).to.not.be.reverted;
+        await expect(accountControl.connect(reserve).creditMinted(0)).to.not.be.reverted;
+        await expect(accountControl.connect(reserve).debitMinted(0)).to.not.be.reverted;
+      });
     });
+
+    describe("Pausing", function () {
+      it("should respect pause state for all operations", async function () {
+        await accountControl.connect(owner).pauseReserve(reserve.address);
+
+        await expect(
+          accountControl.connect(reserve).mintTokens(user.address, amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
+
+        await expect(
+          accountControl.connect(reserve).burnTokens(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
+
+        await expect(
+          accountControl.connect(reserve).creditMinted(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
+
+        await expect(
+          accountControl.connect(reserve).debitMinted(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
+      });
+    });
+  });
 });

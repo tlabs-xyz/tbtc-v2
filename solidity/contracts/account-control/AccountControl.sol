@@ -364,8 +364,10 @@ contract AccountControl is
             revert AmountTooLarge(amount, MAX_SINGLE_MINT);
         }
 
-        // Update accounting to enforce caps and track minted amount
-        _creditMintedInternal(msg.sender, amount);
+        // Check backing invariant - CRITICAL for security
+        if (backing[msg.sender] < minted[msg.sender] + amount) {
+            revert InsufficientBacking(backing[msg.sender], minted[msg.sender] + amount);
+        }
 
         // Pure token minting via Bank
         IBank(bank).mint(recipient, amount);
@@ -373,19 +375,6 @@ contract AccountControl is
         emit PureTokenMint(msg.sender, recipient, amount);
     }
 
-    /// @notice Original mint function for backward compatibility
-    /// @dev Combines token minting and accounting updates
-    /// @param recipient Address to receive minted tokens
-    /// @param amount Amount to mint in satoshis
-    function mint(address recipient, uint256 amount)
-        external
-        onlyAuthorizedReserve
-        nonReentrant
-        returns (bool)
-    {
-        _mintInternal(msg.sender, recipient, amount);
-        return true;
-    }
 
     /// @notice Pure token burning without accounting updates
     /// @dev Burns tokens from caller's balance without updating minted[reserve]
@@ -395,7 +384,6 @@ contract AccountControl is
         onlyAuthorizedReserve
         nonReentrant
     {
-
         // Pure token burning via Bank - burn from the caller (reserve)
         IBank(bank).burnFrom(msg.sender, amount);
 
@@ -478,7 +466,6 @@ contract AccountControl is
 
         return true;
     }
-
     // ========== INTERNAL HELPERS FOR SEPARATED OPERATIONS ==========
 
     function _mintTokensInternal(address recipient, uint256 amount) internal {
@@ -739,6 +726,7 @@ contract AccountControl is
 
         return true;
     }
+
 
 
     // ========== PAUSE FUNCTIONALITY ==========

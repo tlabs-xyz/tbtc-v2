@@ -107,7 +107,7 @@ contract MockReserve is Ownable {
         totalUserBalances += amount;
 
         // AccountControl checks backing >= minted + amount
-        accountControl.mint(recipient, amount);
+        accountControl.atomicMint(recipient, amount);
 
         emit TokensMinted(recipient, amount);
     }
@@ -138,7 +138,7 @@ contract MockReserve is Ownable {
         // Batch mint through AccountControl if it supports it
         // For now, we'll do individual mints as AccountControl may not have batch yet
         for (uint256 i = 0; i < recipients.length; i++) {
-            accountControl.mint(recipients[i], amounts[i]);
+            accountControl.atomicMint(recipients[i], amounts[i]);
         }
 
         emit BatchMintExecuted(total, recipients.length);
