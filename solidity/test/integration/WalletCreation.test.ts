@@ -8,6 +8,14 @@ import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import type { Bridge, IRandomBeacon, WalletRegistry } from "../../typechain"
 
 import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
+import { TestMockFactory } from "../fixtures/mock-factory"
+import {
   performEcdsaDkg,
   updateWalletRegistryDkgResultChallengePeriodLength,
 } from "./utils/ecdsa-wallet-registry"
@@ -31,7 +39,8 @@ describeFn("Integration Test - Wallet Creation", async () => {
   let bridge: Bridge
   let walletRegistry: WalletRegistry
   let randomBeacon: FakeContract<IRandomBeacon>
-  let governance: SignerWithAddress
+  let signers: TestSigners
+  let mockFactory: TestMockFactory
 
   const dkgResultChallengePeriodLength = 10
 
@@ -41,16 +50,31 @@ describeFn("Integration Test - Wallet Creation", async () => {
   const walletPubKeyHash = ecdsaWalletTestData.pubKeyHash160
 
   before(async () => {
-    ;({ governance, bridge, walletRegistry, randomBeacon } =
-      await waffle.loadFixture(fixture))
+    signers = await setupTestSigners()
+    mockFactory = new TestMockFactory()
+
+    const baseEnv = await createBaseTestEnvironment()
+    bridge = baseEnv.bridge
+    walletRegistry = baseEnv.walletRegistry
+    randomBeacon = baseEnv.randomBeacon
 
     // Update only the parameters that are crucial for this test.
     await updateWalletRegistryDkgResultChallengePeriodLength(
       hre,
       walletRegistry,
-      governance,
+      signers.governance,
       dkgResultChallengePeriodLength
     )
+  })
+
+  beforeEach(async () => {
+    await createBaseTestEnvironment()
+    mockFactory.applyStandardIntegrationBehavior()
+  })
+
+  afterEach(async () => {
+    await restoreBaseTestEnvironment()
+    mockFactory.resetAllMocks()
   })
 
   describe("new wallet creation (happy path)", async () => {

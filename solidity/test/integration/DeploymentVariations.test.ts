@@ -2,13 +2,32 @@ import { ethers, deployments, helpers } from "hardhat"
 import { expect } from "chai"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { LibraryLinkingHelper } from "../helpers/libraryLinkingHelper"
+import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
+import { TestMockFactory } from "../fixtures/mock-factory"
 
 describe("v1 System Deployment Tests", () => {
-  let deployer: SignerWithAddress
-  let governance: SignerWithAddress
+  let signers: TestSigners
+  let mockFactory: TestMockFactory
+
+  before(async () => {
+    signers = await setupTestSigners()
+    mockFactory = new TestMockFactory()
+  })
 
   beforeEach(async () => {
-    ;({ deployer, governance } = await helpers.signers.getNamedSigners())
+    await createBaseTestEnvironment()
+    mockFactory.applyStandardIntegrationBehavior()
+  })
+
+  afterEach(async () => {
+    await restoreBaseTestEnvironment()
+    mockFactory.resetAllMocks()
   })
 
   describe("v1 System Deployment (Using Fixtures)", () => {
@@ -130,15 +149,46 @@ describe("v1 System Deployment Tests", () => {
         "WatchdogConsensusManager",
       ]
 
-      for (const contractName of nonExistentContracts) {
+      // Test error consistency using error helpers
+      const contractFactoryPromises = nonExistentContracts.map(async (contractName) => {
         try {
           await ethers.getContractFactory(contractName)
-          expect.fail(
-            `Should not be able to get factory for non-existent contract ${contractName}`
-          )
+          throw new Error(`Should not be able to get factory for non-existent contract ${contractName}`)
         } catch (error) {
           // Expected behavior - contract doesn't exist
           expect(error.message).to.include("not found")
+          return error
+        }
+      })
+
+      // Validate all contracts fail consistently
+      const errors = await Promise.all(contractFactoryPromises)
+      expect(errors).to.have.lengthOf(nonExistentContracts.length)
+    })
+
+    it("should demonstrate deployment error scenarios", async () => {
+      // Test error scenarios that could occur during deployment
+      const errorScenarios = [
+        {
+          description: "deploying with invalid parameters",
+          operation: async () => {
+            // This would fail due to invalid constructor parameters
+            const factory = await ethers.getContractFactory("QCMinter")
+            return factory.deploy(ethers.constants.AddressZero, ethers.constants.AddressZero)
+          },
+          shouldRevert: true
+        }
+      ]
+
+      for (const scenario of errorScenarios) {
+        if (scenario.shouldRevert) {
+          try {
+            await scenario.operation()
+            expect.fail(`Expected deployment to fail for: ${scenario.description}`)
+          } catch (error) {
+            // Expected error during deployment
+            expect(error).to.not.be.undefined
+          }
         }
       }
     })

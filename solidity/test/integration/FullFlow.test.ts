@@ -17,6 +17,15 @@ import type {
   BridgeGovernance,
 } from "../../typechain"
 import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
+import { TestMockFactory } from "../fixtures/mock-factory"
+import { integrationProfiler, setStandardBaselines, profileCrossContractFlow } from "../helpers/performance-helpers"
+import {
   performEcdsaDkg,
   updateWalletRegistryDkgResultChallengePeriodLength,
 } from "./utils/ecdsa-wallet-registry"
@@ -48,43 +57,56 @@ describeFn("Integration Test - Full flow", async () => {
   let walletRegistry: WalletRegistry
   let randomBeacon: FakeContract<IRandomBeacon>
   let relay: FakeContract<IRelay>
-  let deployer: SignerWithAddress
-  let governance: SignerWithAddress
-  let spvMaintainer: SignerWithAddress
+  let signers: TestSigners
+  let mockFactory: TestMockFactory
 
   const dkgResultChallengePeriodLength = 10
 
   before(async () => {
-    ;({
-      deployer,
-      governance,
-      spvMaintainer,
-      tbtc,
-      bridge,
-      bank,
-      tbtcVault,
-      walletRegistry,
-      relay,
-      randomBeacon,
-      bridgeGovernance,
-    } = await waffle.loadFixture(fixture))
+    signers = await setupTestSigners()
+    mockFactory = new TestMockFactory()
+
+    // Set up performance baselines
+    setStandardBaselines()
+    integrationProfiler.startSession()
+
+    const baseEnv = await createBaseTestEnvironment()
+    tbtc = baseEnv.tbtc
+    bridge = baseEnv.bridge
+    bridgeGovernance = baseEnv.bridgeGovernance
+    bank = baseEnv.bank
+    tbtcVault = baseEnv.tbtcVault
+    walletRegistry = baseEnv.walletRegistry
+    relay = baseEnv.relay
+    randomBeacon = baseEnv.randomBeacon
+
     // Update only the parameters that are crucial for this test.
     await updateWalletRegistryDkgResultChallengePeriodLength(
       hre,
       walletRegistry,
-      governance,
+      signers.governance,
       dkgResultChallengePeriodLength
     )
 
     // Disable the reveal ahead period since refund locktimes are fixed
     // within transactions used in this test suite.
     await bridgeGovernance
-      .connect(governance)
+      .connect(signers.governance)
       .beginDepositRevealAheadPeriodUpdate(0)
     await increaseTime(constants.governanceDelay)
     await bridgeGovernance
-      .connect(governance)
+      .connect(signers.governance)
       .finalizeDepositRevealAheadPeriodUpdate()
+  })
+
+  beforeEach(async () => {
+    await createBaseTestEnvironment()
+    mockFactory.applyStandardIntegrationBehavior()
+  })
+
+  afterEach(async () => {
+    await restoreBaseTestEnvironment()
+    mockFactory.resetAllMocks()
   })
 
   describe("Check deposit and redemption flow", async () => {
@@ -107,6 +129,7 @@ describeFn("Integration Test - Full flow", async () => {
           txOutputValue: 0,
         }
         const requestNewWalletTx = await bridge.requestNewWallet(NO_MAIN_UTXO)
+        await integrationProfiler.profileTransaction("Bridge.requestNewWallet", requestNewWalletTx)
 
         await produceRelayEntry(walletRegistry, randomBeacon)
         await performEcdsaDkg(

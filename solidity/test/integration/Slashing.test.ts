@@ -23,6 +23,14 @@ import type {
 } from "../../typechain"
 
 import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
+import { TestMockFactory } from "../fixtures/mock-factory"
+import {
   Operators,
   performEcdsaDkg,
   produceOperatorInactivityClaim,
@@ -57,46 +65,55 @@ describeFn("Integration Test - Slashing", async () => {
   let walletRegistry: WalletRegistry
   let randomBeacon: FakeContract<IRandomBeacon>
   let relay: FakeContract<IRelay>
-  let deployer: SignerWithAddress
-  let governance: SignerWithAddress
-  let spvMaintainer: SignerWithAddress
+  let signers: TestSigners
+  let mockFactory: TestMockFactory
   let thirdParty: SignerWithAddress
 
   const dkgResultChallengePeriodLength = 10
 
   before(async () => {
-    ;({
-      deployer,
-      governance,
-      spvMaintainer,
-      tbtc,
-      bridge,
-      tbtcVault,
-      staking,
-      walletRegistry,
-      relay,
-      randomBeacon,
-      bridgeGovernance,
-    } = await waffle.loadFixture(fixture))
+    signers = await setupTestSigners()
+    mockFactory = new TestMockFactory()
+
+    const baseEnv = await createBaseTestEnvironment()
+    tbtc = baseEnv.tbtc
+    bridge = baseEnv.bridge
+    bridgeGovernance = baseEnv.bridgeGovernance
+    tbtcVault = baseEnv.tbtcVault
+    walletRegistry = baseEnv.walletRegistry
+    relay = baseEnv.relay
+    randomBeacon = baseEnv.randomBeacon
+
+    // Get additional signers
     ;[thirdParty] = await helpers.signers.getUnnamedSigners()
 
     // Update only the parameters that are crucial for this test.
     await updateWalletRegistryDkgResultChallengePeriodLength(
       hre,
       walletRegistry,
-      governance,
+      signers.governance,
       dkgResultChallengePeriodLength
     )
 
     // Disable the reveal ahead period since refund locktimes are fixed
     // within transactions used in this test suite.
     await bridgeGovernance
-      .connect(governance)
+      .connect(signers.governance)
       .beginDepositRevealAheadPeriodUpdate(0)
     await increaseTime(constants.governanceDelay)
     await bridgeGovernance
-      .connect(governance)
+      .connect(signers.governance)
       .finalizeDepositRevealAheadPeriodUpdate()
+  })
+
+  beforeEach(async () => {
+    await createBaseTestEnvironment()
+    mockFactory.applyStandardIntegrationBehavior()
+  })
+
+  afterEach(async () => {
+    await restoreBaseTestEnvironment()
+    mockFactory.resetAllMocks()
   })
 
   describe("notifyFraudChallengeDefeatTimeout", async () => {
