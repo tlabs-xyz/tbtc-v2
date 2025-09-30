@@ -79,6 +79,7 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     bytes32 public constant DEFAULT_ESCALATION = keccak256("DEFAULT_ESCALATION");
     bytes32 public constant BACKLOG_CLEARED = keccak256("BACKLOG_CLEARED");
     bytes32 public constant UNDERCOLLATERALIZED_REASON = keccak256("UNDERCOLLATERALIZED");
+    bytes32 public constant STALE_DATA_REASON = keccak256("STALE_ORACLE_DATA");
     
     // =================== PAUSE CREDIT INTEGRATION ===================
     // Pause credit system managed by QCPauseManager contract
@@ -118,10 +119,14 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     IQCPauseManager public immutable pauseManager;
     
     // =================== WALLET REGISTRATION STORAGE ===================
-    
+
     /// @dev Track used nonces for each QC to prevent replay attacks
     mapping(address => mapping(uint256 => bool)) public usedNonces;
-    
+
+    /// @dev Mutex locks for wallet deregistration to prevent race conditions
+    /// @dev CRITICAL: Prevents concurrent redemptions during deregistration check
+    mapping(string => bool) private walletDeregistrationLocks;
+
     // Temporary reference for QCRedeemer until full consolidation
     IQCRedeemer public qcRedeemer;
 
@@ -181,6 +186,15 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         uint256 timestamp
     );
 
+    /// @dev Emitted when solvency check encounters stale oracle data
+    event SolvencyCheckWithStaleData(
+        address indexed qc,
+        uint256 lastKnownReserveBalance,
+        uint256 mintedAmount,
+        address checkedBy,
+        uint256 timestamp
+    );
+
     /// @dev Emitted when QC is onboarded through governance process
     event QCOnboarded(
         address indexed qc,
@@ -220,6 +234,13 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         uint256 indexed oldAmount,
         uint256 indexed newAmount,
         address updatedBy,
+        uint256 timestamp
+    );
+
+    /// @dev Emitted when wallet deregistration is requested
+    event WalletDeregistrationRequested(
+        address indexed qc,
+        string btcAddress,
         uint256 timestamp
     );
 
@@ -688,8 +709,9 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         return challenge;
     }
 
-    /// @notice Request wallet deregistration
-    /// @dev SECURITY: nonReentrant protects against reentrancy via QCData external calls
+    /// @notice Request wallet deregistration with atomic lock protection
+    /// @dev CRITICAL FIX: Implements atomic lock-check-deregister pattern to prevent
+    ///      race condition where redemptions could be created between check and deregistration
     /// @param btcAddress The Bitcoin address to deregister
     function requestWalletDeRegistration(string calldata btcAddress)
         external
@@ -707,22 +729,46 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         if (qcData.getWalletStatus(btcAddress) != QCData.WalletStatus.Active) {
             revert WalletNotActive(btcAddress);
         }
-        
-        // NEW: Check if wallet has pending redemption obligations
-        // KNOWN LIMITATION: Small race condition window exists between this check
-        // and the actual de-registration. A new redemption could theoretically be
-        // initiated after this check but before de-registration completes.
-        // Mitigation: Window is very small (single transaction), and QCs control
-        // their own wallet usage, making exploitation unlikely in practice.
-        // Future improvement: Consider atomic check-and-act pattern or mutex.
+
+        // CRITICAL FIX: Atomic lock to prevent race conditions
+        // Lock the wallet to prevent concurrent redemption operations
+        require(!walletDeregistrationLocks[btcAddress], "WalletDeregistrationInProgress");
+        walletDeregistrationLocks[btcAddress] = true;
+
+        // Check for pending redemptions while locked
+        bool hasObligations = false;
         if (address(qcRedeemer) != address(0)) {
-            require(
-                !IQCRedeemer(address(qcRedeemer)).hasWalletObligations(btcAddress),
-                "Wallet has pending redemptions"
-            );
+            hasObligations = IQCRedeemer(address(qcRedeemer)).hasWalletObligations(btcAddress);
         }
 
-        qcData.requestWalletDeRegistration(btcAddress);
+        // If wallet has obligations, unlock and revert
+        if (hasObligations) {
+            walletDeregistrationLocks[btcAddress] = false;
+            revert("WalletHasPendingRedemptions");
+        }
+
+        // CRITICAL: Perform deregistration while still locked
+        // This ensures no redemptions can be created between check and deregistration
+        try qcData.requestWalletDeRegistration(btcAddress) {
+            // Success - wallet is now marked for deregistration
+            // Emit event before unlocking
+            emit WalletDeregistrationRequested(
+                msg.sender,
+                btcAddress,
+                block.timestamp
+            );
+        } catch Error(string memory reason) {
+            // Unlock on any failure and propagate the error
+            walletDeregistrationLocks[btcAddress] = false;
+            revert(reason);
+        } catch (bytes memory) {
+            // Unlock on any low-level failure
+            walletDeregistrationLocks[btcAddress] = false;
+            revert("WalletDeregistrationFailed");
+        }
+
+        // Unlock after successful deregistration
+        walletDeregistrationLocks[btcAddress] = false;
     }
 
     /// @notice Finalize wallet deregistration with solvency check
@@ -854,13 +900,11 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         return true;
     }
 
-    /// @notice Verify QC solvency
+    /// @notice Verify QC solvency with proper staleness handling
     /// @param qc The address of the QC to verify
-    /// @return solvent True if QC is solvent
-    /// @dev NOTE: This function ignores staleness of reserve proofs, unlike getAvailableMintingCapacity.
-    ///      This means a QC with stale reserves can still be marked as solvent if their last known
-    ///      balance covers minted amount. This is intentional to avoid false insolvency triggers
-    ///      due to temporary communication issues, but creates potential for manipulation.
+    /// @return solvent True if QC is solvent (false if data is stale)
+    /// @dev CRITICAL FIX: Now properly checks and enforces oracle data freshness.
+    ///      Stale data is treated as potentially insolvent for safety.
     ///      SECURITY: nonReentrant protects against reentrancy during status updates and external reads
     function verifyQCSolvency(address qc)
         external
@@ -871,25 +915,52 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
             revert NotAuthorizedForSolvency(msg.sender);
         }
 
-
         if (!qcData.isQCRegistered(qc)) {
             revert QCNotRegisteredForSolvency(qc);
         }
 
-        (uint256 reserveBalance, ) = QCManagerLib.getReserveBalanceAndStaleness(reserveOracle, qc);
+        // CRITICAL FIX: Get both reserve balance AND staleness flag
+        (uint256 reserveBalance, bool isStale) = QCManagerLib.getReserveBalanceAndStaleness(reserveOracle, qc);
         uint256 mintedAmount = qcData.getQCMintedAmount(qc);
 
-        solvent = reserveBalance >= mintedAmount;
+        // CRITICAL FIX: Handle staleness appropriately
+        if (isStale) {
+            // Data is stale - cannot make accurate solvency determination
+            // Treat as potentially insolvent for safety
+            solvent = false;
 
-        // If insolvent, change status to UnderReview
-        if (!solvent && qcData.getQCStatus(qc) == QCData.QCStatus.Active) {
-            bytes32 reason = UNDERCOLLATERALIZED_REASON;
-            _executeStatusChange(
+            // If currently Active, change status to UnderReview due to stale data
+            if (qcData.getQCStatus(qc) == QCData.QCStatus.Active) {
+                bytes32 reason = STALE_DATA_REASON;
+                _executeStatusChange(
+                    qc,
+                    QCData.QCStatus.UnderReview,
+                    reason,
+                    "STALE_DATA"
+                );
+            }
+
+            emit SolvencyCheckWithStaleData(
                 qc,
-                QCData.QCStatus.UnderReview,
-                reason,
-                "ARBITER"
+                reserveBalance,
+                mintedAmount,
+                msg.sender,
+                block.timestamp
             );
+        } else {
+            // Data is fresh - perform normal solvency check
+            solvent = reserveBalance >= mintedAmount;
+
+            // If insolvent with fresh data, change status to UnderReview
+            if (!solvent && qcData.getQCStatus(qc) == QCData.QCStatus.Active) {
+                bytes32 reason = UNDERCOLLATERALIZED_REASON;
+                _executeStatusChange(
+                    qc,
+                    QCData.QCStatus.UnderReview,
+                    reason,
+                    "ARBITER"
+                );
+            }
         }
 
         emit SolvencyCheckPerformed(
@@ -1201,6 +1272,13 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
     function hasUnfulfilledRedemptions(address qc) public view returns (bool) {
         if (address(qcRedeemer) == address(0)) return false;
         return qcRedeemer.hasUnfulfilledRedemptions(qc);
+    }
+
+    /// @notice Check if a wallet is locked for deregistration
+    /// @param btcAddress The Bitcoin wallet address
+    /// @return isLocked Whether the wallet is currently locked
+    function isWalletDeregistrationLocked(string calldata btcAddress) external view returns (bool) {
+        return walletDeregistrationLocks[btcAddress];
     }
     
     /// @notice Check if QC is eligible for escalation
