@@ -21,7 +21,30 @@ import type {
  * Common fixture for tests suites targeting the Bridge contract.
  */
 export default async function bridgeFixture() {
-  await deployments.fixture()
+  // Deploy all necessary fixtures including test dependencies
+  await deployments.fixture([
+    "TBTC", 
+    "VendingMachine", 
+    "TransferVendingMachineRoles",
+    "TBTCVault", 
+    "WalletRegistry", 
+    "ReimbursementPool", 
+    "LightRelay", 
+    "Bank", 
+    "Bridge", 
+    "BankUpdateBridge", 
+    "BridgeGovernance", 
+    "RedemptionWatchtower", 
+    "MaintainerProxy", 
+    "Timelock", 
+    "TransferBankOwnership", 
+    "AuthorizeSpvMaintainer",
+    "AuthorizeTBTCVault",
+    "AuthorizeMaintainerProxyInBridge",
+    "AuthorizeBridgeInReimbursementPool",
+    "TransferBridgeGovernance",
+    "BridgeGovernanceOwnership"
+  ])
 
   const {
     deployer,
@@ -46,9 +69,11 @@ export default async function bridgeFixture() {
 
   const bank: Bank & BankStub = await helpers.contracts.getContract("Bank")
 
-  const bridge: Bridge & BridgeStub = await helpers.contracts.getContract(
-    "Bridge"
-  )
+  // When TEST_USE_STUBS_TBTC is true, the Bridge proxy points to BridgeStub implementation
+  // We need to get the contract with the correct type
+  const bridge: Bridge & BridgeStub = process.env.TEST_USE_STUBS_TBTC === "true"
+    ? await ethers.getContractAt("BridgeStub", (await deployments.get("Bridge")).address) as Bridge & BridgeStub
+    : await helpers.contracts.getContract("Bridge")
 
   const bridgeGovernance: BridgeGovernance =
     await helpers.contracts.getContract("BridgeGovernance")
@@ -74,7 +99,8 @@ export default async function bridgeFixture() {
     address: await (await bridge.contractReferences()).relay,
   })
 
-  await bank.connect(governance).updateBridge(bridge.address)
+  // Bridge is already updated in Bank via deployment scripts
+  // await bank.connect(governance).updateBridge(bridge.address)
 
   const redemptionWatchtower: RedemptionWatchtower =
     await helpers.contracts.getContract("RedemptionWatchtower")
