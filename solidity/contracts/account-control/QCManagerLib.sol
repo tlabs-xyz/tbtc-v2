@@ -562,7 +562,8 @@ library QCManagerLib {
 
     /**
      * @notice Comprehensive wallet registration validation
-     * @dev Performs all validation checks for wallet registration
+     * @dev Performs all validation checks for wallet registration.
+     *      Reverts directly with custom errors on validation failure.
      * @param qcData QCData contract instance
      * @param qc The QC address
      * @param btcAddress The Bitcoin address to register
@@ -571,8 +572,6 @@ library QCManagerLib {
      * @param v Recovery ID from signature
      * @param r First 32 bytes of signature
      * @param s Last 32 bytes of signature
-     * @return success True if all validations pass
-     * @return errorCode Error code if validation fails (for event emission)
      */
     function validateWalletRegistrationFull(
         QCData qcData,
@@ -583,30 +582,30 @@ library QCManagerLib {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external view returns (bool success, string memory errorCode) {
+    ) external view {
         // Check address length
         if (bytes(btcAddress).length == 0) {
-            return (false, "INVALID_ADDR");
+            revert QCManagerErrors.InvalidWalletAddress();
         }
 
         // Check QC registration
         if (!qcData.isQCRegistered(qc)) {
-            return (false, "QC_NOT_REG");
+            revert QCManagerErrors.QCNotRegistered(qc);
         }
 
         // Check QC status
         if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
-            return (false, "QC_INACTIVE");
+            revert QCManagerErrors.QCNotActive(qc);
         }
 
         // Validate Bitcoin address format
         if (!isValidBitcoinAddress(btcAddress)) {
-            return (false, "BAD_ADDR");
+            revert QCManagerErrors.InvalidWalletAddress();
         }
 
         // Verify Bitcoin signature
         if (!verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
-            return (false, "SIG_FAIL");
+            revert QCManagerErrors.SignatureVerificationFailed();
         }
 
         // CRITICAL SECURITY FIX: Verify that the public key corresponds to the claimed Bitcoin address
@@ -614,15 +613,14 @@ library QCManagerLib {
         // and claims ownership of any Bitcoin address
         string memory derivedAddress = deriveBitcoinAddressFromPublicKey(walletPublicKey);
         if (keccak256(bytes(derivedAddress)) != keccak256(bytes(btcAddress))) {
-            return (false, "ADDR_MISMATCH");
+            revert QCManagerErrors.SignatureVerificationFailed();
         }
-
-        return (true, "");
     }
 
     /**
      * @notice Validate direct wallet registration by QC
-     * @dev Validates direct registration with challenge generation
+     * @dev Validates direct registration with challenge generation.
+     *      Reverts directly with custom errors on validation failure.
      * @param qcData QCData contract instance
      * @param qc The QC address (msg.sender)
      * @param btcAddress The Bitcoin address to register
@@ -631,9 +629,7 @@ library QCManagerLib {
      * @param v Recovery ID from signature
      * @param r First 32 bytes of signature
      * @param s Last 32 bytes of signature
-     * @return success True if all validations pass
      * @return challenge The generated challenge
-     * @return errorCode Error code if validation fails
      */
     function validateDirectWalletRegistration(
         QCData qcData,
@@ -645,18 +641,18 @@ library QCManagerLib {
         bytes32 r,
         bytes32 s,
         uint256 /* chainId */
-    ) external view returns (bool success, bytes32 challenge, string memory errorCode) {
+    ) external view returns (bytes32 challenge) {
         // Check QC registration and status
         if (!qcData.isQCRegistered(qc)) {
-            return (false, bytes32(0), "QC_NOT_REG");
+            revert QCManagerErrors.QCNotRegistered(qc);
         }
         if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
-            return (false, bytes32(0), "QC_INACTIVE");
+            revert QCManagerErrors.QCNotActive(qc);
         }
 
         // Check address length
         if (bytes(btcAddress).length == 0) {
-            return (false, bytes32(0), "INVALID_ADDR");
+            revert QCManagerErrors.InvalidWalletAddress();
         }
 
         // Generate deterministic challenge
@@ -672,12 +668,12 @@ library QCManagerLib {
 
         // Validate Bitcoin address format
         if (!isValidBitcoinAddress(btcAddress)) {
-            return (false, challenge, "BAD_ADDR_DIRECT");
+            revert QCManagerErrors.InvalidWalletAddress();
         }
 
         // Verify Bitcoin signature
         if (!verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
-            return (false, challenge, "SIG_FAIL_DIRECT");
+            revert QCManagerErrors.SignatureVerificationFailed();
         }
 
         // CRITICAL SECURITY FIX: Verify that the public key corresponds to the claimed Bitcoin address
@@ -685,10 +681,10 @@ library QCManagerLib {
         // and claims ownership of any Bitcoin address
         string memory derivedAddress = deriveBitcoinAddressFromPublicKey(walletPublicKey);
         if (keccak256(bytes(derivedAddress)) != keccak256(bytes(btcAddress))) {
-            return (false, challenge, "ADDR_MISMATCH_DIRECT");
+            revert QCManagerErrors.SignatureVerificationFailed();
         }
 
-        return (true, challenge, "");
+        return challenge;
     }
 
     function syncAccountControlWithStatus(
@@ -733,43 +729,6 @@ library QCManagerLib {
         return currentStatus;
     }
 
-    /**
-     * @notice Handle registration error by converting error codes to appropriate reverts
-     * @dev Consolidates error handling for both registerWallet and registerWalletDirect
-     * @param errorCode The error code returned by validation functions
-     * @param qc The QC address for context-specific errors
-     */
-    function handleRegistrationError(string memory errorCode, address qc) external pure {
-        bytes32 errorHash = keccak256(bytes(errorCode));
-        
-        // Address validation errors
-        if (errorHash == keccak256("INVALID_ADDR") ||
-            errorHash == keccak256("BAD_ADDR") ||
-            errorHash == keccak256("BAD_ADDR_DIRECT")) {
-            revert QCManagerErrors.InvalidWalletAddress();
-        }
-        
-        // QC registration errors
-        if (errorHash == keccak256("QC_NOT_REG")) {
-            revert QCManagerErrors.QCNotRegistered(qc);
-        }
-        
-        // QC status errors  
-        if (errorHash == keccak256("QC_INACTIVE")) {
-            revert QCManagerErrors.QCNotActive(qc);
-        }
-        
-        // Signature verification errors
-        if (errorHash == keccak256("SIG_FAIL") ||
-            errorHash == keccak256("SIG_FAIL_DIRECT") ||
-            errorHash == keccak256("ADDR_MISMATCH") ||
-            errorHash == keccak256("ADDR_MISMATCH_DIRECT")) {
-            revert QCManagerErrors.SignatureVerificationFailed();
-        }
-        
-        // Generic fallback for unknown errors
-        revert("Validation failed");
-    }
 }
 
 interface IAccountControl {

@@ -231,14 +231,6 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         uint256 previousReserveBalance
     );
 
-    /// @dev Emitted when wallet registration fails
-    event WalletRegistrationFailed(
-        address indexed qc,
-        string btcAddress,
-        string reason,
-        address attemptedBy
-    );
-    
     // =================== STATE MANAGEMENT EVENTS ===================
     
     event QCSelfPaused(
@@ -566,8 +558,8 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         onlyWhenNotPaused("wallet_reg")
         nonReentrant
     {
-        // Use library for comprehensive validation
-        (bool success, string memory errorCode) = QCManagerLib.validateWalletRegistrationFull(
+        // Validate wallet registration - will revert on failure
+        QCManagerLib.validateWalletRegistrationFull(
             qcData,
             qc,
             btcAddress,
@@ -577,17 +569,6 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
             r,
             s
         );
-
-        if (!success) {
-            emit WalletRegistrationFailed(
-                qc,
-                btcAddress,
-                errorCode,
-                msg.sender
-            );
-            // Delegate error handling to library
-            QCManagerLib.handleRegistrationError(errorCode, qc);
-        }
 
         qcData.registerWallet(qc, btcAddress);
 
@@ -625,8 +606,8 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
         onlyWhenNotPaused("wallet_reg")
         nonReentrant
     {
-        // Use library for comprehensive validation and challenge generation
-        (bool success, bytes32 challenge, string memory errorCode) = QCManagerLib.validateDirectWalletRegistration(
+        // Validate and generate challenge - will revert on failure
+        bytes32 challenge = QCManagerLib.validateDirectWalletRegistration(
             qcData,
             msg.sender,
             btcAddress,
@@ -637,17 +618,6 @@ contract QCManager is AccessControl, ReentrancyGuard, QCManagerErrors {
             s,
             block.chainid
         );
-
-        if (!success) {
-            emit WalletRegistrationFailed(
-                msg.sender,
-                btcAddress,
-                errorCode,
-                msg.sender
-            );
-            // Delegate error handling to library
-            QCManagerLib.handleRegistrationError(errorCode, msg.sender);
-        }
 
         // Check and mark nonce as used to prevent replay
         if (usedNonces[msg.sender][nonce]) {
