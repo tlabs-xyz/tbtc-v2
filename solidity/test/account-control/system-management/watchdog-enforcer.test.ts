@@ -1,6 +1,5 @@
 import chai, { expect } from "chai"
-import { ethers, helpers } from "hardhat"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
+import { ethers } from "hardhat"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 
 import {
@@ -10,17 +9,18 @@ import {
   QCData,
   SystemState,
 } from "../../../typechain"
+import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
 chai.use(smock.matchers)
 
-const { createSnapshot, restoreSnapshot } = helpers.snapshot
-
 describe("WatchdogEnforcer", () => {
-  let deployer: SignerWithAddress
-  let watchdog: SignerWithAddress
-  let qcAddress: SignerWithAddress
-  let randomUser: SignerWithAddress
-
+  let signers: TestSigners
   let watchdogEnforcer: WatchdogEnforcer
   let mockReserveOracle: FakeContract<ReserveOracle>
   let mockQcManager: FakeContract<QCManager>
@@ -41,12 +41,7 @@ describe("WatchdogEnforcer", () => {
   const minCollateralRatio = 100 // 100% = 1:1 ratio
 
   before(async () => {
-    const [deployerSigner, watchdogSigner, qcAddressSigner, randomUserSigner] =
-      await ethers.getSigners()
-    deployer = deployerSigner
-    watchdog = watchdogSigner
-    qcAddress = qcAddressSigner
-    randomUser = randomUserSigner
+    signers = await setupTestSigners()
 
     // Generate role hashes
     DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
@@ -58,7 +53,7 @@ describe("WatchdogEnforcer", () => {
   })
 
   beforeEach(async () => {
-    await createSnapshot()
+    await createBaseTestEnvironment()
 
     // Create mock contracts
     mockReserveOracle = await smock.fake<ReserveOracle>("ReserveOracle")
@@ -88,7 +83,7 @@ describe("WatchdogEnforcer", () => {
   })
 
   afterEach(async () => {
-    await restoreSnapshot()
+    await restoreBaseTestEnvironment()
   })
 
   describe("Deployment", () => {
@@ -106,9 +101,9 @@ describe("WatchdogEnforcer", () => {
     it("should grant deployer necessary roles", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
       expect(
-        await watchdogEnforcer.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)
+        await watchdogEnforcer.hasRole(DEFAULT_ADMIN_ROLE, signers.deployer.address)
       ).to.be.true
-      expect(await watchdogEnforcer.hasRole(ENFORCEMENT_ROLE, deployer.address))
+      expect(await watchdogEnforcer.hasRole(ENFORCEMENT_ROLE, signers.deployer.address))
         .to.be.true
     })
 
@@ -138,14 +133,14 @@ describe("WatchdogEnforcer", () => {
           ) // Undercollateralized
 
           tx = await watchdogEnforcer.enforceObjectiveViolation(
-            qcAddress.address,
+            signers.qcAddress.address,
             INSUFFICIENT_RESERVES
           )
         })
 
         it("should call requestStatusChange on QCManager", async () => {
           expect(mockQcManager.requestStatusChange).to.have.been.calledWith(
-            qcAddress.address,
+            signers.qcAddress.address,
             3, // UnderReview
             INSUFFICIENT_RESERVES
           )
@@ -156,9 +151,9 @@ describe("WatchdogEnforcer", () => {
           await expect(tx)
             .to.emit(watchdogEnforcer, "ObjectiveViolationEnforced")
             .withArgs(
-              qcAddress.address,
+              signers.qcAddress.address,
               INSUFFICIENT_RESERVES,
-              deployer.address,
+              signers.deployer.address,
               currentBlock.timestamp
             )
         })
@@ -167,9 +162,9 @@ describe("WatchdogEnforcer", () => {
           await expect(tx)
             .to.emit(watchdogEnforcer, "EnforcementAttempted")
             .withArgs(
-              qcAddress.address,
+              signers.qcAddress.address,
               INSUFFICIENT_RESERVES,
-              deployer.address,
+              signers.deployer.address,
               true,
               ""
             )
@@ -189,7 +184,7 @@ describe("WatchdogEnforcer", () => {
         it("should revert with ViolationNotFound", async () => {
           await expect(
             watchdogEnforcer.enforceObjectiveViolation(
-              qcAddress.address,
+              signers.qcAddress.address,
               INSUFFICIENT_RESERVES
             )
           ).to.be.revertedWith("ViolationNotFound")
@@ -213,7 +208,7 @@ describe("WatchdogEnforcer", () => {
         it("should revert when checking insufficient reserves", async () => {
           await expect(
             watchdogEnforcer.enforceObjectiveViolation(
-              qcAddress.address,
+              signers.qcAddress.address,
               INSUFFICIENT_RESERVES
             )
           ).to.be.revertedWith("ViolationNotFound")
@@ -238,14 +233,14 @@ describe("WatchdogEnforcer", () => {
           ])
 
           tx = await watchdogEnforcer.enforceObjectiveViolation(
-            qcAddress.address,
+            signers.qcAddress.address,
             STALE_ATTESTATIONS
           )
         })
 
         it("should call requestStatusChange on QCManager", async () => {
           expect(mockQcManager.requestStatusChange).to.have.been.calledWith(
-            qcAddress.address,
+            signers.qcAddress.address,
             3, // UnderReview
             STALE_ATTESTATIONS
           )
@@ -256,9 +251,9 @@ describe("WatchdogEnforcer", () => {
           await expect(tx)
             .to.emit(watchdogEnforcer, "ObjectiveViolationEnforced")
             .withArgs(
-              qcAddress.address,
+              signers.qcAddress.address,
               STALE_ATTESTATIONS,
-              deployer.address,
+              signers.deployer.address,
               currentBlock.timestamp
             )
         })
@@ -276,7 +271,7 @@ describe("WatchdogEnforcer", () => {
         it("should revert with ViolationNotFound", async () => {
           await expect(
             watchdogEnforcer.enforceObjectiveViolation(
-              qcAddress.address,
+              signers.qcAddress.address,
               STALE_ATTESTATIONS
             )
           ).to.be.revertedWith("ViolationNotFound")
@@ -289,7 +284,7 @@ describe("WatchdogEnforcer", () => {
         const invalidReason = ethers.utils.id("INVALID_REASON")
         await expect(
           watchdogEnforcer.enforceObjectiveViolation(
-            qcAddress.address,
+            signers.qcAddress.address,
             invalidReason
           )
         ).to.be.revertedWith("NotObjectiveViolation")
@@ -306,8 +301,8 @@ describe("WatchdogEnforcer", () => {
 
         await expect(
           watchdogEnforcer
-            .connect(watchdog)
-            .enforceObjectiveViolation(qcAddress.address, STALE_ATTESTATIONS)
+            .connect(signers.watchdog)
+            .enforceObjectiveViolation(signers.qcAddress.address, STALE_ATTESTATIONS)
         ).to.not.be.reverted
       })
 
@@ -321,7 +316,7 @@ describe("WatchdogEnforcer", () => {
         await expect(
           watchdogEnforcer
             .connect(randomUser)
-            .enforceObjectiveViolation(qcAddress.address, STALE_ATTESTATIONS)
+            .enforceObjectiveViolation(signers.qcAddress.address, STALE_ATTESTATIONS)
         ).to.not.be.reverted
       })
     })
@@ -341,7 +336,7 @@ describe("WatchdogEnforcer", () => {
         // Should execute without reentrancy issues
         await expect(
           watchdogEnforcer.enforceObjectiveViolation(
-            qcAddress.address,
+            signers.qcAddress.address,
             STALE_ATTESTATIONS
           )
         ).to.not.be.reverted
@@ -362,7 +357,7 @@ describe("WatchdogEnforcer", () => {
         mockQcData.getQCMintedAmount.returns(ethers.utils.parseEther("10"))
 
         const [violated, reason] = await watchdogEnforcer.checkViolation(
-          qcAddress.address,
+          signers.qcAddress.address,
           INSUFFICIENT_RESERVES
         )
 
@@ -378,7 +373,7 @@ describe("WatchdogEnforcer", () => {
         mockQcData.getQCMintedAmount.returns(ethers.utils.parseEther("10"))
 
         const [violated, reason] = await watchdogEnforcer.checkViolation(
-          qcAddress.address,
+          signers.qcAddress.address,
           INSUFFICIENT_RESERVES
         )
 
@@ -393,7 +388,7 @@ describe("WatchdogEnforcer", () => {
         ])
 
         const [violated, reason] = await watchdogEnforcer.checkViolation(
-          qcAddress.address,
+          signers.qcAddress.address,
           INSUFFICIENT_RESERVES
         )
 
@@ -412,7 +407,7 @@ describe("WatchdogEnforcer", () => {
         ])
 
         const [violated, reason] = await watchdogEnforcer.checkViolation(
-          qcAddress.address,
+          signers.qcAddress.address,
           STALE_ATTESTATIONS
         )
 
@@ -427,7 +422,7 @@ describe("WatchdogEnforcer", () => {
         ])
 
         const [violated, reason] = await watchdogEnforcer.checkViolation(
-          qcAddress.address,
+          signers.qcAddress.address,
           STALE_ATTESTATIONS
         )
 
@@ -440,7 +435,7 @@ describe("WatchdogEnforcer", () => {
       it("should return false with appropriate message", async () => {
         const invalidReason = ethers.utils.id("INVALID_REASON")
         const [violated, reason] = await watchdogEnforcer.checkViolation(
-          qcAddress.address,
+          signers.qcAddress.address,
           invalidReason
         )
 
@@ -556,7 +551,7 @@ describe("WatchdogEnforcer", () => {
         mockQcData.getQCMintedAmount.returns(ethers.utils.parseEther("10"))
 
         let [violated] = await watchdogEnforcer.checkViolation(
-          qcAddress.address,
+          signers.qcAddress.address,
           INSUFFICIENT_RESERVES
         )
         expect(violated).to.be.false
@@ -566,7 +561,7 @@ describe("WatchdogEnforcer", () => {
 
         // Now the same QC is undercollateralized
         ;[violated] = await watchdogEnforcer.checkViolation(
-          qcAddress.address,
+          signers.qcAddress.address,
           INSUFFICIENT_RESERVES
         )
         expect(violated).to.be.true
@@ -584,12 +579,12 @@ describe("WatchdogEnforcer", () => {
 
         // Enforce stale attestations
         await watchdogEnforcer.enforceObjectiveViolation(
-          qcAddress.address,
+          signers.qcAddress.address,
           STALE_ATTESTATIONS
         )
 
         expect(mockQcManager.requestStatusChange).to.have.been.calledWith(
-          qcAddress.address,
+          signers.qcAddress.address,
           3,
           STALE_ATTESTATIONS
         )
@@ -597,7 +592,7 @@ describe("WatchdogEnforcer", () => {
         // Cannot enforce insufficient reserves when data is stale
         await expect(
           watchdogEnforcer.enforceObjectiveViolation(
-            qcAddress.address,
+            signers.qcAddress.address,
             INSUFFICIENT_RESERVES
           )
         ).to.be.revertedWith("ViolationNotFound")

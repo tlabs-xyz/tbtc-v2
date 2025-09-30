@@ -1,18 +1,19 @@
 import { expect } from "chai"
-import { ethers, helpers } from "hardhat"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
+import { ethers } from "hardhat"
 import { SystemState } from "../../../typechain"
-
-const { createSnapshot, restoreSnapshot } = helpers.snapshot
+import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
 describe("SystemState [unit][smoke]", () => {
-  let deployer: SignerWithAddress
-  let governance: SignerWithAddress
-  let pauserAccount: SignerWithAddress
-  let adminAccount: SignerWithAddress
-  let thirdParty: SignerWithAddress
-
+  let signers: TestSigners
   let systemState: SystemState
+  let pauserAccount: any
+  let adminAccount: any
 
   // Roles
   let EMERGENCY_ROLE: string
@@ -25,18 +26,11 @@ describe("SystemState [unit][smoke]", () => {
   const testStaleThreshold = 3600 // 1 hour
 
   before(async () => {
-    const [
-      deployerSigner,
-      governanceSigner,
-      pauserAccountSigner,
-      adminAccountSigner,
-      thirdPartySigner,
-    ] = await ethers.getSigners()
-    deployer = deployerSigner
-    governance = governanceSigner
-    pauserAccount = pauserAccountSigner
-    adminAccount = adminAccountSigner
-    thirdParty = thirdPartySigner
+    signers = await setupTestSigners()
+
+    // Use watchdog and liquidator as pauser and admin accounts
+    pauserAccount = signers.watchdog
+    adminAccount = signers.liquidator
 
     // Generate role hashes
     EMERGENCY_ROLE = ethers.utils.id("EMERGENCY_ROLE")
@@ -44,7 +38,7 @@ describe("SystemState [unit][smoke]", () => {
   })
 
   beforeEach(async () => {
-    await createSnapshot()
+    await createBaseTestEnvironment()
 
     // Deploy SystemState
     const SystemStateFactory = await ethers.getContractFactory("SystemState")
@@ -57,17 +51,17 @@ describe("SystemState [unit][smoke]", () => {
   })
 
   afterEach(async () => {
-    await restoreSnapshot()
+    await restoreBaseTestEnvironment()
   })
 
   describe("Deployment [unit][smoke]", () => {
     it("should grant deployer all roles", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-      expect(await systemState.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to
+      expect(await systemState.hasRole(DEFAULT_ADMIN_ROLE, signers.deployer.address)).to
         .be.true
-      expect(await systemState.hasRole(EMERGENCY_ROLE, deployer.address)).to.be
+      expect(await systemState.hasRole(EMERGENCY_ROLE, signers.deployer.address)).to.be
         .true
-      expect(await systemState.hasRole(OPERATIONS_ROLE, deployer.address)).to.be
+      expect(await systemState.hasRole(OPERATIONS_ROLE, signers.deployer.address)).to.be
         .true
     })
 
@@ -240,25 +234,25 @@ describe("SystemState [unit][smoke]", () => {
     context("when called by non-pauser", () => {
       it("should revert for pauseMinting", async () => {
         await expect(
-          systemState.connect(thirdParty).pauseMinting()
+          systemState.connect(signers.thirdParty).pauseMinting()
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
         )
       })
 
       it("should revert for pauseRedemption", async () => {
         await expect(
-          systemState.connect(thirdParty).pauseRedemption()
+          systemState.connect(signers.thirdParty).pauseRedemption()
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
         )
       })
 
       it("should revert for pauseWalletRegistration", async () => {
         await expect(
-          systemState.connect(thirdParty).pauseWalletRegistration()
+          systemState.connect(signers.thirdParty).pauseWalletRegistration()
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
         )
       })
     })
@@ -462,7 +456,7 @@ describe("SystemState [unit][smoke]", () => {
           )
           await expect(tx)
             .to.emit(systemState, "EmergencyCouncilUpdated")
-            .withArgs(oldCouncil, newCouncil.address, deployer.address)
+            .withArgs(oldCouncil, newCouncil.address, signers.deployer.address)
         })
 
         it("should grant EMERGENCY_ROLE to new council", async () => {
@@ -520,43 +514,43 @@ describe("SystemState [unit][smoke]", () => {
     context("when called by non-parameter admin", () => {
       it("should revert for setMinMintAmount", async () => {
         await expect(
-          systemState.connect(thirdParty).setMinMintAmount(testMinMintAmount)
+          systemState.connect(signers.thirdParty).setMinMintAmount(testMinMintAmount)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
 
       it("should revert for setMaxMintAmount", async () => {
         await expect(
-          systemState.connect(thirdParty).setMaxMintAmount(testMaxMintAmount)
+          systemState.connect(signers.thirdParty).setMaxMintAmount(testMaxMintAmount)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
 
       it("should revert for setRedemptionTimeout", async () => {
         await expect(
           systemState
-            .connect(thirdParty)
+            .connect(signers.thirdParty)
             .setRedemptionTimeout(testRedemptionTimeout)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
 
       it("should revert for setStaleThreshold", async () => {
         await expect(
-          systemState.connect(thirdParty).setStaleThreshold(testStaleThreshold)
+          systemState.connect(signers.thirdParty).setStaleThreshold(testStaleThreshold)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
 
       it("should revert for setEmergencyPauseDuration", async () => {
         await expect(
-          systemState.connect(thirdParty).setEmergencyPauseDuration(86400)
+          systemState.connect(signers.thirdParty).setEmergencyPauseDuration(86400)
         ).to.be.revertedWith(
-          `AccessControl: account ${thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
+          `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
       })
     })
@@ -609,25 +603,25 @@ describe("SystemState [unit][smoke]", () => {
   describe("Access Control [validation]", () => {
     context("role management", () => {
       it("should allow admin to grant pauser role", async () => {
-        await systemState.grantRole(EMERGENCY_ROLE, thirdParty.address)
+        await systemState.grantRole(EMERGENCY_ROLE, signers.thirdParty.address)
 
-        expect(await systemState.hasRole(EMERGENCY_ROLE, thirdParty.address)).to
+        expect(await systemState.hasRole(EMERGENCY_ROLE, signers.thirdParty.address)).to
           .be.true
 
         // Third party should now be able to pause
-        await systemState.connect(thirdParty).pauseMinting()
+        await systemState.connect(signers.thirdParty).pauseMinting()
         expect(await systemState.isMintingPaused()).to.be.true
       })
 
       it("should allow admin to grant parameter admin role", async () => {
-        await systemState.grantRole(OPERATIONS_ROLE, thirdParty.address)
+        await systemState.grantRole(OPERATIONS_ROLE, signers.thirdParty.address)
 
-        expect(await systemState.hasRole(OPERATIONS_ROLE, thirdParty.address))
+        expect(await systemState.hasRole(OPERATIONS_ROLE, signers.thirdParty.address))
           .to.be.true
 
         // Third party should now be able to set parameters
         await systemState
-          .connect(thirdParty)
+          .connect(signers.thirdParty)
           .setMinMintAmount(testMinMintAmount)
         expect(await systemState.minMintAmount()).to.equal(testMinMintAmount)
       })
@@ -777,7 +771,7 @@ describe("SystemState [unit][smoke]", () => {
         ).to.emit(systemState, "EmergencyPauseDurationUpdated")
 
         await expect(
-          systemState.connect(deployer).setEmergencyCouncil(thirdParty.address)
+          systemState.connect(deployer).setEmergencyCouncil(signers.thirdParty.address)
         ).to.emit(systemState, "EmergencyCouncilUpdated")
       })
     })
@@ -789,7 +783,7 @@ describe("SystemState [unit][smoke]", () => {
     let invalidQC: string
 
     beforeEach(async () => {
-      testQC = governance.address // Use governance address as test QC
+      testQC = signers.governance.address // Use governance address as test QC
       testReason = ethers.utils.id("INSUFFICIENT_COLLATERAL")
       invalidQC = ethers.constants.AddressZero
     })
@@ -905,7 +899,7 @@ describe("SystemState [unit][smoke]", () => {
       context("when called by non-pauser", () => {
         it("should revert with access control error", async () => {
           await expect(
-            systemState.connect(thirdParty).emergencyPauseQC(testQC, testReason)
+            systemState.connect(signers.thirdParty).emergencyPauseQC(testQC, testReason)
           ).to.be.revertedWith("AccessControl: account")
         })
       })
@@ -994,7 +988,7 @@ describe("SystemState [unit][smoke]", () => {
       context("when called by non-pauser", () => {
         it("should revert with access control error", async () => {
           await expect(
-            systemState.connect(thirdParty).emergencyUnpauseQC(testQC)
+            systemState.connect(signers.thirdParty).emergencyUnpauseQC(testQC)
           ).to.be.revertedWith("AccessControl: account")
         })
       })
@@ -1165,7 +1159,7 @@ describe("SystemState [unit][smoke]", () => {
 
         it("should prevent unauthorized unpause", async () => {
           await expect(
-            systemState.connect(thirdParty).emergencyUnpauseQC(testQC)
+            systemState.connect(signers.thirdParty).emergencyUnpauseQC(testQC)
           ).to.be.revertedWith("AccessControl: account")
         })
       })
