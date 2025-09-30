@@ -1,8 +1,14 @@
 import chai, { expect } from "chai"
 import { ethers } from "hardhat"
-import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers"
-
 import type { QCRedeemerSPV, TestRelay, SPVState } from "../../../typechain"
+import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  setupRelayForTesting,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 import { deploySPVLibraries } from "../../helpers/spvLibraryHelpers"
 import { ValidMainnetProof } from "../../data/bitcoin/spv/valid-spv-proofs"
 
@@ -13,8 +19,7 @@ import { ValidMainnetProof } from "../../data/bitcoin/spv/valid-spv-proofs"
  * Tests SPV validation for Bitcoin redemption payments across different address formats
  */
 describe("SPV Payment Verification", () => {
-  let deployer: HardhatEthersSigner
-  let user: HardhatEthersSigner
+  let signers: TestSigners
 
   let qcRedeemerSPV: QCRedeemerSPV
   let testRelay: TestRelay
@@ -29,9 +34,7 @@ describe("SPV Payment Verification", () => {
   }
 
   before(async () => {
-    const [deployerSigner, userSigner] = await ethers.getSigners()
-    deployer = deployerSigner
-    user = userSigner
+    signers = await setupTestSigners()
 
     // Deploy test dependencies
     const TestRelay = await ethers.getContractFactory("TestRelay")
@@ -58,9 +61,16 @@ describe("SPV Payment Verification", () => {
       1 // txProofDifficultyFactor for testing
     )
 
-    // Set up test relay with reasonable difficulties
-    await testRelay.setCurrentEpochDifficulty(1000)
-    await testRelay.setPrevEpochDifficulty(900)
+    // Set up test relay using standardized helper
+    await setupRelayForTesting(testRelay, 1000)
+  })
+
+  beforeEach(async () => {
+    await createBaseTestEnvironment()
+  })
+
+  afterEach(async () => {
+    await restoreBaseTestEnvironment()
   })
 
   describe("verifyRedemptionPayment", () => {

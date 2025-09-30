@@ -1,11 +1,18 @@
 import { ethers } from "hardhat"
 import { expect } from "chai"
-import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers"
 import type {
   QCRedeemerSPVTest,
   TestRelay,
   SharedSPVCore,
-} from "../../typechain"
+} from "../../../typechain"
+import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  setupRelayForTesting,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 import { deploySPVLibraries } from "../../helpers/spvLibraryHelpers"
 
 /**
@@ -14,7 +21,7 @@ import { deploySPVLibraries } from "../../helpers/spvLibraryHelpers"
  * Verifies the SharedSPVCore refactoring works correctly end-to-end
  */
 describe("SPV Libraries Integration", () => {
-  let deployer: HardhatEthersSigner
+  let signers: TestSigners
   let qcRedeemerSPVTest: QCRedeemerSPVTest
   let testRelay: TestRelay
   let sharedSPVCore: SharedSPVCore

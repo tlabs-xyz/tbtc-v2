@@ -1,7 +1,5 @@
 import { expect } from "chai"
 import { ethers } from "hardhat"
-import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-
 import type {
   QCManager,
   QCRedeemer,
@@ -12,7 +10,15 @@ import type {
   TestRelay,
   ReserveOracle,
   MockAccountControl,
-} from "../../typechain"
+} from "../../../typechain"
+import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  setupRelayForTesting,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
 /**
  * Security Tests for SPV Implementation
@@ -26,10 +32,7 @@ import type {
  * 6. Headers chain manipulation attacks
  */
 describe("SPV Security Tests [security]", () => {
-  let deployer: SignerWithAddress
-  let attacker: SignerWithAddress
-  let qc: SignerWithAddress
-  let user: SignerWithAddress
+  let signers: TestSigners
 
   let qcManager: QCManager
   let qcRedeemer: QCRedeemer
@@ -56,8 +59,7 @@ describe("SPV Security Tests [security]", () => {
   }
 
   before(async () => {
-    const signers = await ethers.getSigners()
-    ;[deployer, attacker, qc, user] = signers
+    signers = await setupTestSigners()
 
     // Deploy test contracts
     const MockTBTC = await ethers.getContractFactory("MockTBTCToken")
@@ -65,6 +67,7 @@ describe("SPV Security Tests [security]", () => {
 
     const TestRelay = await ethers.getContractFactory("TestRelay")
     testRelay = await TestRelay.deploy()
+    await setupRelayForTesting(testRelay)
 
     const QCData = await ethers.getContractFactory("QCData")
     qcData = await QCData.deploy()
@@ -154,9 +157,9 @@ describe("SPV Security Tests [security]", () => {
     console.log("MockAccountControl set (tests will focus on SPV validation)")
 
     // Setup tokens
-    await tbtcToken.mint(user.address, testAmount.mul(10))
+    await tbtcToken.mint(signers.user.address, testAmount.mul(10))
     await tbtcToken
-      .connect(user)
+      .connect(signers.user)
       .approve(qcRedeemer.address, testAmount.mul(10))
 
     // Setup MockAccountControl with sufficient minted amount for redemptions

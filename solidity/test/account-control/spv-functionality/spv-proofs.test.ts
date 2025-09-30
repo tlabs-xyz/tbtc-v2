@@ -1,8 +1,14 @@
 import chai, { expect } from "chai"
 import { ethers } from "hardhat"
-import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers"
-
 import type { QCRedeemerSPV, TestRelay, SPVState } from "../../../typechain"
+import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  setupRelayForTesting,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 import { deploySPVLibraries } from "../../helpers/spvLibraryHelpers"
 import SPVTestHelpers from "../SPVTestHelpers"
 import { ValidMainnetProof, P2PKHWalletControlProof, ComplexMultiInputTx } from "../../data/bitcoin/spv/valid-spv-proofs"
@@ -14,17 +20,14 @@ import { ValidMainnetProof, P2PKHWalletControlProof, ComplexMultiInputTx } from 
  * Tests core SPV proof validation against different Bitcoin transaction types
  */
 describe("SPV Proof Validation", () => {
-  let deployer: HardhatEthersSigner
-  let user: HardhatEthersSigner
+  let signers: TestSigners
 
   let qcRedeemerSPV: QCRedeemerSPV
   let testRelay: TestRelay
   let spvState: SPVState
 
   before(async () => {
-    const [deployerSigner, userSigner] = await ethers.getSigners()
-    deployer = deployerSigner
-    user = userSigner
+    signers = await setupTestSigners()
 
     // Deploy test dependencies
     const TestRelay = await ethers.getContractFactory("TestRelay")

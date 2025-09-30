@@ -1,6 +1,5 @@
 import chai, { expect } from "chai"
-import { ethers, helpers } from "hardhat"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
+import { ethers } from "hardhat"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 import {
   QCManager,
@@ -8,11 +7,16 @@ import {
   SystemState,
   ReserveOracle,
 } from "../../../typechain"
+import {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  TestSigners
+} from "../fixtures/base-setup"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 import { deploySPVLibraries, deployQCManagerLib } from "../../helpers/spvLibraryHelpers"
 
 chai.use(smock.matchers)
-
-const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
 /**
  * SPV Wallet Registration Tests
@@ -21,10 +25,7 @@ const { createSnapshot, restoreSnapshot } = helpers.snapshot
  * Tests SPV signature verification and Bitcoin address validation for wallet registration
  */
 describe("SPV Wallet Registration", () => {
-  let deployer: SignerWithAddress
-  let qc1: SignerWithAddress
-  let qc2: SignerWithAddress
-  let nonQC: SignerWithAddress
+  let signers: TestSigners
 
   let qcManager: QCManager
   let mockQCData: FakeContract<QCData>
@@ -43,16 +44,11 @@ describe("SPV Wallet Registration", () => {
   const mockSignatureS = ethers.utils.formatBytes32String("mock_s_value")
 
   before(async () => {
-    const [deployerSigner, qc1Signer, qc2Signer, nonQCSigner] =
-      await ethers.getSigners()
-    deployer = deployerSigner
-    qc1 = qc1Signer
-    qc2 = qc2Signer
-    nonQC = nonQCSigner
+    signers = await setupTestSigners()
   })
 
   beforeEach(async () => {
-    await createSnapshot()
+    await createBaseTestEnvironment()
 
     // Create mock contracts
     mockQCData = await smock.fake<QCData>("QCData")
@@ -66,9 +62,9 @@ describe("SPV Wallet Registration", () => {
     const QCPauseManagerFactory = await ethers.getContractFactory("QCPauseManager")
     const pauseManager = await QCPauseManagerFactory.deploy(
       mockQCData.address,
-      deployer.address, // Temporary QCManager address
-      deployer.address, // Admin
-      deployer.address  // Emergency role
+      signers.deployer.address, // Temporary QCManager address
+      signers.deployer.address, // Admin
+      signers.deployer.address  // Emergency role
     )
     await pauseManager.deployed()
 
@@ -90,19 +86,19 @@ describe("SPV Wallet Registration", () => {
     mockSystemState.isFunctionPaused.returns(false)
 
     // Setup QC1 as registered and active
-    mockQCData.isQCRegistered.whenCalledWith(qc1.address).returns(true)
-    mockQCData.getQCStatus.whenCalledWith(qc1.address).returns(0) // Active
+    mockQCData.isQCRegistered.whenCalledWith(signers.qcAddress.address).returns(true)
+    mockQCData.getQCStatus.whenCalledWith(signers.qcAddress.address).returns(0) // Active
 
-    // Setup QC2 as registered but paused
-    mockQCData.isQCRegistered.whenCalledWith(qc2.address).returns(true)
-    mockQCData.getQCStatus.whenCalledWith(qc2.address).returns(2) // Paused
+    // Setup user as registered but paused (for testing inactive QC)
+    mockQCData.isQCRegistered.whenCalledWith(signers.user.address).returns(true)
+    mockQCData.getQCStatus.whenCalledWith(signers.user.address).returns(2) // Paused
 
-    // NonQC is not registered
-    mockQCData.isQCRegistered.whenCalledWith(nonQC.address).returns(false)
+    // Third party is not registered
+    mockQCData.isQCRegistered.whenCalledWith(signers.thirdParty.address).returns(false)
   })
 
   afterEach(async () => {
-    await restoreSnapshot()
+    await restoreBaseTestEnvironment()
   })
 
   describe("SPV Signature Verification", () => {
@@ -110,13 +106,13 @@ describe("SPV Wallet Registration", () => {
       it("should reject registration with invalid SPV signature", async () => {
         // Test the SPV signature verification rejection path
         // Calculate expected challenge for SPV verification
-        const chainId = await qc1.getChainId()
+        const chainId = await signers.qcAddress.getChainId()
         const expectedChallenge = ethers.utils.keccak256(
           ethers.utils.solidityPack(
             ["string", "address", "string", "uint256", "uint256"],
             [
               "TBTC_QC_WALLET_DIRECT:",
-              qc1.address,
+              signers.qcAddress.address,
               validBitcoinAddress,
               testNonce,
               chainId,
@@ -127,7 +123,7 @@ describe("SPV Wallet Registration", () => {
         // Using a mock signature that will fail SPV verification
         await expect(
           qcManager
-            .connect(qc1)
+            .connect(signers.qcAddress)
             .registerWalletDirect(
               validBitcoinAddress,
               testNonce,
@@ -139,14 +135,14 @@ describe("SPV Wallet Registration", () => {
         ).to.be.revertedWith("SignatureVerificationFailed")
 
         // Verify the nonce was not consumed due to failed verification
-        const nonceUsed = await qcManager.usedNonces(qc1.address, testNonce)
+        const nonceUsed = await qcManager.usedNonces(signers.qcAddress.address, testNonce)
         expect(nonceUsed).to.be.false // Not used because transaction reverted
       })
 
       it("should handle SPV nonce reuse prevention", async () => {
         // Test SPV nonce validation for preventing replay attacks
         // Check that nonce starts as unused
-        let nonceUsed = await qcManager.usedNonces(qc1.address, testNonce)
+        let nonceUsed = await qcManager.usedNonces(signers.qcAddress.address, testNonce)
         expect(nonceUsed).to.be.false
 
         // In production with valid SPV signatures, successful registration
@@ -158,7 +154,7 @@ describe("SPV Wallet Registration", () => {
         // Test showing the SPV signature validation path exists
         // This requires a valid Bitcoin signature in production
         const tx = qcManager
-          .connect(qc1)
+          .connect(signers.qcAddress)
           .registerWalletDirect(
             validBitcoinAddress,
             testNonce,
@@ -179,7 +175,7 @@ describe("SPV Wallet Registration", () => {
         // Test SPV signature verification with P2PKH address
         await expect(
           qcManager
-            .connect(qc1)
+            .connect(signers.qcAddress)
             .registerWalletDirect(
               validBitcoinAddress, // P2PKH format
               testNonce,
@@ -195,7 +191,7 @@ describe("SPV Wallet Registration", () => {
         // Test SPV signature verification with Bech32 address
         await expect(
           qcManager
-            .connect(qc1)
+            .connect(signers.qcAddress)
             .registerWalletDirect(
               validBech32Address, // Bech32 format
               testNonce + 1, // Different nonce
@@ -211,7 +207,7 @@ describe("SPV Wallet Registration", () => {
 
   describe("SPV Challenge Generation", () => {
     it("should generate deterministic SPV challenges", async () => {
-      const chainId = await qc1.getChainId()
+      const chainId = await signers.qcAddress.getChainId()
 
       // Calculate SPV challenge off-chain (what QC would do)
       const challenge1 = ethers.utils.keccak256(
@@ -219,7 +215,7 @@ describe("SPV Wallet Registration", () => {
           ["string", "address", "string", "uint256", "uint256"],
           [
             "TBTC_QC_WALLET_DIRECT:",
-            qc1.address,
+            signers.qcAddress.address,
             validBitcoinAddress,
             testNonce,
             chainId,
@@ -233,7 +229,7 @@ describe("SPV Wallet Registration", () => {
           ["string", "address", "string", "uint256", "uint256"],
           [
             "TBTC_QC_WALLET_DIRECT:",
-            qc1.address,
+            signers.qcAddress.address,
             validBitcoinAddress,
             testNonce,
             chainId,
@@ -249,7 +245,7 @@ describe("SPV Wallet Registration", () => {
           ["string", "address", "string", "uint256", "uint256"],
           [
             "TBTC_QC_WALLET_DIRECT:",
-            qc1.address,
+            signers.qcAddress.address,
             validBitcoinAddress,
             testNonce + 1,
             chainId,
@@ -261,7 +257,7 @@ describe("SPV Wallet Registration", () => {
     })
 
     it("should include QC address in SPV challenge", async () => {
-      const chainId = await qc1.getChainId()
+      const chainId = await signers.qcAddress.getChainId()
 
       // Different QC should produce different SPV challenge
       const qc1Challenge = ethers.utils.keccak256(
@@ -269,7 +265,7 @@ describe("SPV Wallet Registration", () => {
           ["string", "address", "string", "uint256", "uint256"],
           [
             "TBTC_QC_WALLET_DIRECT:",
-            qc1.address,
+            signers.qcAddress.address,
             validBitcoinAddress,
             testNonce,
             chainId,
@@ -282,7 +278,7 @@ describe("SPV Wallet Registration", () => {
           ["string", "address", "string", "uint256", "uint256"],
           [
             "TBTC_QC_WALLET_DIRECT:",
-            qc2.address,
+            signers.user.address,
             validBitcoinAddress,
             testNonce,
             chainId,
@@ -301,10 +297,10 @@ describe("SPV Wallet Registration", () => {
       const nonce2 = 200
 
       // Both nonces should start as unused for both QCs
-      expect(await qcManager.usedNonces(qc1.address, nonce1)).to.be.false
-      expect(await qcManager.usedNonces(qc1.address, nonce2)).to.be.false
-      expect(await qcManager.usedNonces(qc2.address, nonce1)).to.be.false
-      expect(await qcManager.usedNonces(qc2.address, nonce2)).to.be.false
+      expect(await qcManager.usedNonces(signers.qcAddress.address, nonce1)).to.be.false
+      expect(await qcManager.usedNonces(signers.qcAddress.address, nonce2)).to.be.false
+      expect(await qcManager.usedNonces(signers.user.address, nonce1)).to.be.false
+      expect(await qcManager.usedNonces(signers.user.address, nonce2)).to.be.false
     })
 
     it("should allow different QCs to use the same SPV nonce", async () => {
@@ -312,8 +308,8 @@ describe("SPV Wallet Registration", () => {
       const sharedNonce = 999
 
       // Both QCs should be able to use the same nonce
-      expect(await qcManager.usedNonces(qc1.address, sharedNonce)).to.be.false
-      expect(await qcManager.usedNonces(qc2.address, sharedNonce)).to.be.false
+      expect(await qcManager.usedNonces(signers.qcAddress.address, sharedNonce)).to.be.false
+      expect(await qcManager.usedNonces(signers.user.address, sharedNonce)).to.be.false
 
       // Each QC maintains its own SPV nonce namespace
     })
@@ -326,8 +322,8 @@ describe("SPV Wallet Registration", () => {
       const wallet2 = "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"
 
       // Both nonces should start as unused
-      expect(await qcManager.usedNonces(qc1.address, nonce1)).to.be.false
-      expect(await qcManager.usedNonces(qc1.address, nonce2)).to.be.false
+      expect(await qcManager.usedNonces(signers.qcAddress.address, nonce1)).to.be.false
+      expect(await qcManager.usedNonces(signers.qcAddress.address, nonce2)).to.be.false
 
       // Multiple registrations would succeed with valid SPV signatures
       // Here we're verifying the nonce management structure exists
@@ -339,7 +335,7 @@ describe("SPV Wallet Registration", () => {
       it("should reject SPV wallet registration from non-QC", async () => {
         await expect(
           qcManager
-            .connect(nonQC)
+            .connect(signers.thirdParty)
             .registerWalletDirect(
               validBitcoinAddress,
               testNonce,
@@ -356,7 +352,7 @@ describe("SPV Wallet Registration", () => {
       it("should reject SPV wallet registration from inactive QC", async () => {
         await expect(
           qcManager
-            .connect(qc2) // qc2 is paused
+            .connect(signers.user) // user is paused
             .registerWalletDirect(
               validBitcoinAddress,
               testNonce,
@@ -379,7 +375,7 @@ describe("SPV Wallet Registration", () => {
       it("should reject SPV wallet registration when paused", async () => {
         await expect(
           qcManager
-            .connect(qc1)
+            .connect(signers.qcAddress)
             .registerWalletDirect(
               validBitcoinAddress,
               testNonce,
@@ -398,7 +394,7 @@ describe("SPV Wallet Registration", () => {
       it("should reject SPV registration with empty Bitcoin address", async () => {
         await expect(
           qcManager
-            .connect(qc1)
+            .connect(signers.qcAddress)
             .registerWalletDirect(
               "", // Empty address
               testNonce,
@@ -413,7 +409,7 @@ describe("SPV Wallet Registration", () => {
       it("should reject SPV registration with malformed Bitcoin address", async () => {
         await expect(
           qcManager
-            .connect(qc1)
+            .connect(signers.qcAddress)
             .registerWalletDirect(
               "invalid_bitcoin_address",
               testNonce,
