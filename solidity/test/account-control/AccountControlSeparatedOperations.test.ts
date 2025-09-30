@@ -53,7 +53,7 @@ describe("AccountControl Separated Operations", function () {
         // Don't set backing - should fail
         await expect(
           accountControl.connect(reserve).mint(user.address, amounts.SMALL_MINT)
-        ).to.be.revertedWith("InsufficientBacking");
+        ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
       });
 
       it("should check backing against existing minted amount", async function () {
@@ -65,7 +65,7 @@ describe("AccountControl Separated Operations", function () {
         const remainingBacking = amounts.MEDIUM_CAP - amounts.SMALL_CAP;
         await expect(
           accountControl.connect(reserve).mint(user.address, remainingBacking + 1)
-        ).to.be.revertedWith("InsufficientBacking");
+        ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
       });
 
       it("should emit PureTokenMint event", async function () {
@@ -80,15 +80,18 @@ describe("AccountControl Separated Operations", function () {
       it("should require authorization", async function () {
         await expect(
           accountControl.connect(user).mint(user.address, amounts.SMALL_MINT)
-        ).to.be.revertedWith("UnauthorizedReserve");
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
       });
     });
 
     describe("burn(uint256)", function () {
       beforeEach(async function () {
-        // Setup: give user some tokens first
+        // Setup: give reserve some tokens first via AccountControl
         await accountControl.connect(reserve).updateBacking(amounts.MEDIUM_CAP);
-        await mockBank.mint(reserve.address, amounts.MEDIUM_CAP); // Give reserve tokens to burn
+        await accountControl.connect(reserve).mint(reserve.address, amounts.MEDIUM_CAP); // Give reserve tokens to burn
+
+        // Allow AccountControl to burn reserve's tokens for separated operations
+        await mockBank.connect(reserve).increaseBalanceAllowance(accountControl.address, amounts.MEDIUM_CAP);
       });
 
       it("should burn tokens without updating accounting", async function () {
@@ -98,7 +101,7 @@ describe("AccountControl Separated Operations", function () {
         const initialTotal = await accountControl.totalMintedAmount();
 
         // Call pure burn
-        await accountControl.connect(reserve).burn(amounts.SMALL_MINT);
+        await accountControl.connect(reserve).burnTokens(amounts.SMALL_MINT);
 
         // Verify: tokens burned, accounting unchanged
         expect(await mockBank.balanceOf(reserve.address)).to.equal(amounts.MEDIUM_CAP - amounts.SMALL_MINT);
@@ -108,15 +111,15 @@ describe("AccountControl Separated Operations", function () {
 
       it("should emit PureTokenBurn event", async function () {
         await expect(
-          accountControl.connect(reserve).burn(amounts.SMALL_MINT)
+          accountControl.connect(reserve).burnTokens(amounts.SMALL_MINT)
         ).to.emit(accountControl, "PureTokenBurn")
          .withArgs(reserve.address, amounts.SMALL_MINT);
       });
 
       it("should require authorization", async function () {
         await expect(
-          accountControl.connect(user).burn(amounts.SMALL_MINT)
-        ).to.be.revertedWith("UnauthorizedReserve");
+          accountControl.connect(user).burnTokens(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
       });
     });
   });
@@ -162,7 +165,7 @@ describe("AccountControl Separated Operations", function () {
       it("should require authorization", async function () {
         await expect(
           accountControl.connect(user).creditMinted(amounts.SMALL_MINT)
-        ).to.be.revertedWith("UnauthorizedReserve");
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
       });
     });
 
@@ -200,7 +203,7 @@ describe("AccountControl Separated Operations", function () {
       it("should require authorization", async function () {
         await expect(
           accountControl.connect(user).debitMinted(amounts.SMALL_MINT)
-        ).to.be.revertedWith("UnauthorizedReserve");
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
       });
     });
   });
@@ -287,7 +290,7 @@ describe("AccountControl Separated Operations", function () {
 
         // Simulate strategy loss: burn 50% of tokens without accounting update
         const burnAmount = amounts.SMALL_MINT;
-        await accountControl.connect(reserve).burn(burnAmount);
+        await accountControl.connect(reserve).burnTokens(burnAmount);
 
         // Verify: tokens burned, accounting unchanged (for loss absorption)
         expect(await mockBank.balanceOf(reserve.address)).to.equal(0);
@@ -306,7 +309,7 @@ describe("AccountControl Separated Operations", function () {
         await mockBank.mint(reserve.address, amounts.SMALL_MINT);
 
         // 2. Strategy detects potential loss - preemptively burn tokens
-        await accountControl.connect(reserve).burn(amounts.SMALL_MINT);
+        await accountControl.connect(reserve).burnTokens(amounts.SMALL_MINT);
 
         // 3. Loss confirmed - update accounting
         await accountControl.connect(reserve).debitMinted(amounts.SMALL_MINT);
@@ -335,7 +338,7 @@ describe("AccountControl Separated Operations", function () {
 
         // Simulate 75% loss
         const lossAmount = (amounts.SMALL_MINT * 3) / 4;
-        await accountControl.connect(reserve).burn(lossAmount);
+        await accountControl.connect(reserve).burnTokens(lossAmount);
         await accountControl.connect(reserve).debitMinted(lossAmount);
 
         // Recovery: gradually mint back as strategy recovers
@@ -361,19 +364,19 @@ describe("AccountControl Separated Operations", function () {
       it("should require authorization for all separated operations", async function () {
         await expect(
           accountControl.connect(user).mint(user.address, amounts.SMALL_MINT)
-        ).to.be.revertedWith("UnauthorizedReserve");
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
 
         await expect(
-          accountControl.connect(user).burn(amounts.SMALL_MINT)
-        ).to.be.revertedWith("UnauthorizedReserve");
+          accountControl.connect(user).burnTokens(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
 
         await expect(
           accountControl.connect(user).creditMinted(amounts.SMALL_MINT)
-        ).to.be.revertedWith("UnauthorizedReserve");
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
 
         await expect(
           accountControl.connect(user).debitMinted(amounts.SMALL_MINT)
-        ).to.be.revertedWith("UnauthorizedReserve");
+        ).to.be.revertedWithCustomError(accountControl, "NotAuthorized");
       });
     });
 
@@ -388,13 +391,13 @@ describe("AccountControl Separated Operations", function () {
         // But minting tokens beyond backing should fail
         await expect(
           accountControl.connect(reserve).mint(user.address, amounts.SMALL_MINT)
-        ).to.be.revertedWith("InsufficientBacking");
+        ).to.be.revertedWithCustomError(accountControl, "InsufficientBacking");
       });
 
       it("should handle zero amounts", async function () {
         // All functions should handle zero amounts gracefully
         await expect(accountControl.connect(reserve).mint(user.address, 0)).to.not.be.reverted;
-        await expect(accountControl.connect(reserve).burn(0)).to.not.be.reverted;
+        await expect(accountControl.connect(reserve).burnTokens(0)).to.not.be.reverted;
         await expect(accountControl.connect(reserve).creditMinted(0)).to.not.be.reverted;
         await expect(accountControl.connect(reserve).debitMinted(0)).to.not.be.reverted;
       });
@@ -406,19 +409,19 @@ describe("AccountControl Separated Operations", function () {
 
         await expect(
           accountControl.connect(reserve).mint(user.address, amounts.SMALL_MINT)
-        ).to.be.revertedWith("ReservePaused");
+        ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
 
         await expect(
-          accountControl.connect(reserve).burn(amounts.SMALL_MINT)
-        ).to.be.revertedWith("ReservePaused");
+          accountControl.connect(reserve).burnTokens(amounts.SMALL_MINT)
+        ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
 
         await expect(
           accountControl.connect(reserve).creditMinted(amounts.SMALL_MINT)
-        ).to.be.revertedWith("ReservePaused");
+        ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
 
         await expect(
           accountControl.connect(reserve).debitMinted(amounts.SMALL_MINT)
-        ).to.be.revertedWith("ReservePaused");
+        ).to.be.revertedWithCustomError(accountControl, "ReserveIsPaused");
       });
     });
   });

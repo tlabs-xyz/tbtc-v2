@@ -126,12 +126,6 @@ contract AccountControl is
     // Reserve type events
     event ReserveTypeUpdated(address indexed reserve, ReserveType oldType, ReserveType newType);
 
-    // Separated operations events
-    event PureTokenMint(address indexed reserve, address indexed recipient, uint256 amount);
-    event PureTokenBurn(address indexed reserve, uint256 amount);
-    event AccountingCredit(address indexed reserve, uint256 amount);
-    event AccountingDebit(address indexed reserve, uint256 amount);
-
     // ========== ERRORS ==========
     error InsufficientBacking(uint256 available, uint256 required);
     error ExceedsReserveCap(uint256 requested, uint256 available);
@@ -391,7 +385,23 @@ contract AccountControl is
         nonReentrant
         returns (bool)
     {
-        _mintInternal(msg.sender, recipient, amount);
+        // Validate mint amount bounds
+        if (amount < MIN_MINT_AMOUNT) {
+            revert AmountTooSmall(amount, MIN_MINT_AMOUNT);
+        }
+        if (amount > MAX_SINGLE_MINT) {
+            revert AmountTooLarge(amount, MAX_SINGLE_MINT);
+        }
+
+        // Check backing invariant - CRITICAL for security
+        if (backing[msg.sender] < minted[msg.sender] + amount) {
+            revert InsufficientBacking(backing[msg.sender], minted[msg.sender] + amount);
+        }
+
+        // Pure token minting without accounting updates
+        _mintTokensInternal(recipient, amount);
+
+        emit PureTokenMint(msg.sender, recipient, amount);
         return true;
     }
 
@@ -746,24 +756,6 @@ contract AccountControl is
         return true;
     }
 
-    /// @notice Burn tBTC tokens using separated operations
-    /// @dev This function burns actual tokens AND updates accounting
-    /// @param tbtcAmount Amount in tBTC units (1e18 precision)
-    /// @return success True if burn was successful
-    function burnTBTC(uint256 tbtcAmount)
-        external
-        onlyAuthorizedReserve
-        nonReentrant
-        returns (bool success)
-    {
-        uint256 satoshis = tbtcAmount / SATOSHI_MULTIPLIER;
-
-        // Use separated operations - internal calls
-        _burnTokensInternal(satoshis);           // Pure token operation
-        _debitMintedInternal(msg.sender, satoshis);    // Pure accounting operation
-
-        return true;
-    }
 
 
     // ========== PAUSE FUNCTIONALITY ==========
