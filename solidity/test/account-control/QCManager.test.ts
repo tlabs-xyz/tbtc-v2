@@ -9,8 +9,8 @@ import {
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
-describe("QCManager", () => {
-  describe("Deployment", () => {
+describe("QCManager [unit][smoke]", () => {
+  describe("Deployment [unit][smoke]", () => {
     it("should set correct dependencies", async () => {
       const { qcManager } = await loadFixture(deployQCManagerFixture)
       expect(qcManager.address).to.not.equal(ethers.constants.AddressZero)
@@ -32,7 +32,7 @@ describe("QCManager", () => {
     })
   })
 
-  describe("QC Registration", () => {
+  describe("QC Registration [unit]", () => {
     it("should register QC successfully when called by governance", async () => {
       const fixture = await loadFixture(deployQCManagerFixture)
       const { qcManager, governance, qcAddress, constants } = fixture
@@ -87,7 +87,7 @@ describe("QCManager", () => {
     })
   })
 
-  describe("Minting Capacity Management", () => {
+  describe("Minting Capacity Management [unit]", () => {
     it("should increase minting capacity for registered QC", async () => {
       const fixture = await loadFixture(deployQCManagerFixture)
       const { qcManager, governance, constants } = fixture
@@ -132,7 +132,7 @@ describe("QCManager", () => {
     })
   })
 
-  describe("QC Status Management", () => {
+  describe("QC Status Management [unit]", () => {
     it("should update QC status through valid transitions", async () => {
       const fixture = await loadFixture(deployQCManagerFixture)
       const { qcManager, governance } = fixture
@@ -170,7 +170,7 @@ describe("QCManager", () => {
     })
   })
 
-  describe("Wallet Registration", () => {
+  describe("Wallet Registration [validation]", () => {
     it("should validate Bitcoin address format", async () => {
       const fixture = await loadFixture(deployQCManagerFixture)
       const { qcManager, registrar, constants } = fixture
@@ -249,7 +249,7 @@ describe("QCManager", () => {
     })
   })
 
-  describe("Wallet Ownership Verification", () => {
+  describe("Wallet Ownership Verification [validation]", () => {
     it("should generate challenge for registered QC", async () => {
       const fixture = await loadFixture(deployQCManagerFixture)
       const { qcManager, qcAddress, constants } = fixture
@@ -295,7 +295,7 @@ describe("QCManager", () => {
     })
   })
 
-  describe("Emergency Actions", () => {
+  describe("Emergency Actions [security]", () => {
     it("should allow dispute arbiter to freeze QC operations", async () => {
       const fixture = await loadFixture(deployQCManagerFixture)
       const { qcManager, arbiter } = fixture

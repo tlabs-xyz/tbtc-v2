@@ -11,8 +11,8 @@ import {
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
-describe("QCRedeemer", () => {
-  describe("Deployment", () => {
+describe("QCRedeemer [unit][smoke]", () => {
+  describe("Deployment [unit][smoke]", () => {
     it("should set correct dependencies", async () => {
       const { qcRedeemer } = await loadFixture(deployQCRedeemerFixture)
       expect(qcRedeemer.address).to.not.equal(ethers.constants.AddressZero)
@@ -30,7 +30,7 @@ describe("QCRedeemer", () => {
     })
   })
 
-  describe("Redemption Requests", () => {
+  describe("Redemption Requests [unit]", () => {
     it("should create redemption request with valid parameters", async () => {
       const fixture = await loadFixture(deployQCRedeemerFixture)
       const { qcRedeemer, user, qcAddress, constants } = fixture
@@ -190,31 +190,14 @@ describe("QCRedeemer", () => {
     })
   })
 
-  describe("Redemption Fulfillment", () => {
-    it.skip("should validate SPV proof requirements for redemption fulfillment", async () => {
-      // TODO: Implement proper SPV proof validation
-      // This test requires full SPV implementation including Bitcoin transaction verification
-      const fixture = await loadFixture(deployQCRedeemerFixture)
-      const { qcRedeemer, watchdog, constants } = fixture
-
-      // Create redemption
-      const { redemptionId, amount, btcAddress } = await createTestRedemption(fixture)
-
-      // Get valid SPV data from tBTC test suite
-      const spvData = getValidSpvData()
-
-      // Note: This test verifies the SPV validation framework works properly.
-      // The ValidMainnetProof contains real Bitcoin transaction data that passes
-      // basic SPV validation (merkle proof, headers, difficulty) but doesn't
-      // contain a payment to our specific test btcAddress.
-      // The test expects the payment verification to fail, which demonstrates
-      // that the SPV system is working correctly and rejecting invalid proofs.
-
-      await expect(
-        qcRedeemer
-          .connect(watchdog)
-          .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
-      ).to.be.revertedWithCustomError(qcRedeemer, "RedemptionProofFailed")
+  describe("Redemption Fulfillment [integration]", () => {
+    it.skip("should validate SPV proof requirements for redemption fulfillment - TODO: REQUIRES Bitcoin transaction generation, proper SPV merkle proof builders, valid tBTC transaction outputs that match test addresses, and complete payment verification pipeline", async () => {
+      // IMPLEMENTATION REQUIREMENTS:
+      // 1. Bitcoin transaction generation with actual outputs to test addresses
+      // 2. Proper SPV merkle proof builders that create valid proofs
+      // 3. Bitcoin header chain validation with real difficulty verification
+      // 4. Complete payment verification pipeline for all address formats
+      // 5. Integration with tBTC SPV library validation patterns
     })
 
     it("should prevent fulfillment by non-watchdog", async () => {
@@ -231,39 +214,17 @@ describe("QCRedeemer", () => {
       ).to.be.reverted
     })
 
-    it.skip("should validate SPV proof structure before processing", async () => {
-      // TODO: Implement proper SPV proof validation
-      // This test requires full SPV implementation for structure validation
-      const fixture = await loadFixture(deployQCRedeemerFixture)
-      const { qcRedeemer, watchdog } = fixture
-
-      const { redemptionId, amount, btcAddress } = await createTestRedemption(fixture)
-
-      // Test with valid SPV structure that will fail at payment verification
-      const spvData = getValidSpvData()
-      await expect(
-        qcRedeemer
-          .connect(watchdog)
-          .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
-      ).to.be.revertedWithCustomError(qcRedeemer, "RedemptionProofFailed")
-
-      // Test with invalid SPV structure (empty headers)
-      const invalidSpvData = {
-        ...spvData,
-        proof: {
-          ...spvData.proof,
-          bitcoinHeaders: "0x", // Empty headers should trigger SPV validation error
-        },
-      }
-      await expect(
-        qcRedeemer
-          .connect(watchdog)
-          .recordRedemptionFulfillment(redemptionId, btcAddress, amount, invalidSpvData.txInfo, invalidSpvData.proof)
-      ).to.be.revertedWithCustomError(qcRedeemer, "RedemptionProofFailed")
+    it.skip("should validate SPV proof structure before processing - TODO: REQUIRES Complete SPV structure validation, Bitcoin header chain validation, proper merkle proof format validation, and differentiated error handling for structure vs payment validation failures", async () => {
+      // IMPLEMENTATION REQUIREMENTS:
+      // 1. Complete SPV structure validation (headers, merkle proofs, coinbase proofs)
+      // 2. Bitcoin header chain validation with proper difficulty checking
+      // 3. Proper merkle proof format validation with length and structure checks
+      // 4. Differentiated error handling for structure vs payment validation failures
+      // 5. Edge case testing for malformed proofs, empty headers, invalid lengths
     })
   })
 
-  describe("Redemption Cancellation", () => {
+  describe("Redemption Cancellation [unit]", () => {
     it("should allow dispute arbiter to flag redemption as defaulted", async () => {
       const fixture = await loadFixture(deployQCRedeemerFixture)
       const { qcRedeemer, watchdog } = fixture
@@ -293,36 +254,17 @@ describe("QCRedeemer", () => {
       ).to.be.reverted
     })
 
-    it.skip("should test redemption status validation with SPV proof verification", async () => {
-      // TODO: Implement proper SPV proof validation
-      // This test requires full SPV implementation for status validation
-      const fixture = await loadFixture(deployQCRedeemerFixture)
-      const { qcRedeemer, watchdog } = fixture
-
-      const { redemptionId, amount, btcAddress } = await createTestRedemption(fixture)
-
-      // Test that SPV validation runs but fails at payment verification
-      // This confirms the SPV proof structure is processed correctly
-      const spvData = getValidSpvData()
-      await expect(
-        qcRedeemer
-          .connect(watchdog)
-          .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
-      ).to.be.revertedWithCustomError(qcRedeemer, "RedemptionProofFailed")
-
-      // Verify redemption is still pending (not fulfilled due to failed proof)
-      const redemption = await qcRedeemer.redemptions(redemptionId)
-      expect(redemption.status).to.equal(1) // RedemptionStatus.Pending
-
-      // Should be able to flag as defaulted since it's still pending
-      const reason = ethers.utils.id("test_default_reason")
-      await expect(
-        qcRedeemer.connect(watchdog).flagDefaultedRedemption(redemptionId, reason)
-      ).to.emit(qcRedeemer, "RedemptionDefaulted")
+    it.skip("should test redemption status validation with SPV proof verification - TODO: REQUIRES Full SPV proof validation that properly handles failed proofs while maintaining correct redemption status transitions", async () => {
+      // IMPLEMENTATION REQUIREMENTS:
+      // 1. Full SPV proof validation that properly handles failed proofs
+      // 2. Correct redemption status transitions (Pending -> Fulfilled/Defaulted)
+      // 3. Verification that failed SPV proofs don't incorrectly mark redemptions as fulfilled
+      // 4. State consistency checks after failed validation attempts
+      // 5. Proper error propagation and redemption status management
     })
   })
 
-  describe("Unfulfilled Redemption Queries", () => {
+  describe("Unfulfilled Redemption Queries [unit]", () => {
     it("should track unfulfilled redemptions for QC", async () => {
       const fixture = await loadFixture(deployQCRedeemerFixture)
       const { qcRedeemer, qcAddress } = fixture
@@ -350,45 +292,19 @@ describe("QCRedeemer", () => {
       expect(deadline).to.be.gt(0)
     })
 
-    it.skip("should demonstrate SPV proof validation with comprehensive test data", async () => {
-      // TODO: Implement proper SPV proof validation
-      // This test requires full SPV implementation with comprehensive test data
-      const fixture = await loadFixture(deployQCRedeemerFixture)
-      const { qcRedeemer, qcAddress, watchdog } = fixture
-
-      // Create redemption
-      const { redemptionId, amount, btcAddress } = await createTestRedemption(fixture)
-
-      // Test with comprehensive SPV data from tBTC v2 test suite
-      // This validates the full SPV proof structure including:
-      // - Bitcoin transaction format (version, inputs, outputs, locktime)
-      // - Merkle proof verification
-      // - Bitcoin header chain validation
-      // - Coinbase proof verification
-      const spvData = getValidSpvData()
-
-      // Verify SPV proof structure is processed and fails at payment verification
-      // (as expected since ValidMainnetProof doesn't contain payment to our test address)
-      await expect(
-        qcRedeemer
-          .connect(watchdog)
-          .recordRedemptionFulfillment(redemptionId, btcAddress, amount, spvData.txInfo, spvData.proof)
-      ).to.be.revertedWithCustomError(qcRedeemer, "RedemptionProofFailed")
-
-      // Verify redemption tracking still works - should have unfulfilled redemptions
-      expect(await qcRedeemer.hasUnfulfilledRedemptions(qcAddress.address)).to.be.true
-
-      // Demonstrate that getSimpleSpvData fails earlier in validation pipeline
-      const simpleSpvData = getSimpleSpvData()
-      await expect(
-        qcRedeemer
-          .connect(watchdog)
-          .recordRedemptionFulfillment(redemptionId, btcAddress, amount, simpleSpvData.txInfo, simpleSpvData.proof)
-      ).to.be.revertedWithCustomError(qcRedeemer, "RedemptionProofFailed")
+    it.skip("should demonstrate SPV proof validation with comprehensive test data - TODO: REQUIRES Complete SPV test data suite with real Bitcoin transaction validation", async () => {
+      // IMPLEMENTATION REQUIREMENTS:
+      // 1. Complete SPV test data suite including valid Bitcoin transactions
+      // 2. Valid Bitcoin transactions with matching output addresses for test scenarios
+      // 3. Proper merkle proofs for real Bitcoin blocks with correct transaction inclusion
+      // 4. Valid coinbase proofs that pass Bridge SPV validation
+      // 5. Comprehensive validation covering all SPV pipeline stages
+      // 6. Integration with tBTC v2 test suite validation patterns
+      // 7. Differentiation between simple and comprehensive SPV data validation paths
     })
   })
 
-  describe("System Pause", () => {
+  describe("System Pause [validation]", () => {
     it("should prevent new redemptions when paused", async () => {
       const fixture = await loadFixture(deployQCRedeemerFixture)
       const { qcRedeemer, systemState, user, qcAddress, constants } = fixture
@@ -442,7 +358,7 @@ describe("QCRedeemer", () => {
     })
   })
 
-  describe("AccountControl Integration", () => {
+  describe("AccountControl Integration [integration]", () => {
     it("should reduce total minted on redemption", async () => {
       const fixture = await loadFixture(deployQCRedeemerFixture)
       const { mockAccountControl, constants } = fixture

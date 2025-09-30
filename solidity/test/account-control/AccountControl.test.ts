@@ -5,7 +5,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { AccountControl } from "../../typechain";
 import { safeDeployProxy, cleanupDeployments } from "../helpers/testing-utils";
 
-describe("AccountControl Input Validation", function () {
+describe("AccountControl [unit][smoke]", function () {
   let accountControl: AccountControl;
   let owner: SignerWithAddress;
   let emergencyCouncil: SignerWithAddress;
@@ -20,7 +20,7 @@ describe("AccountControl Input Validation", function () {
     const MockBankFactory = await ethers.getContractFactory("MockBank");
     mockBank = await MockBankFactory.deploy();
 
-    // Deploy AccountControl using safe deployment
+    // Deploy AccountControl using safe deployment (from Validation file - better practice)
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
     accountControl = await safeDeployProxy<AccountControl>(
       AccountControlFactory,
@@ -31,19 +31,130 @@ describe("AccountControl Input Validation", function () {
     // Authorize AccountControl to call MockBank functions
     await mockBank.authorizeBalanceIncreaser(accountControl.address);
 
-    // Note: Using direct updateBacking() for unit tests (oracle integration tested separately)
-
     // Authorize test reserve (QC_PERMISSIONED is initialized by default)
-    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000);
+    await accountControl.connect(owner).authorizeReserve(reserve.address, 1000000); // 0.01 BTC cap in satoshis
     await accountControl.connect(reserve).updateBacking(1000000);
   });
 
   afterEach(async function () {
-    // Clean up deployment locks to prevent conflicts
+    // Clean up deployment locks to prevent conflicts (from Validation file)
     await cleanupDeployments();
   });
 
-  describe("System Pause Enforcement", function () {
+  // ===== CORE FUNCTIONALITY TESTS (from Core file) =====
+  
+  describe("Core Functionality [unit]", function () {
+    describe("Optimized totalMinted calculation [unit][smoke]", function () {
+      it("should return zero initially", async function () {
+        expect(await accountControl.totalMinted()).to.equal(0);
+      });
+
+      it("should track total minted amount efficiently", async function () {
+        // Reserve updates its own backing (federated model)
+        await accountControl.connect(reserve).updateBacking(2000000); // 0.02 BTC
+
+        // Mock Bank.increaseBalance call (normally would be called)
+        const amount = 500000; // 0.005 BTC in satoshis
+        
+        // This would normally fail because we can't call mint from non-reserve
+        // but we're testing the state tracking logic
+        expect(await accountControl.totalMinted()).to.equal(0);
+      });
+    });
+
+    describe("Reserve deauthorization [unit]", function () {
+      it("should deauthorize reserve", async function () {
+        expect(await accountControl.authorized(reserve.address)).to.be.true;
+        
+        await accountControl.connect(owner).deauthorizeReserve(reserve.address);
+        
+        expect(await accountControl.authorized(reserve.address)).to.be.false;
+        const reserveInfo = await accountControl.reserveInfo(reserve.address);
+        expect(reserveInfo.mintingCap).to.equal(0);
+      });
+
+      it("should revert when deauthorizing non-existent reserve", async function () {
+        const nonExistentReserve = ethers.Wallet.createRandom().address;
+        
+        await expect(
+          accountControl.connect(owner).deauthorizeReserve(nonExistentReserve)
+        ).to.be.revertedWith("ReserveNotFound");
+      });
+
+      it("should emit ReserveDeauthorized event", async function () {
+        await expect(
+          accountControl.connect(owner).deauthorizeReserve(reserve.address)
+        )
+          .to.emit(accountControl, "ReserveDeauthorized")
+          .withArgs(reserve.address);
+      });
+
+      it("should revert when deauthorizing reserve with outstanding balance", async function () {
+        // Reserve sets backing and mint some tokens to create outstanding balance
+        await accountControl.connect(reserve).updateBacking(1000000);
+        await accountControl.connect(reserve).mint(user.address, 500000);
+        
+        await expect(
+          accountControl.connect(owner).deauthorizeReserve(reserve.address)
+        ).to.be.revertedWith("CannotDeauthorizeWithOutstandingBalance");
+      });
+
+      it("should clear backing when deauthorizing clean reserve", async function () {
+        // Reserve sets backing but no minted balance
+        await accountControl.connect(reserve).updateBacking(1000000);
+        
+        expect(await accountControl.backing(reserve.address)).to.equal(1000000);
+        
+        await accountControl.connect(owner).deauthorizeReserve(reserve.address);
+        
+        expect(await accountControl.backing(reserve.address)).to.equal(0);
+      });
+    });
+
+    describe("redeem function [unit]", function () {
+      beforeEach(async function () {
+        // Reserve sets up backing and perform a previous mint
+        await accountControl.connect(reserve).updateBacking(1000000);
+        // Mint some tokens to create minted balance for testing redemption
+        await accountControl.connect(reserve).mint(user.address, 500000); // Mint 0.005 BTC
+      });
+
+      it("should decrease minted amount on redemption", async function () {
+        const initialMinted = await accountControl.minted(reserve.address);
+        const initialTotal = await accountControl.totalMinted();
+        
+        await accountControl.connect(reserve).redeem(200000); // Redeem 0.002 BTC
+        
+        expect(await accountControl.minted(reserve.address)).to.equal(initialMinted.sub(200000));
+        expect(await accountControl.totalMinted()).to.equal(initialTotal.sub(200000));
+      });
+
+      it("should emit RedemptionProcessed event", async function () {
+        await expect(
+          accountControl.connect(reserve).redeem(200000)
+        )
+          .to.emit(accountControl, "RedemptionProcessed")
+          .withArgs(reserve.address, 200000);
+      });
+
+      it("should revert when redeeming more than minted", async function () {
+        await expect(
+          accountControl.connect(reserve).redeem(1000000) // More than minted
+        ).to.be.revertedWith("InsufficientMinted");
+      });
+    });
+
+    describe("Unit consistency [unit][smoke]", function () {
+      it("should use correct satoshi constants", async function () {
+        expect(await accountControl.MIN_MINT_AMOUNT()).to.equal(10000); // 0.0001 BTC in satoshis
+        expect(await accountControl.MAX_SINGLE_MINT()).to.equal(10000000000); // 100 BTC in satoshis
+      });
+    });
+  });
+
+  // ===== VALIDATION TESTS (from Validation file) =====
+
+  describe("System Pause Enforcement [validation]", function () {
     it("should block all minting when system is paused", async function () {
       // Pause the system
       await accountControl.connect(emergencyCouncil).pauseSystem();
@@ -104,7 +215,7 @@ describe("AccountControl Input Validation", function () {
     });
   });
 
-  describe("Re-authorization", function () {
+  describe("Re-authorization [unit]", function () {
     it("should allow re-authorization after deauthorization", async function () {
       // Deauthorize the reserve first
       await accountControl.connect(owner).deauthorizeReserve(reserve.address);
@@ -122,7 +233,7 @@ describe("AccountControl Input Validation", function () {
     });
   });
 
-  describe("Input Validation", function () {
+  describe("Input Validation [validation]", function () {
     it("should revert when recipients.length != amounts.length in batchMint", async function () {
       const recipients = [user.address, owner.address]; // 2 recipients
       const amounts = [100000]; // 1 amount
@@ -205,7 +316,7 @@ describe("AccountControl Input Validation", function () {
     });
   });
 
-  describe("Authorization Validation", function () {
+  describe("Authorization Validation [validation]", function () {
     it("should prevent unauthorized reserves from minting", async function () {
       // Use the user signer which has ETH but is not authorized as a reserve
       await expect(

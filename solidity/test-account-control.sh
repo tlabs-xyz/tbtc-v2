@@ -17,21 +17,18 @@ export TEST_USE_STUBS_TBTC=true
 
 # List of all account-control test files
 TEST_FILES=(
-    "test/account-control/AccountControlCore.test.ts"
+    "test/account-control/AccountControl.test.ts"
     "test/account-control/AccountControlFeatures.test.ts"
     "test/account-control/AccountControlIntegration.test.ts"
     "test/account-control/AccountControlMintTBTC.test.ts"
     "test/account-control/AccountControlOracleIntegration.test.ts"
     "test/account-control/AccountControlSeparatedOperations.test.ts"
-    "test/account-control/AccountControlValidation.test.ts"
     "test/account-control/AccountControlWorkflows.test.ts"
     "test/account-control/BitcoinAddressUtils.test.ts"
     "test/account-control/BitcoinAddressValidation.test.ts"
     "test/account-control/MockReserveIntegration.test.ts"
     "test/account-control/QCData.test.ts"
     "test/account-control/QCManagerAccountControlIntegration.test.ts"
-    "test/account-control/QCManagerLib.ExtractedFunctions.test.ts"
-    "test/account-control/QCManagerLib.Integration.test.ts"
     "test/account-control/QCManagerLib.test.ts"
     "test/account-control/QCManager.test.ts"
     "test/account-control/QCManagerWalletDirect.test.ts"

@@ -5,7 +5,7 @@ import { SystemState } from "../../typechain"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
-describe("SystemState", () => {
+describe("SystemState [unit][smoke]", () => {
   let deployer: SignerWithAddress
   let governance: SignerWithAddress
   let pauserAccount: SignerWithAddress
@@ -60,7 +60,7 @@ describe("SystemState", () => {
     await restoreSnapshot()
   })
 
-  describe("Deployment", () => {
+  describe("Deployment [unit][smoke]", () => {
     it("should grant deployer all roles", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
       expect(await systemState.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to
@@ -90,7 +90,7 @@ describe("SystemState", () => {
     })
   })
 
-  describe("Pause Functions", () => {
+  describe("Pause Functions [unit]", () => {
     context("when called by pauser", () => {
       describe("pauseMinting", () => {
         it("should pause minting successfully", async () => {
@@ -264,7 +264,7 @@ describe("SystemState", () => {
     })
   })
 
-  describe("Parameter Management", () => {
+  describe("Parameter Management [unit]", () => {
     context("when called by parameter admin", () => {
       describe("setMinMintAmount", () => {
         it("should update min mint amount successfully", async () => {
@@ -562,7 +562,7 @@ describe("SystemState", () => {
     })
   })
 
-  describe("Function-Specific Pause Checks", () => {
+  describe("Function-Specific Pause Checks [unit]", () => {
     describe("isFunctionPaused", () => {
       it("should return correct status for minting", async () => {
         expect(await systemState.isFunctionPaused("minting")).to.be.false
@@ -606,7 +606,7 @@ describe("SystemState", () => {
     })
   })
 
-  describe("Access Control", () => {
+  describe("Access Control [validation]", () => {
     context("role management", () => {
       it("should allow admin to grant pauser role", async () => {
         await systemState.grantRole(EMERGENCY_ROLE, thirdParty.address)
@@ -647,7 +647,7 @@ describe("SystemState", () => {
     })
   })
 
-  describe("Edge Cases", () => {
+  describe("Edge Cases [unit]", () => {
     context("simultaneous operations", () => {
       it("should handle independent pause states", async () => {
         await systemState.connect(pauserAccount).pauseMinting()
@@ -783,7 +783,7 @@ describe("SystemState", () => {
     })
   })
 
-  describe("Emergency QC Functions", () => {
+  describe("Emergency QC Functions [security]", () => {
     let testQC: string
     let testReason: string
     let invalidQC: string

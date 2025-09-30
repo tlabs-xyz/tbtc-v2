@@ -11,8 +11,9 @@ import {
   MockBank
 } from "../../typechain";
 
-describe("QCManagerLib", function () {
+describe("QCManagerLib - Consolidated Tests", function () {
   let qcManager: QCManager;
+  let qcManagerLib: any;
   let qcData: QCData;
   let accountControl: AccountControl;
   let systemState: SystemState;
@@ -24,12 +25,14 @@ describe("QCManagerLib", function () {
   let qc2: SignerWithAddress;
   let user: SignerWithAddress;
   let attester1: SignerWithAddress;
+  let governance: SignerWithAddress;
+  let registrar: SignerWithAddress;
 
   const MAX_MINTING_CAP = ethers.utils.parseUnits("100", 8); // 100 BTC in satoshis
   const ZERO_ADDRESS = ethers.constants.AddressZero;
 
   beforeEach(async function () {
-    [owner, qc1, qc2, user, attester1] = await ethers.getSigners();
+    [owner, qc1, qc2, user, attester1, governance, registrar] = await ethers.getSigners();
 
     // Deploy mock bank
     const MockBankFactory = await ethers.getContractFactory("MockBank");
@@ -42,12 +45,12 @@ describe("QCManagerLib", function () {
     const SystemStateFactory = await ethers.getContractFactory("SystemState");
     systemState = await SystemStateFactory.deploy();
 
-    const ReserveOracleFactory = await ethers.getContractFactory("ReserveOracle");
-    reserveOracle = await ReserveOracleFactory.deploy();
+    const MockReserveOracle = await ethers.getContractFactory("MockReserveOracle");
+    reserveOracle = await MockReserveOracle.deploy();
 
     // Deploy QCManagerLib library
     const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib");
-    const qcManagerLib = await QCManagerLibFactory.deploy();
+    qcManagerLib = await QCManagerLibFactory.deploy();
 
     // Deploy QCPauseManager first
     const QCPauseManagerFactory = await ethers.getContractFactory("QCPauseManager");
@@ -76,6 +79,9 @@ describe("QCManagerLib", function () {
     await pauseManager.grantRole(QC_MANAGER_ROLE, qcManager.address);
     await pauseManager.revokeRole(QC_MANAGER_ROLE, owner.address);
 
+    // Grant QCManager the emergency role for forwarding calls
+    await pauseManager.grantRole(await pauseManager.EMERGENCY_ROLE(), qcManager.address);
+
     // Deploy AccountControl using upgrades proxy
     const AccountControlFactory = await ethers.getContractFactory("AccountControl");
     accountControl = await upgrades.deployProxy(
@@ -91,6 +97,11 @@ describe("QCManagerLib", function () {
     // Grant governance role to owner for QCManager operations
     const GOVERNANCE_ROLE = await qcManager.GOVERNANCE_ROLE();
     await qcManager.grantRole(GOVERNANCE_ROLE, owner.address);
+    await qcManager.grantRole(GOVERNANCE_ROLE, governance.address);
+
+    // Grant registrar role
+    const REGISTRAR_ROLE = await qcManager.REGISTRAR_ROLE();
+    await qcManager.grantRole(REGISTRAR_ROLE, registrar.address);
 
     // Set AccountControl in QCManager
     await qcManager.connect(owner).setAccountControl(accountControl.address);
@@ -102,186 +113,216 @@ describe("QCManagerLib", function () {
     await accountControl.connect(owner).setEmergencyCouncil(qcManager.address);
   });
 
-  describe("Library Error Validation", function () {
+  describe("Core Library Functions", function () {
+    describe("Library Error Validation", function () {
+      it("should revert with InvalidQCAddress when registering zero address", async function () {
+        await expect(
+          qcManager.connect(owner).registerQC(ZERO_ADDRESS, MAX_MINTING_CAP)
+        ).to.be.revertedWithCustomError(qcManager, "InvalidQCAddress");
+      });
 
-    it("should revert with InvalidQCAddress when registering zero address", async function () {
-      await expect(
-        qcManager.connect(owner).registerQC(ZERO_ADDRESS, MAX_MINTING_CAP)
-      ).to.be.revertedWithCustomError(qcManager, "InvalidQCAddress");
-    });
+      it("should revert with InvalidMintingCapacity when capacity is zero", async function () {
+        await expect(
+          qcManager.connect(owner).registerQC(qc1.address, 0)
+        ).to.be.revertedWithCustomError(qcManager, "InvalidMintingCapacity");
+      });
 
-    it("should revert with InvalidMintingCapacity when capacity is zero", async function () {
-      await expect(
-        qcManager.connect(owner).registerQC(qc1.address, 0)
-      ).to.be.revertedWithCustomError(qcManager, "InvalidMintingCapacity");
-    });
+      it("should revert with QCAlreadyRegistered when registering twice", async function () {
+        await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
 
-    it("should revert with QCAlreadyRegistered when registering twice", async function () {
-      await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
+        await expect(
+          qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP)
+        ).to.be.reverted;
+      });
 
-      await expect(
-        qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP)
-      ).to.be.reverted;
-    });
+      it("should revert with QCNotRegistered for non-existent QC", async function () {
+        await expect(
+          qcManager.connect(owner).setQCStatus(qc1.address, 2, ethers.utils.formatBytes32String("test")) // PAUSED
+        ).to.be.reverted;
+      });
 
-    it("should revert with QCNotRegistered for non-existent QC", async function () {
-      await expect(
-        qcManager.connect(owner).setQCStatus(qc1.address, 2, ethers.utils.formatBytes32String("test")) // PAUSED
-      ).to.be.reverted;
-    });
+      it("should revert with InvalidStatusTransition for invalid status changes", async function () {
+        await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
 
-    it("should revert with InvalidStatusTransition for invalid status changes", async function () {
-      await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
+        // Grant DISPUTE_ARBITER_ROLE to owner for status transitions
+        const DISPUTE_ARBITER_ROLE = await qcManager.DISPUTE_ARBITER_ROLE();
+        await qcManager.grantRole(DISPUTE_ARBITER_ROLE, owner.address);
+        
+        // First set to UnderReview(3)
+        await qcManager.connect(owner).setQCStatus(qc1.address, 3, ethers.utils.formatBytes32String("test"));
+        
+        // Try to transition from UnderReview(3) to MintingPaused(1) - this is invalid
+        await expect(
+          qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"))
+        ).to.be.revertedWithCustomError(qcManager, "InvalidStatusTransition");
+      });
 
-      // Grant DISPUTE_ARBITER_ROLE to owner for status transitions
-      const DISPUTE_ARBITER_ROLE = await qcManager.DISPUTE_ARBITER_ROLE();
-      await qcManager.grantRole(DISPUTE_ARBITER_ROLE, owner.address);
-      
-      // First set to UnderReview(3)
-      await qcManager.connect(owner).setQCStatus(qc1.address, 3, ethers.utils.formatBytes32String("test"));
-      
-      // Try to transition from UnderReview(3) to MintingPaused(1) - this is invalid
-      await expect(
-        qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"))
-      ).to.be.revertedWithCustomError(qcManager, "InvalidStatusTransition");
-    });
+      it("should revert with NewCapMustBeHigher when not increasing capacity", async function () {
+        await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
 
-    it("should revert with NewCapMustBeHigher when not increasing capacity", async function () {
-      await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
-
-      await expect(
-        qcManager.connect(owner).increaseMintingCapacity(qc1.address, MAX_MINTING_CAP)
-      ).to.be.reverted;
-    });
-  });
-
-  describe("Library Registration Logic", function () {
-
-    it("should successfully register QC with valid parameters", async function () {
-      await expect(
-        qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP)
-      ).to.emit(qcManager, "QCOnboarded");
-
-      const qcInfo = await qcData.getQCInfo(qc1.address);
-      expect(qcInfo.registeredAt).to.be.gt(0);
-      expect(qcInfo.status).to.equal(0); // REGISTERED
-      expect(qcInfo.maxCapacity).to.equal(MAX_MINTING_CAP);
-    });
-
-    it("should authorize QC in AccountControl when enabled", async function () {
-      // Grant QC_MANAGER_ROLE to qcManager in AccountControl
-      const QC_MANAGER_ROLE_AC = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_MANAGER_ROLE"));
-      await accountControl.grantRole(QC_MANAGER_ROLE_AC, qcManager.address);
-
-      await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
-
-      expect(await accountControl.authorized(qc1.address)).to.be.true;
-    });
-  });
-
-  describe("Library Status Validation", function () {
-
-    beforeEach(async function () {
-      await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
-    });
-
-    it("should validate status transitions correctly", async function () {
-      // Grant DISPUTE_ARBITER_ROLE to owner for setQCStatus
-      const DISPUTE_ARBITER_ROLE = await qcManager.DISPUTE_ARBITER_ROLE();
-      await qcManager.grantRole(DISPUTE_ARBITER_ROLE, owner.address);
-
-      // QC already registered in beforeEach with Active(0) status
-
-      // Valid: Active(0) -> MintingPaused(1)
-      const tx = await qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"));
-      const receipt = await tx.wait();
-      
-      // Find the QCStatusChanged event
-      const event = receipt.events?.find(e => e.event === "QCStatusChanged");
-      expect(event).to.not.be.undefined;
-      expect(event?.args?.qc).to.equal(qc1.address);
-      expect(event?.args?.oldStatus).to.equal(0);
-      expect(event?.args?.newStatus).to.equal(1);
-
-      // Valid: MintingPaused(1) -> UnderReview(3)
-      await expect(
-        qcManager.connect(owner).setQCStatus(qc1.address, 3, ethers.utils.formatBytes32String("test"))
-      ).to.emit(qcManager, "QCStatusChanged");
-
-      // Note: Revoked status requires owner to call deauthorizeReserve directly
-      // since it has onlyOwner modifier, not onlyOwnerOrQCManager
-    });
-  });
-
-
-  describe("Library Gas Optimization", function () {
-
-    it("should maintain reasonable gas costs for library operations", async function () {
-      // Measure gas for registration
-      const registrationTx = await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
-      const registrationReceipt = await registrationTx.wait();
-
-      // Library calls should not significantly increase gas
-      expect(registrationReceipt.gasUsed).to.be.lt(350000);
-
-      // Grant DISPUTE_ARBITER_ROLE to owner for status transitions
-      const DISPUTE_ARBITER_ROLE = await qcManager.DISPUTE_ARBITER_ROLE();
-      await qcManager.grantRole(DISPUTE_ARBITER_ROLE, owner.address);
-
-      // Measure gas for status change
-      const statusChangeTx = await qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"));
-      const statusChangeReceipt = await statusChangeTx.wait();
-
-      expect(statusChangeReceipt.gasUsed).to.be.lt(150000);
-    });
-  });
-
-  describe("Library Integration with AccountControl", function () {
-
-    it("should properly sync with AccountControl during operations", async function () {
-      // Register QC
-      await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
-
-      // Verify AccountControl integration
-      expect(await accountControl.authorized(qc1.address)).to.be.true;
-
-      const reserveInfo = await accountControl.reserveInfo(qc1.address);
-      expect(reserveInfo.mintingCap).to.equal(MAX_MINTING_CAP);
-
-      // Update capacity
-      const newCap = MAX_MINTING_CAP.mul(2);
-      await qcManager.connect(owner).increaseMintingCapacity(qc1.address, newCap);
-
-      // Verify update propagated
-      const updatedInfo = await accountControl.reserveInfo(qc1.address);
-      expect(updatedInfo.mintingCap).to.equal(newCap);
-    });
-  });
-
-  describe("New Extracted Library Functions", function () {
-    let qcManagerLib: any;
-
-    beforeEach(async function () {
-      // Deploy QCManagerLib for direct testing
-      const QCManagerLibFactory = await ethers.getContractFactory("QCManagerLib");
-      qcManagerLib = await QCManagerLibFactory.deploy();
-    });
-
-    // calculateTimeUntilRenewal tests removed - function moved to QCManagerPauseLib
-
-    describe("getReserveBalanceAndStaleness", function () {
-      it("should call reserve oracle correctly", async function () {
-        // This test would require mocking the reserveOracle
-        // For now, we'll test the function signature exists
-        const reserveOracleInterface = new ethers.utils.Interface([
-          "function getReserveBalanceAndStaleness(address) view returns (uint256, bool)"
-        ]);
-
-        // Verify the function exists and has correct signature
-        expect(qcManagerLib.interface.getFunction("getReserveBalanceAndStaleness")).to.exist;
+        await expect(
+          qcManager.connect(owner).increaseMintingCapacity(qc1.address, MAX_MINTING_CAP)
+        ).to.be.reverted;
       });
     });
 
+    describe("Library Registration Logic", function () {
+      it("should successfully register QC with valid parameters", async function () {
+        await expect(
+          qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP)
+        ).to.emit(qcManager, "QCOnboarded");
+
+        const qcInfo = await qcData.getQCInfo(qc1.address);
+        expect(qcInfo.registeredAt).to.be.gt(0);
+        expect(qcInfo.status).to.equal(0); // REGISTERED
+        expect(qcInfo.maxCapacity).to.equal(MAX_MINTING_CAP);
+      });
+
+      it("should authorize QC in AccountControl when enabled", async function () {
+        // Grant QC_MANAGER_ROLE to qcManager in AccountControl
+        const QC_MANAGER_ROLE_AC = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("QC_MANAGER_ROLE"));
+        await accountControl.grantRole(QC_MANAGER_ROLE_AC, qcManager.address);
+
+        await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
+
+        expect(await accountControl.authorized(qc1.address)).to.be.true;
+      });
+    });
+
+    describe("Library Status Validation", function () {
+      beforeEach(async function () {
+        await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
+      });
+
+      it("should validate status transitions correctly", async function () {
+        // Grant DISPUTE_ARBITER_ROLE to owner for setQCStatus
+        const DISPUTE_ARBITER_ROLE = await qcManager.DISPUTE_ARBITER_ROLE();
+        await qcManager.grantRole(DISPUTE_ARBITER_ROLE, owner.address);
+
+        // QC already registered in beforeEach with Active(0) status
+
+        // Valid: Active(0) -> MintingPaused(1)
+        const tx = await qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"));
+        const receipt = await tx.wait();
+        
+        // Find the QCStatusChanged event
+        const event = receipt.events?.find(e => e.event === "QCStatusChanged");
+        expect(event).to.not.be.undefined;
+        expect(event?.args?.qc).to.equal(qc1.address);
+        expect(event?.args?.oldStatus).to.equal(0);
+        expect(event?.args?.newStatus).to.equal(1);
+
+        // Valid: MintingPaused(1) -> UnderReview(3)
+        await expect(
+          qcManager.connect(owner).setQCStatus(qc1.address, 3, ethers.utils.formatBytes32String("test"))
+        ).to.emit(qcManager, "QCStatusChanged");
+      });
+    });
+
+    describe("Library Gas Optimization", function () {
+      it("should maintain reasonable gas costs for library operations", async function () {
+        // Measure gas for registration
+        const registrationTx = await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
+        const registrationReceipt = await registrationTx.wait();
+
+        // Library calls should not significantly increase gas
+        expect(registrationReceipt.gasUsed).to.be.lt(350000);
+
+        // Grant DISPUTE_ARBITER_ROLE to owner for status transitions
+        const DISPUTE_ARBITER_ROLE = await qcManager.DISPUTE_ARBITER_ROLE();
+        await qcManager.grantRole(DISPUTE_ARBITER_ROLE, owner.address);
+
+        // Measure gas for status change
+        const statusChangeTx = await qcManager.connect(owner).setQCStatus(qc1.address, 1, ethers.utils.formatBytes32String("test"));
+        const statusChangeReceipt = await statusChangeTx.wait();
+
+        expect(statusChangeReceipt.gasUsed).to.be.lt(150000);
+      });
+    });
+
+    describe("Library Integration with AccountControl", function () {
+      it("should properly sync with AccountControl during operations", async function () {
+        // Register QC
+        await qcManager.connect(owner).registerQC(qc1.address, MAX_MINTING_CAP);
+
+        // Verify AccountControl integration
+        expect(await accountControl.authorized(qc1.address)).to.be.true;
+
+        const reserveInfo = await accountControl.reserveInfo(qc1.address);
+        expect(reserveInfo.mintingCap).to.equal(MAX_MINTING_CAP);
+
+        // Update capacity
+        const newCap = MAX_MINTING_CAP.mul(2);
+        await qcManager.connect(owner).increaseMintingCapacity(qc1.address, newCap);
+
+        // Verify update propagated
+        const updatedInfo = await accountControl.reserveInfo(qc1.address);
+        expect(updatedInfo.mintingCap).to.equal(newCap);
+      });
+    });
+  });
+
+  describe("Integration Testing", function () {
+    describe("Library Linking Verification", function () {
+      it("should have QCManagerLib properly linked", async function () {
+        // Verify library is deployed
+        expect(qcManagerLib.address).to.not.equal(ethers.constants.AddressZero);
+
+        // Verify QCManager can call library functions through delegatecall
+        // This is implicit in the working of extracted functions
+      });
+
+      it("should verify contract sizes are within limits", async function () {
+        // Get deployed bytecode size
+        const qcManagerCode = await ethers.provider.getCode(qcManager.address);
+        const qcManagerSize = (qcManagerCode.length - 2) / 2; // Remove 0x and divide by 2 for bytes
+
+        const qcManagerLibCode = await ethers.provider.getCode(qcManagerLib.address);
+        const qcManagerLibSize = (qcManagerLibCode.length - 2) / 2;
+
+        console.log(`QCManager size: ${qcManagerSize} bytes`);
+        console.log(`QCManagerLib size: ${qcManagerLibSize} bytes`);
+
+        // Verify sizes are under EIP-170 limit
+        expect(qcManagerSize).to.be.lessThan(24576, "QCManager exceeds size limit");
+        expect(qcManagerLibSize).to.be.lessThan(24576, "QCManagerLib exceeds size limit");
+      });
+    });
+
+    describe("Basic Integration Tests", function () {
+      it("should integrate with QCData for basic QC operations", async function () {
+        const mintingCap = ethers.utils.parseEther("1000000");
+
+        // Register QC
+        await qcManager.connect(governance).registerQC(qc1.address, mintingCap);
+
+        // Get QC info to verify integration
+        const qcInfo = await qcData.getQCInfo(qc1.address);
+        expect(qcInfo.maxCapacity).to.equal(mintingCap);
+        expect(qcInfo.status).to.equal(0); // Active
+      });
+
+      it("should handle library error propagation", async function () {
+        // Try to register QC with zero address
+        await expect(
+          qcManager.connect(governance).registerQC(
+            ethers.constants.AddressZero,
+            ethers.utils.parseEther("1000000")
+          )
+        ).to.be.revertedWithCustomError(qcManager, "InvalidQCAddress");
+
+        // Try to register with zero capacity
+        await expect(
+          qcManager.connect(governance).registerQC(
+            qc1.address,
+            0
+          )
+        ).to.be.revertedWithCustomError(qcManager, "InvalidMintingCapacity");
+      });
+    });
+  });
+
+  describe("Extracted Functions", function () {
     describe("isValidBitcoinAddress", function () {
       it("should return false for empty address", async function () {
         const result = await qcManagerLib.isValidBitcoinAddress("");
@@ -320,9 +361,21 @@ describe("QCManagerLib", function () {
       });
     });
 
+    describe("getReserveBalanceAndStaleness", function () {
+      it("should have correct function signature", async function () {
+        // Verify the function exists and has correct signature
+        expect(qcManagerLib.interface.getFunction("getReserveBalanceAndStaleness")).to.exist;
+
+        const func = qcManagerLib.interface.getFunction("getReserveBalanceAndStaleness");
+        expect(func.inputs).to.have.length(2); // reserveOracle and qc
+        expect(func.outputs).to.have.length(2); // balance and isStale
+      });
+    });
+
     describe("verifyBitcoinSignature", function () {
       // Note: verifyBitcoinSignature is an internal function and cannot be accessed directly
       // It is tested indirectly through functions that use it
     });
   });
+
 });
