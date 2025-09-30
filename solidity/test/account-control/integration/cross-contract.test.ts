@@ -44,12 +44,12 @@ describe("Cross-Contract Integration Tests", function () {
     it("should verify AccountControl configuration and connectivity", async function () {
       // Check if AccountControl mode is properly configured
       const isEnabled = await framework.contracts.systemState.accountControlMode()
-      console.log("AccountControl mode enabled:", isEnabled)
+      // Debug log removed for cleaner test output
 
       // Check if QCMinter has AccountControl set
       const accountControlAddress = await framework.contracts.qcMinter.accountControl()
-      console.log("QCMinter AccountControl address:", accountControlAddress)
-      console.log("Actual AccountControl address:", framework.contracts.accountControl.address)
+      // Debug log removed for cleaner test output
+      // Debug log removed for cleaner test output
 
       // Verify they match
       expect(accountControlAddress).to.equal(framework.contracts.accountControl.address)
@@ -57,14 +57,14 @@ describe("Cross-Contract Integration Tests", function () {
       // Check if QCMinter can mint
       const minterRole = await framework.contracts.accountControl.MINTER_ROLE()
       const hasMinterRole = await framework.contracts.accountControl.hasRole(minterRole, framework.contracts.qcMinter.address)
-      console.log("QCMinter has MINTER_ROLE:", hasMinterRole)
+      // Debug log removed for cleaner test output
 
       // Check Bank authorizations
       const isBankAuthorized = await framework.contracts.mockBank.isBalanceIncreaserAuthorized(framework.contracts.accountControl.address)
-      console.log("AccountControl authorized in Bank:", isBankAuthorized)
+      // Debug log removed for cleaner test output
 
       const isQCMinterAuthorized = await framework.contracts.mockBank.isBalanceIncreaserAuthorized(framework.contracts.qcMinter.address)
-      console.log("QCMinter authorized in Bank:", isQCMinterAuthorized)
+      // Debug log removed for cleaner test output
 
       // Verify system is properly configured
       expect(isBankAuthorized).to.be.true
@@ -80,32 +80,32 @@ describe("Cross-Contract Integration Tests", function () {
       )
 
       const mintAmount = framework.MINT_AMOUNT
-      console.log("Attempting to mint:", mintAmount.toString())
+      // Debug log removed for cleaner test output
 
       // Check initial state across all contracts
       const initialMinted = await framework.contracts.accountControl.totalMinted()
       const initialBankBalance = await framework.contracts.mockBank.balances(user.address)
-      console.log("Initial total minted:", initialMinted.toString())
-      console.log("Initial bank balance:", initialBankBalance.toString())
+      // Debug log removed for cleaner test output
+      // Debug log removed for cleaner test output
 
       // Execute mint and trace execution
-      console.log("Calling requestQCMint...")
+      // Debug log removed for cleaner test output
       const tx = await framework.contracts.qcMinter.connect(owner).requestQCMint(
         qcAddress.address,
         user.address,
         mintAmount
       )
-      console.log("Transaction hash:", tx.hash)
+      // Debug log removed for cleaner test output
 
       const receipt = await tx.wait()
-      console.log("Transaction mined in block:", receipt.blockNumber)
-      console.log("Events emitted:", receipt.events?.map(e => e.event))
+      // Debug log removed for cleaner test output
+      // Debug log removed for cleaner test output
 
       // Check final state across all contracts
       const finalMinted = await framework.contracts.accountControl.totalMinted()
       const finalBankBalance = await framework.contracts.mockBank.balances(user.address)
-      console.log("Final total minted:", finalMinted.toString())
-      console.log("Final bank balance:", finalBankBalance.toString())
+      // Debug log removed for cleaner test output
+      // Debug log removed for cleaner test output
 
       // Verify state consistency
       expect(finalMinted.sub(initialMinted)).to.equal(mintAmount)
@@ -173,8 +173,8 @@ describe("Cross-Contract Integration Tests", function () {
       const qc1Info = await framework.contracts.qcManager.getQCInfo(qcAddress.address)
       const qc2Info = await framework.contracts.qcManager.getQCInfo(qcAddress2.address)
 
-      console.log("QC1 info:", qc1Info)
-      console.log("QC2 info:", qc2Info)
+      // Debug log removed for cleaner test output
+      // Debug log removed for cleaner test output
     })
 
     it("should handle complex multi-step operations with state validation", async function () {
@@ -269,7 +269,7 @@ describe("Cross-Contract Integration Tests", function () {
       )
 
       expect(isValid).to.be.true
-      console.log("SPV proof validation successful for tx:", validProof.txId)
+      // Debug log removed for cleaner test output
     })
 
     it("should integrate SPV validation with redemption flow", async function () {
@@ -332,7 +332,7 @@ describe("Cross-Contract Integration Tests", function () {
       for (const address of validBitcoinAddresses) {
         const isValid = await framework.contracts.qcRedeemer.validateBitcoinAddress(address)
         expect(isValid).to.be.true
-        console.log(`Valid Bitcoin address: ${address}`)
+      // Debug log removed for cleaner test output
       }
 
       const invalidAddresses = [
@@ -344,7 +344,7 @@ describe("Cross-Contract Integration Tests", function () {
       for (const address of invalidAddresses) {
         const isValid = await framework.contracts.qcRedeemer.validateBitcoinAddress(address)
         expect(isValid).to.be.false
-        console.log(`Invalid Bitcoin address: ${address}`)
+      // Debug log removed for cleaner test output
       }
     })
 
@@ -361,8 +361,8 @@ describe("Cross-Contract Integration Tests", function () {
       const libraryBasedSize = (await ethers.provider.getCode(framework.contracts.qcRedeemer.address)).length
       const standaloneSize = (await ethers.provider.getCode(standaloneQCRedeemer.address)).length
 
-      console.log(`QCRedeemer with libraries: ${libraryBasedSize} bytes`)
-      console.log(`QCRedeemer standalone: ${standaloneSize} bytes`)
+      // Debug log removed for cleaner test output
+      // Debug log removed for cleaner test output
 
       // Library-based should be smaller (if libraries are shared)
       // This test demonstrates the efficiency gain from using libraries
@@ -544,7 +544,7 @@ describe("Cross-Contract Integration Tests", function () {
       )
 
       const receipt = await tx.wait()
-      console.log(`Complete mint flow gas usage: ${receipt.gasUsed}`)
+      // Debug log removed for cleaner test output
 
       // Measure gas for redemption flow
       const spvProof = {
@@ -560,7 +560,7 @@ describe("Cross-Contract Integration Tests", function () {
       )
 
       const redeemReceipt = await redeemTx.wait()
-      console.log(`Complete redemption flow gas usage: ${redeemReceipt.gasUsed}`)
+      // Debug log removed for cleaner test output
 
       // Gas usage should be reasonable for complex operations
       expect(receipt.gasUsed.toNumber()).to.be.lessThan(500000) // Reasonable limit for mint

@@ -280,8 +280,9 @@ describe("QCManagerLib - Consolidated Tests", function () {
         const qcManagerLibCode = await ethers.provider.getCode(qcManagerLib.address);
         const qcManagerLibSize = (qcManagerLibCode.length - 2) / 2;
 
-        console.log(`QCManager size: ${qcManagerSize} bytes`);
-        console.log(`QCManagerLib size: ${qcManagerLibSize} bytes`);
+        // Uncomment to see contract sizes
+        // console.log(`QCManager size: ${qcManagerSize} bytes`);
+        // console.log(`QCManagerLib size: ${qcManagerLibSize} bytes`);
 
         // Verify sizes are under EIP-170 limit
         expect(qcManagerSize).to.be.lessThan(24576, "QCManager exceeds size limit");

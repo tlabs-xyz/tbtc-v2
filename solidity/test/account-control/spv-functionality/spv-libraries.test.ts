@@ -245,15 +245,16 @@ describe("SPV Libraries Integration", () => {
 
   describe("Library Efficiency Comparison", () => {
     it("should demonstrate contract size improvements", async () => {
-      console.log("\n📊 Contract Size Analysis:")
-      console.log("================================")
-      console.log("SharedSPVCore:    10.054 KB (shared library)")
-      console.log("QCManagerSPV:      4.221 KB (reduced by 6.673 KB)")
-      console.log("QCRedeemerSPV:     5.356 KB (reduced by 6.993 KB)")
-      console.log("TestRelay:         1.261 KB (test infrastructure)")
-      console.log("================================")
-      console.log("Total savings:    13.666 KB of duplicated code eliminated")
-      console.log("Code reuse:       100% of common SPV functions centralized")
+      // Uncomment to see contract size analysis
+      // console.log("\n📊 Contract Size Analysis:")
+      // console.log("================================")
+      // console.log("SharedSPVCore:    10.054 KB (shared library)")
+      // console.log("QCManagerSPV:      4.221 KB (reduced by 6.673 KB)")
+      // console.log("QCRedeemerSPV:     5.356 KB (reduced by 6.993 KB)")
+      // console.log("TestRelay:         1.261 KB (test infrastructure)")
+      // console.log("================================")
+      // console.log("Total savings:    13.666 KB of duplicated code eliminated")
+      // console.log("Code reuse:       100% of common SPV functions centralized")
     })
 
     it("should verify deployment gas costs", async () => {
@@ -265,16 +266,17 @@ describe("SPV Libraries Integration", () => {
         TestRelay: 325006,
       }
 
-      console.log("\n⛽ Deployment Gas Analysis:")
-      console.log("================================")
+      // Uncomment to see deployment gas analysis
+      // console.log("\n⛽ Deployment Gas Analysis:")
+      // console.log("================================")
       Object.entries(deploymentCosts).forEach(([contract, cost]) => {
         const percentage =
           typeof cost === "number"
             ? ((cost / 30000000) * 100).toFixed(1)
             : "N/A"
-        console.log(
-          `${contract.padEnd(20)}: ${cost} gas (${percentage}% of block limit)`
-        )
+        // console.log(
+        //   `${contract.padEnd(20)}: ${cost} gas (${percentage}% of block limit)`
+        // )
       })
     })
   })

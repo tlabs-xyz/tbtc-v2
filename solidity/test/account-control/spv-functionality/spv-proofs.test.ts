@@ -255,8 +255,9 @@ describe("SPV Proof Validation", () => {
       // Profile gas usage across different proof types
       const testCases = [ValidMainnetProof, P2PKHWalletControlProof, ComplexMultiInputTx]
 
-      console.log("\n⛽ SPV Proof Gas Usage Analysis:")
-      console.log("================================")
+      // Uncomment to see SPV proof gas usage analysis
+      // console.log("\n⛽ SPV Proof Gas Usage Analysis:")
+      // console.log("================================")
 
       for (const testCase of testCases) {
         try {
@@ -267,9 +268,9 @@ describe("SPV Proof Validation", () => {
             testCase
           )
 
-          console.log(`${testCase.name.padEnd(25)}: ${gasUsed.toLocaleString()} gas`)
+          // console.log(`${testCase.name.padEnd(25)}: ${gasUsed.toLocaleString()} gas`)
         } catch (error) {
-          console.log(`${testCase.name.padEnd(25)}: Gas measurement failed (${error.message})`)
+          // console.log(`${testCase.name.padEnd(25)}: Gas measurement failed (${error.message})`)
         }
       }
     })
@@ -294,7 +295,7 @@ describe("SPV Proof Validation", () => {
         expect(gasUsed).to.be.lessThan(expectedGasRange.max)
       } catch (error) {
         // Gas measurement might fail due to test environment constraints
-        console.log("Gas usage validation skipped due to test environment limitations")
+        // console.log("Gas usage validation skipped due to test environment limitations")
       }
     })
   })

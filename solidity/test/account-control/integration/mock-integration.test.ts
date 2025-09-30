@@ -294,8 +294,9 @@ describe("Mock-Based Integration Tests", () => {
       // Compare with individual mints (simulate)
       const individualMintEstimate = 50000 * recipients.length // Rough estimate per mint
 
-      console.log(`Batch mint gas used: ${batchReceipt.gasUsed}`)
-      console.log(`Estimated individual mints gas: ${individualMintEstimate}`)
+      // Uncomment to see gas optimization metrics
+      // console.log(`Batch mint gas used: ${batchReceipt.gasUsed}`)
+      // console.log(`Estimated individual mints gas: ${individualMintEstimate}`)
 
       // Batch should be more efficient
       expect(batchReceipt.gasUsed.toNumber()).to.be.lessThan(individualMintEstimate)

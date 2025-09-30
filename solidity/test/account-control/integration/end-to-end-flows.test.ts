@@ -47,9 +47,7 @@ describe("End-to-End Integration Flow Tests", function () {
       const accountControlAddress = await framework.contracts.qcMinter.accountControl()
       expect(accountControlAddress).to.equal(framework.contracts.accountControl.address)
 
-      console.log("Basic integration verification passed")
-      console.log("Owner:", owner.address)
-      console.log("AccountControl:", framework.contracts.accountControl.address)
+      // Basic integration verification passed
     })
   })
 

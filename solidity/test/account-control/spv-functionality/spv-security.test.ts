@@ -93,21 +93,16 @@ describe("SPV Security Tests [security]", () => {
       reserveOracle.address
     )
 
-    console.log("Deploying SharedSPVCore...")
     const SharedSPVCore = await ethers.getContractFactory("SharedSPVCore")
     const sharedSPVCore = await SharedSPVCore.deploy()
-    console.log("SharedSPVCore deployed")
 
-    console.log("Deploying QCRedeemerSPV...")
     const QCRedeemerSPV = await ethers.getContractFactory("QCRedeemerSPV", {
       libraries: {
         SharedSPVCore: sharedSPVCore.address,
       },
     })
     const qcRedeemerSPV = await QCRedeemerSPV.deploy()
-    console.log("QCRedeemerSPV deployed")
 
-    console.log("Deploying QCRedeemer...")
     const QCRedeemer = await ethers.getContractFactory("QCRedeemer", {
       libraries: {
         QCRedeemerSPV: qcRedeemerSPV.address,
@@ -120,41 +115,28 @@ describe("SPV Security Tests [security]", () => {
       testRelay.address,
       1000 // Higher difficulty factor
     )
-    console.log("QCRedeemer deployed, waiting for deployment...")
     await qcRedeemer.deployed()
-    console.log("QCRedeemer.deployed() completed")
 
     // Deploy MockAccountControl for testing
-    console.log("Deploying MockAccountControl...")
     const MockAccountControl = await ethers.getContractFactory("MockAccountControl")
     mockAccountControl = await MockAccountControl.deploy()
-    console.log("MockAccountControl deployed")
 
     // Setup system
-    console.log("Setting min mint amount...")
     await systemState.setMinMintAmount(ethers.utils.parseUnits("0.01", "ether"))
-    console.log("Setting redemption timeout...")
     await systemState.setRedemptionTimeout(86400)
-    console.log("System setup completed")
 
     // Setup QC
-    console.log("Registering QC...")
     await qcData.registerQC(
       qc.address,
       ethers.utils.parseUnits("100", "ether") // maxMintingCapacity
     )
-    console.log("QC registered and activated")
 
     // Register wallet with QC (required for redemptions)
-    console.log("Registering wallet with QC...")
     await qcData.registerWallet(qc.address, validBitcoinAddress)
-    console.log("Wallet registered")
 
     // For SPV security tests, we'll use a mock AccountControl contract
     // to allow initiateRedemption to work while focusing on SPV validation
-    console.log("Setting MockAccountControl for SPV tests...")
     await qcRedeemer.setAccountControl(mockAccountControl.address)
-    console.log("MockAccountControl set (tests will focus on SPV validation)")
 
     // Setup tokens
     await tbtcToken.mint(signers.user.address, testAmount.mul(10))
