@@ -31,7 +31,7 @@ import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
  * 5. Difficulty manipulation attacks
  * 6. Headers chain manipulation attacks
  */
-describe("SPV Security Tests [security]", () => {
+describe("SPV Security Tests [unit]", () => {
   let signers: TestSigners
 
   let qcManager: QCManager
@@ -149,7 +149,7 @@ describe("SPV Security Tests [security]", () => {
     await mockAccountControl.setTotalMintedForTesting(testAmount.mul(10))
   })
 
-  describe("Merkle Proof Manipulation Attacks [security]", () => {
+  describe("Merkle Proof Manipulation Attacks [unit]", () => {
     it("should reject proofs with mismatched merkle and coinbase proof lengths", async () => {
       // Attack: Provide merkle proof and coinbase proof of different lengths
       // This violates the requirement that both proofs are on same tree level
@@ -235,7 +235,7 @@ describe("SPV Security Tests [security]", () => {
     })
   })
 
-  describe("Transaction Replay Attacks [security]", () => {
+  describe("Transaction Replay Attacks [unit]", () => {
     it("should prevent reuse of same transaction for multiple redemptions", async () => {
       // Attack: Try to use same Bitcoin transaction to fulfill multiple redemptions
 
@@ -339,7 +339,7 @@ describe("SPV Security Tests [security]", () => {
     })
   })
 
-  describe("Bitcoin Address Attacks [security]", () => {
+  describe("Bitcoin Address Attacks [unit]", () => {
     it("should prevent address spoofing with similar-looking addresses", async () => {
       // Attack: Use visually similar but different Bitcoin address
 
@@ -394,7 +394,7 @@ describe("SPV Security Tests [security]", () => {
     })
   })
 
-  describe("Payment Manipulation Attacks [security]", () => {
+  describe("Payment Manipulation Attacks [unit]", () => {
     it("should prevent dust amount attacks", async () => {
       // Attack: Try to fulfill redemption with dust payment below threshold
 
@@ -490,7 +490,7 @@ describe("SPV Security Tests [security]", () => {
     })
   })
 
-  describe("Difficulty Manipulation Attacks [security]", () => {
+  describe("Difficulty Manipulation Attacks [unit]", () => {
     it("should reject proofs with insufficient accumulated difficulty", async () => {
       // Attack: Provide valid proof but with insufficient work
       // Our difficulty factor is set to 1000 for these tests (higher than normal)
@@ -535,7 +535,7 @@ describe("SPV Security Tests [security]", () => {
     })
   })
 
-  describe("Headers Chain Attacks [security]", () => {
+  describe("Headers Chain Attacks [unit]", () => {
     it("should reject invalid header chain structures", async () => {
       // Attack: Provide headers that don't form valid chain
 
@@ -621,7 +621,7 @@ describe("SPV Security Tests [security]", () => {
     })
   })
 
-  describe("Access Control and SPV Security [security]", () => {
+  describe("Access Control and SPV Security [unit]", () => {
     it("should prevent unauthorized SPV parameter changes", async () => {
       // Attack: Try to lower difficulty requirements as non-admin
 

@@ -9,7 +9,7 @@ import {
   SystemState,
   ReserveOracle,
   MockBank
-} from "../../typechain";
+} from "../../../typechain";
 
 describe("QCManagerLib - Consolidated Tests", function () {
   let qcManager: QCManager;

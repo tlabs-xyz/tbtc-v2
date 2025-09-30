@@ -68,7 +68,7 @@ describe("AccountControl", function () {
   // ===== CORE FUNCTIONALITY TESTS =====
 
   describe("Core Functionality", function () {
-    describe("Optimized totalMinted calculation [unit][smoke]", function () {
+    describe("Optimized totalMinted calculation [unit]", function () {
       it("should return zero initially", async function () {
         expect(await accountControl.totalMinted()).to.equal(0);
       });
@@ -168,7 +168,7 @@ describe("AccountControl", function () {
       });
     });
 
-    describe("Unit consistency [unit][smoke]", function () {
+    describe("Unit consistency [unit]", function () {
       it("should use correct satoshi constants", async function () {
         expect(await accountControl.MIN_MINT_AMOUNT()).to.equal(10000); // 0.0001 BTC in satoshis
         expect(await accountControl.MAX_SINGLE_MINT()).to.equal(10000000000); // 100 BTC in satoshis

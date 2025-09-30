@@ -12,8 +12,8 @@ import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
-describe("QCRedeemer [unit][smoke]", () => {
-  describe("Deployment [unit][smoke]", () => {
+describe("QCRedeemer [unit]", () => {
+  describe("Deployment [unit]", () => {
     it("should set correct dependencies", async () => {
       const { qcRedeemer } = await loadFixture(deployQCRedeemerFixture)
       expect(qcRedeemer.address).to.not.equal(ethers.constants.AddressZero)

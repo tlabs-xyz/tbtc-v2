@@ -16,8 +16,8 @@ export USE_EXTERNAL_DEPLOY=true
 export TEST_USE_STUBS_TBTC=true
 
 # Run tests in the organized directory structure
-# This automatically includes all .test.ts files in subdirectories
-TEST_PATTERN="test/account-control/**/*.test.ts"
+# Find all test files in subdirectories
+TEST_FILES=$(find test/account-control -name "*.test.ts" -type f | tr '\n' ' ')
 
 # Check if any arguments are provided for specific test filtering
 if [ $# -gt 0 ]; then
@@ -27,7 +27,7 @@ if [ $# -gt 0 ]; then
     echo ""
     
     # Run with timeout and error handling
-    timeout 3600 npx hardhat test "$TEST_PATTERN" "$@" || {
+    timeout 3600 npx hardhat test $TEST_FILES "$@" || {
         EXIT_CODE=$?
         echo ""
         echo "❌ Tests failed with exit code: $EXIT_CODE"
@@ -46,7 +46,7 @@ else
     echo ""
     
     # Run with timeout and error handling
-    timeout 3600 npx hardhat test "$TEST_PATTERN" || {
+    timeout 3600 npx hardhat test $TEST_FILES || {
         EXIT_CODE=$?
         echo ""
         echo "❌ Tests failed with exit code: $EXIT_CODE"

@@ -9,7 +9,7 @@ import {
 } from "../fixtures/base-setup"
 import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
-describe("SystemState [unit][smoke]", () => {
+describe("SystemState [unit]", () => {
   let signers: TestSigners
   let systemState: SystemState
   let pauserAccount: any
@@ -54,7 +54,7 @@ describe("SystemState [unit][smoke]", () => {
     await restoreBaseTestEnvironment()
   })
 
-  describe("Deployment [unit][smoke]", () => {
+  describe("Deployment [unit]", () => {
     it("should grant deployer all roles", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
       expect(await systemState.hasRole(DEFAULT_ADMIN_ROLE, signers.deployer.address)).to
@@ -777,7 +777,7 @@ describe("SystemState [unit][smoke]", () => {
     })
   })
 
-  describe("Emergency QC Functions [security]", () => {
+  describe("Emergency QC Functions [unit]", () => {
     let testQC: string
     let testReason: string
     let invalidQC: string

@@ -10,8 +10,8 @@ import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
-describe("QCManager [unit][smoke]", () => {
-  describe("Deployment [unit][smoke]", () => {
+describe("QCManager [unit]", () => {
+  describe("Deployment [unit]", () => {
     it("should set correct dependencies", async () => {
       const { qcManager } = await loadFixture(deployQCManagerFixture)
       expect(qcManager.address).to.not.equal(ethers.constants.AddressZero)
@@ -296,7 +296,7 @@ describe("QCManager [unit][smoke]", () => {
     })
   })
 
-  describe("Emergency Actions [security]", () => {
+  describe("Emergency Actions [unit]", () => {
     it("should allow dispute arbiter to freeze QC operations", async () => {
       const fixture = await loadFixture(deployQCManagerFixture)
       const { qcManager, arbiter } = fixture

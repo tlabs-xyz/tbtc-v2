@@ -11,8 +11,8 @@
  */
 
 // Re-export all helpers for backward compatibility
-export * from "./helpers/spv-data-helpers"
-export * from "./fixtures/test-data"
+export * from "./spv-data-helpers"
+export * from "../fixtures/test-data"
 
 // Import specific items that were exported individually
 import {
@@ -26,12 +26,12 @@ import {
   fulfillRedemptionForTest as _fulfillRedemptionForTest,
   createMockSpvValidationResult as _createMockSpvValidationResult,
   generateTestId as _generateTestId,
-} from "./helpers/spv-data-helpers"
+} from "./spv-data-helpers"
 
 import {
   bitcoinTestAddresses as _bitcoinTestAddresses,
   validLegacyBtc as _validLegacyBtc,
-} from "./fixtures/test-data"
+} from "../fixtures/test-data"
 
 // Export individual items for exact backward compatibility
 export type BitcoinTxInfo = _BitcoinTxInfo

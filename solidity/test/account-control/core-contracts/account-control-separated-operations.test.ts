@@ -2,12 +2,12 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
-import { AccountControl } from "../../typechain";
+import { AccountControl } from "../../../typechain";
 import {
     getTestAmounts,
     deployAccountControlForTest,
     cleanupDeployments
-} from "../helpers/testing-utils";
+} from "../../helpers/testing-utils";
 
 describe("AccountControl Separated Operations", function () {
     let accountControl: AccountControl;

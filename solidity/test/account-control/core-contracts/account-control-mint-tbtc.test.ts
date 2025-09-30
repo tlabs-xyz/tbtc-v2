@@ -2,8 +2,8 @@ import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
-import { AccountControl } from "../../typechain";
-import { setupAccountControlForTesting } from "../helpers/testSetupHelpers";
+import { AccountControl } from "../../../typechain";
+import { setupAccountControlForTesting } from "../../helpers/testSetupHelpers";
 
 describe("AccountControl mintTBTC Functionality", function () {
   let accountControl: AccountControl;

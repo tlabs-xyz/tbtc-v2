@@ -4,9 +4,9 @@ import type {
   SPVValidator,
   LightRelayStub,
   SystemTestRelay,
-} from "../../typechain"
-import { assertGasUsed } from "../integration/utils/gas"
-import type { SPVProofTestData } from "../data/bitcoin/spv/valid-spv-proofs"
+} from "../../../typechain"
+import { assertGasUsed } from "../../integration/utils/gas"
+import type { SPVProofTestData } from "../../data/bitcoin/spv/valid-spv-proofs"
 import type { BitcoinTxInfo, BitcoinTxProof } from "./account-control-test-helpers"
 
 /**
