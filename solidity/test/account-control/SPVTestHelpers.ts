@@ -195,7 +195,11 @@ class SPVTestHelpers {
     for (let i = 0; i < outputCount; i++) {
       // 8 bytes for value (little-endian)
       const valueHex = data.slice(0, 16)
-      const value = BigInt(`0x${valueHex.match(/../g)!.reverse().join("")}`)
+      const valueBytes = valueHex.match(/../g)
+      if (!valueBytes) {
+        throw new Error(`Malformed value hex in output ${i}: ${valueHex}`)
+      }
+      const value = BigInt(`0x${valueBytes.reverse().join("")}`)
       data = data.slice(16)
 
       // 1 byte for script length

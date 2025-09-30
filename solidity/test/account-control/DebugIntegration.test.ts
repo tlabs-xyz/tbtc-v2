@@ -27,6 +27,7 @@ describe("Debug AccountControl Integration", () => {
     // Check if AccountControl mode is enabled
     const isEnabled = await framework.contracts.systemState.accountControlMode()
     console.log("AccountControl mode enabled:", isEnabled)
+    expect(isEnabled).to.be.false // Default state is disabled
     
     // Check if QCMinter has AccountControl set
     const accountControlAddress = await framework.contracts.qcMinter.accountControl()
@@ -39,22 +40,27 @@ describe("Debug AccountControl Integration", () => {
     // Check backing
     const backing = await framework.contracts.accountControl.backing(qcAddress.address)
     console.log("QC backing:", backing.toString())
+    expect(backing).to.be.gt(0)
     
     // Check minting cap
     const mintingCap = await framework.contracts.accountControl.mintingCaps(qcAddress.address)
     console.log("QC minting cap:", mintingCap.toString())
+    expect(mintingCap).to.be.gt(0)
     
     // Check if QCMinter can mint
     const minterRole = await framework.contracts.accountControl.MINTER_ROLE()
     const hasMinterRole = await framework.contracts.accountControl.hasRole(minterRole, framework.contracts.qcMinter.address)
     console.log("QCMinter has MINTER_ROLE:", hasMinterRole)
+    expect(hasMinterRole).to.be.true
     
     // Check Bank authorizations
     const isBankAuthorized = await framework.contracts.mockBank.isBalanceIncreaserAuthorized(framework.contracts.accountControl.address)
     console.log("AccountControl authorized in Bank:", isBankAuthorized)
+    expect(isBankAuthorized).to.be.true
     
     const isQCMinterAuthorized = await framework.contracts.mockBank.isBalanceIncreaserAuthorized(framework.contracts.qcMinter.address)
     console.log("QCMinter authorized in Bank:", isQCMinterAuthorized)
+    expect(isQCMinterAuthorized).to.be.true
   })
 
   it("should trace mint execution", async () => {
@@ -88,6 +94,17 @@ describe("Debug AccountControl Integration", () => {
       
       const bankBalance = await framework.contracts.mockBank.balances(user.address)
       console.log("User bank balance:", bankBalance.toString())
+      
+      // Add assertions to validate mint execution
+      expect(finalMinted).to.equal(initialMinted.add(mintAmount))
+      expect(bankBalance).to.equal(mintAmount)
+      
+      // Verify transaction succeeded
+      expect(receipt.status).to.equal(1)
+      
+      // Verify events were emitted
+      expect(receipt.events).to.not.be.undefined
+      expect(receipt.events.length).to.be.gt(0)
       
     } catch (error: any) {
       console.error("Mint failed with error:", error.reason || error.message)

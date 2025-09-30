@@ -17,6 +17,7 @@ contract MockReimbursementPool {
 
     function transferOwnership(address newOwner) external {
         require(msg.sender == owner, "Only owner can transfer ownership");
+        require(newOwner != address(0), "Cannot transfer to zero address");
         owner = newOwner;
     }
 

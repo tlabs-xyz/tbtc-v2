@@ -31,6 +31,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
     error NotAuthorizedInBank();
     error InsufficientBalance();
     error ZeroAmount();
+    error AutoMintDisabled();
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
@@ -167,6 +168,7 @@ contract QCMinter is AccessControl, ReentrancyGuard {
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(GOVERNANCE_ROLE, msg.sender);
     }
 
     /// @notice Enable or disable auto-minting feature
@@ -335,10 +337,8 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             bank.increaseBalance(user, satoshis);
         }
 
-        // Auto-mint if enabled globally
-        if (autoMintEnabled) {
-            _executeAutoMint(user, satoshis);
-        }
+        // Note: Auto-mint removed from here - users must call executeAutoMint() separately
+        // after approving this contract to spend their Bank balance
 
         // Emit event for QC attribution
         emit QCBankBalanceCreated(qc, user, satoshis, mintId);
@@ -481,12 +481,12 @@ contract QCMinter is AccessControl, ReentrancyGuard {
             // Option 1: Automated minting - create balance and immediately mint tBTC
             satoshis = AccountControl(accountControl).mintTBTC(user, amount);
             
-            // Execute automated minting directly
-            _executeAutoMint(user, satoshis);
-            autoMintExecuted = true;
+            // Note: Auto-mint removed from here - users must call executeAutoMint() separately
+            // after approving this contract to spend their Bank balance
+            autoMintExecuted = false;
             
-            // Emit event for automated completion
-            emit QCMintCompleted(user, satoshis, true);
+            // Emit event indicating manual mint needed
+            emit QCMintCompleted(user, satoshis, false);
         } else {
             // Option 2: Manual process - just create Bank balance
             satoshis = AccountControl(accountControl).mintTBTC(user, amount);
@@ -614,10 +614,13 @@ contract QCMinter is AccessControl, ReentrancyGuard {
         hasAllowance = allowance >= balance;
     }
 
-    /// @dev Execute automated minting for user
-    /// @param user The user receiving tBTC tokens
-    /// @param satoshis Amount of satoshis to convert to tBTC
-    function _executeAutoMint(address user, uint256 satoshis) internal {
+    /// @notice Execute automated minting of tBTC from Bank balance
+    /// @dev User must have approved this contract to spend their Bank balance before calling
+    /// @param satoshis The amount of satoshis to convert to tBTC
+    function executeAutoMint(uint256 satoshis) external nonReentrant {
+        if (systemState.isMintingPaused()) revert MintingPaused();
+        if (!autoMintEnabled) revert AutoMintDisabled();
+        address user = msg.sender;
         if (user == address(0)) revert InvalidUserAddress();
         if (satoshis == 0) revert ZeroAmount();
         
