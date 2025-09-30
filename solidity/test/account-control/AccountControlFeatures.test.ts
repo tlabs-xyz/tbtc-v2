@@ -84,7 +84,7 @@ describe("AccountControl Features", function () {
   describe("Reserve Cap Reduction Safety", function () {
     beforeEach(async function () {
       // Mint some tokens first
-      await accountControl.connect(reserve1).mint(user1.address, 500000); // 0.005 BTC
+      await accountControl.connect(reserve1).atomicMint(user1.address, 500000); // 0.005 BTC
     });
 
     it("should prevent reducing cap below current minted amount", async function () {
@@ -233,7 +233,7 @@ describe("AccountControl Features", function () {
       // doesn't break existing functionality
       
       // Test core functionality still works
-      await accountControl.connect(reserve1).mint(user1.address, 100000);
+      await accountControl.connect(reserve1).atomicMint(user1.address, 100000);
       expect(await accountControl.minted(reserve1.address)).to.equal(100000);
       
       // Test all state variables are accessible

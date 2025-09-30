@@ -375,35 +375,6 @@ contract AccountControl is
         emit PureTokenMint(msg.sender, recipient, amount);
     }
 
-    /// @notice Original mint function for backward compatibility
-    /// @dev Combines token minting and accounting updates
-    /// @param recipient Address to receive minted tokens
-    /// @param amount Amount to mint in satoshis
-    function mint(address recipient, uint256 amount)
-        external
-        onlyAuthorizedReserve
-        nonReentrant
-        returns (bool)
-    {
-        // Validate mint amount bounds
-        if (amount < MIN_MINT_AMOUNT) {
-            revert AmountTooSmall(amount, MIN_MINT_AMOUNT);
-        }
-        if (amount > MAX_SINGLE_MINT) {
-            revert AmountTooLarge(amount, MAX_SINGLE_MINT);
-        }
-
-        // Check backing invariant - CRITICAL for security
-        if (backing[msg.sender] < minted[msg.sender] + amount) {
-            revert InsufficientBacking(backing[msg.sender], minted[msg.sender] + amount);
-        }
-
-        // Pure token minting without accounting updates
-        _mintTokensInternal(recipient, amount);
-
-        emit PureTokenMint(msg.sender, recipient, amount);
-        return true;
-    }
 
     /// @notice Pure token burning without accounting updates
     /// @dev Burns tokens from caller's balance without updating minted[reserve]
