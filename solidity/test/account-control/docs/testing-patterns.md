@@ -239,7 +239,7 @@ describe("Parameter Validation", () => {
 
 ```typescript
 import { createMockSpvData, setupMockRelayForSpv } from "../helpers/spv-data-helpers"
-import { SPVTestHelpers } from "../SPVTestHelpers"
+import { SPVTestHelpers } from "../helpers/spv-test-helpers-legacy"
 
 describe("SPV Functionality", () => {
   it("should validate correct SPV proofs", async () => {
@@ -403,7 +403,7 @@ describe("Data Validation", () => {
 ### Proof Manipulation Testing
 
 ```typescript
-import { SPVTestHelpers } from "../SPVTestHelpers"
+import { SPVTestHelpers } from "../helpers/spv-test-helpers-legacy"
 
 describe("Security Tests", () => {
   it("should reject proofs with insufficient work", async () => {

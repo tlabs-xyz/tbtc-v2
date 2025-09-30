@@ -383,7 +383,7 @@ await expect(transaction)
 
 ### SPV Testing Pattern
 ```typescript
-import { createRealSpvData, setupMockRelayForSpv } from "../AccountControlTestHelpers"
+import { createRealSpvData, setupMockRelayForSpv } from "../helpers/account-control-test-helpers"
 
 // For tests requiring valid SPV data
 const spvData = createRealSpvData()
@@ -395,7 +395,7 @@ const mockSpvData = createMockSpvData()
 
 ### Bitcoin Address Testing Pattern
 ```typescript
-import { bitcoinTestAddresses } from "../AccountControlTestHelpers"
+import { bitcoinTestAddresses } from "../helpers/account-control-test-helpers"
 
 // Use standardized test addresses
 const validAddress = bitcoinTestAddresses.validP2PKH

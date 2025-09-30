@@ -254,7 +254,7 @@ import {
   createRealSpvData,
   setupMockRelayForSpv
 } from "../helpers/spv-data-helpers"
-import { SPVTestHelpers } from "../SPVTestHelpers"
+import { SPVTestHelpers } from "../helpers/spv-test-helpers-legacy"
 import { validSpvProofs } from "../../data/bitcoin/spv/valid-spv-proofs"
 
 describe("SPVValidator", () => {

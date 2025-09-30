@@ -7,7 +7,7 @@ import type {
 } from "../../typechain"
 import { assertGasUsed } from "../integration/utils/gas"
 import type { SPVProofTestData } from "../data/bitcoin/spv/valid-spv-proofs"
-import type { BitcoinTxInfo, BitcoinTxProof } from "./AccountControlTestHelpers"
+import type { BitcoinTxInfo, BitcoinTxProof } from "./account-control-test-helpers"
 
 /**
  * Helper utilities for SPV validation testing

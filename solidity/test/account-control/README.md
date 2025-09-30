@@ -51,14 +51,8 @@ test/account-control/
 │   ├── mock-integration.test.ts    # Mock-based integration tests
 │   └── oracle-integration.test.ts   # Oracle integration scenarios
 │
-├── bitcoin-integration/             # Bitcoin address and transaction tests
-│   └── address-handling.test.ts    # Bitcoin address validation
-│
-└── Legacy Files (being migrated)
-    ├── AccountControl*.test.ts      # Original test files
-    ├── BitcoinAddress*.test.ts      # Address utility tests
-    ├── SPV*.test.ts                 # SPV-related legacy tests
-    └── SystemState*.test.ts         # System state legacy tests
+└── bitcoin-integration/             # Bitcoin address and transaction tests
+    └── address-handling.test.ts    # Bitcoin address validation
 ```
 
 ## Quick Start
@@ -230,9 +224,9 @@ await setupMockRelayForSpv(relay, spvData)
 - **[Helper Usage](./docs/helper-usage.md)**: Detailed documentation of helper functions
 - **[Contributing](./docs/contributing.md)**: Guidelines for adding new tests
 
-## Legacy Migration
+## Test Organization Complete
 
-This test suite represents a refactored and improved version of the original account-control tests. Legacy files are being gradually migrated to the new structure:
+The account-control test suite has been fully organized into a clean, modular structure:
 
 ### Migration Status
 - ✅ Helper infrastructure established
@@ -240,10 +234,13 @@ This test suite represents a refactored and improved version of the original acc
 - ✅ System management tests reorganized
 - ✅ SPV functionality consolidated
 - ✅ Integration tests enhanced
-- 🔄 Legacy file cleanup in progress
+- ✅ Legacy files migrated to appropriate directories
 
 ### Backward Compatibility
-The `AccountControlTestHelpers.ts` file provides backward compatibility by re-exporting from the new modular structure. For new code, import directly from the appropriate helper modules.
+Helper files in the `helpers/` directory maintain backward compatibility:
+- `account-control-test-helpers.ts` - Consolidated test helpers
+- `spv-test-helpers-legacy.ts` - SPV testing utilities
+For new code, import directly from the specific helper modules in the `helpers/` directory.
 
 ## Performance and Gas Analysis
 

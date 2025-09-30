@@ -657,7 +657,7 @@ When migrating legacy tests:
 1. **Update Imports**
    ```typescript
    // Old
-   import { createMockSpvData } from "../AccountControlTestHelpers"
+   import { createMockSpvData } from "../helpers/account-control-test-helpers"
 
    // New
    import { createMockSpvData } from "../helpers/spv-data-helpers"

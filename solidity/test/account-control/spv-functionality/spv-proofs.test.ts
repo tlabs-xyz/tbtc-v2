@@ -10,7 +10,7 @@ import {
 } from "../fixtures/base-setup"
 import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 import { deploySPVLibraries } from "../../helpers/spvLibraryHelpers"
-import SPVTestHelpers from "../SPVTestHelpers"
+import SPVTestHelpers from "../helpers/spv-test-helpers-legacy"
 import { ValidMainnetProof, P2PKHWalletControlProof, ComplexMultiInputTx } from "../../data/bitcoin/spv/valid-spv-proofs"
 
 /**

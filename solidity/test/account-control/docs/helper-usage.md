@@ -522,7 +522,7 @@ import {
   bitcoinTestAddresses,
   BitcoinTxInfo,
   BitcoinTxProof
-} from "../AccountControlTestHelpers"
+} from "../helpers/account-control-test-helpers"
 ```
 
 ### Index-based Imports
@@ -550,7 +550,7 @@ import {
   createMockSpvData,
   bitcoinTestAddresses,
   setupMockRelayForSpv
-} from "../AccountControlTestHelpers"
+} from "../helpers/account-control-test-helpers"
 ```
 
 ### New Pattern (Recommended)
