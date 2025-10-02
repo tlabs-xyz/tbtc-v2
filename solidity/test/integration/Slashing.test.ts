@@ -26,9 +26,9 @@ import {
   setupTestSigners,
   createBaseTestEnvironment,
   restoreBaseTestEnvironment,
-  TestSigners
+  TestSigners,
 } from "../fixtures/base-setup"
-import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-utils"
 import { TestMockFactory } from "../fixtures/mock-factory"
 import {
   Operators,
@@ -303,6 +303,7 @@ describeFn("Integration Test - Slashing", async () => {
           deposit.depositor,
           { from: deployer, value: 10 }
         )
+
         const redemptionAmount = 3_000 * constants.satoshiMultiplier
         redeemerOutputScript =
           "0x17a91486884e6be1525dab5ae0b451bd2c72cee67dcf4187"
@@ -458,6 +459,7 @@ describeFn("Integration Test - Slashing", async () => {
         const walletMembersIDs = walletMembers.getIds()
 
         const inactiveMembersIndices = [26, 40, 63, 78, 89]
+
         const claim = await produceOperatorInactivityClaim(
           hre,
           ecdsaWalletID,

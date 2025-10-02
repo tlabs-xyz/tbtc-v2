@@ -43,11 +43,13 @@ const fixture = async () => {
   await tbtc.deployed()
 
   const TBTCVault = await ethers.getContractFactory("TBTCVault")
+
   const vault = await TBTCVault.deploy(
     bank.address,
     tbtc.address,
     bridge.address
   )
+
   await vault.deployed()
 
   await tbtc.connect(deployer).transferOwnership(vault.address)

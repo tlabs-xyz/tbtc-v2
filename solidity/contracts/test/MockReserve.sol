@@ -28,7 +28,6 @@ contract MockReserve is Ownable {
     event BackingChanged(uint256 oldBacking, uint256 newBacking);
     event TokensMinted(address indexed recipient, uint256 amount);
     event TokensRedeemed(address indexed user, uint256 amount);
-    event BatchMintExecuted(uint256 totalAmount, uint256 recipientCount);
 
     // ========== ERRORS ==========
 
@@ -107,41 +106,11 @@ contract MockReserve is Ownable {
         totalUserBalances += amount;
 
         // AccountControl checks backing >= minted + amount
-        accountControl.mint(recipient, amount);
+        // Convert satoshis to tBTC (18 decimals) for mintTBTC
+        uint256 tbtcAmount = amount * 1e10; // SATOSHI_MULTIPLIER
+        accountControl.mintTBTC(address(this), recipient, tbtcAmount);
 
         emit TokensMinted(recipient, amount);
-    }
-
-    /// @notice Batch mint tokens to multiple recipients
-    /// @param recipients Array of recipient addresses
-    /// @param amounts Array of amounts to mint
-    function batchMint(
-        address[] calldata recipients,
-        uint256[] calldata amounts
-    ) external onlyOwner {
-        if (recipients.length != amounts.length) {
-            revert InvalidArrayLengths();
-        }
-
-        // Update state before external calls (CEI pattern)
-        uint256 total = 0;
-        for (uint256 i = 0; i < amounts.length; i++) {
-            if (recipients[i] == address(0)) {
-                revert InvalidRecipient();
-            }
-            total += amounts[i];
-            userBalances[recipients[i]] += amounts[i];
-        }
-
-        totalUserBalances += total;
-
-        // Batch mint through AccountControl if it supports it
-        // For now, we'll do individual mints as AccountControl may not have batch yet
-        for (uint256 i = 0; i < recipients.length; i++) {
-            accountControl.mint(recipients[i], amounts[i]);
-        }
-
-        emit BatchMintExecuted(total, recipients.length);
     }
 
     // ========== REDEMPTION OPERATIONS ==========

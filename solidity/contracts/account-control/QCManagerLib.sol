@@ -1,14 +1,29 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
+
+// ██████████████     ▐████▌     ██████████████
+// ██████████████     ▐████▌     ██████████████
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+// ██████████████     ▐████▌     ██████████████
+// ██████████████     ▐████▌     ██████████████
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+
 pragma solidity 0.8.17;
 
 import "./QCData.sol";
-import "./QCManagerErrors.sol";
+import "./QCErrors.sol";
 import "./ReserveOracle.sol";
 import "./AccountControl.sol";
 import "./SystemState.sol";
+import "./interfaces/IQCRedeemer.sol";
+import "./interfaces/IAccountControl.sol";
 import {BitcoinAddressUtils} from "./BitcoinAddressUtils.sol";
 import {CheckBitcoinSigs} from "@keep-network/bitcoin-spv-sol/contracts/CheckBitcoinSigs.sol";
-// MessageSigning import removed - not used in this library
 
 /**
  * @title QCManagerLib
@@ -22,49 +37,104 @@ import {CheckBitcoinSigs} from "@keep-network/bitcoin-spv-sol/contracts/CheckBit
  */
 library QCManagerLib {
 
-    // ========== EVENTS ==========
-    // Note: Events are defined in main QCManager contract as libraries cannot emit events directly
-
-    // ========== ERRORS ==========
-    // All error definitions are imported from QCManagerErrors.sol to avoid duplicates
+    // ========== STRUCTS ==========
+    
+    /// @notice Struct for QC registration data instead of direct external calls
+    struct QCRegistrationData {
+        address qc;
+        uint256 maxMintingCap;
+        bool shouldAuthorizeInAccountControl;
+        IAccountControl.ReserveType reserveType;
+    }
+    
+    /// @notice Struct for batch sync result data instead of storage parameters
+    struct BatchSyncResult {
+        address qc;
+        uint256 newTimestamp;
+        uint256 balance;
+        bool isStale;
+        bool success;
+    }
+    
+    /// @notice Struct for pause information instead of storage parameters
+    struct PauseInfoData {
+        bool isPaused;
+        uint256 pauseEndTime;
+        bool canEarlyResume;
+    }
+    
+    /// @notice Struct for oracle health check result
+    struct OracleHealthResult {
+        address qc;
+        bool healthy;
+        bool stale;
+        bool failed;
+        bool shouldUpdateStatus;
+        uint256 balance;
+        bool shouldUpdateCache;
+        bool shouldMarkFailure;
+        bool shouldClearFailure;
+    }
+    
+    /// @notice Struct for batch health check results
+    struct BatchHealthCheckResult {
+        uint256 healthyCount;
+        uint256 staleCount;
+        uint256 failedCount;
+        uint256 processedCount;
+        OracleHealthResult[] results;
+    }
+    
+    /// @notice Result structure for sync operations
+    struct SyncResult {
+        address qc;
+        uint256 balance;
+        bool isStale;
+        bool success;
+        bool shouldUpdateStatus;
+        bool shouldUpdateAccountControl;
+        uint256 newTimestamp;
+    }
 
     // ========== REGISTRATION LOGIC ==========
 
     /**
-     * @notice Register a new QC with validation and setup
+     * @notice Validate QC registration parameters and return action data
+     * @dev Returns structured data for caller to handle registration actions
      * @param qcData QCData contract instance
-     * @param accountControl AccountControl address for authorization
      * @param qc Address of the QC to register
      * @param maxMintingCap Maximum minting capacity for the QC
+     * @return registrationData Structured data for registration actions
      */
-    function registerQCWithValidation(
+    function validateQCRegistration(
         QCData qcData,
-        address accountControl,
         address qc,
         uint256 maxMintingCap
-    ) external {
+    ) internal view returns (QCRegistrationData memory registrationData) {
         // Validate qcData parameter
-        require(address(qcData) != address(0), "QCData cannot be zero");
+        if (address(qcData) == address(0)) {
+            revert QCErrors.InvalidQCDataAddress();
+        }
 
         // Input validation
         if (qc == address(0)) {
-            revert QCManagerErrors.InvalidQCAddress();
+            revert QCErrors.InvalidQCAddress();
         }
         if (maxMintingCap == 0) {
-            revert QCManagerErrors.InvalidMintingCapacity();
+            revert QCErrors.InvalidMintingCapacity();
         }
 
         if (qcData.isQCRegistered(qc)) {
-            revert QCManagerErrors.QCAlreadyRegistered(qc);
+            revert QCErrors.QCAlreadyRegistered(qc);
         }
 
-        // Register QC with provided minting capacity
-        qcData.registerQC(qc, maxMintingCap);
-
-        // Authorize QC in Account Control with minting cap
-        if (accountControl != address(0)) {
-            AccountControl(accountControl).authorizeReserve(qc, maxMintingCap);
-        }
+        // Return action data for caller to execute
+        return QCRegistrationData({
+            qc: qc,
+            maxMintingCap: maxMintingCap,
+            shouldAuthorizeInAccountControl: true,
+            reserveType: IAccountControl.ReserveType.QC_PERMISSIONED
+        });
     }
 
 
@@ -77,7 +147,7 @@ library QCManagerLib {
     function isValidStatusTransition(
         QCData.QCStatus from,
         QCData.QCStatus to
-    ) external pure returns (bool valid) {
+    ) internal pure returns (bool valid) {
         // Self-transitions always allowed
         if (from == to) return true;
 
@@ -123,30 +193,32 @@ library QCManagerLib {
      * @param newCap New minting capacity
      * @param accountControl AccountControl address for updating
      */
-    function updateMintingCapacity(
+    /**
+     * @notice Validate minting capacity update parameters
+     * @dev Returns validation results without making external calls
+     * @param qcData QCData contract instance
+     * @param qc QC address
+     * @param newCap New minting capacity
+     * @return currentCap Current minting capacity
+     * @return isValid Whether the update is valid
+     */
+    function validateMintingCapacityUpdate(
         QCData qcData,
         address qc,
-        uint256 newCap,
-        address accountControl
-    ) external {
+        uint256 newCap
+    ) internal view returns (uint256 currentCap, bool isValid) {
         if (!qcData.isQCRegistered(qc)) {
-            revert QCManagerErrors.QCNotRegistered(qc);
+            revert QCErrors.QCNotRegistered(qc);
         }
 
-        uint256 currentCap = qcData.getMaxMintingCapacity(qc);
+        currentCap = qcData.getMaxMintingCapacity(qc);
 
         // Only allow increases
         if (newCap <= currentCap) {
-            revert QCManagerErrors.NewCapMustBeHigher(currentCap, newCap);
+            revert QCErrors.NewCapMustBeHigher(currentCap, newCap);
         }
 
-        // Update in QCData
-        qcData.updateMaxMintingCapacity(qc, newCap);
-
-        // Update in AccountControl if set
-        if (accountControl != address(0)) {
-            AccountControl(accountControl).setMintingCap(qc, newCap);
-        }
+        return (currentCap, true);
     }
 
     /**
@@ -165,15 +237,19 @@ library QCManagerLib {
         ReserveOracle reserveOracle,
         address accountControl,
         address qc
-    ) external returns (uint256 balance, bool isStale) {
-        require(qc != address(0), "QC address cannot be zero");
-        require(accountControl != address(0), "AccountControl not set");
+    ) internal returns (uint256 balance, bool isStale) {
+        if (qc == address(0)) {
+            revert QCErrors.InvalidQCAddress();
+        }
+        if (accountControl == address(0)) {
+            revert QCErrors.AccountControlNotSet();
+        }
 
         // Get the latest attested balance from oracle
         (balance, isStale) = reserveOracle.getReserveBalanceAndStaleness(qc);
 
         // Update AccountControl with the oracle-attested balance
-        AccountControl(accountControl).setBacking(qc, balance);
+        IAccountControl(accountControl).setBacking(qc, balance);
 
         return (balance, isStale);
     }
@@ -248,132 +324,7 @@ library QCManagerLib {
     }
 
     /**
-     * @notice Derive Bitcoin P2WPKH (native SegWit) address from public key
-     * @dev Derives a bech32 encoded Bitcoin address (bc1...) from an uncompressed public key
-     * @param publicKey The uncompressed public key (64 bytes, no 0x04 prefix)
-     * @return btcAddress The derived Bitcoin address in bech32 format
-     */
-    function deriveBitcoinAddressFromPublicKey(bytes memory publicKey) internal pure returns (string memory) {
-        require(publicKey.length == 64, "Invalid public key length");
-        
-        // Step 1: Compress the public key
-        // Take the X coordinate (first 32 bytes)
-        bytes memory compressed = new bytes(33);
-        // Determine prefix based on Y coordinate parity
-        // Y coordinate is the last 32 bytes of the public key
-        bytes32 yCoordBytes;
-        for (uint i = 0; i < 32; i++) {
-            yCoordBytes |= bytes32(publicKey[32 + i]) >> (i * 8);
-        }
-        uint256 yCoord = uint256(yCoordBytes);
-        compressed[0] = (yCoord % 2 == 0) ? bytes1(0x02) : bytes1(0x03);
-        // Copy X coordinate
-        for (uint i = 0; i < 32; i++) {
-            compressed[i + 1] = publicKey[i];
-        }
-        
-        // Step 2: Hash the compressed public key
-        bytes20 pubKeyHash = ripemd160(abi.encodePacked(sha256(compressed)));
-        
-        // Step 3: Witness program is implicitly version 0 with 20 bytes pubKeyHash
-        
-        // Step 4: Convert to 5-bit groups for bech32
-        // Need 33 entries: 1 witness version + 32 payload groups (20 bytes * 8 bits / 5 bits = 32)
-        uint256[] memory values = new uint256[](39); // Extra space for checksum calculation
-        values[0] = 0; // witness version
-        
-        // Convert 20 bytes to 5-bit groups
-        uint256 accumulator = 0;
-        uint256 bits = 0;
-        uint256 idx = 1;
-        
-        for (uint256 i = 0; i < 20; i++) {
-            uint8 b = uint8(pubKeyHash[i]);
-            accumulator = (accumulator << 8) | b;
-            bits += 8;
-            
-            while (bits >= 5) {
-                bits -= 5;
-                values[idx++] = (accumulator >> bits) & 0x1f;
-            }
-        }
-        if (bits > 0) {
-            values[idx++] = (accumulator << (5 - bits)) & 0x1f;
-        }
-        
-        // Step 5: Calculate bech32 checksum
-        uint256 checksum = _bech32Checksum("bc", values, idx);
-        
-        // Append checksum (6 characters)
-        for (uint256 i = 0; i < 6; i++) {
-            values[idx++] = (checksum >> (5 * (5 - i))) & 0x1f;
-        }
-        
-        // Step 6: Encode as bech32
-        bytes memory result = "bc1";
-        bytes memory charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-        
-        for (uint256 i = 0; i < idx; i++) {
-            result = abi.encodePacked(result, charset[values[i]]);
-        }
-        
-        return string(result);
-    }
-
-    /**
-     * @notice Calculate bech32 checksum according to BIP 173
-     * @param hrp Human readable part (e.g., "bc")
-     * @param data The data part in 5-bit groups
-     * @param dataLen Length of data array to process
-     * @return checksum The 30-bit checksum
-     */
-    function _bech32Checksum(string memory hrp, uint256[] memory data, uint256 dataLen) internal pure returns (uint256) {
-        uint256 chk = 1;
-        
-        // Process HRP
-        bytes memory hrpBytes = bytes(hrp);
-        for (uint256 i = 0; i < hrpBytes.length; i++) {
-            chk = _bech32Polymod(chk) ^ (uint256(uint8(hrpBytes[i])) >> 5);
-        }
-        chk = _bech32Polymod(chk);
-        
-        for (uint256 i = 0; i < hrpBytes.length; i++) {
-            chk = _bech32Polymod(chk) ^ (uint256(uint8(hrpBytes[i])) & 0x1f);
-        }
-        
-        // Process data
-        for (uint256 i = 0; i < dataLen; i++) {
-            chk = _bech32Polymod(chk) ^ data[i];
-        }
-        
-        // Process 6 zeros for checksum
-        for (uint256 i = 0; i < 6; i++) {
-            chk = _bech32Polymod(chk);
-        }
-        
-        return chk ^ 1;
-    }
-
-    /**
-     * @notice Bech32 polymod function for checksum calculation
-     * @param pre Previous checksum state
-     * @return Updated checksum state
-     */
-    function _bech32Polymod(uint256 pre) internal pure returns (uint256) {
-        uint256 b = pre >> 25;
-        uint256 chk = (pre & 0x1ffffff) << 5;
-        
-        if (b & 1 != 0) chk ^= 0x3b6a57b2;
-        if (b & 2 != 0) chk ^= 0x26508e6d;
-        if (b & 4 != 0) chk ^= 0x1ea119fa;
-        if (b & 8 != 0) chk ^= 0x3d4233dd;
-        if (b & 16 != 0) chk ^= 0x2a1462b3;
-        
-        return chk;
-    }
-
-    /**
-     * @notice Enhanced status transition validation with detailed reasoning
+     * @notice Enhanced status transition validation with detailed reasoning\n     * @dev Complex state machine validation with business rule enforcement:\n     *      1. Self-transitions always allowed (idempotency)\n     *      2. Revoked is terminal state (no outbound transitions)\n     *      3. Cannot revoke QCs with unfulfilled redemptions (prevents fund loss)\n     *      4. Active state is most permissive (can transition anywhere)\n     *      5. Paused states have restricted transitions for operational safety\n     *      6. UnderReview can only go to Active or Revoked (governance decision)\n     *      7. Returns detailed error messages for governance transparency
      * @param from Current QC status
      * @param to Target QC status
      * @param hasUnfulfilledRedemptions Whether QC has pending redemptions
@@ -384,7 +335,7 @@ library QCManagerLib {
         QCData.QCStatus from,
         QCData.QCStatus to,
         bool hasUnfulfilledRedemptions
-    ) external pure returns (bool valid, string memory reason) {
+    ) internal pure returns (bool valid, string memory reason) {
         // Self-transitions always allowed
         if (from == to) return (true, "");
 
@@ -438,10 +389,6 @@ library QCManagerLib {
 
     // =================== BUSINESS LOGIC FUNCTIONS ===================
 
-
-
-    // calculateTimeUntilRenewal moved to QCManagerPauseLib
-
     /**
      * @notice Get reserve balance and staleness from oracle
      * @dev Retrieves the most recent attested reserve balance for a QC.
@@ -455,7 +402,7 @@ library QCManagerLib {
     function getReserveBalanceAndStaleness(
         ReserveOracle reserveOracle,
         address qc
-    ) external view returns (uint256 balance, bool isStale) {
+    ) internal view returns (uint256 balance, bool isStale) {
         return reserveOracle.getReserveBalanceAndStaleness(qc);
     }
 
@@ -477,7 +424,7 @@ library QCManagerLib {
         address qc,
         QCData qcData,
         ReserveOracle reserveOracle
-    ) external view returns (
+    ) internal view returns (
         bool isSolvent,
         uint256 backing,
         uint256 obligations,
@@ -503,7 +450,6 @@ library QCManagerLib {
 
     // =================== VIEW FUNCTIONS ===================
 
-
     /**
      * @notice Calculate available minting capacity for a QC
      * @dev Determines how much more tBTC a QC can mint based on:
@@ -520,7 +466,7 @@ library QCManagerLib {
         QCData qcData,
         ReserveOracle reserveOracle,
         address qc
-    ) external view returns (uint256 availableCapacity) {
+    ) internal view returns (uint256 availableCapacity) {
         // Check QC is active
         if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
             return 0;
@@ -585,35 +531,35 @@ library QCManagerLib {
     ) external view {
         // Check address length
         if (bytes(btcAddress).length == 0) {
-            revert QCManagerErrors.InvalidWalletAddress();
+            revert QCErrors.InvalidWalletAddress();
         }
 
         // Check QC registration
         if (!qcData.isQCRegistered(qc)) {
-            revert QCManagerErrors.QCNotRegistered(qc);
+            revert QCErrors.QCNotRegistered(qc);
         }
 
         // Check QC status
         if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
-            revert QCManagerErrors.QCNotActive(qc);
+            revert QCErrors.QCNotActive(qc);
         }
 
         // Validate Bitcoin address format
         if (!isValidBitcoinAddress(btcAddress)) {
-            revert QCManagerErrors.InvalidWalletAddress();
+            revert QCErrors.InvalidWalletAddress();
         }
 
         // Verify Bitcoin signature
         if (!verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
-            revert QCManagerErrors.SignatureVerificationFailed();
+            revert QCErrors.SignatureVerificationFailed();
         }
 
         // CRITICAL SECURITY FIX: Verify that the public key corresponds to the claimed Bitcoin address
         // This prevents signature bypass attacks where an attacker signs with any key
         // and claims ownership of any Bitcoin address
-        string memory derivedAddress = deriveBitcoinAddressFromPublicKey(walletPublicKey);
+        string memory derivedAddress = BitcoinAddressUtils.deriveBitcoinAddressFromPublicKey(walletPublicKey);
         if (keccak256(bytes(derivedAddress)) != keccak256(bytes(btcAddress))) {
-            revert QCManagerErrors.SignatureVerificationFailed();
+            revert QCErrors.SignatureVerificationFailed();
         }
     }
 
@@ -644,44 +590,36 @@ library QCManagerLib {
     ) external view returns (bytes32 challenge) {
         // Check QC registration and status
         if (!qcData.isQCRegistered(qc)) {
-            revert QCManagerErrors.QCNotRegistered(qc);
+            revert QCErrors.QCNotRegistered(qc);
         }
         if (qcData.getQCStatus(qc) != QCData.QCStatus.Active) {
-            revert QCManagerErrors.QCNotActive(qc);
+            revert QCErrors.QCNotActive(qc);
         }
 
         // Check address length
         if (bytes(btcAddress).length == 0) {
-            revert QCManagerErrors.InvalidWalletAddress();
+            revert QCErrors.InvalidWalletAddress();
         }
 
         // Generate deterministic challenge
-        challenge = keccak256(
-            abi.encodePacked(
-                "TBTC_QC_WALLET_DIRECT:",
-                qc,
-                btcAddress,
-                nonce,
-                block.chainid
-            )
-        );
+        challenge = keccak256(abi.encodePacked("TBTC_DIRECT:", qc, btcAddress, nonce));
 
         // Validate Bitcoin address format
         if (!isValidBitcoinAddress(btcAddress)) {
-            revert QCManagerErrors.InvalidWalletAddress();
+            revert QCErrors.InvalidWalletAddress();
         }
 
         // Verify Bitcoin signature
         if (!verifyBitcoinSignature(walletPublicKey, challenge, v, r, s)) {
-            revert QCManagerErrors.SignatureVerificationFailed();
+            revert QCErrors.SignatureVerificationFailed();
         }
 
-        // CRITICAL SECURITY FIX: Verify that the public key corresponds to the claimed Bitcoin address
+        // Verify that the public key corresponds to the claimed Bitcoin address
         // This prevents signature bypass attacks where an attacker signs with any key
         // and claims ownership of any Bitcoin address
-        string memory derivedAddress = deriveBitcoinAddressFromPublicKey(walletPublicKey);
+        string memory derivedAddress = BitcoinAddressUtils.deriveBitcoinAddressFromPublicKey(walletPublicKey);
         if (keccak256(bytes(derivedAddress)) != keccak256(bytes(btcAddress))) {
-            revert QCManagerErrors.SignatureVerificationFailed();
+            revert QCErrors.SignatureVerificationFailed();
         }
 
         return challenge;
@@ -692,7 +630,7 @@ library QCManagerLib {
         address qc,
         QCData.QCStatus oldStatus,
         QCData.QCStatus newStatus
-    ) external {
+    ) internal {
         if (oldStatus == newStatus) return;
 
         IAccountControl ac = IAccountControl(accountControl);
@@ -714,7 +652,7 @@ library QCManagerLib {
         QCData qcData,
         address qc,
         bytes32 autoEscalationReason
-    ) external returns (QCData.QCStatus newStatus) {
+    ) internal returns (QCData.QCStatus newStatus) {
         QCData.QCStatus currentStatus = qcData.getQCStatus(qc);
 
         if (currentStatus == QCData.QCStatus.MintingPaused ||
@@ -729,10 +667,619 @@ library QCManagerLib {
         return currentStatus;
     }
 
+    /**
+     * @notice Update reserve balance and check solvency
+     * @param qc The QC address
+     * @param newBalance The new reserve balance
+     * @param qcData QCData contract for minted amount
+     */
+    function updateReserveBalanceAndCheckSolvency(
+        address qc,
+        uint256 newBalance,
+        QCData qcData
+    ) internal view {
+        uint256 mintedAmount = qcData.getQCMintedAmount(qc);
+        if (newBalance < mintedAmount) {
+            revert QCErrors.QCWouldBecomeInsolvent(newBalance, mintedAmount);
+        }
+    }
+
+    /**
+     * @notice Get comprehensive pause information for a QC
+     */
+    /**
+     * @notice Calculate pause information from provided data
+     * @dev Pure function that processes pause data without storage access
+     * @param pauseTimestamp Pause timestamp for the QC
+     * @param canEarlyResume Whether QC can early resume
+     * @param selfPauseTimeout Timeout for self-pause
+     * @return pauseInfo Structured pause information
+     */
+    function calculatePauseInfo(
+        uint256 pauseTimestamp,
+        bool canEarlyResume,
+        uint256 selfPauseTimeout
+    ) internal pure returns (PauseInfoData memory pauseInfo) {
+        pauseInfo.isPaused = pauseTimestamp != 0;
+        pauseInfo.pauseEndTime = pauseInfo.isPaused ? pauseTimestamp + selfPauseTimeout : 0;
+        pauseInfo.canEarlyResume = canEarlyResume;
+    }
+
+    /**
+     * @notice Process single QC sync with full logic
+     * @dev Returns structured data for main contract to handle storage updates
+     * @param reserveOracle ReserveOracle contract
+     * @param qcData QCData contract
+     * @param qc QC address
+     * @return result Structured sync result
+     */
+    function processSingleSync(
+        address reserveOracle,
+        address qcData,
+        address qc
+    ) external view returns (SyncResult memory result) {
+        result.qc = qc;
+        result.newTimestamp = block.timestamp;
+        
+        // Try oracle first
+        try ReserveOracle(reserveOracle).getReserveBalanceAndStaleness(qc) returns (
+            uint256 _balance,
+            bool _isStale
+        ) {
+            result.balance = _balance;
+            result.isStale = _isStale;
+            result.success = true;
+            result.shouldUpdateAccountControl = true;
+            
+            // Check if should update status
+            if (_isStale && QCData(qcData).getQCStatus(qc) == QCData.QCStatus.Active) {
+                result.shouldUpdateStatus = true;
+            }
+        } catch {
+            // Oracle failed - sync fails
+            result.success = false;
+        }
+        
+        return result;
+    }
+    
+    /// @notice Check if QC has unfulfilled redemptions
+    function checkUnfulfilledRedemptions(address qcRedeemer, address qc) external view returns (bool) {
+        return qcRedeemer != address(0) && IQCRedeemer(qcRedeemer).hasUnfulfilledRedemptions(qc);
+    }
+
+    /// @notice Get earliest redemption deadline for a QC
+    function getEarliestRedemptionDeadline(address qcRedeemer, address qc) external view returns (uint256) {
+        if (qcRedeemer == address(0)) return 0;
+        try IQCRedeemer(qcRedeemer).getEarliestRedemptionDeadline(qc) returns (uint256 deadline) {
+            return deadline;
+        } catch { return 0; }
+    }
+
+    /// @notice Check if QC is eligible for escalation
+    /**
+     * @notice Check if QC is eligible for escalation based on pause time
+     * @dev Pure function that calculates escalation eligibility without storage access
+     * @param pauseTimestamp When the QC was paused
+     * @param selfPauseTimeout Timeout for self-pause
+     * @param currentTime Current timestamp
+     * @return eligible Whether QC is eligible for escalation
+     * @return timeUntilEscalation Time remaining until escalation
+     */
+    function calculateEscalationEligibility(
+        uint256 pauseTimestamp,
+        uint256 selfPauseTimeout,
+        uint256 currentTime
+    ) internal pure returns (bool eligible, uint256 timeUntilEscalation) {
+        if (pauseTimestamp == 0) return (false, 0);
+
+        uint256 elapsed = currentTime - pauseTimestamp;
+        return elapsed >= selfPauseTimeout ? (true, 0) : (false, selfPauseTimeout - elapsed);
+    }
+
+
+    /**
+     * @notice Process oracle health check with full logic
+     * @dev Returns structured data for main contract to handle storage updates
+     * @param reserveOracle ReserveOracle contract
+     * @param qcData QCData contract  
+     * @param qc QC address to check
+     * @param lastSyncTimestamp Last sync timestamp for QC
+     * @param oracleRetryInterval Retry interval for oracle
+     * @param oracleFailureDetected Whether oracle failure was previously detected
+     * @return result Structured result for processing
+     */
+    function processOracleHealthCheck(
+        address reserveOracle,
+        address qcData,
+        address qc,
+        uint256 lastSyncTimestamp,
+        uint256 oracleRetryInterval,
+        bool oracleFailureDetected
+    ) internal view returns (OracleHealthResult memory result) {
+        result.qc = qc;
+        
+        // Skip if checked recently
+        if (oracleRetryInterval > 0 && block.timestamp < lastSyncTimestamp + oracleRetryInterval) {
+            return result;
+        }
+        
+        // Try to get oracle data
+        try ReserveOracle(reserveOracle).getReserveBalanceAndStaleness(qc) returns (
+            uint256 balance, 
+            bool isStale
+        ) {
+            result.balance = balance;
+            
+            // Oracle working - check staleness
+            if (isStale && QCData(qcData).getQCStatus(qc) == QCData.QCStatus.Active) {
+                result.stale = true;
+                result.shouldUpdateStatus = true;
+                result.shouldUpdateCache = true;
+            } else {
+                result.healthy = true;
+                result.shouldUpdateCache = true;
+            }
+            
+            // Clear failure flag if it was set
+            if (oracleFailureDetected) {
+                result.shouldClearFailure = true;
+            }
+        } catch {
+            // Oracle failed
+            result.failed = true;
+            if (!oracleFailureDetected) {
+                result.shouldMarkFailure = true;
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @notice Process batch oracle health check with gas optimization
+     * @dev Returns structured results for main contract to handle storage updates
+     * @param reserveOracle ReserveOracle contract
+     * @param qcData QCData contract
+     * @param qcs Array of QC addresses to check
+     * @param lastSyncTimestamps Array of last sync timestamps for each QC
+     * @param oracleFailureDetected Array of oracle failure detection flags for each QC
+     * @param minGasPerOperation Minimum gas required per operation
+     * @return result Batch health check results
+     */
+    function processBatchOracleHealthCheck(
+        address reserveOracle,
+        address qcData,
+        address[] calldata qcs,
+        uint256[] calldata lastSyncTimestamps,
+        bool[] calldata oracleFailureDetected,
+        uint256 minGasPerOperation
+    ) external view returns (BatchHealthCheckResult memory result) {
+        require(qcs.length > 0 && qcs.length <= 100, "Invalid batch size");
+        require(qcs.length == lastSyncTimestamps.length && qcs.length == oracleFailureDetected.length, "Array length mismatch");
+        
+        // First pass: count how many we can process
+        uint256 canProcess = 0;
+        uint256 gasPerOp = minGasPerOperation;
+        for (uint256 i = 0; i < qcs.length; i++) {
+            if (gasleft() < gasPerOp) break;
+            canProcess++;
+        }
+        
+        result.results = new OracleHealthResult[](canProcess);
+        
+        for (uint256 i = 0; i < canProcess; i++) {
+            result.processedCount++;
+            
+            OracleHealthResult memory healthResult = processOracleHealthCheck(
+                reserveOracle,
+                qcData,
+                qcs[i],
+                lastSyncTimestamps[i],
+                0, // No rate limiting for health checks
+                oracleFailureDetected[i]
+            );
+            
+            result.results[i] = healthResult;
+            
+            // Update counters
+            if (healthResult.healthy) {
+                result.healthyCount++;
+            } else if (healthResult.stale) {
+                result.staleCount++;
+            } else if (healthResult.failed) {
+                result.failedCount++;
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * @notice Process batch sync for a single QC
+     * @dev Extracted from QCManager to reduce contract size
+     * @param reserveOracle ReserveOracle contract
+     * @param qcData QCData contract
+     * @param qc QC address
+     * @param lastSyncTimestamp Last sync timestamp
+     * @param minSyncInterval Minimum sync interval
+     * @return success Whether sync was successful
+     * @return balance Reserve balance if successful
+     * @return isStale Whether data is stale
+     * @return shouldUpdateStatus Whether status should be updated
+     */
+    function processSingleQCSync(
+        address reserveOracle,
+        address qcData, 
+        address qc,
+        uint256 lastSyncTimestamp,
+        uint256 minSyncInterval
+    ) internal view returns (
+        bool success,
+        uint256 balance,
+        bool isStale,
+        bool shouldUpdateStatus
+    ) {
+        // Check if valid QC
+        if (qc == address(0) || !QCData(qcData).isQCRegistered(qc)) {
+            return (false, 0, false, false);
+        }
+        
+        QCData.QCStatus status = QCData(qcData).getQCStatus(qc);
+        if (status == QCData.QCStatus.Revoked) {
+            return (false, 0, false, false);
+        }
+        
+        // Check rate limit (allow initial sync when timestamp is 0)
+        if (lastSyncTimestamp != 0 && block.timestamp < lastSyncTimestamp + minSyncInterval) {
+            return (false, 0, false, false);
+        }
+        
+        // Try oracle
+        try ReserveOracle(reserveOracle).getReserveBalanceAndStaleness(qc) returns (
+            uint256 _balance,
+            bool _isStale
+        ) {
+            // Check if should update status
+            bool _shouldUpdateStatus = _isStale && status == QCData.QCStatus.Active;
+            return (true, _balance, _isStale, _shouldUpdateStatus);
+        } catch {
+            return (false, 0, false, false);
+        }
+    }
+
+    /**
+     * @notice Handle solvency verification with enhanced error reporting
+     * @dev Extracted from QCManager to reduce contract size
+     * @param qc QC address to verify
+     * @param qcData QCData contract
+     * @param reserveOracle ReserveOracle contract
+     * @return solvent Whether QC is solvent
+     * @return shouldUpdateStatus Whether status should be updated
+     * @return newStatus New status if update needed
+     * @return mintedAmount Current minted amount
+     * @return reserveBalance Current reserve balance\n     * @return isStale Whether oracle data is stale
+     */
+    function performSolvencyVerification(
+        address qc,
+        address qcData,
+        address reserveOracle,
+        address /* performedBy */
+    ) external view returns (
+        bool solvent,
+        bool shouldUpdateStatus,
+        QCData.QCStatus newStatus,
+        uint256 mintedAmount,
+        uint256 reserveBalance,
+        bool isStale
+    ) {
+        (reserveBalance, isStale) = ReserveOracle(reserveOracle).getReserveBalanceAndStaleness(qc);
+        mintedAmount = QCData(qcData).getQCMintedAmount(qc);
+
+        if (isStale) {
+            solvent = false;
+            shouldUpdateStatus = QCData(qcData).getQCStatus(qc) == QCData.QCStatus.Active;
+            newStatus = QCData.QCStatus.UnderReview;
+        } else {
+            solvent = reserveBalance >= mintedAmount;
+            shouldUpdateStatus = !solvent && QCData(qcData).getQCStatus(qc) == QCData.QCStatus.Active;
+            newStatus = QCData.QCStatus.UnderReview;
+        }
+
+        return (solvent, shouldUpdateStatus, newStatus, mintedAmount, reserveBalance, isStale);
+    }
+
+    /**
+     * @notice Process auto-escalation for QCs that have timed out
+     * @dev Extracted from QCManager to reduce contract size
+     * @param qc QC address
+     * @param qcData QCData contract
+     * @param pauseTimestamp Pause timestamp for QC
+     * @param selfPauseTimeout Timeout for self-pause
+     * @param escalationWarningPeriod Warning period before escalation
+     * @param escalationWarningEmitted Whether warning was already emitted
+     * @return shouldEscalate Whether QC should be escalated
+     * @return shouldEmitWarning Whether warning should be emitted
+     * @return timeRemaining Time remaining until escalation
+     */
+    function processAutoEscalationCheck(
+        address qc,
+        address qcData,
+        uint256 pauseTimestamp,
+        uint256 selfPauseTimeout,
+        uint256 escalationWarningPeriod,
+        bool escalationWarningEmitted
+    ) external view returns (
+        bool shouldEscalate,
+        bool shouldEmitWarning,
+        uint256 timeRemaining
+    ) {
+        QCData.QCStatus currentStatus = QCData(qcData).getQCStatus(qc);
+        if (
+            currentStatus != QCData.QCStatus.Paused &&
+            currentStatus != QCData.QCStatus.MintingPaused
+        ) {
+            return (false, false, 0);
+        }
+
+        if (pauseTimestamp == 0) return (false, false, 0);
+
+        uint256 timeElapsed = block.timestamp - pauseTimestamp;
+
+        // Check for warning period
+        if (
+            timeElapsed >= selfPauseTimeout - escalationWarningPeriod &&
+            timeElapsed < selfPauseTimeout &&
+            !escalationWarningEmitted
+        ) {
+            timeRemaining = selfPauseTimeout - timeElapsed;
+            return (false, true, timeRemaining);
+        }
+
+        if (timeElapsed >= selfPauseTimeout) {
+            return (true, false, 0);
+        }
+
+        return (false, false, selfPauseTimeout - timeElapsed);
+    }
+
+    /**
+     * @notice Handle redemption default with graduated consequences
+     * @dev Extracted from QCManager to reduce contract size
+     * @param qcData QCData contract
+     * @param qc QC that defaulted
+     * @return oldStatus The old status
+     * @return newStatus The new status to set
+     * @return shouldClearPause Whether to clear pause tracking
+     */
+    function processRedemptionDefault(
+        address qcData,
+        address qc,
+        bytes32 /* redemptionId */
+    ) external view returns (
+        QCData.QCStatus oldStatus,
+        QCData.QCStatus newStatus,
+        bool shouldClearPause
+    ) {
+        oldStatus = QCData(qcData).getQCStatus(qc);
+        newStatus = oldStatus;
+
+        // Progressive escalation logic
+        if (
+            oldStatus == QCData.QCStatus.Active ||
+            oldStatus == QCData.QCStatus.MintingPaused
+        ) {
+            // First default → UnderReview
+            newStatus = QCData.QCStatus.UnderReview;
+        } else if (
+            oldStatus == QCData.QCStatus.UnderReview ||
+            oldStatus == QCData.QCStatus.Paused
+        ) {
+            // Second default → Revoked
+            newStatus = QCData.QCStatus.Revoked;
+        }
+        // Revoked QCs remain revoked
+
+        shouldClearPause = newStatus != oldStatus;
+        return (oldStatus, newStatus, shouldClearPause);
+    }
+
+    /**
+     * @notice Validate and process mint capacity consumption
+     * @dev Extracted from QCManager to reduce contract size
+     * @param qcData QCData contract
+     * @param qc QC address
+     * @param amount Amount to mint
+     * @return success Whether minting is allowed
+     * @return reason Reason for failure if applicable
+     */
+    function validateMintCapacityConsumption(
+        address qcData,
+        address qc,
+        uint256 amount
+    ) external view returns (bool success, string memory reason) {
+        if (qc == address(0)) return (false, "Invalid QC address");
+        if (amount == 0) return (false, "Invalid amount");
+        if (!QCData(qcData).isQCRegistered(qc)) return (false, "QC not registered");
+        if (QCData(qcData).getQCStatus(qc) != QCData.QCStatus.Active) return (false, "QC not active");
+
+        uint256 mintingCap = QCData(qcData).getMaxMintingCapacity(qc);
+        uint256 currentMinted = QCData(qcData).getQCMintedAmount(qc);
+
+        if (currentMinted + amount > mintingCap) return (false, "Exceeds minting cap");
+
+        return (true, "");
+    }
+
+
+    // =================== BATCH OPERATIONS ===================
+    
+    /**
+     * @notice Process batch sync backing data from oracle with gas optimization
+     * @dev Returns sync results for caller to handle storage updates and external calls
+     * @param reserveOracle ReserveOracle contract
+     * @param qcs Array of QC addresses to sync
+     * @param lastSyncTimestamps Array of last sync timestamps (parallel to qcs array)
+     * @param minSyncInterval Minimum sync interval
+     * @return syncResults Array of sync results for caller to process
+     * @return processedCount Total processed count
+     * @return skippedDueToGas Count skipped due to gas limits
+     */
+    function processBatchSyncFromOracle(
+        address reserveOracle,
+        address[] calldata qcs,
+        uint256[] calldata lastSyncTimestamps,
+        uint256 minSyncInterval
+    ) external view returns (
+        BatchSyncResult[] memory syncResults,
+        uint256 processedCount,
+        uint256 skippedDueToGas
+    ) {
+        if (qcs.length == 0 || qcs.length > 50) {
+            revert QCErrors.InvalidCapacity();
+        }
+        if (qcs.length != lastSyncTimestamps.length) {
+            revert QCErrors.InvalidCapacity();
+        }
+        
+        syncResults = new BatchSyncResult[](qcs.length);
+        uint256 resultCount = 0;
+        processedCount = 0;
+        skippedDueToGas = 0;
+
+        for (uint256 i = 0; i < qcs.length; i++) {
+            // Circuit breaker - ensure enough gas for remaining operations
+            if (gasleft() < 100000) {
+                skippedDueToGas = qcs.length - i;
+                break;
+            }
+            
+            processedCount++;
+            address currentQC = qcs[i];
+            
+            // Use existing single QC processing and create result directly
+            (bool _success, uint256 _balance, bool _isStale, ) = 
+                processSingleQCSync(reserveOracle, address(0), currentQC, lastSyncTimestamps[i], minSyncInterval);
+                
+            // Create result entry directly without intermediate variables
+            syncResults[resultCount++] = BatchSyncResult(
+                currentQC,
+                _success ? block.timestamp : lastSyncTimestamps[i],
+                _balance,
+                _isStale,
+                _success
+            );
+        }
+
+        // If we processed fewer items, create a properly sized array
+        if (resultCount < syncResults.length) {
+            BatchSyncResult[] memory resizedResults = new BatchSyncResult[](resultCount);
+            for (uint256 j = 0; j < resultCount; j++) {
+                resizedResults[j] = syncResults[j];
+            }
+            syncResults = resizedResults;
+        }
+        
+        return (syncResults, processedCount, skippedDueToGas);
+    }
+    
+    /**
+     * @notice Sync backing data from oracle for a single QC
+     * @dev Moved from QCManager to reduce contract size
+     * @param qc QC address to sync backing for
+     * @param reserveOracle ReserveOracle contract
+     * @param accountControl AccountControl contract
+     * @param lastSyncTimestamp Last sync timestamp for rate limiting
+     * @param minSyncInterval Minimum sync interval
+     * @return balance The synced balance
+     * @return isStale Whether data is stale
+     */
+    function syncBackingFromOracleInternal(
+        address qc,
+        address reserveOracle,
+        address accountControl,
+        uint256 lastSyncTimestamp,
+        uint256 minSyncInterval
+    ) external returns (uint256 balance, bool isStale) {
+        if (lastSyncTimestamp != 0 && 
+            block.timestamp < lastSyncTimestamp + minSyncInterval) {
+            revert QCErrors.OracleRetryTooSoon(lastSyncTimestamp + minSyncInterval);
+        }
+        if (qc == address(0)) {
+            revert QCErrors.InvalidQCAddress();
+        }
+
+        // Get reserve balance from oracle
+        (balance, isStale) = ReserveOracle(reserveOracle).getReserveBalanceAndStaleness(qc);
+        
+        // Update AccountControl
+        if (accountControl != address(0)) {
+            IAccountControl(accountControl).setBacking(qc, balance);
+        }
+        
+        return (balance, isStale);
+    }
+
+    // =================== VIEW FUNCTIONS FOR QCMANAGER ===================
+    
+    /**
+     * @notice Check if QC has unfulfilled redemptions
+     * @dev Moved from QCManager to reduce contract size
+     */
+    function hasUnfulfilledRedemptionsView(address qcRedeemer, address qc) external view returns (bool) {
+        return qcRedeemer != address(0) && IQCRedeemer(qcRedeemer).hasUnfulfilledRedemptions(qc);
+    }
+    
+    /**
+     * @notice Get available minting capacity for a QC
+     * @dev Moved from QCManager to reduce contract size
+     */
+    function getAvailableMintingCapacityView(
+        address qcData,
+        address reserveOracle,
+        address qc
+    ) external view returns (uint256) {
+        return calculateAvailableMintingCapacity(
+            QCData(qcData),
+            ReserveOracle(reserveOracle),
+            qc
+        );
+    }
+
+    /**
+     * @notice Helper function to update AccountControl backing to reduce stack depth
+     * @param accountControl AccountControl contract address
+     * @param validQCs Array of valid QC addresses
+     * @param backingAmounts Array of backing amounts
+     * @param validCount Number of valid entries
+     */
+    function _updateAccountControlBacking(
+        address accountControl,
+        address[] memory validQCs,
+        uint256[] memory backingAmounts,
+        uint256 validCount
+    ) internal {
+        if (validCount == 0 || accountControl == address(0)) return;
+
+        uint256 MIN_GAS_PER_OPERATION = 50000;
+        
+        try IAccountControl(accountControl).batchSetBacking(
+            validQCs,
+            backingAmounts
+        ) {
+            // Success
+        } catch {
+            // If batch fails, try individual updates as fallback
+            for (uint256 j = 0; j < validCount; j++) {
+                if (gasleft() < MIN_GAS_PER_OPERATION) break;
+                
+                try IAccountControl(accountControl).setBacking(
+                    validQCs[j],
+                    backingAmounts[j]
+                ) {} catch {}
+            }
+        }
+    }
+
 }
 
-interface IAccountControl {
-    function pauseReserve(address reserve) external;
-    function unpauseReserve(address reserve) external;
-    function deauthorizeReserve(address reserve) external;
-}

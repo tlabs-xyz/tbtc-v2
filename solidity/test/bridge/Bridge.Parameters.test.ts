@@ -26,9 +26,12 @@ describe("Bridge - Parameters", () => {
     context("when caller is the contract guvnor", () => {
       context("when all new parameter values are correct", () => {
         const newDepositDustThreshold = constants.depositDustThreshold * 2
+
         const newDepositTreasuryFeeDivisor =
           constants.depositTreasuryFeeDivisor * 2
+
         const newDepositTxMaxFee = constants.depositTxMaxFee * 3
+
         const newDepositRevealAheadPeriod =
           constants.depositRevealAheadPeriod * 2
 
@@ -259,13 +262,17 @@ describe("Bridge - Parameters", () => {
     context("when caller is the contract guvnor", () => {
       context("when all new parameter values are correct", () => {
         const newRedemptionDustThreshold = constants.redemptionDustThreshold * 2
+
         const newRedemptionTreasuryFeeDivisor =
           constants.redemptionTreasuryFeeDivisor / 2
+
         const newRedemptionTxMaxFee = constants.redemptionTxMaxFee * 3
         const newRedemptionTxMaxTotalFee = constants.redemptionTxMaxTotalFee * 3
         const newRedemptionTimeout = constants.redemptionTimeout * 4
+
         const newRedemptionTimeoutSlashingAmount =
           constants.redemptionTimeoutSlashingAmount.mul(2)
+
         const newRedemptionTimeoutNotifierRewardMultiplier =
           constants.redemptionTimeoutNotifierRewardMultiplier / 4
 
@@ -734,22 +741,32 @@ describe("Bridge - Parameters", () => {
       context("when all new parameter values are correct", () => {
         const newMovingFundsTxMaxTotalFee =
           constants.movingFundsTxMaxTotalFee / 2
+
         const newMovingFundsDustThreshold =
           constants.movingFundsDustThreshold * 2
+
         const newMovingFundsTimeoutResetDelay =
           constants.movingFundsTimeoutResetDelay * 2
+
         const newMovingFundsTimeout = constants.movingFundsTimeout * 2
+
         const newMovingFundsTimeoutSlashingAmount =
           constants.movingFundsTimeoutSlashingAmount.mul(3)
+
         const newMovingFundsTimeoutNotifierRewardMultiplier =
           constants.movingFundsTimeoutNotifierRewardMultiplier / 2
+
         const newMovingFundsCommitmentGasOffset =
           constants.movingFundsCommitmentGasOffset / 2
+
         const newMovedFundsSweepTxMaxTotalFee =
           constants.movedFundsSweepTxMaxTotalFee * 2
+
         const newMovedFundsSweepTimeout = constants.movedFundsSweepTimeout * 4
+
         const newMovedFundsSweepTimeoutSlashingAmount =
           constants.movedFundsSweepTimeoutSlashingAmount.mul(6)
+
         const newMovedFundsSweepTimeoutNotifierRewardMultiplier =
           constants.movedFundsSweepTimeoutNotifierRewardMultiplier / 4
 
@@ -1284,12 +1301,16 @@ describe("Bridge - Parameters", () => {
     context("when caller is the contract guvnor", () => {
       context("when all new parameter values are correct", () => {
         const newWalletCreationPeriod = constants.walletCreationPeriod * 2
+
         const newWalletCreationMinBtcBalance =
           constants.walletCreationMinBtcBalance.add(1000)
+
         const newWalletCreationMaxBtcBalance =
           constants.walletCreationMaxBtcBalance.add(2000)
+
         const newWalletClosureMinBtcBalance =
           constants.walletClosureMinBtcBalance.add(3000)
+
         const newWalletMaxAge = constants.walletMaxAge * 2
         const newWalletMaxBtcTransfer = constants.walletMaxBtcTransfer.add(1000)
         const newWalletClosingPeriod = constants.walletClosingPeriod * 2
@@ -1579,9 +1600,12 @@ describe("Bridge - Parameters", () => {
       context("when all new parameter values are correct", () => {
         const newFraudChallengeDepositAmount =
           constants.fraudChallengeDepositAmount.mul(4)
+
         const newFraudChallengeDefeatTimeout =
           constants.fraudChallengeDefeatTimeout * 3
+
         const newFraudSlashingAmount = constants.fraudSlashingAmount.mul(2)
+
         const newFraudNotifierRewardMultiplier =
           constants.fraudNotifierRewardMultiplier / 4
 

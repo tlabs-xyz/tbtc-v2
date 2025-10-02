@@ -1,30 +1,42 @@
 // SPDX-License-Identifier: GPL-3.0-only
+
+// ██████████████     ▐████▌     ██████████████
+// ██████████████     ▐████▌     ██████████████
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+// ██████████████     ▐████▌     ██████████████
+// ██████████████     ▐████▌     ██████████████
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./QCData.sol";
 import "./SystemState.sol";
-import "./SPVState.sol";
 import "./BitcoinAddressUtils.sol";
 import "../token/TBTC.sol";
-import "../bridge/BitcoinTx.sol";
-import {QCRedeemerSPV} from "./libraries/QCRedeemerSPV.sol";
 import "./AccountControl.sol";
-import "./QCManagerErrors.sol";
+import "./QCErrors.sol";
 
 /// @title QCRedeemer
 /// @dev Direct implementation for tBTC redemption with QC backing.
 /// Manages the entire lifecycle of a redemption request, handling
 /// fulfillment and default logic directly without interfaces.
-/// Implements SPV verification for redemption fulfillment.
+/// Manages redemption fulfillment through trusted arbiter validation.
 ///
 /// Key Features:
 /// - Collision-resistant redemption ID generation
 /// - Direct validation and fulfillment logic
 /// - Role-based access control for sensitive operations
 /// - Integration with tBTC token burning mechanism
-/// - SPV proof verification for Bitcoin transaction validation
+/// - Trusted arbiter validation for Bitcoin transaction verification
 /// - Wallet Obligation Tracking System (WOTS) for preventing wallet abandonment
 ///
 /// WOTS Design Notes:
@@ -36,37 +48,8 @@ import "./QCManagerErrors.sol";
 /// Role definitions:
 /// - DEFAULT_ADMIN_ROLE: Can grant/revoke roles
 /// - DISPUTE_ARBITER_ROLE: Can record redemption fulfillments and flag defaults
-contract QCRedeemer is AccessControl, ReentrancyGuard {
-    using SPVState for SPVState.Storage;
-    
-    // Custom errors for gas-efficient reverts
-    error InvalidAmount();
-    error BitcoinAddressRequired();
-    error InvalidBitcoinAddressFormat();
-    error RedemptionProcessingFailed();
-    error RedemptionNotPending();
-    error FulfillmentVerificationFailed();
-    error DefaultFlaggingFailed();
-    error InvalidRedemptionId();
-    error RedemptionIdAlreadyUsed(bytes32 redemptionId);
-    error InvalidBitcoinAddress(string btcAddress);
-    error ValidationFailed(address user, address qc, uint256 amount);
-    error RedemptionNotRequested(bytes32 redemptionId);
-    error RedemptionAlreadyFulfilled(bytes32 redemptionId);
-    error RedemptionAlreadyDefaulted(bytes32 redemptionId);
-    error RedemptionsArePaused();
-    error SPVVerificationFailed(bytes32 redemptionId);
-    error InvalidReason();
-    error SPVValidatorNotAvailable();
-    error RelayNotSet();
-    error InvalidRelayAddress();
-    error SPVProofValidationFailed(string reason);
-    error RedemptionProofFailed(string reason);
-    error InsufficientProofDifficulty();
-    error TransactionTooOld();
-    error InvalidBitcoinTransaction();
-    error PaymentNotFound();
-    error InsufficientPayment(uint64 expected, uint64 actual);
+contract QCRedeemer is AccessControl, ReentrancyGuard, QCErrors {
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     // Role definitions for access control
     bytes32 public constant DISPUTE_ARBITER_ROLE = keccak256("DISPUTE_ARBITER_ROLE");
@@ -85,19 +68,17 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         address qc;
         uint256 amount;
         uint256 requestedAt;
-        uint256 deadline;           // Added: Deadline for fulfillment
+        uint256 deadline;           // Deadline for fulfillment
         RedemptionStatus status;
         string userBtcAddress;
-        string qcWalletAddress;     // Added: QC's chosen wallet for this redemption
+        string qcWalletAddress;     // QC's chosen wallet for this redemption
     }
 
     // Contract dependencies
     TBTC public immutable tbtcToken;
     QCData public immutable qcData;
     SystemState public immutable systemState;
-    
-    // SPV validation storage
-    SPVState.Storage internal spvState;
+    AccountControl public accountControl;
 
     /// @dev Maps redemption IDs to redemption data
     mapping(bytes32 => Redemption) public redemptions;
@@ -115,26 +96,18 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     uint256 private redemptionCounter;
 
     /// @dev Track redemptions by QC for efficient lookup
-    mapping(address => bytes32[]) public qcRedemptions;
+    mapping(address => EnumerableSet.Bytes32Set) private qcRedemptions;
     
     /// @dev Track number of active redemptions per QC
     mapping(address => uint256) public qcActiveRedemptionCount;
     
     /// @dev Track redemptions by wallet for obligation management
-    /// @notice KNOWN LIMITATION: Arrays don't shrink after fulfillment/default
-    ///         This causes gas costs to increase over time as arrays grow.
-    ///         Mitigation: Use counter for obligation checks (O(1) complexity).
-    ///         Future improvement: Implement array cleanup or use EnumerableSet.
-    mapping(string => bytes32[]) public walletActiveRedemptions;
+    mapping(string => EnumerableSet.Bytes32Set) private walletActiveRedemptions;
     
     /// @dev Track number of active redemptions per wallet
-    /// @notice This counter is properly decremented on fulfillment/default,
-    ///         providing accurate obligation tracking despite array growth.
     mapping(string => uint256) public walletActiveRedemptionCount;
     
     // Account Control Integration
-    /// @dev Address of the Account Control contract
-    address public accountControl;
 
     // =================== EVENTS ===================
 
@@ -145,26 +118,17 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         address indexed qc,
         uint256 amount,
         string userBtcAddress,
-        address requestedBy,
-        uint256 timestamp
+        string qcWalletAddress
     );
     
-    /// @dev Emitted when a redemption is assigned to a specific wallet
-    event RedemptionAssignedToWallet(
-        bytes32 indexed redemptionId,
-        address indexed qc,
-        string walletAddress,
-        uint256 timestamp
-    );
-
     /// @dev Emitted when a redemption is fulfilled
     event RedemptionFulfilled(
         bytes32 indexed redemptionId,
         address indexed user,
         address indexed qc,
         uint256 amount,
-        address fulfilledBy,
-        uint256 timestamp
+        uint256 actualAmount,
+        address fulfilledBy
     );
 
     /// @dev Emitted when a redemption is flagged as defaulted
@@ -174,23 +138,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         address indexed qc,
         uint256 amount,
         bytes32 reason,
-        address defaultedBy,
-        uint256 timestamp
-    );
-
-    /// @dev Emitted when a redemption is fulfilled (policy-level event)
-    event RedemptionFulfilledByPolicy(
-        bytes32 indexed redemptionId,
-        address indexed verifiedBy,
-        uint256 indexed timestamp
-    );
-
-    /// @dev Emitted when a redemption is flagged as defaulted (policy-level event)
-    event RedemptionDefaultedByPolicy(
-        bytes32 indexed redemptionId,
-        bytes32 indexed reason,
-        address indexed flaggedBy,
-        uint256 timestamp
+        address defaultedBy
     );
 
     /// @dev Emitted when a redemption request fails
@@ -202,27 +150,21 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         address attemptedBy
     );
 
-    // Account Control Events
-    /// @dev Emitted when Account Control address is updated
-    event AccountControlUpdated(address indexed oldAddress, address indexed newAddress, address changedBy, uint256 timestamp);
-
     constructor(
         address _tbtcToken,
         address _qcData,
         address _systemState,
-        address _relay,
-        uint96 _txProofDifficultyFactor
+        address _accountControl
     ) {
         require(_tbtcToken != address(0), "Invalid token address");
         require(_qcData != address(0), "Invalid qcData address");
         require(_systemState != address(0), "Invalid systemState address");
+        require(_accountControl != address(0), "Invalid accountControl address");
 
         tbtcToken = TBTC(_tbtcToken);
         qcData = QCData(_qcData);
         systemState = SystemState(_systemState);
-        
-        // Initialize SPV state
-        spvState.initialize(_relay, _txProofDifficultyFactor);
+        accountControl = AccountControl(_accountControl);
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(DISPUTE_ARBITER_ROLE, msg.sender);
@@ -234,7 +176,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     /// @param userBtcAddress The user's Bitcoin address
     /// @param qcWalletAddress The QC's Bitcoin wallet that will handle this redemption
     /// @return redemptionId Unique identifier for this redemption request
-    /// @dev SECURITY: nonReentrant protects against reentrancy via TBTC burnFrom and external calls
+    /// @dev SECURITY: nonReentrant protects against reentrancy via TBTC burnFrom, AccountControl.notifyRedemption, and event emissions
     function initiateRedemption(
         address qc,
         uint256 amount,
@@ -246,23 +188,21 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             revert RedemptionsArePaused();
         }
         
-        if (qc == address(0)) revert QCManagerErrors.InvalidQCAddress();
-        if (amount == 0) revert InvalidAmount();
+        if (qc == address(0)) revert QCErrors.InvalidQCAddress();
+        require(amount > 0, "InvalidRedemptionAmount");
         if (bytes(userBtcAddress).length == 0) revert BitcoinAddressRequired();
         if (bytes(qcWalletAddress).length == 0) revert BitcoinAddressRequired();
 
         // Bitcoin address format validation for user address
-        if (!_isValidBitcoinAddress(userBtcAddress)) {
-            revert InvalidBitcoinAddressFormat();
-        }
+        if (!_isValidBitcoinAddress(userBtcAddress)) revert InvalidBitcoinAddressFormat(userBtcAddress);
         
         // Bitcoin address format validation for QC wallet address  
-        if (!_isValidBitcoinAddress(qcWalletAddress)) {
-            revert InvalidBitcoinAddressFormat();
-        }
+        if (!_isValidBitcoinAddress(qcWalletAddress)) revert InvalidBitcoinAddressFormat(qcWalletAddress);
         
         // Validate QC wallet is registered and active
-        require(qcData.getWalletOwner(qcWalletAddress) == qc, "Wallet not registered to QC");
+        address walletOwner = qcData.getWalletOwner(qcWalletAddress);
+        require(walletOwner != address(0), "Wallet not registered to QC");
+        require(walletOwner == qc, "Wallet not registered to QC");
         require(
             qcData.getWalletStatus(qcWalletAddress) == QCData.WalletStatus.Active,
             "Wallet not active"
@@ -270,7 +210,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
 
         // Check if QC is emergency paused
         if (systemState.isQCEmergencyPaused(qc)) {
-            revert SystemState.QCIsEmergencyPaused(qc);
+            revert QCErrors.QCIsEmergencyPaused(qc);
         }
 
         redemptionId = _generateRedemptionId(msg.sender, qc, amount);
@@ -305,12 +245,9 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // Burn the tBTC tokens
         tbtcToken.burnFrom(msg.sender, amount);
 
-        // Notify AccountControl of redemption only if AccountControl mode is enabled
-        if (systemState.isAccountControlEnabled()) {
-            require(accountControl != address(0), "AccountControl not set");
-            AccountControl(accountControl).redeemTBTC(amount);
-        }
-        // If AccountControl mode is disabled, redemption proceeds without AccountControl notification
+        // Convert tBTC amount to satoshis for AccountControl
+        uint256 satoshis = amount / 1e10; // Convert from 18 decimals (tBTC) to 8 decimals (satoshis), assuming 1:1 tBTC:BTC ratio
+        accountControl.notifyRedemption(qc, satoshis);
 
         // Calculate deadline
         uint256 redemptionTimeout = systemState.redemptionTimeout();
@@ -329,11 +266,11 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         });
         
         // Track redemption for QC
-        qcRedemptions[qc].push(redemptionId);
+        qcRedemptions[qc].add(redemptionId);
         qcActiveRedemptionCount[qc]++;
         
         // Track redemption for wallet
-        walletActiveRedemptions[qcWalletAddress].push(redemptionId);
+        walletActiveRedemptions[qcWalletAddress].add(redemptionId);
         walletActiveRedemptionCount[qcWalletAddress]++;
 
         emit RedemptionRequested(
@@ -342,33 +279,28 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             qc,
             amount,
             userBtcAddress,
-            msg.sender,
-            block.timestamp
-        );
-        
-        emit RedemptionAssignedToWallet(
-            redemptionId,
-            qc,
-            qcWalletAddress,
-            block.timestamp
+            qcWalletAddress
         );
 
         return redemptionId;
     }
 
-    /// @notice Record fulfillment of a redemption (DISPUTE_ARBITER_ROLE)
+
+    /// @notice Validate Bitcoin address format
+    /// @param bitcoinAddress The Bitcoin address to validate
+    /// @return isValid True if the address is valid
+    function validateBitcoinAddress(string calldata bitcoinAddress) external pure returns (bool isValid) {
+        return _isValidBitcoinAddress(bitcoinAddress);
+    }
+
+    /// @notice Record fulfillment of a redemption by trusting the arbiter (DISPUTE_ARBITER_ROLE)
     /// @param redemptionId The unique identifier of the redemption
-    /// @param userBtcAddress The user's Bitcoin address
-    /// @param expectedAmount The expected payment amount in satoshis
-    /// @param txInfo Bitcoin transaction information
-    /// @param proof SPV proof of transaction inclusion
+    /// @param actualAmount The actual payment amount in satoshis sent to user
+    /// @dev This is a trusted variant that relies on arbiter validation
     /// @dev SECURITY: nonReentrant protects against reentrancy via external calls
-    function recordRedemptionFulfillment(
+    function recordRedemptionFulfillmentTrusted(
         bytes32 redemptionId,
-        string calldata userBtcAddress,
-        uint64 expectedAmount,
-        BitcoinTx.Info calldata txInfo,
-        BitcoinTx.Proof calldata proof
+        uint64 actualAmount
     ) external onlyRole(DISPUTE_ARBITER_ROLE) nonReentrant {
         // Check if redemptions are paused
         if (systemState.isRedemptionPaused()) {
@@ -379,43 +311,26 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             revert RedemptionNotPending();
         }
 
-        // Validate and record fulfillment using internal logic
-        if (
-            !_recordFulfillment(
-                redemptionId,
-                userBtcAddress,
-                expectedAmount,
-                txInfo,
-                proof
-            )
-        ) {
+        // Validate and record fulfillment using trusted internal logic
+        if (!_recordFulfillmentTrusted(redemptionId, actualAmount)) {
             revert FulfillmentVerificationFailed();
         }
 
         // Update status
         redemptions[redemptionId].status = RedemptionStatus.Fulfilled;
         
-        // Note: Redemption accounting happens during initiateRedemption (when tokens are burned)
-        // This function only records the fulfillment proof that BTC was actually sent
-        // No additional AccountControl state changes needed here
-        
-        // Tokens were already burned during initiation (tbtcToken.burnFrom)
-        // Backing will be updated in ReserveOracle when BTC reserves decrease
-        // This maintains proper invariant: backing >= minted
-        
         // Update tracking for QC
         address qc = redemptions[redemptionId].qc;
         if (qcActiveRedemptionCount[qc] > 0) {
             qcActiveRedemptionCount[qc]--;
+            qcRedemptions[qc].remove(redemptionId);
         }
         
         // Update tracking for wallet
         string memory qcWalletAddress = redemptions[redemptionId].qcWalletAddress;
         if (walletActiveRedemptionCount[qcWalletAddress] > 0) {
             walletActiveRedemptionCount[qcWalletAddress]--;
-            // NOTE: We decrement the counter but don't remove from walletActiveRedemptions array
-            // This is intentional for V1 to keep logic simple and gas costs predictable
-            // The counter provides accurate obligation tracking for hasWalletObligations()
+            walletActiveRedemptions[qcWalletAddress].remove(redemptionId);
         }
 
         Redemption memory redemption = redemptions[redemptionId];
@@ -424,8 +339,8 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             redemption.user,
             redemption.qc,
             redemption.amount,
-            msg.sender,
-            block.timestamp
+            actualAmount,
+            msg.sender
         );
     }
 
@@ -454,15 +369,14 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         address qc = redemptions[redemptionId].qc;
         if (qcActiveRedemptionCount[qc] > 0) {
             qcActiveRedemptionCount[qc]--;
+            qcRedemptions[qc].remove(redemptionId);
         }
         
         // Update tracking for wallet
         string memory qcWalletAddress = redemptions[redemptionId].qcWalletAddress;
         if (walletActiveRedemptionCount[qcWalletAddress] > 0) {
             walletActiveRedemptionCount[qcWalletAddress]--;
-            // NOTE: We decrement the counter but don't remove from walletActiveRedemptions array
-            // This is intentional for V1 to keep logic simple and gas costs predictable
-            // The counter provides accurate obligation tracking for hasWalletObligations()
+            walletActiveRedemptions[qcWalletAddress].remove(redemptionId);
         }
 
         Redemption memory redemption = redemptions[redemptionId];
@@ -472,8 +386,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             redemption.qc,
             redemption.amount,
             reason,
-            msg.sender,
-            block.timestamp
+            msg.sender
         );
     }
 
@@ -522,43 +435,6 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     /// @return timeout The timeout period in seconds
     function getRedemptionTimeout() external view returns (uint256 timeout) {
         return systemState.redemptionTimeout();
-    }
-    
-    // =================== SPV CONFIGURATION FUNCTIONS ===================
-    
-    /// @notice Update the Bitcoin relay address
-    /// @param _relay New relay address
-    function setRelay(address _relay) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
-        spvState.setRelay(_relay);
-    }
-    
-    /// @notice Update the transaction proof difficulty factor
-    /// @param _txProofDifficultyFactor New difficulty factor
-    function setTxProofDifficultyFactor(uint96 _txProofDifficultyFactor) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
-        spvState.setTxProofDifficultyFactor(_txProofDifficultyFactor);
-    }
-    
-    /// @notice Get current SPV parameters
-    /// @return relay The current relay address
-    /// @return difficultyFactor The current difficulty factor
-    function getSPVParameters() 
-        external 
-        view 
-        returns (address relay, uint96 difficultyFactor) 
-    {
-        return spvState.getParameters();
-    }
-    
-    /// @notice Check if SPV validation is properly configured
-    /// @return isConfigured True if SPV state is initialized
-    function isSPVConfigured() external view returns (bool isConfigured) {
-        return spvState.isInitialized();
     }
 
     /// @notice Check if a redemption is fulfilled
@@ -619,7 +495,8 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         }
 
         // QC can be Active, MintingPaused, or UnderReview for redemptions (more permissive than minting)
-        // MintingPaused QCs can fulfill redemptions to maintain network continuity
+        // MintingPaused QCs can fulfill redemptions to maintain network continuity during operational issues
+        // This prevents user funds from being locked due to temporary QC operational problems
         QCData.QCStatus qcStatus = qcData.getQCStatus(qc);
         if (
             qcStatus != QCData.QCStatus.Active &&
@@ -637,19 +514,14 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         return true;
     }
 
-    /// @dev Internal function to record fulfillment
+
+    /// @dev Internal function to record fulfillment with trusted arbiter validation
     /// @param redemptionId The unique identifier of the redemption
-    /// @param userBtcAddress The user's Bitcoin address
-    /// @param expectedAmount The expected payment amount in satoshis
-    /// @param txInfo Bitcoin transaction information
-    /// @param proof SPV proof of transaction inclusion
+    /// @param actualAmount The actual payment amount in satoshis sent to user
     /// @return success True if the fulfillment was successfully recorded
-    function _recordFulfillment(
+    function _recordFulfillmentTrusted(
         bytes32 redemptionId,
-        string calldata userBtcAddress,
-        uint64 expectedAmount,
-        BitcoinTx.Info calldata txInfo,
-        BitcoinTx.Proof calldata proof
+        uint64 actualAmount
     ) internal returns (bool success) {
         // Input validation
         if (redemptionId == bytes32(0)) {
@@ -660,19 +532,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             revert RedemptionNotRequested(redemptionId);
         }
 
-        if (bytes(userBtcAddress).length == 0) {
-            revert InvalidBitcoinAddress(userBtcAddress);
-        }
-
-        // Validate BTC address matches the originally requested address
-        if (
-            keccak256(bytes(userBtcAddress)) !=
-            keccak256(bytes(redemptions[redemptionId].userBtcAddress))
-        ) {
-            revert RedemptionProofFailed("USER_ADDRESS_MISMATCH");
-        }
-
-        if (expectedAmount == 0) {
+        if (actualAmount == 0) {
             revert InvalidAmount();
         }
 
@@ -690,25 +550,8 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
             revert RedemptionsArePaused();
         }
 
-        // SPV proof verification
-        // Note: _verifySPVProof now reverts with RedemptionProofFailed on any error
-        _verifySPVProof(
-            redemptionId,
-            userBtcAddress,
-            expectedAmount,
-            txInfo,
-            proof
-        );
-
         // State update - mark as fulfilled
         fulfilledRedemptions[redemptionId] = true;
-
-        // Event emission for monitoring and indexing
-        emit RedemptionFulfilledByPolicy(
-            redemptionId,
-            msg.sender,
-            block.timestamp
-        );
 
         return true;
     }
@@ -746,61 +589,9 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         // State update - record the default with reason for audit trail
         defaultedRedemptions[redemptionId] = reason;
 
-        // Event emission for monitoring and audit
-        emit RedemptionDefaultedByPolicy(
-            redemptionId,
-            reason,
-            msg.sender,
-            block.timestamp
-        );
-
         return true;
     }
 
-    /// @dev Verify SPV proof for redemption fulfillment using SPV validator
-    /// @param redemptionId The redemption identifier
-    /// @param userBtcAddress The user's Bitcoin address
-    /// @param expectedAmount The expected payment amount
-    /// @param txInfo Bitcoin transaction information
-    /// @param proof SPV proof of transaction inclusion
-    /// @return verified True if verification successful
-    function _verifySPVProof(
-        bytes32 redemptionId,
-        string calldata userBtcAddress,
-        uint64 expectedAmount,
-        BitcoinTx.Info calldata txInfo,
-        BitcoinTx.Proof calldata proof
-    ) private view returns (bool verified) {
-        // Verify SPV state is initialized
-        if (!spvState.isInitialized()) {
-            revert RelayNotSet();
-        }
-        
-        // Complete SPV validation using library
-        
-        // 1. Validate SPV proof using library
-        // First try the safe validation to check if it would fail
-        (bool spvSuccess, ) = QCRedeemerSPV.validateSPVProofSafe(spvState, txInfo, proof);
-        if (!spvSuccess) {
-            revert RedemptionProofFailed("SPV proof validation failed");
-        }
-        
-        // 2. Verify transaction contains expected payment to userBtcAddress
-        if (!QCRedeemerSPV.verifyRedemptionPayment(userBtcAddress, expectedAmount, txInfo)) {
-            revert RedemptionProofFailed("Payment verification failed");
-        }
-        
-        // 3. Validate redemption-specific transaction requirements
-        Redemption memory redemption = redemptions[redemptionId];
-        if (!QCRedeemerSPV.validateRedemptionTransaction(uint8(redemption.status), txInfo)) {
-            revert RedemptionProofFailed("Transaction validation failed");
-        }
-        
-        return true;
-    }
-    
-    
-    
 
     /// @dev Generate unique redemption ID
     /// @param user The user requesting redemption
@@ -832,6 +623,13 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     function getPendingRedemptionCount(address qc) external view returns (uint256 count) {
         return qcActiveRedemptionCount[qc];
     }
+    
+    /// @notice Get all redemption IDs for a QC
+    /// @param qc The QC address to check
+    /// @return redemptionIds Array of active redemption IDs
+    function getQCRedemptions(address qc) external view returns (bytes32[] memory) {
+        return qcRedemptions[qc].values();
+    }
 
     /// @notice Check if QC has unfulfilled redemptions
     /// @param qc The QC address to check
@@ -844,7 +642,7 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     /// @param qc The QC address to check
     /// @return deadline Earliest deadline timestamp, or type(uint256).max if no pending redemptions
     function getEarliestRedemptionDeadline(address qc) external view returns (uint256 deadline) {
-        bytes32[] memory redemptionIds = qcRedemptions[qc];
+        bytes32[] memory redemptionIds = qcRedemptions[qc].values();
         uint256 earliest = type(uint256).max;
         
         for (uint256 i = 0; i < redemptionIds.length; i++) {
@@ -857,28 +655,12 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         return earliest;
     }
     
-    /// @notice Get SPV state information for debugging
-    /// @return relay Current relay address
-    /// @return difficultyFactor Current difficulty factor
-    /// @return isInitialized Whether SPV is properly configured
-    function getSPVState() external view returns (
-        address relay,
-        uint96 difficultyFactor,
-        bool isInitialized
-    ) {
-        (relay, difficultyFactor) = spvState.getParameters();
-        isInitialized = spvState.isInitialized();
-    }
-    
     // =================== Wallet Obligation Management ===================
     
     /// @notice Check if a wallet has unfulfilled redemption obligations
     /// @param walletAddress The Bitcoin wallet address to check
     /// @return hasObligations True if wallet has pending redemptions
     /// @dev CRITICAL FUNCTION: Used by QCManager to prevent wallet de-registration.
-    ///      This relies on walletActiveRedemptionCount being accurately maintained.
-    ///      Counter is decremented on fulfillment/default but arrays are not cleaned up.
-    ///      This design choice prioritizes gas efficiency (O(1)) over storage efficiency.
     function hasWalletObligations(string calldata walletAddress) 
         external 
         view 
@@ -901,15 +683,12 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     /// @notice Get earliest redemption deadline for a wallet
     /// @param walletAddress The Bitcoin wallet address to check
     /// @return deadline Earliest deadline timestamp, or type(uint256).max if no pending redemptions
-    /// @notice GAS WARNING: This function iterates through ALL redemption IDs for a wallet,
-    ///         including fulfilled/defaulted ones. Gas cost increases over time as array grows.
-    ///         For production use, consider caching results or implementing array cleanup.
     function getWalletEarliestRedemptionDeadline(string calldata walletAddress) 
         external 
         view 
         returns (uint256 deadline) 
     {
-        bytes32[] memory redemptionIds = walletActiveRedemptions[walletAddress];
+        bytes32[] memory redemptionIds = walletActiveRedemptions[walletAddress].values();
         uint256 earliest = type(uint256).max;
         
         for (uint256 i = 0; i < redemptionIds.length; i++) {
@@ -927,8 +706,6 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     /// @return activeCount Number of active redemptions
     /// @return totalAmount Total tBTC amount being redeemed
     /// @return earliestDeadline Earliest redemption deadline
-    /// @notice GAS WARNING: This function iterates through ALL redemption IDs for a wallet.
-    ///         Consider using getWalletPendingRedemptionCount() alone for basic checks.
     function getWalletObligationDetails(string calldata walletAddress)
         external
         view
@@ -939,13 +716,12 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
         )
     {
         activeCount = walletActiveRedemptionCount[walletAddress];
-        bytes32[] memory redemptionIds = walletActiveRedemptions[walletAddress];
+        bytes32[] memory redemptionIds = walletActiveRedemptions[walletAddress].values();
         
         earliestDeadline = type(uint256).max;
         totalAmount = 0;
         
-        // NOTE: This loops through ALL redemption IDs, including non-pending ones
-        // Counter provides accurate activeCount, but we need to iterate for amounts/deadlines
+        // Iterate through active redemptions to calculate totals
         for (uint256 i = 0; i < redemptionIds.length; i++) {
             Redemption memory redemption = redemptions[redemptionIds[i]];
             if (redemption.status == RedemptionStatus.Pending) {
@@ -959,30 +735,14 @@ contract QCRedeemer is AccessControl, ReentrancyGuard {
     
     /// @notice Get all redemption IDs for a wallet
     /// @param walletAddress The Bitcoin wallet address to check
-    /// @return redemptionIds Array of ALL redemption IDs (including fulfilled/defaulted)
-    /// @dev IMPORTANT: Returns all redemption IDs including fulfilled/defaulted ones.
-    ///      Array never shrinks, so this includes historical redemptions.
-    ///      Caller must check redemption status to filter active ones.
-    ///      For active count only, use getWalletPendingRedemptionCount() instead.
-    /// @notice GAS WARNING: Array size grows over time and never shrinks.
+    /// @return redemptionIds Array of active redemption IDs only
+    /// @dev Returns only active redemptions thanks to EnumerableSet cleanup
     function getWalletRedemptions(string calldata walletAddress)
         external
         view
         returns (bytes32[] memory)
     {
-        return walletActiveRedemptions[walletAddress];
-    }
-
-    // =================== CONFIGURATION FUNCTIONS ===================
-
-
-    /// @notice Set the Account Control contract address
-    /// @param _accountControl The address of the Account Control contract
-    /// @dev Only DEFAULT_ADMIN_ROLE can call this function
-    function setAccountControl(address _accountControl) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        address oldAddress = accountControl;
-        accountControl = _accountControl;
-        emit AccountControlUpdated(oldAddress, _accountControl, msg.sender, block.timestamp);
+        return walletActiveRedemptions[walletAddress].values();
     }
 
     // =================== BITCOIN ADDRESS VALIDATION ===================

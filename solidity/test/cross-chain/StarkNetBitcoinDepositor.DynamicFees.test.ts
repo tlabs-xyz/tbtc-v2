@@ -22,6 +22,7 @@ describe("StarkNetBitcoinDepositor - Dynamic Fee Estimation", () => {
 
   const l2TokenAddress =
     "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
   const INITIAL_MESSAGE_FEE = ethers.utils.parseEther("0.002")
 
   beforeEach(async () => {
@@ -35,17 +36,20 @@ describe("StarkNetBitcoinDepositor - Dynamic Fee Estimation", () => {
     const MockBridgeForStarkNet = await ethers.getContractFactory(
       "MockBridgeForStarkNet"
     )
+
     bridge = await MockBridgeForStarkNet.deploy()
 
     const MockTBTCVault = await ethers.getContractFactory(
       "contracts/test/MockTBTCVault.sol:MockTBTCVault"
     )
+
     tbtcVault = (await MockTBTCVault.deploy()) as MockTBTCVault
     await tbtcVault.setTbtcToken(tbtcToken.address)
 
     const MockStarkGateBridge = await ethers.getContractFactory(
       "MockStarkGateBridge"
     )
+
     starkGateBridge = await MockStarkGateBridge.deploy()
 
     // Deploy StarkNet depositor using proxy pattern
@@ -64,6 +68,7 @@ describe("StarkNetBitcoinDepositor - Dynamic Fee Estimation", () => {
         },
       }
     )
+
     starkNetDepositor = deployment[0] as StarkNetBitcoinDepositor
   })
 

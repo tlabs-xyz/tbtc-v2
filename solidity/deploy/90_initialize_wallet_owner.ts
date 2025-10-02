@@ -18,4 +18,6 @@ func.dependencies = ["Bridge"]
 func.runAtTheEnd = true
 
 func.skip = async (hre: HardhatRuntimeEnvironment): Promise<boolean> =>
-  hre.network.name === "mainnet" || hre.network.name === "hardhat" || hre.network.name === "localhost"
+  hre.network.name === "mainnet" ||
+  hre.network.name === "hardhat" ||
+  hre.network.name === "localhost"

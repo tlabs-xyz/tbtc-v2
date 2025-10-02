@@ -23,8 +23,6 @@ test/account-control/
 │   ├── bitcoin-helpers.ts           # Bitcoin-specific test utilities
 │   ├── error-helpers.ts             # Standardized error testing
 │   ├── gas-helpers.ts               # Gas usage analysis utilities
-│   ├── spv-helpers.ts               # SPV testing infrastructure
-│   └── spv-data-helpers.ts          # SPV data generation utilities
 │
 ├── core-contracts/                  # QC financial operation tests
 │   ├── qc-data.test.ts             # QC data structure tests
@@ -37,13 +35,6 @@ test/account-control/
 │   ├── system-state.test.ts        # System state management
 │   ├── reserve-oracle.test.ts      # Oracle functionality
 │   └── watchdog-enforcer.test.ts   # Watchdog enforcement
-│
-├── spv-functionality/               # SPV and Bitcoin integration tests
-│   ├── spv-proofs.test.ts          # SPV proof validation
-│   ├── spv-security.test.ts        # SPV security testing
-│   ├── spv-libraries.test.ts       # SPV library integration
-│   ├── payment-verification.test.ts # Payment verification
-│   └── wallet-registration.test.ts  # Wallet registration
 │
 ├── integration/                     # Cross-contract and end-to-end tests
 │   ├── cross-contract.test.ts      # Multi-contract interactions
@@ -65,7 +56,6 @@ npm test test/account-control
 
 # Run specific test categories
 npm test test/account-control/core-contracts
-npm test test/account-control/spv-functionality
 npm test test/account-control/integration
 
 # Run individual test files
@@ -78,7 +68,7 @@ All tests should use the standardized base setup:
 
 ```typescript
 import { createBaseTestEnvironment, restoreBaseTestEnvironment } from "../fixtures/base-setup"
-import { expectCustomError } from "../helpers/error-helpers"
+import { expectCustomError } from "../helpers/error-utils"
 
 describe("Your Test Suite", () => {
   let testEnv: TestEnvironment
@@ -120,14 +110,6 @@ Tests for system-level state and external integrations:
 - **Reserve Oracle**: Price feed and reserve ratio calculations
 - **Watchdog Enforcer**: Security monitoring and emergency procedures
 
-### SPV Functionality (`spv-functionality/`)
-Tests for Simplified Payment Verification and Bitcoin integration:
-- **SPV Proofs**: Bitcoin transaction proof validation
-- **SPV Security**: Security testing for proof manipulation attacks
-- **SPV Libraries**: Integration with Bitcoin SPV libraries
-- **Payment Verification**: Bitcoin payment confirmation
-- **Wallet Registration**: Bitcoin wallet control proof validation
-
 ### Integration (`integration/`)
 Tests for cross-contract interactions and complete workflows:
 - **Cross-Contract**: Multi-contract interaction testing
@@ -153,7 +135,6 @@ Shared infrastructure for consistent test environments:
 Specialized utilities for common testing patterns:
 
 - **`error-helpers.ts`**: Standardized error testing with `expectCustomError()`
-- **`spv-helpers.ts`**: SPV testing utilities and proof generation
 - **`gas-helpers.ts`**: Gas usage analysis and profiling
 - **`bitcoin-helpers.ts`**: Bitcoin-specific testing utilities
 
@@ -205,17 +186,16 @@ await expectCustomError(
 )
 ```
 
-### SPV Testing
+### Trusted Fulfillment Testing
 ```typescript
-import { createMockSpvData, setupMockRelayForSpv } from "../helpers/spv-data-helpers"
+// QCRedeemer now uses trusted arbiter validation
+import { TEST_CONSTANTS } from "../fixtures/AccountControlFixtures"
 
-const spvData = createMockSpvData({
-  txId: "example_tx_id",
-  outputIndex: 0,
-  value: ethers.utils.parseEther("1.0")
-})
-
-await setupMockRelayForSpv(relay, spvData)
+// Fulfill redemption with trusted arbiter
+await qcRedeemer.connect(arbiter).recordRedemptionFulfillmentTrusted(
+  redemptionId,
+  actualAmountSatoshis
+)
 ```
 
 ## Documentation
@@ -232,14 +212,12 @@ The account-control test suite has been fully organized into a clean, modular st
 - ✅ Helper infrastructure established
 - ✅ Core contracts organized and improved
 - ✅ System management tests reorganized
-- ✅ SPV functionality consolidated
 - ✅ Integration tests enhanced
 - ✅ Legacy files migrated to appropriate directories
 
 ### Backward Compatibility
 Helper files in the `helpers/` directory maintain backward compatibility:
 - `account-control-test-helpers.ts` - Consolidated test helpers
-- `spv-test-helpers-legacy.ts` - SPV testing utilities
 For new code, import directly from the specific helper modules in the `helpers/` directory.
 
 ## Performance and Gas Analysis
@@ -256,10 +234,10 @@ console.table(gasProfile)
 ## Security Testing
 
 Security testing patterns are standardized across the test suite:
-- SPV proof manipulation testing
 - Access control validation
 - Parameter validation testing
 - Edge case boundary testing
+- Trusted arbiter role security
 
 ## Continuous Integration
 

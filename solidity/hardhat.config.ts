@@ -1,19 +1,34 @@
 import { HardhatUserConfig } from "hardhat/config"
-import "./tasks"
-
 import "dotenv/config"
+
+// Core imports (always needed)
 import "@keep-network/hardhat-helpers"
-import "@keep-network/hardhat-local-networks-config"
 import "@nomiclabs/hardhat-waffle"
 import "@nomicfoundation/hardhat-chai-matchers"
-import "@nomiclabs/hardhat-etherscan"
-import "hardhat-gas-reporter"
-import "hardhat-contract-sizer"
-import "hardhat-deploy"
-import "@tenderly/hardhat-tenderly"
 import "@typechain/hardhat"
+import "hardhat-deploy"
 import "hardhat-dependency-compiler"
-import "solidity-docgen"
+
+// Environment detection
+const isTestEnv =
+  process.env.NODE_ENV === "test" ||
+  process.env.HARDHAT_NETWORK === "hardhat" ||
+  process.env.TEST_ENV === "true"
+
+// Production imports (conditionally imported)
+if (!isTestEnv) {
+  try {
+    require("./tasks")
+    require("@keep-network/hardhat-local-networks-config")
+    require("@nomiclabs/hardhat-etherscan")
+    require("hardhat-gas-reporter")
+    require("hardhat-contract-sizer")
+    require("@tenderly/hardhat-tenderly")
+    require("solidity-docgen")
+  } catch (error) {
+    console.warn("Some production plugins could not be loaded:", error.message)
+  }
+}
 
 const ecdsaSolidityCompilerConfig = {
   version: "0.8.17",
@@ -60,7 +75,7 @@ const config: HardhatUserConfig = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 1000,
+            runs: isTestEnv ? 100 : 1000, // Optimize for size in tests, gas efficiency in production
           },
         },
       },
@@ -79,38 +94,54 @@ const config: HardhatUserConfig = {
           viaIR: true, // Enable intermediate representation for better optimization
         },
       },
+      "contracts/account-control/QCManagerLib.sol": {
+        version: "0.8.17",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200, // Optimize for size with reasonable gas efficiency
+          },
+          viaIR: true, // Enable intermediate representation for better optimization
+        },
+      },
     },
   },
 
   paths: {
     artifacts: "./build",
+    deploy: "./deploy",
+    deployments: "./deployments",
   },
 
   networks: {
     hardhat: {
-      forking: {
-        // forking is enabled only if FORKING_URL env is provided
-        enabled: !!process.env.FORKING_URL,
-        // URL should point to a node with archival data (Alchemy recommended)
-        url: process.env.FORKING_URL || "",
-        // latest block is taken if FORKING_BLOCK env is not provided
-        blockNumber:
-          process.env.FORKING_BLOCK && parseInt(process.env.FORKING_BLOCK, 10),
-      },
+      forking: isTestEnv
+        ? undefined
+        : {
+            // forking is enabled only if FORKING_URL env is provided
+            enabled: !!process.env.FORKING_URL,
+            // URL should point to a node with archival data (Alchemy recommended)
+            url: process.env.FORKING_URL || "",
+            // latest block is taken if FORKING_BLOCK env is not provided
+            blockNumber:
+              process.env.FORKING_BLOCK &&
+              parseInt(process.env.FORKING_BLOCK, 10),
+          },
       accounts: {
-        // Number of accounts that should be predefined on the testing environment.
-        count:
-          testConfig.nonStakingAccountsCount +
-          testConfig.stakingRolesCount * testConfig.operatorsCount,
+        // Simplified account count for tests, full count for production
+        count: isTestEnv
+          ? 50
+          : testConfig.nonStakingAccountsCount +
+            testConfig.stakingRolesCount * testConfig.operatorsCount,
       },
       tags: ["allowStubs"],
       // we use higher gas price for tests to obtain more realistic results
       // for gas refund tests than when the default hardhat ~1 gwei gas price is
       // used
       gasPrice: 200000000000, // 200 gwei
-      // Ignore contract size on deployment to hardhat network, to be able to
-      // deploy stub contracts in tests.
-      allowUnlimitedContractSize: process.env.TEST_USE_STUBS_TBTC === "true",
+      // Allow oversized contracts in test environment, conditional in production
+      allowUnlimitedContractSize:
+        isTestEnv || process.env.TEST_USE_STUBS_TBTC === "true",
     },
     system_tests: {
       url: "http://127.0.0.1:8545",
@@ -254,20 +285,8 @@ const config: HardhatUserConfig = {
     ],
     keep: true,
   },
-  etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
-  },
-  contractSizer: {
-    alphaSort: true,
-    disambiguatePaths: false,
-    runOnCompile: process.env.CONTRACT_SIZE_CHECK_DISABLED !== "true",
-    strict: false,
-    // WalletRegistry is excluded because it's an external dependency from @keep-network/ecdsa
-    // that exceeds the 24KB contract size limit (24.142 KB). We don't control this contract.
-    except: ["BridgeStub$", "WalletRegistry$"],
-  },
   mocha: {
-    timeout: 600_000, // Increased timeout for complex tests (10 minutes)
+    timeout: isTestEnv ? 60000 : 600_000, // 1 minute for tests, 10 minutes for production
     slow: 5000, // Mark tests taking >5s as slow
     reporter: "spec",
     // Reduce parallel execution to help with lock file conflicts
@@ -276,12 +295,30 @@ const config: HardhatUserConfig = {
   typechain: {
     outDir: "typechain",
   },
-  docgen: {
-    outputDir: "generated-docs",
-    templates: "docgen-templates",
-    pages: "files", // `single`, `items` or `files`
-    exclude: ["./test"],
-  },
+
+  // Production-only configurations
+  ...(isTestEnv
+    ? {}
+    : {
+        etherscan: {
+          apiKey: process.env.ETHERSCAN_API_KEY,
+        },
+        contractSizer: {
+          alphaSort: true,
+          disambiguatePaths: false,
+          runOnCompile: process.env.CONTRACT_SIZE_CHECK_DISABLED !== "true",
+          strict: false,
+          // WalletRegistry is excluded because it's an external dependency from @keep-network/ecdsa
+          // that exceeds the 24KB contract size limit (24.142 KB). We don't control this contract.
+          except: ["BridgeStub$", "WalletRegistry$"],
+        },
+        docgen: {
+          outputDir: "generated-docs",
+          templates: "docgen-templates",
+          pages: "files", // `single`, `items` or `files`
+          exclude: ["./test"],
+        },
+      }),
 }
 
 export default config

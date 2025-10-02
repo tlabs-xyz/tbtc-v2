@@ -59,4 +59,13 @@ contract MockQCRedeemer is IQCRedeemer {
     function setWalletEarliestDeadline(string calldata walletAddress, uint256 deadline) external {
         walletEarliestDeadlines[walletAddress] = deadline;
     }
+
+    /// @notice Validate Bitcoin address format
+    /// @param btcAddress Bitcoin address to validate
+    /// @return true if address appears valid, false otherwise
+    function validateBitcoinAddress(string memory btcAddress) external pure returns (bool) {
+        bytes memory addrBytes = bytes(btcAddress);
+        // Basic validation: P2PKH (26-35 chars), P2SH (34 chars), Bech32 (42-62 chars)
+        return addrBytes.length >= 26 && addrBytes.length <= 62;
+    }
 }

@@ -35,6 +35,7 @@ describe("ReserveOracle", () => {
       arbiterSigner,
       ownerSigner,
     ] = await ethers.getSigners()
+
     deployer = deployerSigner
     attester1 = attester1Signer
     attester2 = attester2Signer
@@ -50,11 +51,17 @@ describe("ReserveOracle", () => {
   beforeEach(async () => {
     await createSnapshot()
 
+    // Deploy mock SystemState first
+    const MockSystemState = await ethers.getContractFactory("MockSystemState")
+    const systemState = await MockSystemState.deploy()
+    await systemState.deployed()
+
     // Deploy ReserveOracle
     const ReserveOracleFactory = await ethers.getContractFactory(
       "ReserveOracle"
     )
-    reserveOracle = await ReserveOracleFactory.deploy()
+
+    reserveOracle = await ReserveOracleFactory.deploy(systemState.address)
     await reserveOracle.deployed()
 
     // Grant roles
@@ -102,6 +109,7 @@ describe("ReserveOracle", () => {
       const tx = await reserveOracle
         .connect(attester1)
         .attestBalance(qcAddress.address, balance)
+
       await expect(tx).to.emit(reserveOracle, "AttestationSubmitted")
       await expect(tx).to.emit(reserveOracle, "AttesterRegistered")
 
@@ -110,6 +118,7 @@ describe("ReserveOracle", () => {
           qcAddress.address,
           attester1.address
         )
+
       expect(attestedBalance).to.equal(balance)
       expect(timestamp).to.be.gt(0)
     })
@@ -130,12 +139,14 @@ describe("ReserveOracle", () => {
       const tx = await reserveOracle
         .connect(attester1)
         .attestBalance(qcAddress.address, 0)
+
       await expect(tx).to.emit(reserveOracle, "AttestationSubmitted")
 
       const [attestedBalance] = await reserveOracle.getPendingAttestation(
         qcAddress.address,
         attester1.address
       )
+
       expect(attestedBalance).to.equal(0)
     })
 
@@ -170,6 +181,7 @@ describe("ReserveOracle", () => {
         qc1,
         attester1.address
       )
+
       expect(balance1Result).to.equal(balance1)
 
       // Check second QC attestation
@@ -177,11 +189,13 @@ describe("ReserveOracle", () => {
         qc2,
         attester1.address
       )
+
       expect(balance2Result).to.equal(balance2)
     })
 
     it("should revert with mismatched arrays", async () => {
       const qcs = [qcAddress.address]
+
       const balances = [
         ethers.utils.parseEther("100"),
         ethers.utils.parseEther("200"),
@@ -222,9 +236,11 @@ describe("ReserveOracle", () => {
 
       // Should emit 2 consensus events
       const receipt = await tx.wait()
+
       const consensusEvents = receipt.events?.filter(
         (e) => e.event === "ConsensusReached"
       )
+
       expect(consensusEvents).to.have.length(2)
     })
 
@@ -260,11 +276,13 @@ describe("ReserveOracle", () => {
       const tx = await reserveOracle
         .connect(attester3)
         .attestBalance(qcAddress.address, balance)
+
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
       // Check that reserve was updated
       const [reserveBalance, isStale] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
       expect(reserveBalance).to.equal(balance)
       expect(isStale).to.be.false
     })
@@ -282,19 +300,23 @@ describe("ReserveOracle", () => {
       const tx = await reserveOracle
         .connect(attester3)
         .attestBalance(qcAddress.address, ethers.utils.parseEther("110"))
+
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
       // Verify median was calculated correctly (median of 90, 100, 110 is 100)
       const [reserveBalance] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
       expect(reserveBalance).to.equal(ethers.utils.parseEther("100"))
     })
 
     it("should handle even number of attestations", async () => {
       // First grant DISPUTE_ARBITER_ROLE to deployer
       const DISPUTE_ARBITER_ROLE = await reserveOracle.DISPUTE_ARBITER_ROLE()
-      await reserveOracle.connect(deployer).grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
-      
+      await reserveOracle
+        .connect(deployer)
+        .grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
+
       // Update threshold to 5 (must be odd)
       await reserveOracle.connect(deployer).setConsensusThreshold(5)
 
@@ -313,7 +335,7 @@ describe("ReserveOracle", () => {
       await reserveOracle
         .connect(attester4)
         .attestBalance(qcAddress.address, ethers.utils.parseEther("110"))
-      
+
       // Fifth attestation triggers consensus (threshold is 5)
       await expect(
         reserveOracle
@@ -332,6 +354,7 @@ describe("ReserveOracle", () => {
       // The 6th attestation starts a new round, so the balance remains 100
       const [reserveBalance] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
       expect(reserveBalance).to.equal(ethers.utils.parseEther("100"))
     })
 
@@ -351,6 +374,7 @@ describe("ReserveOracle", () => {
       // Check that reserve was not updated
       const [reserveBalance] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
       expect(reserveBalance).to.equal(0)
     })
 
@@ -373,6 +397,7 @@ describe("ReserveOracle", () => {
         qcAddress.address,
         attester1.address
       )
+
       expect(attestation1.balance).to.equal(0)
       expect(attestation1.timestamp).to.equal(0)
     })
@@ -396,6 +421,7 @@ describe("ReserveOracle", () => {
     it("should return correct balance and freshness", async () => {
       const [balance, isStale] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
       expect(balance).to.equal(ethers.utils.parseEther("100"))
       expect(isStale).to.be.false
     })
@@ -407,18 +433,20 @@ describe("ReserveOracle", () => {
 
       const [balance, isStale] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
       expect(balance).to.equal(ethers.utils.parseEther("100"))
       expect(isStale).to.be.true
     })
   })
 
-
   describe("Configuration", () => {
     describe("setConsensusThreshold", () => {
       it("should allow admin to update threshold", async () => {
         // Grant DISPUTE_ARBITER_ROLE to deployer first
-        await reserveOracle.connect(deployer).grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
-        
+        await reserveOracle
+          .connect(deployer)
+          .grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
+
         await expect(reserveOracle.connect(deployer).setConsensusThreshold(5))
           .to.emit(reserveOracle, "ConsensusThresholdUpdated")
           .withArgs(3, 5)
@@ -436,8 +464,10 @@ describe("ReserveOracle", () => {
 
       it("should revert if threshold is zero", async () => {
         // Grant DISPUTE_ARBITER_ROLE to deployer first
-        await reserveOracle.connect(deployer).grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
-        
+        await reserveOracle
+          .connect(deployer)
+          .grantRole(DISPUTE_ARBITER_ROLE, deployer.address)
+
         await expect(
           reserveOracle.connect(deployer).setConsensusThreshold(0)
         ).to.be.revertedWith("InvalidThreshold")
@@ -446,9 +476,7 @@ describe("ReserveOracle", () => {
 
     describe("setAttestationTimeout", () => {
       it("should allow arbiter to update timeout", async () => {
-        await expect(
-          reserveOracle.connect(arbiter).setAttestationTimeout(7200)
-        )
+        await expect(reserveOracle.connect(arbiter).setAttestationTimeout(7200))
           .to.emit(reserveOracle, "AttestationTimeoutUpdated")
           .withArgs(21600, 7200)
 
@@ -540,6 +568,7 @@ describe("ReserveOracle", () => {
       // Should be fresh
       let [balance, isStale] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
       expect(balance).to.equal(ethers.utils.parseEther("100"))
       expect(isStale).to.be.false
 
@@ -566,11 +595,13 @@ describe("ReserveOracle", () => {
       const tx = await reserveOracle
         .connect(attester3)
         .attestBalance(qcAddress.address, 0)
+
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
       // Check that reserve was updated to zero
       const [reserveBalance, isStale] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
       expect(reserveBalance).to.equal(0)
       expect(isStale).to.be.false
     })
@@ -586,11 +617,13 @@ describe("ReserveOracle", () => {
       const tx = await reserveOracle
         .connect(attester3)
         .attestBalance(qcAddress.address, ethers.utils.parseEther("50"))
+
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
       // Verify median was calculated correctly (median of 0, 50, 100 is 50)
       const [reserveBalance] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
       expect(reserveBalance).to.equal(ethers.utils.parseEther("50"))
     })
 
@@ -602,6 +635,7 @@ describe("ReserveOracle", () => {
 
       let [balance, isStale] =
         await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
       expect(balance).to.equal(0)
       expect(isStale).to.be.false
 
@@ -652,6 +686,7 @@ describe("ReserveOracle", () => {
       let [balance] = await reserveOracle.getReserveBalanceAndStaleness(
         qcAddress.address
       )
+
       expect(balance).to.equal(0)
 
       // Refunded
@@ -690,6 +725,7 @@ describe("ReserveOracle", () => {
         qcAddress.address,
         attester1.address
       )
+
       expect(attestation.balance).to.equal(ethers.utils.parseEther("100"))
     })
 
@@ -719,6 +755,7 @@ describe("ReserveOracle", () => {
       const tx = await reserveOracle
         .connect(attester4)
         .attestBalance(qcAddress.address, ethers.utils.parseEther("200"))
+
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
     })
   })
@@ -735,6 +772,7 @@ describe("ReserveOracle", () => {
       const attesterIndex = await reserveOracle.attesterToIndex(
         attester1.address
       )
+
       expect(attesterIndex).to.equal(1) // First attester gets index 1
 
       const indexToAttester = await reserveOracle.indexToAttester(1)
@@ -758,6 +796,7 @@ describe("ReserveOracle", () => {
       const attesterIndex = await reserveOracle.attesterToIndex(
         attester1.address
       )
+
       expect(attesterIndex).to.equal(1)
     })
 
@@ -783,6 +822,7 @@ describe("ReserveOracle", () => {
     describe("emergencySetReserve", () => {
       it("should allow arbiter to emergency set reserve balance", async () => {
         const newBalance = ethers.utils.parseEther("500")
+
         const oldBalance = await reserveOracle.getReserveBalance(
           qcAddress.address
         )
@@ -791,13 +831,27 @@ describe("ReserveOracle", () => {
           .connect(arbiter)
           .emergencySetReserve(qcAddress.address, newBalance)
 
+        const receipt = await tx.wait()
+
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
+        )
+
         await expect(tx)
           .to.emit(reserveOracle, "ReserveBalanceUpdated")
-          .withArgs(qcAddress.address, oldBalance, newBalance)
+          .withArgs(
+            qcAddress.address,
+            oldBalance,
+            newBalance,
+            0,
+            arbiter.address,
+            timestamp
+          )
 
         // Verify balance was updated
         const [balance, isStale] =
           await reserveOracle.getReserveBalanceAndStaleness(qcAddress.address)
+
         expect(balance).to.equal(newBalance)
         expect(isStale).to.be.false
       })
@@ -845,6 +899,7 @@ describe("ReserveOracle", () => {
           qcAddress.address,
           attester1.address
         )
+
         expect(attestedBalance1).to.equal(0)
       })
 
@@ -876,13 +931,27 @@ describe("ReserveOracle", () => {
           .connect(arbiter)
           .emergencySetReserve(qcAddress.address, 0)
 
+        const receipt = await tx.wait()
+
+        const { timestamp } = await ethers.provider.getBlock(
+          receipt.blockNumber
+        )
+
         await expect(tx)
           .to.emit(reserveOracle, "ReserveBalanceUpdated")
-          .withArgs(qcAddress.address, ethers.utils.parseEther("100"), 0)
+          .withArgs(
+            qcAddress.address,
+            ethers.utils.parseEther("100"),
+            0,
+            0,
+            arbiter.address,
+            timestamp
+          )
 
         const [balance] = await reserveOracle.getReserveBalanceAndStaleness(
           qcAddress.address
         )
+
         expect(balance).to.equal(0)
       })
     })
@@ -914,6 +983,7 @@ describe("ReserveOracle", () => {
           qcAddress.address,
           attester1.address
         )
+
         expect(attestedBalance1).to.equal(0)
       })
 
@@ -957,6 +1027,7 @@ describe("ReserveOracle", () => {
         const [balance] = await reserveOracle.getReserveBalanceAndStaleness(
           qcAddress.address
         )
+
         expect(balance).to.equal(ethers.utils.parseEther("500"))
       })
     })
@@ -986,9 +1057,11 @@ describe("ReserveOracle", () => {
         expect(
           await reserveOracle.getPendingAttestationCount(qcAddress.address)
         ).to.equal(0)
+
         const [balance] = await reserveOracle.getReserveBalanceAndStaleness(
           qcAddress.address
         )
+
         expect(balance).to.equal(ethers.utils.parseEther("200"))
       })
 
@@ -1015,9 +1088,11 @@ describe("ReserveOracle", () => {
         expect(
           await reserveOracle.getPendingAttestationCount(qcAddress.address)
         ).to.equal(0)
+
         const [balance] = await reserveOracle.getReserveBalanceAndStaleness(
           qcAddress.address
         )
+
         expect(balance).to.equal(ethers.utils.parseEther("300"))
       })
 

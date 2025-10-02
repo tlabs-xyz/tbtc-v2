@@ -43,20 +43,26 @@ export const fixture = deployments.createFixture(
     relay: FakeContract<IRelay>
   }> => {
     await deployments.fixture()
+
     const { deployer, governance, chaosnetOwner, spvMaintainer } =
       await helpers.signers.getNamedSigners()
 
     const tbtc = await helpers.contracts.getContract<TBTC>("TBTC")
     const bridge = await helpers.contracts.getContract<Bridge>("Bridge")
+
     const bridgeGovernance =
       await helpers.contracts.getContract<BridgeGovernance>("BridgeGovernance")
+
     const bank = await helpers.contracts.getContract<Bank>("Bank")
+
     const tbtcVault: TBTCVault = await helpers.contracts.getContract(
       "TBTCVault"
     )
+
     const walletRegistry = await helpers.contracts.getContract<WalletRegistry>(
       "WalletRegistry"
     )
+
     const t = await helpers.contracts.getContract("T")
     const staking = await helpers.contracts.getContract("TokenStaking")
 
@@ -69,6 +75,7 @@ export const fixture = deployments.createFixture(
       "SortitionPool",
       await walletRegistry.sortitionPool()
     )
+
     await sortitionPool.connect(chaosnetOwner).deactivateChaosnet()
 
     // TODO: INTEGRATE WITH THE REAL LIGHT RELAY
@@ -89,8 +96,10 @@ export const fixture = deployments.createFixture(
 
     for (let i = 0; i < numberOfOperators; i++) {
       const owner: SignerWithAddress = signers[i]
+
       const stakingProvider: SignerWithAddress =
         signers[1 * numberOfOperators + i]
+
       const operator: SignerWithAddress = signers[2 * numberOfOperators + i]
       const beneficiary: SignerWithAddress = signers[3 * numberOfOperators + i]
       const authorizer: SignerWithAddress = signers[4 * numberOfOperators + i]

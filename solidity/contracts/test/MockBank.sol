@@ -117,6 +117,14 @@ contract MockBank is IBank {
 
     // Missing mint function that AccountControl IBank interface expects
     function mint(address recipient, uint256 amount) external onlyAuthorized whenNotPaused {
+        individualCallCount++;
+        callCount++;
+        
+        // Simulate failure on second call if configured
+        if (failOnSecondCall && callCount == 2) {
+            revert("Mock Bank: Forced failure");
+        }
+        
         _balances[recipient] += amount;
         _totalSupply += amount;
     }
@@ -197,6 +205,21 @@ contract MockBank is IBank {
 
     function unauthorizeBalanceIncreaser(address account) external onlyAdmin {
         _authorizedIncreasers[account] = false;
+    }
+
+    // Alias for compatibility with tests
+    function isBalanceIncreaserAuthorized(address account) external view returns (bool) {
+        return _authorizedIncreasers[account];
+    }
+
+    // Alias for unauthorizeBalanceIncreaser for test compatibility
+    function revokeBalanceIncreaser(address account) external onlyAdmin {
+        _authorizedIncreasers[account] = false;
+    }
+    
+    // Alias for authorizeBalanceIncreaser for test compatibility
+    function authorizeIncreaser(address account) external onlyAdmin {
+        _authorizedIncreasers[account] = true;
     }
 
     function setPaused(bool _paused) external onlyAdmin {

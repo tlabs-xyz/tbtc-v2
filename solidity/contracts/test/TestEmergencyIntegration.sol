@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "../account-control/SystemState.sol";
+import "../account-control/QCErrors.sol";
 
 /// @title TestEmergencyIntegration
 /// @notice Test contract to verify emergency pause modifier integration
@@ -23,7 +24,7 @@ contract TestEmergencyIntegration {
     function testFunction(address qc) external {
         // Perform inline runtime check for QC emergency pause
         if (systemState.isQCEmergencyPaused(qc)) {
-            revert SystemState.QCIsEmergencyPaused(qc);
+            revert QCErrors.QCIsEmergencyPaused(qc);
         }
 
         emit ModifierPassed(qc);
@@ -34,7 +35,7 @@ contract TestEmergencyIntegration {
     /// @param qc The QC address
     function testQCMinting(address qc, uint256 /* amount */) external {
         if (systemState.isQCEmergencyPaused(qc)) {
-            revert SystemState.QCIsEmergencyPaused(qc);
+            revert QCErrors.QCIsEmergencyPaused(qc);
         }
 
         emit FunctionExecuted(qc, "Minting operation completed");
@@ -44,7 +45,7 @@ contract TestEmergencyIntegration {
     /// @param qc The QC address
     function testQCRedemption(address qc, uint256 /* amount */) external {
         if (systemState.isQCEmergencyPaused(qc)) {
-            revert SystemState.QCIsEmergencyPaused(qc);
+            revert QCErrors.QCIsEmergencyPaused(qc);
         }
 
         emit FunctionExecuted(qc, "Redemption operation completed");

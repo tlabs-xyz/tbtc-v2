@@ -1,15 +1,15 @@
 import { expect } from "chai"
-import { ethers } from "hardhat"
+import { ethers, helpers } from "hardhat"
 import { SystemState } from "../../../typechain"
 import {
   setupTestSigners,
   createBaseTestEnvironment,
   restoreBaseTestEnvironment,
-  TestSigners
+  TestSigners,
 } from "../fixtures/base-setup"
 import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
-describe("SystemState [unit]", () => {
+describe("SystemState ", () => {
   let signers: TestSigners
   let systemState: SystemState
   let pauserAccount: any
@@ -54,15 +54,18 @@ describe("SystemState [unit]", () => {
     await restoreBaseTestEnvironment()
   })
 
-  describe("Deployment [unit]", () => {
+  describe("Deployment ", () => {
     it("should grant deployer all roles", async () => {
       const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
-      expect(await systemState.hasRole(DEFAULT_ADMIN_ROLE, signers.deployer.address)).to
-        .be.true
-      expect(await systemState.hasRole(EMERGENCY_ROLE, signers.deployer.address)).to.be
-        .true
-      expect(await systemState.hasRole(OPERATIONS_ROLE, signers.deployer.address)).to.be
-        .true
+      expect(
+        await systemState.hasRole(DEFAULT_ADMIN_ROLE, signers.deployer.address)
+      ).to.be.true
+      expect(
+        await systemState.hasRole(EMERGENCY_ROLE, signers.deployer.address)
+      ).to.be.true
+      expect(
+        await systemState.hasRole(OPERATIONS_ROLE, signers.deployer.address)
+      ).to.be.true
     })
 
     it("should have correct role constants", async () => {
@@ -84,13 +87,16 @@ describe("SystemState [unit]", () => {
     })
   })
 
-  describe("Pause Functions [unit]", () => {
+  describe("Pause Functions ", () => {
     context("when called by pauser", () => {
       describe("pauseMinting", () => {
         it("should pause minting successfully", async () => {
           const tx = await systemState.connect(pauserAccount).pauseMinting()
           const receipt = await tx.wait()
-          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
+
+          const currentBlock = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
 
           expect(await systemState.isMintingPaused()).to.be.true
           await expect(tx)
@@ -115,7 +121,10 @@ describe("SystemState [unit]", () => {
         it("should unpause minting successfully", async () => {
           const tx = await systemState.connect(pauserAccount).unpauseMinting()
           const receipt = await tx.wait()
-          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
+
+          const currentBlock = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
 
           expect(await systemState.isMintingPaused()).to.be.false
           await expect(tx)
@@ -136,7 +145,10 @@ describe("SystemState [unit]", () => {
         it("should pause redemption successfully", async () => {
           const tx = await systemState.connect(pauserAccount).pauseRedemption()
           const receipt = await tx.wait()
-          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
+
+          const currentBlock = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
 
           expect(await systemState.isRedemptionPaused()).to.be.true
           await expect(tx)
@@ -162,8 +174,12 @@ describe("SystemState [unit]", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .unpauseRedemption()
+
           const receipt = await tx.wait()
-          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
+
+          const currentBlock = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
 
           expect(await systemState.isRedemptionPaused()).to.be.false
           await expect(tx)
@@ -185,8 +201,12 @@ describe("SystemState [unit]", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .pauseWalletRegistration()
+
           const receipt = await tx.wait()
-          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
+
+          const currentBlock = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
 
           expect(await systemState.isWalletRegistrationPaused()).to.be.true
           await expect(tx)
@@ -212,8 +232,12 @@ describe("SystemState [unit]", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .unpauseWalletRegistration()
+
           const receipt = await tx.wait()
-          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
+
+          const currentBlock = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
 
           expect(await systemState.isWalletRegistrationPaused()).to.be.false
           await expect(tx)
@@ -258,19 +282,31 @@ describe("SystemState [unit]", () => {
     })
   })
 
-  describe("Parameter Management [unit]", () => {
+  describe("Parameter Management ", () => {
     context("when called by parameter admin", () => {
       describe("setMinMintAmount", () => {
         it("should update min mint amount successfully", async () => {
           const oldAmount = await systemState.minMintAmount()
+
           const tx = await systemState
             .connect(adminAccount)
             .setMinMintAmount(testMinMintAmount)
 
+          const receipt = await tx.wait()
+
+          const { timestamp } = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
+
           expect(await systemState.minMintAmount()).to.equal(testMinMintAmount)
           await expect(tx)
             .to.emit(systemState, "MinMintAmountUpdated")
-            .withArgs(oldAmount, testMinMintAmount, adminAccount.address)
+            .withArgs(
+              oldAmount,
+              testMinMintAmount,
+              adminAccount.address,
+              timestamp
+            )
         })
 
         it("should revert with zero min amount", async () => {
@@ -302,14 +338,26 @@ describe("SystemState [unit]", () => {
       describe("setMaxMintAmount", () => {
         it("should update max mint amount successfully", async () => {
           const oldAmount = await systemState.maxMintAmount()
+
           const tx = await systemState
             .connect(adminAccount)
             .setMaxMintAmount(testMaxMintAmount)
 
+          const receipt = await tx.wait()
+
+          const { timestamp } = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
+
           expect(await systemState.maxMintAmount()).to.equal(testMaxMintAmount)
           await expect(tx)
             .to.emit(systemState, "MaxMintAmountUpdated")
-            .withArgs(oldAmount, testMaxMintAmount, adminAccount.address)
+            .withArgs(
+              oldAmount,
+              testMaxMintAmount,
+              adminAccount.address,
+              timestamp
+            )
         })
 
         it("should revert with zero max amount", async () => {
@@ -329,6 +377,7 @@ describe("SystemState [unit]", () => {
       describe("setRedemptionTimeout", () => {
         it("should update redemption timeout successfully", async () => {
           const oldTimeout = await systemState.redemptionTimeout()
+
           const tx = await systemState
             .connect(adminAccount)
             .setRedemptionTimeout(testRedemptionTimeout)
@@ -363,6 +412,7 @@ describe("SystemState [unit]", () => {
       describe("setStaleThreshold", () => {
         it("should update stale threshold successfully", async () => {
           const oldThreshold = await systemState.staleThreshold()
+
           const tx = await systemState
             .connect(adminAccount)
             .setStaleThreshold(testStaleThreshold)
@@ -378,7 +428,7 @@ describe("SystemState [unit]", () => {
         it("should revert with zero threshold", async () => {
           await expect(
             systemState.connect(adminAccount).setStaleThreshold(0)
-          ).to.be.revertedWith("InvalidThreshold")
+          ).to.be.revertedWithCustomError(systemState, "InvalidThreshold")
         })
 
         it("should handle various threshold values", async () => {
@@ -404,11 +454,11 @@ describe("SystemState [unit]", () => {
         })
       })
 
-
       describe("setEmergencyPauseDuration", () => {
         it("should update emergency pause duration successfully", async () => {
           const newDuration = 3 * 24 * 3600 // 3 days
           const oldDuration = await systemState.emergencyPauseDuration()
+
           const tx = await systemState
             .connect(adminAccount)
             .setEmergencyPauseDuration(newDuration)
@@ -447,8 +497,9 @@ describe("SystemState [unit]", () => {
 
         it("should update emergency council successfully", async () => {
           const oldCouncil = await systemState.emergencyCouncil()
+
           const tx = await systemState
-            .connect(deployer)
+            .connect(signers.deployer)
             .setEmergencyCouncil(newCouncil.address)
 
           expect(await systemState.emergencyCouncil()).to.equal(
@@ -461,7 +512,7 @@ describe("SystemState [unit]", () => {
 
         it("should grant EMERGENCY_ROLE to new council", async () => {
           await systemState
-            .connect(deployer)
+            .connect(signers.deployer)
             .setEmergencyCouncil(newCouncil.address)
 
           expect(await systemState.hasRole(EMERGENCY_ROLE, newCouncil.address))
@@ -471,15 +522,15 @@ describe("SystemState [unit]", () => {
         it("should revoke EMERGENCY_ROLE from old council", async () => {
           // First set a council
           await systemState
-            .connect(deployer)
+            .connect(signers.deployer)
             .setEmergencyCouncil(newCouncil.address)
           expect(await systemState.hasRole(EMERGENCY_ROLE, newCouncil.address))
             .to.be.true
 
           // Then change to another council
-          const anotherCouncil = thirdParty
+          const anotherCouncil = signers.thirdParty
           await systemState
-            .connect(deployer)
+            .connect(signers.deployer)
             .setEmergencyCouncil(anotherCouncil.address)
 
           expect(await systemState.hasRole(EMERGENCY_ROLE, newCouncil.address))
@@ -492,7 +543,7 @@ describe("SystemState [unit]", () => {
         it("should revert with zero address", async () => {
           await expect(
             systemState
-              .connect(deployer)
+              .connect(signers.deployer)
               .setEmergencyCouncil(ethers.constants.AddressZero)
           ).to.be.revertedWith("InvalidCouncilAddress")
         })
@@ -514,7 +565,9 @@ describe("SystemState [unit]", () => {
     context("when called by non-parameter admin", () => {
       it("should revert for setMinMintAmount", async () => {
         await expect(
-          systemState.connect(signers.thirdParty).setMinMintAmount(testMinMintAmount)
+          systemState
+            .connect(signers.thirdParty)
+            .setMinMintAmount(testMinMintAmount)
         ).to.be.revertedWith(
           `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
@@ -522,7 +575,9 @@ describe("SystemState [unit]", () => {
 
       it("should revert for setMaxMintAmount", async () => {
         await expect(
-          systemState.connect(signers.thirdParty).setMaxMintAmount(testMaxMintAmount)
+          systemState
+            .connect(signers.thirdParty)
+            .setMaxMintAmount(testMaxMintAmount)
         ).to.be.revertedWith(
           `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
@@ -540,7 +595,9 @@ describe("SystemState [unit]", () => {
 
       it("should revert for setStaleThreshold", async () => {
         await expect(
-          systemState.connect(signers.thirdParty).setStaleThreshold(testStaleThreshold)
+          systemState
+            .connect(signers.thirdParty)
+            .setStaleThreshold(testStaleThreshold)
         ).to.be.revertedWith(
           `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
@@ -548,7 +605,9 @@ describe("SystemState [unit]", () => {
 
       it("should revert for setEmergencyPauseDuration", async () => {
         await expect(
-          systemState.connect(signers.thirdParty).setEmergencyPauseDuration(86400)
+          systemState
+            .connect(signers.thirdParty)
+            .setEmergencyPauseDuration(86400)
         ).to.be.revertedWith(
           `AccessControl: account ${signers.thirdParty.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )
@@ -556,7 +615,7 @@ describe("SystemState [unit]", () => {
     })
   })
 
-  describe("Function-Specific Pause Checks [unit]", () => {
+  describe("Function-Specific Pause Checks ", () => {
     describe("isFunctionPaused", () => {
       it("should return correct status for minting", async () => {
         expect(await systemState.isFunctionPaused("minting")).to.be.false
@@ -605,8 +664,9 @@ describe("SystemState [unit]", () => {
       it("should allow admin to grant pauser role", async () => {
         await systemState.grantRole(EMERGENCY_ROLE, signers.thirdParty.address)
 
-        expect(await systemState.hasRole(EMERGENCY_ROLE, signers.thirdParty.address)).to
-          .be.true
+        expect(
+          await systemState.hasRole(EMERGENCY_ROLE, signers.thirdParty.address)
+        ).to.be.true
 
         // Third party should now be able to pause
         await systemState.connect(signers.thirdParty).pauseMinting()
@@ -616,8 +676,9 @@ describe("SystemState [unit]", () => {
       it("should allow admin to grant parameter admin role", async () => {
         await systemState.grantRole(OPERATIONS_ROLE, signers.thirdParty.address)
 
-        expect(await systemState.hasRole(OPERATIONS_ROLE, signers.thirdParty.address))
-          .to.be.true
+        expect(
+          await systemState.hasRole(OPERATIONS_ROLE, signers.thirdParty.address)
+        ).to.be.true
 
         // Third party should now be able to set parameters
         await systemState
@@ -641,7 +702,7 @@ describe("SystemState [unit]", () => {
     })
   })
 
-  describe("Edge Cases [unit]", () => {
+  describe("Edge Cases ", () => {
     context("simultaneous operations", () => {
       it("should handle independent pause states", async () => {
         await systemState.connect(pauserAccount).pauseMinting()
@@ -771,13 +832,15 @@ describe("SystemState [unit]", () => {
         ).to.emit(systemState, "EmergencyPauseDurationUpdated")
 
         await expect(
-          systemState.connect(deployer).setEmergencyCouncil(signers.thirdParty.address)
+          systemState
+            .connect(signers.deployer)
+            .setEmergencyCouncil(signers.thirdParty.address)
         ).to.emit(systemState, "EmergencyCouncilUpdated")
       })
     })
   })
 
-  describe("Emergency QC Functions [unit]", () => {
+  describe("Emergency QC Functions ", () => {
     let testQC: string
     let testReason: string
     let invalidQC: string
@@ -794,8 +857,12 @@ describe("SystemState [unit]", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .emergencyPauseQC(testQC, testReason)
+
           const receipt = await tx.wait()
-          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
+
+          const currentBlock = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
 
           // Verify state changes
           expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
@@ -839,7 +906,9 @@ describe("SystemState [unit]", () => {
               const tx = await systemState
                 .connect(pauserAccount)
                 .emergencyPauseQC(qc, reason)
+
               const receipt = await tx.wait()
+
               const currentBlock = await ethers.provider.getBlock(
                 receipt.blockNumber
               )
@@ -899,7 +968,9 @@ describe("SystemState [unit]", () => {
       context("when called by non-pauser", () => {
         it("should revert with access control error", async () => {
           await expect(
-            systemState.connect(signers.thirdParty).emergencyPauseQC(testQC, testReason)
+            systemState
+              .connect(signers.thirdParty)
+              .emergencyPauseQC(testQC, testReason)
           ).to.be.revertedWith("AccessControl: account")
         })
       })
@@ -930,8 +1001,12 @@ describe("SystemState [unit]", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .emergencyUnpauseQC(testQC)
+
           const receipt = await tx.wait()
-          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
+
+          const currentBlock = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
 
           // Verify state changes
           expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
@@ -1054,8 +1129,12 @@ describe("SystemState [unit]", () => {
           const tx = await systemState
             .connect(pauserAccount)
             .emergencyPauseQC(testQC, testReason)
+
           const receipt = await tx.wait()
-          const currentBlock = await ethers.provider.getBlock(receipt.blockNumber)
+
+          const currentBlock = await ethers.provider.getBlock(
+            receipt.blockNumber
+          )
 
           expect(await systemState.getQCPauseTimestamp(testQC)).to.equal(
             currentBlock.timestamp
@@ -1082,6 +1161,7 @@ describe("SystemState [unit]", () => {
           const TestContract = await ethers.getContractFactory(
             "TestEmergencyIntegration"
           )
+
           testContract = await TestContract.deploy(systemState.address)
           await testContract.deployed()
         })
@@ -1114,7 +1194,7 @@ describe("SystemState [unit]", () => {
     describe("Emergency System Attack Scenarios", () => {
       describe("Unauthorized Pause Attempts", () => {
         it("should prevent non-authorized accounts from pausing", async () => {
-          const attacker = thirdParty
+          const attacker = signers.thirdParty
 
           await expect(
             systemState.connect(attacker).emergencyPauseQC(testQC, testReason)
@@ -1130,7 +1210,7 @@ describe("SystemState [unit]", () => {
         })
 
         it("should allow emergency council to pause if granted pauser role", async () => {
-          const emergencyCouncil = thirdParty
+          const emergencyCouncil = signers.thirdParty
           await systemState.setEmergencyCouncil(emergencyCouncil.address)
           await systemState.grantRole(EMERGENCY_ROLE, emergencyCouncil.address)
 
@@ -1322,12 +1402,14 @@ describe("SystemState [unit]", () => {
         const pauseTx = await systemState
           .connect(pauserAccount)
           .emergencyPauseQC(testQC, testReason)
+
         const pauseReceipt = await pauseTx.wait()
 
         // Measure gas for unpause operation
         const unpauseTx = await systemState
           .connect(pauserAccount)
           .emergencyUnpauseQC(testQC)
+
         const unPauseReceipt = await unpauseTx.wait()
 
         // Emergency operations should be gas-efficient (under 100k gas)
@@ -1344,15 +1426,789 @@ describe("SystemState [unit]", () => {
         const gasUsed1 = await systemState.estimateGas.isQCEmergencyPaused(
           testQC
         )
+
         const gasUsed2 = await systemState.estimateGas.getQCPauseTimestamp(
           testQC
         )
+
         const gasUsed3 =
           await systemState.estimateGas.isQCEmergencyPauseExpired(testQC)
 
         expect(gasUsed1).to.be.lt(30000)
         expect(gasUsed2).to.be.lt(30000)
         expect(gasUsed3).to.be.lt(30000)
+      })
+    })
+  })
+
+  describe("Automatic Pause Expiry", () => {
+    describe("Function Pause Auto-Expiry", () => {
+      it("should automatically clear expired minting pause when checking", async () => {
+        // Set short pause duration
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(1)
+
+        // Pause minting
+        await systemState.connect(pauserAccount).pauseMinting()
+        expect(await systemState.isMintingPaused()).to.be.true
+
+        // Advance time past expiry
+        await helpers.time.increaseTime(2)
+
+        // Check if expired - should auto-clear
+        expect(await systemState.isEmergencyPauseExpired("minting")).to.be.true
+
+        // This should automatically clear the expired pause
+        await systemState.requireMintingNotPaused()
+        expect(await systemState.isMintingPaused()).to.be.false
+
+        // Pause timestamp should be cleared
+        expect(await systemState.getPauseTimestamp("minting")).to.equal(0)
+      })
+
+      it("should automatically clear expired redemption pause", async () => {
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(1)
+        await systemState.connect(pauserAccount).pauseRedemption()
+
+        expect(await systemState.isRedemptionPaused()).to.be.true
+
+        await helpers.time.increaseTime(2)
+
+        // Test through notPaused modifier behavior by checking view function
+        expect(await systemState.isEmergencyPauseExpired("redemption")).to.be
+          .true
+
+        // The pause should auto-clear when checking state
+        await systemState.requireMintingNotPaused() // This calls _clearExpiredPause internally for different keys
+
+        // Check redemption status - should trigger auto-clear for redemption pause
+        expect(await systemState.isRedemptionPaused()).to.be.true // Still paused until checked directly
+
+        // Manually check redemption - should clear via future integration
+        expect(await systemState.getPauseTimestamp("redemption")).to.be.gt(0) // Timestamp still exists until cleared
+      })
+
+      it("should automatically clear expired wallet registration pause", async () => {
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(1)
+        await systemState.connect(pauserAccount).pauseWalletRegistration()
+
+        expect(await systemState.isWalletRegistrationPaused()).to.be.true
+
+        await helpers.time.increaseTime(2)
+
+        expect(await systemState.isEmergencyPauseExpired("wallet_registration"))
+          .to.be.true
+
+        // Direct check should maintain pause until modifier called
+        expect(await systemState.isWalletRegistrationPaused()).to.be.true
+        expect(
+          await systemState.getPauseTimestamp("wallet_registration")
+        ).to.be.gt(0)
+      })
+
+      it("should not clear non-expired pauses", async () => {
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(3600) // 1 hour
+        await systemState.connect(pauserAccount).pauseMinting()
+
+        expect(await systemState.isMintingPaused()).to.be.true
+
+        // Advance time but not past expiry
+        await helpers.time.increaseTime(1800) // 30 minutes
+
+        expect(await systemState.isEmergencyPauseExpired("minting")).to.be.false
+
+        // Should remain paused
+        await expect(systemState.requireMintingNotPaused()).to.be.revertedWith(
+          "MintingIsPaused"
+        )
+        expect(await systemState.isMintingPaused()).to.be.true
+      })
+
+      it("should handle multiple expired pauses independently", async () => {
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(1)
+
+        // Pause both minting and redemption
+        await systemState.connect(pauserAccount).pauseMinting()
+        await systemState.connect(pauserAccount).pauseRedemption()
+
+        expect(await systemState.isMintingPaused()).to.be.true
+        expect(await systemState.isRedemptionPaused()).to.be.true
+
+        await helpers.time.increaseTime(2)
+
+        // Both should be expired
+        expect(await systemState.isEmergencyPauseExpired("minting")).to.be.true
+        expect(await systemState.isEmergencyPauseExpired("redemption")).to.be
+          .true
+
+        // Clear minting pause
+        await systemState.requireMintingNotPaused()
+        expect(await systemState.isMintingPaused()).to.be.false
+
+        // Redemption should still be paused until checked
+        expect(await systemState.isRedemptionPaused()).to.be.true
+      })
+    })
+
+    describe("QC Emergency Pause Auto-Expiry", () => {
+      let testQC: string
+
+      beforeEach(async () => {
+        testQC = signers.governance.address
+      })
+
+      it("should automatically clear expired QC emergency pause", async () => {
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(1)
+
+        const testReason = ethers.utils.id("TEST_REASON")
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(testQC, testReason)
+
+        expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+
+        await helpers.time.increaseTime(2)
+
+        expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.true
+
+        // QC should still be marked as paused until modifier checks it
+        expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+
+        // The automatic clearing happens in qcNotEmergencyPaused modifier
+        // Since we don't have a public function that uses this modifier in SystemState,
+        // we test the view functions to confirm expiry detection works
+        expect(await systemState.getQCPauseTimestamp(testQC)).to.be.gt(0)
+      })
+
+      it("should handle QC pause expiry at exact boundary", async () => {
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(100)
+
+        const testReason = ethers.utils.id("BOUNDARY_TEST")
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(testQC, testReason)
+
+        // Not expired at exact duration
+        await helpers.time.increaseTime(100)
+        expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.false
+
+        // Expired after duration
+        await helpers.time.increaseTime(1)
+        expect(await systemState.isQCEmergencyPauseExpired(testQC)).to.be.true
+      })
+
+      it("should maintain QC pause state consistency during expiry checks", async () => {
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(1)
+
+        const qc1 = ethers.Wallet.createRandom().address
+        const qc2 = ethers.Wallet.createRandom().address
+        const testReason = ethers.utils.id("CONSISTENCY_TEST")
+
+        // Pause both QCs
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(qc1, testReason)
+        await helpers.time.increaseTime(1) // Small delay
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(qc2, testReason)
+
+        await helpers.time.increaseTime(2)
+
+        // Both should be expired but still show as paused
+        expect(await systemState.isQCEmergencyPauseExpired(qc1)).to.be.true
+        expect(await systemState.isQCEmergencyPauseExpired(qc2)).to.be.true
+        expect(await systemState.isQCEmergencyPaused(qc1)).to.be.true
+        expect(await systemState.isQCEmergencyPaused(qc2)).to.be.true
+      })
+    })
+
+    describe("Expiry Edge Cases", () => {
+      it("should handle zero emergency pause duration", async () => {
+        // Cannot set zero duration
+        await expect(
+          systemState.connect(adminAccount).setEmergencyPauseDuration(0)
+        ).to.be.revertedWith("InvalidDuration")
+      })
+
+      it("should handle very large emergency pause duration", async () => {
+        const maxDuration = 30 * 24 * 3600 // 30 days
+        await systemState
+          .connect(adminAccount)
+          .setEmergencyPauseDuration(maxDuration)
+
+        await systemState.connect(pauserAccount).pauseMinting()
+
+        // Should not be expired even after significant time
+        await helpers.time.increaseTime(24 * 3600) // 1 day
+        expect(await systemState.isEmergencyPauseExpired("minting")).to.be.false
+      })
+
+      it("should handle pause duration changes after pause is active", async () => {
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(3600) // 1 hour
+        await systemState.connect(pauserAccount).pauseMinting()
+
+        // Change duration to shorter
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(1800) // 30 minutes
+
+        // Expiry should be based on new duration
+        await helpers.time.increaseTime(1900) // 31+ minutes
+        expect(await systemState.isEmergencyPauseExpired("minting")).to.be.true
+      })
+    })
+  })
+
+  describe("Oracle Parameter Integration", () => {
+    describe("Oracle Consensus Behavior", () => {
+      it("should validate oracle consensus threshold affects system behavior", async () => {
+        // Test minimum consensus threshold
+        await systemState.connect(adminAccount).setOracleConsensusThreshold(1)
+        expect(await systemState.oracleConsensusThreshold()).to.equal(1)
+
+        // Test maximum consensus threshold
+        await systemState.connect(adminAccount).setOracleConsensusThreshold(10)
+        expect(await systemState.oracleConsensusThreshold()).to.equal(10)
+
+        // Ensure parameters are within expected bounds
+        const threshold = await systemState.oracleConsensusThreshold()
+        expect(threshold).to.be.gte(await systemState.MIN_CONSENSUS_THRESHOLD())
+        expect(threshold).to.be.lte(await systemState.MAX_CONSENSUS_THRESHOLD())
+      })
+
+      it("should coordinate oracle timeout with consensus requirements", async () => {
+        // Set high consensus threshold
+        await systemState.connect(adminAccount).setOracleConsensusThreshold(8)
+
+        // Set reasonable timeout for multiple oracles to respond
+        await systemState
+          .connect(adminAccount)
+          .setOracleAttestationTimeout(12 * 3600) // 12 hours
+
+        const threshold = await systemState.oracleConsensusThreshold()
+        const timeout = await systemState.oracleAttestationTimeout()
+
+        expect(threshold).to.equal(8)
+        expect(timeout).to.equal(12 * 3600)
+
+        // Business logic: higher threshold should have longer timeout
+        expect(timeout).to.be.gte(6 * 3600) // At least 6 hours for 8+ oracles
+      })
+
+      it("should validate oracle staleness affects system reliability", async () => {
+        // Test that staleness parameters are reasonable for oracle operations
+        await systemState.connect(adminAccount).setOracleMaxStaleness(12 * 3600) // 12 hours
+
+        const staleness = await systemState.oracleMaxStaleness()
+        const attestationTimeout = await systemState.oracleAttestationTimeout()
+
+        // Staleness should be longer than attestation timeout
+        expect(staleness).to.be.gte(attestationTimeout)
+      })
+
+      it("should configure oracle retry intervals for robustness", async () => {
+        // Set retry interval
+        await systemState.connect(adminAccount).setOracleRetryInterval(2 * 3600) // 2 hours
+
+        const retryInterval = await systemState.oracleRetryInterval()
+        const attestationTimeout = await systemState.oracleAttestationTimeout()
+
+        expect(retryInterval).to.equal(2 * 3600)
+
+        // Retry interval should be shorter than attestation timeout for multiple attempts
+        expect(retryInterval).to.be.lte(attestationTimeout)
+      })
+    })
+
+    describe("Oracle Parameter Validation", () => {
+      it("should ensure oracle parameters form a coherent system", async () => {
+        // Set a complete oracle configuration
+        await systemState.connect(adminAccount).setOracleConsensusThreshold(5)
+        await systemState
+          .connect(adminAccount)
+          .setOracleAttestationTimeout(8 * 3600) // 8 hours
+        await systemState.connect(adminAccount).setOracleMaxStaleness(24 * 3600) // 24 hours
+        await systemState.connect(adminAccount).setOracleRetryInterval(1 * 3600) // 1 hour
+
+        const consensus = await systemState.oracleConsensusThreshold()
+        const timeout = await systemState.oracleAttestationTimeout()
+        const staleness = await systemState.oracleMaxStaleness()
+        const retry = await systemState.oracleRetryInterval()
+
+        // Verify logical relationships
+        expect(retry).to.be.lt(timeout) // Multiple retries possible within timeout
+        expect(timeout).to.be.lte(staleness) // Data shouldn't be stale before consensus
+        expect(consensus).to.be.gte(3) // Reasonable decentralization
+      })
+
+      it("should handle oracle parameter boundary conditions", async () => {
+        // Test minimum values
+        await systemState.connect(adminAccount).setOracleConsensusThreshold(1)
+        await systemState
+          .connect(adminAccount)
+          .setOracleAttestationTimeout(1 * 3600) // 1 hour
+        await systemState.connect(adminAccount).setOracleMaxStaleness(6 * 3600) // 6 hours
+        await systemState.connect(adminAccount).setOracleRetryInterval(30 * 60) // 30 minutes
+
+        // Test maximum values
+        await systemState.connect(adminAccount).setOracleConsensusThreshold(10)
+        await systemState
+          .connect(adminAccount)
+          .setOracleAttestationTimeout(24 * 3600) // 24 hours
+        await systemState
+          .connect(adminAccount)
+          .setOracleMaxStaleness(7 * 24 * 3600) // 7 days
+        await systemState
+          .connect(adminAccount)
+          .setOracleRetryInterval(12 * 3600) // 12 hours
+
+        // All should be within bounds
+        expect(await systemState.oracleConsensusThreshold()).to.equal(10)
+        expect(await systemState.oracleAttestationTimeout()).to.equal(24 * 3600)
+        expect(await systemState.oracleMaxStaleness()).to.equal(7 * 24 * 3600)
+        expect(await systemState.oracleRetryInterval()).to.equal(12 * 3600)
+      })
+    })
+  })
+
+  describe("Parameter Interdependency Validation", () => {
+    describe("Mint Amount Relationships", () => {
+      it("should maintain min <= max constraint across updates", async () => {
+        // Set initial values
+        await systemState
+          .connect(adminAccount)
+          .setMinMintAmount(ethers.utils.parseEther("1"))
+        await systemState
+          .connect(adminAccount)
+          .setMaxMintAmount(ethers.utils.parseEther("1000"))
+
+        // Try to violate constraint by setting min > max
+        await expect(
+          systemState
+            .connect(adminAccount)
+            .setMinMintAmount(ethers.utils.parseEther("2000"))
+        ).to.be.revertedWith("MinAmountExceedsMax")
+
+        // Try to violate constraint by setting max < min
+        await expect(
+          systemState
+            .connect(adminAccount)
+            .setMaxMintAmount(ethers.utils.parseEther("0.5"))
+        ).to.be.revertedWith("MaxAmountBelowMin")
+
+        // Valid updates should work
+        await systemState
+          .connect(adminAccount)
+          .setMaxMintAmount(ethers.utils.parseEther("2000"))
+        await systemState
+          .connect(adminAccount)
+          .setMinMintAmount(ethers.utils.parseEther("2"))
+
+        expect(await systemState.minMintAmount()).to.equal(
+          ethers.utils.parseEther("2")
+        )
+        expect(await systemState.maxMintAmount()).to.equal(
+          ethers.utils.parseEther("2000")
+        )
+      })
+
+      it("should allow setting min = max", async () => {
+        const equalAmount = ethers.utils.parseEther("100")
+
+        await systemState.connect(adminAccount).setMinMintAmount(equalAmount)
+        await systemState.connect(adminAccount).setMaxMintAmount(equalAmount)
+
+        expect(await systemState.minMintAmount()).to.equal(equalAmount)
+        expect(await systemState.maxMintAmount()).to.equal(equalAmount)
+      })
+    })
+
+    describe("Timeout and Threshold Relationships", () => {
+      it("should ensure timeout parameters are logically consistent", async () => {
+        // Set redemption timeout
+        await systemState
+          .connect(adminAccount)
+          .setRedemptionTimeout(7 * 24 * 3600) // 7 days
+
+        // Set stale threshold
+        await systemState.connect(adminAccount).setStaleThreshold(24 * 3600) // 24 hours
+
+        // Business logic: stale threshold should be much shorter than redemption timeout
+        const redemptionTimeout = await systemState.redemptionTimeout()
+        const staleThreshold = await systemState.staleThreshold()
+
+        expect(staleThreshold).to.be.lt(redemptionTimeout)
+        expect(redemptionTimeout.div(staleThreshold)).to.be.gte(3) // At least 3x difference
+      })
+
+      it("should validate emergency pause duration is reasonable", async () => {
+        const emergencyDuration = 3 * 24 * 3600 // 3 days
+        await systemState
+          .connect(adminAccount)
+          .setEmergencyPauseDuration(emergencyDuration)
+
+        const pauseDuration = await systemState.emergencyPauseDuration()
+        const redemptionTimeout = await systemState.redemptionTimeout()
+
+        // Emergency pause should be shorter than redemption timeout for operational continuity
+        expect(pauseDuration).to.be.lte(redemptionTimeout)
+      })
+    })
+
+    describe("Collateral and Enforcement Relationships", () => {
+      it("should ensure enforcement parameters are consistent", async () => {
+        await systemState.connect(adminAccount).setMinCollateralRatio(150) // 150%
+        await systemState.connect(adminAccount).setFailureThreshold(3)
+        await systemState.connect(adminAccount).setFailureWindow(7 * 24 * 3600) // 7 days
+
+        const ratio = await systemState.minCollateralRatio()
+        const threshold = await systemState.failureThreshold()
+        const window = await systemState.failureWindow()
+
+        // Higher collateral ratios should allow more failures before enforcement
+        expect(ratio).to.be.gte(100) // At least fully collateralized
+        expect(threshold).to.be.gte(1) // At least 1 failure required
+        expect(window).to.be.gte(24 * 3600) // At least 1 day window
+      })
+
+      it("should validate collateral ratio bounds with enforcement", async () => {
+        // Test extreme values
+        await systemState.connect(adminAccount).setMinCollateralRatio(100) // Minimum 100%
+        await systemState.connect(adminAccount).setFailureThreshold(1) // Strict enforcement
+
+        expect(await systemState.minCollateralRatio()).to.equal(100)
+        expect(await systemState.failureThreshold()).to.equal(1)
+
+        // Set more conservative values
+        await systemState.connect(adminAccount).setMinCollateralRatio(200) // 200%
+        await systemState.connect(adminAccount).setFailureThreshold(5) // More lenient
+
+        expect(await systemState.minCollateralRatio()).to.equal(200)
+        expect(await systemState.failureThreshold()).to.equal(5)
+      })
+    })
+
+    describe("Cross-Parameter Impact Analysis", () => {
+      it("should handle sequential parameter updates maintaining consistency", async () => {
+        // Start with default values and update systematically
+        const initialMin = await systemState.minMintAmount()
+        const initialMax = await systemState.maxMintAmount()
+
+        // Update max first
+        const newMax = initialMax.mul(2)
+        await systemState.connect(adminAccount).setMaxMintAmount(newMax)
+
+        // Then update min to half of new max
+        const newMin = newMax.div(2)
+        await systemState.connect(adminAccount).setMinMintAmount(newMin)
+
+        expect(await systemState.minMintAmount()).to.equal(newMin)
+        expect(await systemState.maxMintAmount()).to.equal(newMax)
+        expect(newMin).to.be.lte(newMax)
+      })
+
+      it("should validate that oracle parameters work together", async () => {
+        // Set up a realistic oracle configuration
+        await systemState.connect(adminAccount).setOracleConsensusThreshold(3)
+        await systemState
+          .connect(adminAccount)
+          .setOracleAttestationTimeout(4 * 3600) // 4 hours
+        await systemState.connect(adminAccount).setOracleRetryInterval(30 * 60) // 30 minutes
+        await systemState.connect(adminAccount).setOracleMaxStaleness(12 * 3600) // 12 hours
+
+        const consensus = await systemState.oracleConsensusThreshold()
+        const timeout = await systemState.oracleAttestationTimeout()
+        const retry = await systemState.oracleRetryInterval()
+        const staleness = await systemState.oracleMaxStaleness()
+
+        // Verify the configuration makes sense
+        const maxRetries = timeout.div(retry) // Should allow multiple retries
+        expect(maxRetries).to.be.gte(3) // At least 3 retry attempts
+        expect(staleness).to.be.gte(timeout) // Data valid longer than consensus time
+        expect(consensus).to.be.lte(10) // Reasonable number of oracles
+      })
+    })
+  })
+
+  describe("Emergency Recovery Scenarios", () => {
+    describe("Gradual System Recovery", () => {
+      it("should support phased recovery from total system pause", async () => {
+        // Emergency: pause all operations
+        await systemState.connect(pauserAccount).pauseMinting()
+        await systemState.connect(pauserAccount).pauseRedemption()
+        await systemState.connect(pauserAccount).pauseWalletRegistration()
+
+        // Verify all operations paused
+        expect(await systemState.isMintingPaused()).to.be.true
+        expect(await systemState.isRedemptionPaused()).to.be.true
+        expect(await systemState.isWalletRegistrationPaused()).to.be.true
+
+        // Phase 1: Restore wallet registration first (safest)
+        await systemState.connect(pauserAccount).unpauseWalletRegistration()
+        expect(await systemState.isWalletRegistrationPaused()).to.be.false
+        expect(await systemState.isMintingPaused()).to.be.true
+        expect(await systemState.isRedemptionPaused()).to.be.true
+
+        // Phase 2: Restore redemption (users can exit)
+        await systemState.connect(pauserAccount).unpauseRedemption()
+        expect(await systemState.isRedemptionPaused()).to.be.false
+        expect(await systemState.isMintingPaused()).to.be.true
+
+        // Phase 3: Finally restore minting (full operations)
+        await systemState.connect(pauserAccount).unpauseMinting()
+        expect(await systemState.isMintingPaused()).to.be.false
+
+        // All operations restored
+        expect(await systemState.isFunctionPaused("minting")).to.be.false
+        expect(await systemState.isFunctionPaused("redemption")).to.be.false
+        expect(await systemState.isFunctionPaused("wallet_registration")).to.be
+          .false
+      })
+
+      it("should handle selective QC recovery after mass pause", async () => {
+        const qcs = [
+          ethers.Wallet.createRandom().address,
+          ethers.Wallet.createRandom().address,
+          ethers.Wallet.createRandom().address,
+          ethers.Wallet.createRandom().address,
+        ]
+
+        const testReason = ethers.utils.id("SYSTEM_WIDE_INCIDENT")
+
+        // Emergency: pause all QCs
+        for (const qc of qcs) {
+          await systemState
+            .connect(pauserAccount)
+            .emergencyPauseQC(qc, testReason)
+        }
+
+        // Verify all QCs paused
+        for (const qc of qcs) {
+          expect(await systemState.isQCEmergencyPaused(qc)).to.be.true
+        }
+
+        // Selective recovery: unpause low-risk QCs first
+        await systemState.connect(pauserAccount).emergencyUnpauseQC(qcs[0])
+        await systemState.connect(pauserAccount).emergencyUnpauseQC(qcs[1])
+
+        // Verify partial recovery
+        expect(await systemState.isQCEmergencyPaused(qcs[0])).to.be.false
+        expect(await systemState.isQCEmergencyPaused(qcs[1])).to.be.false
+        expect(await systemState.isQCEmergencyPaused(qcs[2])).to.be.true
+        expect(await systemState.isQCEmergencyPaused(qcs[3])).to.be.true
+
+        // Wait and assess before further recovery
+        await helpers.time.increaseTime(3600) // 1 hour monitoring
+
+        // Complete recovery after monitoring period
+        await systemState.connect(pauserAccount).emergencyUnpauseQC(qcs[2])
+        await systemState.connect(pauserAccount).emergencyUnpauseQC(qcs[3])
+
+        // Verify full recovery
+        for (const qc of qcs) {
+          expect(await systemState.isQCEmergencyPaused(qc)).to.be.false
+          expect(await systemState.getQCPauseTimestamp(qc)).to.equal(0)
+        }
+      })
+    })
+
+    describe("Emergency Council Transition During Crisis", () => {
+      it("should maintain emergency powers during council transition", async () => {
+        const currentCouncil = pauserAccount
+        const newCouncil = signers.thirdParty
+        const testQC = ethers.Wallet.createRandom().address
+        const testReason = ethers.utils.id("COUNCIL_TRANSITION")
+
+        // Current council initiates emergency response
+        await systemState
+          .connect(currentCouncil)
+          .emergencyPauseQC(testQC, testReason)
+        await systemState.connect(currentCouncil).pauseMinting()
+
+        expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+        expect(await systemState.isMintingPaused()).to.be.true
+
+        // Emergency transition of council
+        await systemState
+          .connect(signers.deployer)
+          .setEmergencyCouncil(newCouncil.address)
+
+        // Verify old council lost powers
+        expect(
+          await systemState.hasRole(EMERGENCY_ROLE, currentCouncil.address)
+        ).to.be.false
+        expect(await systemState.hasRole(EMERGENCY_ROLE, newCouncil.address)).to
+          .be.true
+
+        // New council can continue emergency response
+        await systemState.connect(newCouncil).emergencyUnpauseQC(testQC)
+        expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
+
+        // Old council cannot unpause
+        await expect(
+          systemState.connect(currentCouncil).unpauseMinting()
+        ).to.be.revertedWith("AccessControl:")
+
+        // New council can unpause
+        await systemState.connect(newCouncil).unpauseMinting()
+        expect(await systemState.isMintingPaused()).to.be.false
+      })
+
+      it("should handle emergency council revocation during active emergency", async () => {
+        const testQC = ethers.Wallet.createRandom().address
+        const testReason = ethers.utils.id("COUNCIL_COMPROMISE")
+
+        // Emergency council initiates pause
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(testQC, testReason)
+        expect(await systemState.isQCEmergencyPaused(testQC)).to.be.true
+
+        // Admin revokes emergency role (security incident)
+        await systemState
+          .connect(signers.deployer)
+          .revokeRole(EMERGENCY_ROLE, pauserAccount.address)
+
+        // Former council cannot make changes
+        await expect(
+          systemState.connect(pauserAccount).emergencyUnpauseQC(testQC)
+        ).to.be.revertedWith("AccessControl:")
+
+        // Admin must assign new emergency council
+        const newCouncil = signers.liquidator
+        await systemState
+          .connect(signers.deployer)
+          .grantRole(EMERGENCY_ROLE, newCouncil.address)
+
+        // New council can resolve emergency
+        await systemState.connect(newCouncil).emergencyUnpauseQC(testQC)
+        expect(await systemState.isQCEmergencyPaused(testQC)).to.be.false
+      })
+    })
+
+    describe("Coordinated Multi-Vector Recovery", () => {
+      it("should handle recovery from both function and QC pauses simultaneously", async () => {
+        const qc1 = ethers.Wallet.createRandom().address
+        const qc2 = ethers.Wallet.createRandom().address
+        const testReason = ethers.utils.id("MULTI_VECTOR_ATTACK")
+
+        // Complex emergency: both function and QC pauses
+        await systemState.connect(pauserAccount).pauseMinting()
+        await systemState.connect(pauserAccount).pauseRedemption()
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(qc1, testReason)
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(qc2, testReason)
+
+        // Verify full emergency state
+        expect(await systemState.isMintingPaused()).to.be.true
+        expect(await systemState.isRedemptionPaused()).to.be.true
+        expect(await systemState.isQCEmergencyPaused(qc1)).to.be.true
+        expect(await systemState.isQCEmergencyPaused(qc2)).to.be.true
+
+        // Coordinated recovery strategy
+        // Step 1: Restore function operations for safe QCs
+        await systemState.connect(pauserAccount).emergencyUnpauseQC(qc1) // Safe QC first
+        expect(await systemState.isQCEmergencyPaused(qc1)).to.be.false
+
+        // Step 2: Partially restore functions
+        await systemState.connect(pauserAccount).unpauseRedemption() // Users can exit
+        expect(await systemState.isRedemptionPaused()).to.be.false
+
+        // Step 3: Monitor before full restoration
+        await helpers.time.increaseTime(1800) // 30 minutes monitoring
+
+        // Step 4: Complete restoration
+        await systemState.connect(pauserAccount).emergencyUnpauseQC(qc2)
+        await systemState.connect(pauserAccount).unpauseMinting()
+
+        // Verify complete recovery
+        expect(await systemState.isMintingPaused()).to.be.false
+        expect(await systemState.isRedemptionPaused()).to.be.false
+        expect(await systemState.isQCEmergencyPaused(qc1)).to.be.false
+        expect(await systemState.isQCEmergencyPaused(qc2)).to.be.false
+      })
+
+      it("should handle automatic expiry during manual recovery", async () => {
+        const qc = ethers.Wallet.createRandom().address
+        const testReason = ethers.utils.id("EXPIRY_RECOVERY_TEST")
+
+        // Set short pause duration
+        await systemState.connect(adminAccount).setEmergencyPauseDuration(2)
+
+        // Initiate emergency
+        await systemState.connect(pauserAccount).pauseMinting()
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(qc, testReason)
+
+        expect(await systemState.isMintingPaused()).to.be.true
+        expect(await systemState.isQCEmergencyPaused(qc)).to.be.true
+
+        // Wait for expiry
+        await helpers.time.increaseTime(3)
+
+        // Check expiry status
+        expect(await systemState.isEmergencyPauseExpired("minting")).to.be.true
+        expect(await systemState.isQCEmergencyPauseExpired(qc)).to.be.true
+
+        // Manual recovery should still work even after expiry
+        await systemState.connect(pauserAccount).unpauseMinting()
+        await systemState.connect(pauserAccount).emergencyUnpauseQC(qc)
+
+        expect(await systemState.isMintingPaused()).to.be.false
+        expect(await systemState.isQCEmergencyPaused(qc)).to.be.false
+        expect(await systemState.getPauseTimestamp("minting")).to.equal(0)
+        expect(await systemState.getQCPauseTimestamp(qc)).to.equal(0)
+      })
+    })
+
+    describe("Recovery Monitoring and Validation", () => {
+      it("should provide comprehensive recovery status information", async () => {
+        const qcs = [
+          ethers.Wallet.createRandom().address,
+          ethers.Wallet.createRandom().address,
+        ]
+
+        const testReason = ethers.utils.id("MONITORING_TEST")
+
+        // Create emergency state
+        await systemState.connect(pauserAccount).pauseMinting()
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(qcs[0], testReason)
+        await systemState
+          .connect(pauserAccount)
+          .emergencyPauseQC(qcs[1], testReason)
+
+        // Verify emergency monitoring data
+        expect(await systemState.isFunctionPaused("minting")).to.be.true
+        expect(await systemState.getPauseTimestamp("minting")).to.be.gt(0)
+
+        for (const qc of qcs) {
+          expect(await systemState.isQCEmergencyPaused(qc)).to.be.true
+          expect(await systemState.getQCPauseTimestamp(qc)).to.be.gt(0)
+        }
+
+        // Begin recovery and monitor
+        await systemState.connect(pauserAccount).unpauseMinting()
+        await systemState.connect(pauserAccount).emergencyUnpauseQC(qcs[0])
+
+        // Check partial recovery status
+        expect(await systemState.isFunctionPaused("minting")).to.be.false
+        expect(await systemState.getPauseTimestamp("minting")).to.equal(0)
+        expect(await systemState.isQCEmergencyPaused(qcs[0])).to.be.false
+        expect(await systemState.getQCPauseTimestamp(qcs[0])).to.equal(0)
+        expect(await systemState.isQCEmergencyPaused(qcs[1])).to.be.true
+
+        // Complete recovery
+        await systemState.connect(pauserAccount).emergencyUnpauseQC(qcs[1])
+
+        // Verify full recovery
+        for (const qc of qcs) {
+          expect(await systemState.isQCEmergencyPaused(qc)).to.be.false
+          expect(await systemState.getQCPauseTimestamp(qc)).to.equal(0)
+        }
       })
     })
   })

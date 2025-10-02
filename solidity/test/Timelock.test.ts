@@ -18,10 +18,12 @@ describe("Timelock", () => {
 
   const zeroBytes32 =
     "0x0000000000000000000000000000000000000000000000000000000000000000"
+
   const timelockDelay = 86400 // 24h governance delay
 
   before(async () => {
     const { esdm } = await helpers.signers.getNamedSigners()
+
     // eslint-disable-next-line @typescript-eslint/no-extra-semi
     ;({ governance, bridge, tbtcVault } = await waffle.loadFixture(
       bridgeFixture
@@ -36,7 +38,7 @@ describe("Timelock", () => {
       }
     )
 
-    timelock = (await helpers.contracts.getContract("Timelock")) as Timelock
+    timelock = await helpers.contracts.getContract("Timelock")
     proxyAdmin = (await upgrades.admin.getInstance()) as ProxyAdmin
 
     console.log("ProxyAdmin address:", proxyAdmin.address)
@@ -90,6 +92,7 @@ describe("Timelock", () => {
       const newImplementation = await upgrades.erc1967.getImplementationAddress(
         bridge.address
       )
+
       expect(newImplementation).to.equal(expectedNewImplementation)
     })
   })

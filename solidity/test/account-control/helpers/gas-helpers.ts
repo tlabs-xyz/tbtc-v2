@@ -168,15 +168,21 @@ export async function benchmarkGasUsage(
     results.push(gasUsage)
   }
 
-  const gasValues = results.map(r => r.gasUsed).sort((a, b) => a - b)
+  const gasValues = results.map((r) => r.gasUsed).sort((a, b) => a - b)
   const sum = gasValues.reduce((a, b) => a + b, 0)
   const average = sum / gasValues.length
 
-  const median = gasValues.length % 2 === 0
-    ? (gasValues[gasValues.length / 2 - 1] + gasValues[gasValues.length / 2]) / 2
-    : gasValues[Math.floor(gasValues.length / 2)]
+  const median =
+    gasValues.length % 2 === 0
+      ? (gasValues[gasValues.length / 2 - 1] +
+          gasValues[gasValues.length / 2]) /
+        2
+      : gasValues[Math.floor(gasValues.length / 2)]
 
-  const variance = gasValues.reduce((sum, value) => sum + Math.pow(value - average, 2), 0) / gasValues.length
+  const variance =
+    gasValues.reduce((sum, value) => sum + (value - average) ** 2, 0) /
+    gasValues.length
+
   const standardDeviation = Math.sqrt(variance)
 
   return {
@@ -230,7 +236,7 @@ export function createGasReporter() {
      * Gets measurements for a specific function
      */
     getMeasurementsForFunction(functionName: string): GasUsageResult[] {
-      return measurements.filter(m => m.functionName === functionName)
+      return measurements.filter((m) => m.functionName === functionName)
     },
 
     /**
@@ -256,17 +262,19 @@ export function createGasReporter() {
         return groups
       }, {} as Record<string, GasUsageResult[]>)
 
-      const functions = Object.entries(functionGroups).map(([name, results]) => {
-        const gasValues = results.map(r => r.gasUsed)
-        return {
-          name,
-          count: results.length,
-          totalGas: gasValues.reduce((a, b) => a + b, 0),
-          averageGas: gasValues.reduce((a, b) => a + b, 0) / gasValues.length,
-          minGas: Math.min(...gasValues),
-          maxGas: Math.max(...gasValues),
+      const functions = Object.entries(functionGroups).map(
+        ([name, results]) => {
+          const gasValues = results.map((r) => r.gasUsed)
+          return {
+            name,
+            count: results.length,
+            totalGas: gasValues.reduce((a, b) => a + b, 0),
+            averageGas: gasValues.reduce((a, b) => a + b, 0) / gasValues.length,
+            minGas: Math.min(...gasValues),
+            maxGas: Math.max(...gasValues),
+          }
         }
-      })
+      )
 
       return {
         totalMeasurements: measurements.length,

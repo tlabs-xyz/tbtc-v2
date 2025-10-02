@@ -6,7 +6,7 @@ import {
   ETHEREUM_ADDRESSES,
   AMOUNT_CONSTANTS,
   TIMING_CONSTANTS,
-  SPV_CONSTANTS,
+  BLOCKCHAIN_CONSTANTS,
   GAS_CONSTANTS,
   createTestWalletRegistration,
   createTestRedemptionScenario,
@@ -37,9 +37,15 @@ describe("Account Control Test Data Validation", () => {
     })
 
     it("should have valid Bitcoin addresses", () => {
-      expect(BITCOIN_ADDRESSES.VALID_LEGACY_BTC).to.match(/^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/)
-      expect(BITCOIN_ADDRESSES.VALID_P2SH_BTC).to.match(/^3[a-km-zA-HJ-NP-Z1-9]{25,34}$/)
-      expect(BITCOIN_ADDRESSES.VALID_BECH32_BTC).to.match(/^bc1[a-z0-9]{39,59}$/)
+      expect(BITCOIN_ADDRESSES.VALID_LEGACY_BTC).to.match(
+        /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/
+      )
+      expect(BITCOIN_ADDRESSES.VALID_P2SH_BTC).to.match(
+        /^3[a-km-zA-HJ-NP-Z1-9]{25,34}$/
+      )
+      expect(BITCOIN_ADDRESSES.VALID_BECH32_BTC).to.match(
+        /^bc1[a-z0-9]{39,59}$/
+      )
       expect(BITCOIN_ADDRESSES.VALID_P2WSH_BTC).to.match(/^bc1[a-z0-9]{39,59}$/)
     })
 
@@ -63,16 +69,12 @@ describe("Account Control Test Data Validation", () => {
       expect(TIMING_CONSTANTS.ATTESTATION_TIMEOUT).to.equal(21600) // 6 hours
     })
 
-    it("should have valid SPV constants", () => {
-      expect(SPV_CONSTANTS.DEFAULT_CHAIN_DIFFICULTY).to.be.a("number")
-      expect(SPV_CONSTANTS.MOCK_TX_HASH).to.match(/^0x[a-f0-9]{64}$/)
-      expect(SPV_CONSTANTS.TEST_BLOCK_HEIGHT).to.be.a("number")
-    })
-
     it("should have gas constants within reasonable ranges", () => {
       expect(GAS_CONSTANTS.DEPLOYMENT_GAS).to.be.greaterThan(1000000)
       expect(GAS_CONSTANTS.SPV_VALIDATION_GAS).to.be.greaterThan(500000)
-      expect(GAS_CONSTANTS.SPV_GAS_RANGE.min).to.be.lessThan(GAS_CONSTANTS.SPV_GAS_RANGE.max)
+      expect(GAS_CONSTANTS.SPV_GAS_RANGE.min).to.be.lessThan(
+        GAS_CONSTANTS.SPV_GAS_RANGE.max
+      )
     })
   })
 
@@ -136,10 +138,18 @@ describe("Account Control Test Data Validation", () => {
 
   describe("Legacy Compatibility", () => {
     it("should maintain backward compatibility with TEST_CONSTANTS", () => {
-      expect(TEST_CONSTANTS.GOVERNANCE_ROLE).to.equal(ROLE_CONSTANTS.GOVERNANCE_ROLE)
-      expect(TEST_CONSTANTS.VALID_LEGACY_BTC).to.equal(BITCOIN_ADDRESSES.VALID_LEGACY_BTC)
-      expect(TEST_CONSTANTS.VALID_BECH32_BTC).to.equal(BITCOIN_ADDRESSES.VALID_BECH32_BTC)
-      expect(TEST_CONSTANTS.SMALL_MINT).to.equal(AMOUNT_CONSTANTS.SMALL_MINT_AMOUNT)
+      expect(TEST_CONSTANTS.GOVERNANCE_ROLE).to.equal(
+        ROLE_CONSTANTS.GOVERNANCE_ROLE
+      )
+      expect(TEST_CONSTANTS.VALID_LEGACY_BTC).to.equal(
+        BITCOIN_ADDRESSES.VALID_LEGACY_BTC
+      )
+      expect(TEST_CONSTANTS.VALID_BECH32_BTC).to.equal(
+        BITCOIN_ADDRESSES.VALID_BECH32_BTC
+      )
+      expect(TEST_CONSTANTS.SMALL_MINT).to.equal(
+        AMOUNT_CONSTANTS.SMALL_MINT_AMOUNT
+      )
     })
   })
 
@@ -149,20 +159,40 @@ describe("Account Control Test Data Validation", () => {
       expect(ROLE_CONSTANTS.GOVERNANCE_ROLE).to.equal(expectedGovernanceRole)
 
       const expectedArbitratorRole = ethers.utils.id("DISPUTE_ARBITER_ROLE")
-      expect(ROLE_CONSTANTS.DISPUTE_ARBITER_ROLE).to.equal(expectedArbitratorRole)
+      expect(ROLE_CONSTANTS.DISPUTE_ARBITER_ROLE).to.equal(
+        expectedArbitratorRole
+      )
     })
 
     it("should have amount constants in proper hierarchy", () => {
-      expect(AMOUNT_CONSTANTS.MIN_MINT_AMOUNT.lt(AMOUNT_CONSTANTS.SMALL_MINT_AMOUNT)).to.be.true
-      expect(AMOUNT_CONSTANTS.SMALL_MINT_AMOUNT.lt(AMOUNT_CONSTANTS.STANDARD_MINT_AMOUNT)).to.be.true
-      expect(AMOUNT_CONSTANTS.STANDARD_MINT_AMOUNT.lt(AMOUNT_CONSTANTS.LARGE_MINT_AMOUNT)).to.be.true
+      expect(
+        AMOUNT_CONSTANTS.MIN_MINT_AMOUNT.lt(AMOUNT_CONSTANTS.SMALL_MINT_AMOUNT)
+      ).to.be.true
+      expect(
+        AMOUNT_CONSTANTS.SMALL_MINT_AMOUNT.lt(
+          AMOUNT_CONSTANTS.STANDARD_MINT_AMOUNT
+        )
+      ).to.be.true
+      expect(
+        AMOUNT_CONSTANTS.STANDARD_MINT_AMOUNT.lt(
+          AMOUNT_CONSTANTS.LARGE_MINT_AMOUNT
+        )
+      ).to.be.true
     })
 
     it("should have timing constants in logical order", () => {
-      expect(TIMING_CONSTANTS.STALE_THRESHOLD_SHORT).to.be.lessThan(TIMING_CONSTANTS.STALE_THRESHOLD_TEST)
-      expect(TIMING_CONSTANTS.STALE_THRESHOLD_TEST).to.be.lessThan(TIMING_CONSTANTS.STALE_THRESHOLD_DEFAULT)
-      expect(TIMING_CONSTANTS.REDEMPTION_TIMEOUT_SHORT).to.be.lessThan(TIMING_CONSTANTS.REDEMPTION_TIMEOUT_TEST)
-      expect(TIMING_CONSTANTS.REDEMPTION_TIMEOUT_TEST).to.be.lessThan(TIMING_CONSTANTS.REDEMPTION_TIMEOUT_DEFAULT)
+      expect(TIMING_CONSTANTS.STALE_THRESHOLD_SHORT).to.be.lessThan(
+        TIMING_CONSTANTS.STALE_THRESHOLD_TEST
+      )
+      expect(TIMING_CONSTANTS.STALE_THRESHOLD_TEST).to.be.lessThan(
+        TIMING_CONSTANTS.STALE_THRESHOLD_DEFAULT
+      )
+      expect(TIMING_CONSTANTS.REDEMPTION_TIMEOUT_SHORT).to.be.lessThan(
+        TIMING_CONSTANTS.REDEMPTION_TIMEOUT_TEST
+      )
+      expect(TIMING_CONSTANTS.REDEMPTION_TIMEOUT_TEST).to.be.lessThan(
+        TIMING_CONSTANTS.REDEMPTION_TIMEOUT_DEFAULT
+      )
     })
   })
 })

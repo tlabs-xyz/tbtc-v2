@@ -1,9 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
+
+// ██████████████     ▐████▌     ██████████████
+// ██████████████     ▐████▌     ██████████████
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+// ██████████████     ▐████▌     ██████████████
+// ██████████████     ▐████▌     ██████████████
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-
-
+import "./QCErrors.sol";
 
 /// @title SystemState
 /// @dev Global system state and emergency controls for the tBTC Account Control system.
@@ -40,7 +53,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 /// - **Parameter Bounds Validation**: Hard-coded limits prevent malicious parameter changes
 /// - **Comprehensive Event Logging**: Full audit trail for all emergency actions
 /// - **Expiry Mechanisms**: Automatic recovery from time-limited emergency states
-contract SystemState is AccessControl {
+contract SystemState is AccessControl, QCErrors {
     bytes32 public constant OPERATIONS_ROLE =
         keccak256("OPERATIONS_ROLE");
     bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
@@ -54,35 +67,6 @@ contract SystemState is AccessControl {
     bytes32 private constant PAUSE_KEY_REDEMPTION = keccak256("redemption");
     bytes32 private constant PAUSE_KEY_WALLET_REGISTRATION = keccak256("wallet_registration");
 
-    // Custom errors for gas-efficient reverts
-    error MintingAlreadyPaused();
-    error MintingNotPaused();
-    error RedemptionAlreadyPaused();
-    error RedemptionNotPaused();
-    error WalletRegistrationAlreadyPaused();
-    error WalletRegistrationNotPaused();
-    error InvalidAmount();
-    error MinAmountExceedsMax(uint256 minAmount, uint256 maxAmount);
-    error MaxAmountBelowMin(uint256 maxAmount, uint256 minAmount);
-    error InvalidTimeout();
-    error TimeoutTooLong(uint256 timeout, uint256 maxTimeout);
-    error InvalidThreshold();
-    error ThresholdTooLong(uint256 threshold, uint256 maxThreshold);
-    error InvalidDuration();
-    error DurationTooLong(uint256 duration, uint256 maxDuration);
-    error InvalidCouncilAddress();
-    error MintingIsPaused();
-    error RedemptionIsPaused();
-    error WalletRegistrationIsPaused();
-    error InvalidPauseKey(string functionName);
-    error QCIsEmergencyPaused(address qc);
-    error QCNotEmergencyPaused(address qc);
-    error QCEmergencyPauseExpired(address qc);
-    error AccountControlModeAlreadySet(bool currentMode);
-    error InvalidAccountControlMode();
-
-
-
     /// @dev Global pause flags for granular emergency controls
     bool public isMintingPaused;
     bool public isRedemptionPaused;
@@ -94,13 +78,33 @@ contract SystemState is AccessControl {
     uint256 public minMintAmount; // Minimum amount for minting operations
     uint256 public maxMintAmount; // Maximum amount for single minting operation
 
+    /// @dev Oracle system parameters
+    uint256 public oracleConsensusThreshold; // Number of attestations required for consensus
+    uint256 public oracleAttestationTimeout; // Time window for attestations to be considered valid
+    uint256 public oracleMaxStaleness; // Maximum time before reserve data is considered stale
+    uint256 public oracleRetryInterval; // Retry interval for oracle operations
+
     /// @dev Automated enforcement parameters
     uint256 public minCollateralRatio; // Minimum collateral ratio percentage (e.g., 90 for 90%)
     uint256 public failureThreshold; // Number of failures before enforcement action
     uint256 public failureWindow; // Time window for counting failures
 
-    /// @dev AccountControl mode management
-    bool public accountControlMode; // Whether AccountControl integration is enabled
+    /// @dev QC sync parameters
+    uint256 public minSyncInterval = 5 minutes;
+
+    // Parameter bounds for safety
+    uint256 public constant MAX_SYNC_INTERVAL = 1 hours;
+    uint256 public constant MIN_SYNC_INTERVAL_BOUND = 1 minutes;
+    
+    // Oracle parameter bounds
+    uint256 public constant MIN_CONSENSUS_THRESHOLD = 1;
+    uint256 public constant MAX_CONSENSUS_THRESHOLD = 10;
+    uint256 public constant MIN_ATTESTATION_TIMEOUT = 1 hours;
+    uint256 public constant MAX_ATTESTATION_TIMEOUT = 24 hours;
+    uint256 public constant MIN_ORACLE_STALENESS = 6 hours;
+    uint256 public constant MAX_ORACLE_STALENESS = 7 days;
+    uint256 public constant MIN_ORACLE_RETRY_INTERVAL = 30 minutes;
+    uint256 public constant MAX_ORACLE_RETRY_INTERVAL = 12 hours;
 
     /// @dev Emergency parameters
     address public emergencyCouncil; // Emergency council address
@@ -108,7 +112,6 @@ contract SystemState is AccessControl {
     mapping(bytes32 => uint256) public pauseTimestamps; // Tracks when pauses were activated
     mapping(address => bool) public qcEmergencyPauses; // Tracks QC-specific emergency pauses
     mapping(address => uint256) public qcPauseTimestamps; // Tracks when QCs were emergency paused
-    
 
     // =================== STANDARDIZED EVENTS ===================
 
@@ -116,60 +119,65 @@ contract SystemState is AccessControl {
     event MinMintAmountUpdated(
         uint256 indexed oldAmount,
         uint256 indexed newAmount,
-        address indexed updatedBy
+        address indexed updatedBy,
+        uint256 timestamp
     );
 
     event MaxMintAmountUpdated(
         uint256 indexed oldAmount,
         uint256 indexed newAmount,
-        address indexed updatedBy
+        address indexed updatedBy,
+        uint256 timestamp
     );
 
     event RedemptionTimeoutUpdated(
         uint256 indexed oldTimeout,
         uint256 indexed newTimeout,
-        address indexed updatedBy
+        address indexed updatedBy,
+        uint256 timestamp
     );
 
     event StaleThresholdUpdated(
         uint256 indexed oldThreshold,
         uint256 indexed newThreshold,
-        address indexed updatedBy
+        address indexed updatedBy,
+        uint256 timestamp
     );
 
 
     event EmergencyPauseDurationUpdated(
         uint256 indexed oldDuration,
         uint256 indexed newDuration,
-        address indexed updatedBy
+        address indexed updatedBy,
+        uint256 timestamp
     );
 
     /// @dev Emitted when specific function types are paused/unpaused
-    event MintingPaused(address indexed triggeredBy, uint256 indexed timestamp);
+    event MintingPaused(address indexed pausedBy, uint256 indexed timestamp);
 
     event MintingUnpaused(
-        address indexed triggeredBy,
+        address indexed unpausedBy,
         uint256 indexed timestamp
     );
 
     event RedemptionPaused(
-        address indexed triggeredBy,
+        address indexed pausedBy,
         uint256 indexed timestamp
     );
 
     event RedemptionUnpaused(
-        address indexed triggeredBy,
+        address indexed unpausedBy,
         uint256 indexed timestamp
     );
 
 
     event WalletRegistrationPaused(
-        address indexed triggeredBy,
+        address indexed pausedBy,
         uint256 indexed timestamp
     );
 
     event WalletRegistrationUnpaused(
-        address indexed triggeredBy,
+        address indexed unpausedBy,
         uint256 indexed timestamp
     );
 
@@ -199,15 +207,34 @@ contract SystemState is AccessControl {
         address indexed updatedBy
     );
 
-    /// @dev Emitted when AccountControl mode is toggled
-    event AccountControlModeUpdated(
-        bool indexed oldMode,
-        bool indexed newMode,
+    /// @dev Emitted when oracle parameters are updated
+    event OracleConsensusThresholdUpdated(
+        uint256 indexed oldThreshold,
+        uint256 indexed newThreshold,
         address indexed updatedBy
     );
+
+    event OracleAttestationTimeoutUpdated(
+        uint256 indexed oldTimeout,
+        uint256 indexed newTimeout,
+        address indexed updatedBy
+    );
+
+    event OracleMaxStalenessUpdated(
+        uint256 indexed oldStaleness,
+        uint256 indexed newStaleness,
+        address indexed updatedBy
+    );
+
+
+    event OracleRetryIntervalUpdated(
+        uint256 indexed oldInterval,
+        uint256 indexed newInterval,
+        address indexed updatedBy
+    );
+
+    event MinSyncIntervalUpdated(uint256 oldInterval, uint256 newInterval);
     
-
-
     /// @dev Events for role management are inherited from AccessControl
 
     // =================== MODIFIERS ===================
@@ -236,7 +263,7 @@ contract SystemState is AccessControl {
         // Set default parameters
         staleThreshold = 24 hours; // Reserve attestations stale after 24 hours
         redemptionTimeout = 7 days; // 7 days to fulfill redemptions
-        minMintAmount = 0.001 ether; // Minimum 0.001 tBTC (lowered for testing)
+        minMintAmount = 0.001 ether; // Minimum 0.001 tBTC for minting operations
         maxMintAmount = 1000 ether; // Maximum 1000 tBTC per transaction
         emergencyPauseDuration = 7 days; // Emergency pauses last max 7 days
 
@@ -244,15 +271,20 @@ contract SystemState is AccessControl {
         minCollateralRatio = 100; // 100% minimum collateral ratio
         failureThreshold = 3; // 3 failures trigger enforcement
         failureWindow = 7 days; // Count failures over 7 days
-        
-        // AccountControl mode is disabled by default to allow tests to enable it explicitly
-        accountControlMode = false;
 
+        // Set oracle system defaults
+        oracleConsensusThreshold = 3; // 3 attestations required for consensus
+        oracleAttestationTimeout = 6 hours; // 6 hour window for attestations
+        oracleMaxStaleness = 24 hours; // Max 24 hours before data is stale
+        oracleRetryInterval = 1 hours; // 1 hour retry interval
     }
 
     // =================== PAUSE FUNCTIONS ===================
 
     /// @notice Pause minting operations
+    /// @dev Activates emergency pause for all minting operations system-wide.
+    ///      Automatically expires after emergencyPauseDuration. Clears any existing
+    ///      expired pause before setting new pause state.
     function pauseMinting() external onlyRole(EMERGENCY_ROLE) {
         bytes32 pauseKey = keccak256("minting");
         _clearExpiredPause(pauseKey);
@@ -263,6 +295,8 @@ contract SystemState is AccessControl {
     }
 
     /// @notice Unpause minting operations
+    /// @dev Manually clears emergency pause for minting operations, allowing
+    ///      normal minting to resume immediately. Also cleans up pause timestamp.
     function unpauseMinting() external onlyRole(EMERGENCY_ROLE) {
         if (!isMintingPaused) revert MintingNotPaused();
         isMintingPaused = false;
@@ -271,6 +305,9 @@ contract SystemState is AccessControl {
     }
 
     /// @notice Pause redemption operations
+    /// @dev Activates emergency pause for all redemption operations system-wide.
+    ///      Automatically expires after emergencyPauseDuration. Clears any existing
+    ///      expired pause before setting new pause state.
     function pauseRedemption() external onlyRole(EMERGENCY_ROLE) {
         bytes32 pauseKey = keccak256("redemption");
         _clearExpiredPause(pauseKey);
@@ -281,6 +318,8 @@ contract SystemState is AccessControl {
     }
 
     /// @notice Unpause redemption operations
+    /// @dev Manually clears emergency pause for redemption operations, allowing
+    ///      normal redemptions to resume immediately. Also cleans up pause timestamp.
     function unpauseRedemption() external onlyRole(EMERGENCY_ROLE) {
         if (!isRedemptionPaused) revert RedemptionNotPaused();
         isRedemptionPaused = false;
@@ -290,6 +329,9 @@ contract SystemState is AccessControl {
 
 
     /// @notice Pause wallet registration operations
+    /// @dev Activates emergency pause for all wallet registration operations system-wide.
+    ///      Automatically expires after emergencyPauseDuration. Clears any existing
+    ///      expired pause before setting new pause state.
     function pauseWalletRegistration() external onlyRole(EMERGENCY_ROLE) {
         bytes32 pauseKey = keccak256("wallet_registration");
         _clearExpiredPause(pauseKey);
@@ -301,6 +343,8 @@ contract SystemState is AccessControl {
     }
 
     /// @notice Unpause wallet registration operations
+    /// @dev Manually clears emergency pause for wallet registration operations, allowing
+    ///      normal wallet registrations to resume immediately. Also cleans up pause timestamp.
     function unpauseWalletRegistration() external onlyRole(EMERGENCY_ROLE) {
         if (!isWalletRegistrationPaused) revert WalletRegistrationNotPaused();
         isWalletRegistrationPaused = false;
@@ -311,7 +355,10 @@ contract SystemState is AccessControl {
     // =================== PARAMETER FUNCTIONS ===================
 
     /// @notice Update minimum mint amount
-    /// @param newAmount The new minimum amount
+    /// @dev Sets the minimum amount required for minting operations to prevent dust transactions
+    ///      and maintain economic viability. Must be non-zero and cannot exceed maxMintAmount
+    ///      to maintain valid mint range constraints.
+    /// @param newAmount The new minimum amount (must be > 0 and <= maxMintAmount)
     function setMinMintAmount(uint256 newAmount)
         external
         onlyRole(OPERATIONS_ROLE)
@@ -323,11 +370,14 @@ contract SystemState is AccessControl {
         uint256 oldAmount = minMintAmount;
         minMintAmount = newAmount;
 
-        emit MinMintAmountUpdated(oldAmount, newAmount, msg.sender);
+        emit MinMintAmountUpdated(oldAmount, newAmount, msg.sender, block.timestamp);
     }
 
     /// @notice Update maximum mint amount
-    /// @param newAmount The new maximum amount
+    /// @dev Sets the maximum amount allowed for single minting operations to limit exposure
+    ///      and manage liquidity constraints. Must be at least equal to minMintAmount
+    ///      to maintain valid mint range. Used for risk management and operational limits.
+    /// @param newAmount The new maximum amount (must be >= minMintAmount)
     function setMaxMintAmount(uint256 newAmount)
         external
         onlyRole(OPERATIONS_ROLE)
@@ -338,7 +388,7 @@ contract SystemState is AccessControl {
         uint256 oldAmount = maxMintAmount;
         maxMintAmount = newAmount;
 
-        emit MaxMintAmountUpdated(oldAmount, newAmount, msg.sender);
+        emit MaxMintAmountUpdated(oldAmount, newAmount, msg.sender, block.timestamp);
     }
 
     /// @notice Update redemption timeout
@@ -353,9 +403,8 @@ contract SystemState is AccessControl {
         uint256 oldTimeout = redemptionTimeout;
         redemptionTimeout = newTimeout;
 
-        emit RedemptionTimeoutUpdated(oldTimeout, newTimeout, msg.sender);
+        emit RedemptionTimeoutUpdated(oldTimeout, newTimeout, msg.sender, block.timestamp);
     }
-
 
     /// @notice Update stale threshold
     /// @param newThreshold The new threshold in seconds
@@ -370,7 +419,7 @@ contract SystemState is AccessControl {
         uint256 oldThreshold = staleThreshold;
         staleThreshold = newThreshold;
 
-        emit StaleThresholdUpdated(oldThreshold, newThreshold, msg.sender);
+        emit StaleThresholdUpdated(oldThreshold, newThreshold, msg.sender, block.timestamp);
     }
 
 
@@ -389,7 +438,8 @@ contract SystemState is AccessControl {
         emit EmergencyPauseDurationUpdated(
             oldDuration,
             newDuration,
-            msg.sender
+            msg.sender,
+            block.timestamp
         );
     }
 
@@ -416,7 +466,11 @@ contract SystemState is AccessControl {
     // =================== AUTOMATED ENFORCEMENT PARAMETERS ===================
 
     /// @notice Update minimum collateral ratio
-    /// @param newRatio The new minimum collateral ratio percentage (e.g., 90 for 90%)
+    /// @dev Sets the minimum collateral ratio threshold for automated enforcement.
+    ///      Ratios below 100% indicate undercollateralization. Used by watchdog systems
+    ///      to trigger emergency actions when QC reserves fall below this threshold.
+    ///      Range: 100-200% (100% = fully backed, 200% = 2x overcollateralized).
+    /// @param newRatio The new minimum collateral ratio percentage (100-200, e.g., 150 for 150%)
     function setMinCollateralRatio(uint256 newRatio)
         external
         onlyRole(OPERATIONS_ROLE)
@@ -458,31 +512,94 @@ contract SystemState is AccessControl {
         emit FailureWindowUpdated(oldWindow, newWindow, msg.sender);
     }
 
-    // =================== ACCOUNT CONTROL MODE MANAGEMENT ===================
+    // =================== QC PARAMETER UPDATES ===================
 
-    /// @notice Enable AccountControl mode
-    /// @dev When enabled, all minting and redemption operations go through AccountControl
-    function setAccountControlMode(bool enabled)
+
+    /// @notice Update minimum sync interval
+    /// @param newInterval New interval in seconds
+    function setMinSyncInterval(uint256 newInterval) 
+        external 
+        onlyRole(OPERATIONS_ROLE) 
+    {
+        if (newInterval < MIN_SYNC_INTERVAL_BOUND || newInterval > MAX_SYNC_INTERVAL) {
+            revert DurationOutOfBounds(newInterval, MIN_SYNC_INTERVAL_BOUND, MAX_SYNC_INTERVAL);
+        }
+        
+        uint256 oldInterval = minSyncInterval;
+        minSyncInterval = newInterval;
+        emit MinSyncIntervalUpdated(oldInterval, newInterval);
+    }
+
+    // =================== ORACLE PARAMETER UPDATES ===================
+
+    /// @notice Update oracle consensus threshold
+    /// @dev Sets the minimum number of oracle attestations required to reach consensus
+    ///      on reserve data. Higher values increase security but may reduce availability.
+    ///      Must balance between decentralization (higher) and system responsiveness (lower).
+    ///      Works with oracleAttestationTimeout to define consensus requirements.
+    /// @param newThreshold New consensus threshold (1-10 attestations)
+    function setOracleConsensusThreshold(uint256 newThreshold)
         external
         onlyRole(OPERATIONS_ROLE)
     {
-        if (accountControlMode == enabled) {
-            revert AccountControlModeAlreadySet(enabled);
+        if (newThreshold < MIN_CONSENSUS_THRESHOLD || newThreshold > MAX_CONSENSUS_THRESHOLD) {
+            revert DurationOutOfBounds(newThreshold, MIN_CONSENSUS_THRESHOLD, MAX_CONSENSUS_THRESHOLD);
         }
-
-        bool oldMode = accountControlMode;
-        accountControlMode = enabled;
-
-        emit AccountControlModeUpdated(oldMode, enabled, msg.sender);
+        
+        uint256 oldThreshold = oracleConsensusThreshold;
+        oracleConsensusThreshold = newThreshold;
+        emit OracleConsensusThresholdUpdated(oldThreshold, newThreshold, msg.sender);
     }
 
-    /// @notice Check if AccountControl mode is enabled
-    /// @return enabled True if AccountControl mode is enabled
-    function isAccountControlEnabled() external view returns (bool enabled) {
-        return accountControlMode;
+    /// @notice Update oracle attestation timeout
+    /// @dev Sets the time window during which oracle attestations are collected for consensus.
+    ///      Shorter timeouts provide faster responses but may miss slow oracles.
+    ///      Must coordinate with oracleConsensusThreshold to ensure enough oracles
+    ///      can respond within the timeout period. Affects system responsiveness vs. reliability.
+    /// @param newTimeout New attestation timeout in seconds (1-24 hours)
+    function setOracleAttestationTimeout(uint256 newTimeout)
+        external
+        onlyRole(OPERATIONS_ROLE)
+    {
+        if (newTimeout < MIN_ATTESTATION_TIMEOUT || newTimeout > MAX_ATTESTATION_TIMEOUT) {
+            revert DurationOutOfBounds(newTimeout, MIN_ATTESTATION_TIMEOUT, MAX_ATTESTATION_TIMEOUT);
+        }
+        
+        uint256 oldTimeout = oracleAttestationTimeout;
+        oracleAttestationTimeout = newTimeout;
+        emit OracleAttestationTimeoutUpdated(oldTimeout, newTimeout, msg.sender);
     }
-    
 
+    /// @notice Update oracle maximum staleness
+    /// @param newStaleness New maximum staleness in seconds
+    function setOracleMaxStaleness(uint256 newStaleness)
+        external
+        onlyRole(OPERATIONS_ROLE)
+    {
+        if (newStaleness < MIN_ORACLE_STALENESS || newStaleness > MAX_ORACLE_STALENESS) {
+            revert DurationOutOfBounds(newStaleness, MIN_ORACLE_STALENESS, MAX_ORACLE_STALENESS);
+        }
+        
+        uint256 oldStaleness = oracleMaxStaleness;
+        oracleMaxStaleness = newStaleness;
+        emit OracleMaxStalenessUpdated(oldStaleness, newStaleness, msg.sender);
+    }
+
+
+    /// @notice Update oracle retry interval
+    /// @param newInterval New oracle retry interval in seconds
+    function setOracleRetryInterval(uint256 newInterval)
+        external
+        onlyRole(OPERATIONS_ROLE)
+    {
+        if (newInterval < MIN_ORACLE_RETRY_INTERVAL || newInterval > MAX_ORACLE_RETRY_INTERVAL) {
+            revert DurationOutOfBounds(newInterval, MIN_ORACLE_RETRY_INTERVAL, MAX_ORACLE_RETRY_INTERVAL);
+        }
+        
+        uint256 oldInterval = oracleRetryInterval;
+        oracleRetryInterval = newInterval;
+        emit OracleRetryIntervalUpdated(oldInterval, newInterval, msg.sender);
+    }
 
     /// @notice Emergency pause for a specific QC (called by automated systems)
     /// @dev This function provides granular emergency control for individual QCs without
@@ -567,20 +684,20 @@ contract SystemState is AccessControl {
     event EmergencyActionTaken(
         address indexed target,
         bytes32 indexed action,
-        address indexed triggeredBy,
+        address indexed actionBy,
         uint256 timestamp
     );
 
     event QCEmergencyPaused(
         address indexed qc,
-        address indexed triggeredBy,
+        address indexed pausedBy,
         uint256 indexed timestamp,
         bytes32 reason
     );
 
     event QCEmergencyUnpaused(
         address indexed qc,
-        address indexed triggeredBy,
+        address indexed unpausedBy,
         uint256 indexed timestamp
     );
 
@@ -675,6 +792,12 @@ contract SystemState is AccessControl {
         if (isMintingPaused) revert MintingIsPaused();
     }
 
+    /// @dev Automatically clears expired emergency pauses to enable system recovery.
+    ///      Checks if the pause duration has exceeded emergencyPauseDuration and
+    ///      automatically resets the pause state. Called by pause modifiers and
+    ///      direct pause checking functions to ensure automatic cleanup.
+    ///      Prevents indefinite system lockdown from forgotten emergency pauses.
+    /// @param pauseKey The keccak256 hash of the function name being checked
     function _clearExpiredPause(bytes32 pauseKey) internal {
         uint256 pausedAt = pauseTimestamps[pauseKey];
         if (pausedAt != 0 && block.timestamp > pausedAt + emergencyPauseDuration) {

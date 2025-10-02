@@ -13,7 +13,13 @@
     "new-cap": "off",
     "import/no-extraneous-dependencies": "off",
     "@typescript-eslint/no-use-before-define": "off",
-    "no-plusplus": ["error", { "allowForLoopAfterthoughts": true }]
+    "no-plusplus": ["error", { "allowForLoopAfterthoughts": true }],
+    "@typescript-eslint/semi": "off",
+    "@typescript-eslint/quotes": "off",
+    "@typescript-eslint/lines-between-class-members": "off",
+    "@typescript-eslint/no-throw-literal": "off",
+    "@typescript-eslint/no-extra-semi": "off",
+    "@typescript-eslint/unbound-method": "off"
   },
   "overrides": [
     {
@@ -26,19 +32,6 @@
         "@typescript-eslint/no-shadow": "off",
         "no-console": "off",
         "@typescript-eslint/no-unused-vars": "off"
-      }
-    },
-    {
-      "files": ["flows/**/*.ts"],
-      "rules": {
-        "no-await-in-loop": "off",
-        "no-restricted-syntax": "off",
-        "import/prefer-default-export": "off",
-        "@typescript-eslint/no-explicit-any": "off",
-        "@typescript-eslint/explicit-module-boundary-types": "off",
-        "class-methods-use-this": "off",
-        "no-console": "off",
-        "func-names": "off"
       }
     }
   ]

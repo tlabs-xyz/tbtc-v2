@@ -22,6 +22,7 @@ const { lastBlockTime, increaseTime } = helpers.time
 // Helper functions for TBTC/satoshi conversions
 const SATOSHI_MULTIPLIER = ethers.BigNumber.from(10).pow(10)
 const toSatoshis = (tbtcAmount: BigNumber) => tbtcAmount.div(SATOSHI_MULTIPLIER)
+
 const toTBTC = (satoshiAmount: BigNumber) =>
   satoshiAmount.mul(SATOSHI_MULTIPLIER)
 
@@ -43,9 +44,12 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
 
   const exampleAmount = ethers.utils.parseUnits("2", 18) // 2 TBTC with 18 decimals
   const exampleAmountInSatoshis = toSatoshis(exampleAmount) // Convert to satoshis
+
   const exampleRedeemerOutputScript =
     "0x1976a9140102030405060708090a0b0c0d0e0f101112131488ac"
+
   const exampleWalletPubKeyHash = "0x8db50eb52063ea9d98b3eac91489a90f738986f6"
+
   const exampleMainUtxo = {
     txHash:
       "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
@@ -56,8 +60,10 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
   // Additional example output scripts for testing
   const exampleP2WPKHOutputScript =
     "0x1600140102030405060708090a0b0c0d0e0f1011121314"
+
   const exampleP2SHOutputScript =
     "0x17a9140102030405060708090a0b0c0d0e0f101112131487"
+
   const exampleP2WSHOutputScript =
     "0x2200200102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
 
@@ -73,7 +79,7 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
 
     // Deploy mock contracts
     const MockBankFactory = await ethers.getContractFactory("MockBank")
-    const _bank = (await MockBankFactory.deploy()) as MockBank
+    const _bank = await MockBankFactory.deploy()
     await _bank.deployed()
 
     //
@@ -91,14 +97,18 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
     const WormholeBridgeStubFactory = await ethers.getContractFactory(
       "WormholeBridgeStub"
     )
+
     const _wormholeBridgeStub = await WormholeBridgeStubFactory.deploy(
       _wormholeTbtc.address
     )
+
     await _wormholeBridgeStub.deployed()
+
     const MockTBTCBridgeFactory = await ethers.getContractFactory(
       "MockTBTCBridge"
     )
-    const _bridge = (await MockTBTCBridgeFactory.deploy()) as MockTBTCBridge
+
+    const _bridge = await MockTBTCBridgeFactory.deploy()
     await _bridge.deployed()
 
     const tbtcDeployment = await helpers.upgrades.deployProxy(
@@ -110,6 +120,7 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
         proxyOpts: { kind: "transparent" },
       }
     )
+
     const _tbtcToken = tbtcDeployment[0] as L2TBTC
 
     // The deployer of L2TBTC is its owner. The owner needs to add itself as a minter.
@@ -119,6 +130,7 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
     const _wormholeTokenBridge = await smock.fake<IWormholeTokenBridge>(
       "IWormholeTokenBridge"
     )
+
     const _reimbursementPool = await smock.fake<ReimbursementPool>(
       "ReimbursementPool"
     )
@@ -143,6 +155,7 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
         },
       }
     )
+
     const _l1BtcRedeemer =
       l1BtcRedeemerWormholeDeployment[0] as MockL1BTCRedeemerWormhole
 
@@ -472,6 +485,7 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
 
   describe("requestRedemption", () => {
     const encodedVm = "0x1234567890"
+
     const calculatedRedemptionKey = ethers.utils.solidityKeccak256(
       ["bytes32", "bytes20"],
       [
@@ -904,6 +918,7 @@ describe("L1BTCRedeemerWormhole (using Mock)", () => {
     context("when multiple redemptions in sequence", () => {
       const encodedVm2 = "0x2345678901"
       const encodedVm3 = "0x3456789012"
+
       const differentOutputScript =
         "0x1976a914aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa88ac"
 

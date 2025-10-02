@@ -37,15 +37,18 @@ describe("L1BTCDepositorWormhole", () => {
     const relayer = await ethers.getSigner(accounts[1])
 
     const bridge = await smock.fake<IBridge>("IBridge")
+
     const tbtcToken = await (
       await ethers.getContractFactory("TestERC20")
     ).deploy()
+
     const tbtcVault = await smock.fake<ITBTCVault>("ITBTCVault", {
       // The TBTCVault contract address must be known in advance and match
       // the one used in initializeDeposit fixture. This is necessary to
       // pass the vault address check in the initializeDeposit function.
       address: tbtcVaultAddress,
     })
+
     // Attach the tbtcToken mock to the tbtcVault mock.
     tbtcVault.tbtcToken.returns(tbtcToken.address)
 
@@ -55,14 +58,18 @@ describe("L1BTCDepositorWormhole", () => {
     const wormholeRelayer = await smock.fake<IWormholeRelayer>(
       "IWormholeRelayer"
     )
+
     const wormholeTokenBridge = await smock.fake<IWormholeTokenBridge>(
       "IWormholeTokenBridge"
     )
+
     const l2WormholeGateway = await smock.fake<IWormholeGateway>(
       "IWormholeGateway"
     )
+
     // Just an arbitrary L2BTCDepositorWormhole address.
     const l2BtcDepositor = "0xeE6F5f69860f310114185677D017576aed0dEC83"
+
     const reimbursementPool = await smock.fake<ReimbursementPool>(
       "ReimbursementPool"
     )
@@ -89,6 +96,7 @@ describe("L1BTCDepositorWormhole", () => {
         },
       }
     )
+
     const l1BtcDepositor = deployment[0] as L1BTCDepositorWormhole
 
     await l1BtcDepositor.connect(deployer).transferOwnership(governance.address)
@@ -1239,6 +1247,7 @@ describe("L1BTCDepositorWormhole", () => {
                 // to compare the arguments manually.
                 const call =
                   wormholeTokenBridge.transferTokensWithPayload.getCall(0)
+
                 expect(call.value).to.equal(messageFee)
                 expect(call.args[0]).to.equal(tbtcToken.address)
                 expect(call.args[1]).to.equal(expectedTbtcAmount)
@@ -1443,6 +1452,7 @@ describe("L1BTCDepositorWormhole", () => {
                   // to compare the arguments manually.
                   const call =
                     wormholeTokenBridge.transferTokensWithPayload.getCall(0)
+
                   expect(call.value).to.equal(messageFee)
                   expect(call.args[0]).to.equal(tbtcToken.address)
                   expect(call.args[1]).to.equal(expectedTbtcAmount)
@@ -1505,6 +1515,7 @@ describe("L1BTCDepositorWormhole", () => {
 
                   // Second call is the refund for deposit finalization.
                   const call2 = reimbursementPool.refund.getCall(1)
+
                   // It doesn't make much sense to check the exact gas spent
                   // value here because Wormhole contracts mocks are used for
                   // testing and the resulting value won't be realistic.
@@ -1517,6 +1528,7 @@ describe("L1BTCDepositorWormhole", () => {
                   )
                     .div(reimbursementPoolMaxGasPrice)
                     .sub(reimbursementPoolStaticGas)
+
                   expect(
                     BigNumber.from(call2.args[0]).toNumber()
                   ).to.be.greaterThan(msgValueOffset.toNumber())
@@ -1686,6 +1698,7 @@ describe("L1BTCDepositorWormhole", () => {
                   // to compare the arguments manually.
                   const call =
                     wormholeTokenBridge.transferTokensWithPayload.getCall(0)
+
                   expect(call.value).to.equal(messageFee)
                   expect(call.args[0]).to.equal(tbtcToken.address)
                   expect(call.args[1]).to.equal(expectedTbtcAmount)

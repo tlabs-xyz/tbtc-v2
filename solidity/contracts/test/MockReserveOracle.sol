@@ -43,7 +43,7 @@ contract MockReserveOracle {
         address qc,
         uint256 balance,
         uint256 timestamp,
-        bytes calldata signature
+        bytes calldata // signature parameter unused in mock
     ) external {
         // Mock implementation - just update the balance
         reserves[qc] = ReserveData({

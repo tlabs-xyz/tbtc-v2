@@ -17,4 +17,15 @@ contract TestBitcoinAddressUtils {
     {
         return BitcoinAddressUtils.decodeAddress(btcAddress);
     }
+
+    /// @notice Derive Bitcoin P2WPKH address from public key for testing
+    /// @param publicKey The uncompressed public key (64 bytes, no 0x04 prefix)
+    /// @return btcAddress The derived Bitcoin address in bech32 format
+    function deriveBitcoinAddressFromPublicKey(bytes memory publicKey)
+        external
+        pure
+        returns (string memory btcAddress)
+    {
+        return BitcoinAddressUtils.deriveBitcoinAddressFromPublicKey(publicKey);
+    }
 }

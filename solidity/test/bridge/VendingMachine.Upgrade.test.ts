@@ -152,6 +152,7 @@ describe("VendingMachine - Upgrade", () => {
         const data: DepositSweepTestData = JSON.parse(
           JSON.stringify(SingleP2SHDeposit)
         )
+
         const { fundingTx, depositor, reveal } = data.deposits[0] // it's a single deposit
         reveal.vault = tbtcVault.address
 
@@ -172,6 +173,7 @@ describe("VendingMachine - Upgrade", () => {
           from: governance,
           value: 10,
         })
+
         await bridge.connect(depositorSigner).revealDeposit(fundingTx, reveal)
 
         relay.getCurrentEpochDifficulty.returns(data.chainDifficulty)
@@ -211,10 +213,12 @@ describe("VendingMachine - Upgrade", () => {
         // Bank balances are denominated in satoshi
         const unmintedBankBalance1 = 7000 // [sat]
         const unmintedBankBalance2 = 1000 // [sat]
+
         // Values in satoshi need to be multiplied by 1e10 (satoshi multiplier)
         // to be represented in 1e18 (Ethereum) precision.
         const unmintedAmount1 =
           unmintedBankBalance1 * constants.satoshiMultiplier
+
         const unmintedAmount2 =
           unmintedBankBalance2 * constants.satoshiMultiplier
 
@@ -390,6 +394,7 @@ describe("VendingMachine - Upgrade", () => {
       // initial value is 0.05% of the deposited amount so the
       // final depositor balance should be cut by 10 satoshi.
       const totalWalletBtcBalance = 18490
+
       const totalTbtcMinted =
         totalWalletBtcBalance * constants.satoshiMultiplier
 

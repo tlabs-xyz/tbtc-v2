@@ -9,12 +9,6 @@ import { expect } from "chai"
  * Common error messages used across account-control tests
  */
 export const ERROR_MESSAGES = {
-  // SPV related errors
-  INSUFFICIENT_PROOF_OF_WORK: "Insufficient proof of work",
-  INVALID_MERKLE_PROOF: "Invalid merkle proof",
-  INVALID_BLOCK_HEADER: "Invalid block header",
-  RELAY_NOT_READY: "Relay not ready",
-
   // Wallet control errors
   WALLET_NOT_REGISTERED: "Wallet not registered",
   UNAUTHORIZED_WALLET_ACCESS: "Unauthorized wallet access",
@@ -35,7 +29,6 @@ export const ERROR_MESSAGES = {
   INVALID_ADDRESS: "Invalid address",
   ZERO_ADDRESS: "Zero address",
   INVALID_AMOUNT: "Invalid amount",
-  ARRAY_LENGTH_MISMATCH: "Array length mismatch",
 } as const
 
 /**
@@ -69,14 +62,20 @@ export async function expectCustomError(
       .to.be.revertedWithCustomError(contractFactory, errorName)
       .withArgs(...errorArgs)
   } else {
-    await expect(txPromise).to.be.revertedWithCustomError(contractFactory, errorName)
+    await expect(txPromise).to.be.revertedWithCustomError(
+      contractFactory,
+      errorName
+    )
   }
 }
 
 /**
  * Checks if an error message contains expected text
  */
-export function containsErrorMessage(error: unknown, expectedMessage: string): boolean {
+export function containsErrorMessage(
+  error: unknown,
+  expectedMessage: string
+): boolean {
   const errorMessage = error instanceof Error ? error.message : String(error)
   return errorMessage.includes(expectedMessage)
 }
@@ -105,7 +104,7 @@ export function validateErrorMessage(
   possibleMessages: string[]
 ): boolean {
   const errorMessage = extractErrorMessage(error)
-  return possibleMessages.some(msg => errorMessage.includes(msg))
+  return possibleMessages.some((msg) => errorMessage.includes(msg))
 }
 
 /**
@@ -195,25 +194,6 @@ export function createParameterValidationTester(contract: any) {
         ERROR_MESSAGES.INVALID_AMOUNT
       )
     },
-
-    /**
-     * Tests array length mismatch validation
-     */
-    async testArrayLengthMismatch(
-      functionName: string,
-      array1Index: number,
-      array2Index: number,
-      otherArgs: any[] = []
-    ): Promise<void> {
-      const args = [...otherArgs]
-      args[array1Index] = [1, 2, 3]
-      args[array2Index] = [1, 2] // Different length
-
-      await expectRevert(
-        contract[functionName](...args),
-        ERROR_MESSAGES.ARRAY_LENGTH_MISMATCH
-      )
-    },
   }
 }
 
@@ -251,7 +231,9 @@ export async function testInvalidInputs(
         test.expectedError
       )
     } catch (error) {
-      throw new Error(`Test "${test.name}" failed: ${extractErrorMessage(error)}`)
+      throw new Error(
+        `Test "${test.name}" failed: ${extractErrorMessage(error)}`
+      )
     }
   }
 }

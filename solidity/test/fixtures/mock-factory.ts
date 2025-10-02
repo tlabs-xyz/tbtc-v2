@@ -1,10 +1,6 @@
 import { FakeContract, smock } from "@defi-wonderland/smock"
 import type { BigNumber } from "ethers"
-import type {
-  IRelay,
-  IRandomBeacon,
-  ReserveOracle,
-} from "../../typechain"
+import type { IRelay, IRandomBeacon, ReserveOracle } from "../../typechain"
 
 export interface MockConfiguration {
   relay?: {
@@ -27,7 +23,9 @@ export class TestMockFactory {
   /**
    * Create a mock IRelay contract
    */
-  async createMockRelay(config?: MockConfiguration["relay"]): Promise<FakeContract<IRelay>> {
+  async createMockRelay(
+    config?: MockConfiguration["relay"]
+  ): Promise<FakeContract<IRelay>> {
     const mockRelay = await smock.fake<IRelay>("IRelay")
 
     // Set default behaviors
@@ -45,7 +43,9 @@ export class TestMockFactory {
   /**
    * Create a mock IRandomBeacon contract
    */
-  async createMockRandomBeacon(config?: MockConfiguration["randomBeacon"]): Promise<FakeContract<IRandomBeacon>> {
+  async createMockRandomBeacon(
+    config?: MockConfiguration["randomBeacon"]
+  ): Promise<FakeContract<IRandomBeacon>> {
     const mockRandomBeacon = await smock.fake<IRandomBeacon>("IRandomBeacon")
 
     // Set default behaviors for random beacon
@@ -58,7 +58,9 @@ export class TestMockFactory {
   /**
    * Create a mock ReserveOracle contract for QC tests
    */
-  async createMockReserveOracle(config?: MockConfiguration["reserveOracle"]): Promise<FakeContract<ReserveOracle>> {
+  async createMockReserveOracle(
+    config?: MockConfiguration["reserveOracle"]
+  ): Promise<FakeContract<ReserveOracle>> {
     const mockOracle = await smock.fake<ReserveOracle>("ReserveOracle")
 
     // Set default oracle behaviors
@@ -131,7 +133,9 @@ export class TestMockFactory {
   async createQCMockSet(config?: MockConfiguration): Promise<{
     reserveOracle: FakeContract<ReserveOracle>
   }> {
-    const reserveOracle = await this.createMockReserveOracle(config?.reserveOracle)
+    const reserveOracle = await this.createMockReserveOracle(
+      config?.reserveOracle
+    )
 
     return {
       reserveOracle,

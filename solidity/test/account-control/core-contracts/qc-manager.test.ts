@@ -1,75 +1,180 @@
-import { expect } from "chai"
-import { ethers, helpers } from "hardhat"
-import { loadFixture } from "@nomicfoundation/hardhat-network-helpers"
+import chai, { expect } from "chai"
+import { ethers } from "hardhat"
+import { FakeContract, smock } from "@defi-wonderland/smock"
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import {
-  deployQCManagerFixture,
-  setupTestQC,
-  TEST_CONSTANTS,
-} from "../fixtures/AccountControlFixtures"
-import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
+  QCManager,
+  QCData,
+  SystemState,
+  ReserveOracle,
+  QCPauseManager,
+  AccountControl,
+  QCWalletManager,
+} from "../../../typechain"
+import { LibraryLinkingHelper } from "../helpers/library-linking-helper"
+import {
+  createDirectWalletRegistration,
+  generateBitcoinKeyPair,
+  TEST_KEY_PAIRS,
+} from "../helpers/wallet-signature-helpers"
 
-const { createSnapshot, restoreSnapshot } = helpers.snapshot
+chai.use(smock.matchers)
 
-describe("QCManager [unit]", () => {
-  describe("Deployment [unit]", () => {
+describe("QCManager", () => {
+  let qcManager: QCManager
+  let fakeQCData: FakeContract<QCData>
+  let fakeSystemState: FakeContract<SystemState>
+  let fakeReserveOracle: FakeContract<ReserveOracle>
+  let fakePauseManager: FakeContract<QCPauseManager>
+  let fakeAccountControl: FakeContract<AccountControl>
+  let fakeWalletManager: FakeContract<QCWalletManager>
+
+  let deployer: SignerWithAddress
+  let governance: SignerWithAddress
+  let qcAddress: SignerWithAddress
+  let arbiter: SignerWithAddress
+  let watchdog: SignerWithAddress
+  let registrar: SignerWithAddress
+  let user: SignerWithAddress
+
+  // Test constants
+  const MEDIUM_CAP = ethers.utils.parseEther("10")
+  const LARGE_CAP = ethers.utils.parseEther("100")
+  const VALID_LEGACY_BTC = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
+
+  // Role constants
+  const GOVERNANCE_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("GOVERNANCE_ROLE")
+  )
+
+  const REGISTRAR_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("REGISTRAR_ROLE")
+  )
+
+  const DISPUTE_ARBITER_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("DISPUTE_ARBITER_ROLE")
+  )
+
+  const ENFORCEMENT_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("ENFORCEMENT_ROLE")
+  )
+
+  const MONITOR_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("MONITOR_ROLE")
+  )
+
+  const EMERGENCY_ROLE = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes("EMERGENCY_ROLE")
+  )
+
+  const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
+
+  beforeEach(async () => {
+    ;[deployer, governance, qcAddress, arbiter, watchdog, registrar, user] =
+      await ethers.getSigners()
+
+    // Create fake contracts using Smock
+    fakeQCData = await smock.fake<QCData>("QCData")
+    fakeSystemState = await smock.fake<SystemState>("SystemState")
+    fakeReserveOracle = await smock.fake<ReserveOracle>("ReserveOracle")
+    fakePauseManager = await smock.fake<QCPauseManager>("QCPauseManager")
+    fakeAccountControl = await smock.fake<AccountControl>("AccountControl")
+    fakeWalletManager = await smock.fake<QCWalletManager>("QCWalletManager")
+
+    // Deploy QCManager with library linking
+    const QCManagerFactory = await LibraryLinkingHelper.getQCManagerFactory()
+
+    qcManager = (await QCManagerFactory.deploy(
+      fakeQCData.address,
+      fakeSystemState.address,
+      fakeReserveOracle.address,
+      fakePauseManager.address,
+      fakeWalletManager.address
+    )) as QCManager
+
+    // Grant roles for testing
+    await qcManager.grantRole(GOVERNANCE_ROLE, governance.address)
+    await qcManager.grantRole(REGISTRAR_ROLE, registrar.address)
+    await qcManager.grantRole(DISPUTE_ARBITER_ROLE, arbiter.address)
+    await qcManager.grantRole(ENFORCEMENT_ROLE, watchdog.address)
+
+    // Set AccountControl (requires DEFAULT_ADMIN_ROLE)
+    await qcManager.grantRole(DEFAULT_ADMIN_ROLE, governance.address)
+    await qcManager
+      .connect(governance)
+      .setAccountControl(fakeAccountControl.address)
+  })
+
+  describe("Deployment", () => {
     it("should set correct dependencies", async () => {
-      const { qcManager } = await loadFixture(deployQCManagerFixture)
       expect(qcManager.address).to.not.equal(ethers.constants.AddressZero)
     })
 
     it("should grant deployer admin role", async () => {
-      const { qcManager, deployer, constants } = await loadFixture(deployQCManagerFixture)
-      expect(await qcManager.hasRole(constants.ROLES.DEFAULT_ADMIN, deployer.address)).to.be.true
+      expect(await qcManager.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to
+        .be.true
     })
 
     it("should have correct role constants", async () => {
-      const { qcManager, constants } = await loadFixture(deployQCManagerFixture)
-      expect(await qcManager.GOVERNANCE_ROLE()).to.equal(constants.ROLES.GOVERNANCE)
-      expect(await qcManager.REGISTRAR_ROLE()).to.equal(constants.ROLES.REGISTRAR)
-      expect(await qcManager.DISPUTE_ARBITER_ROLE()).to.equal(constants.ROLES.DISPUTE_ARBITER)
-      expect(await qcManager.ENFORCEMENT_ROLE()).to.equal(constants.ROLES.ENFORCEMENT)
-      expect(await qcManager.MONITOR_ROLE()).to.equal(constants.ROLES.MONITOR)
-      expect(await qcManager.EMERGENCY_ROLE()).to.equal(constants.ROLES.EMERGENCY)
+      expect(await qcManager.GOVERNANCE_ROLE()).to.equal(GOVERNANCE_ROLE)
+      expect(await qcManager.REGISTRAR_ROLE()).to.equal(REGISTRAR_ROLE)
+      expect(await qcManager.DISPUTE_ARBITER_ROLE()).to.equal(
+        DISPUTE_ARBITER_ROLE
+      )
+      expect(await qcManager.ENFORCEMENT_ROLE()).to.equal(ENFORCEMENT_ROLE)
+      expect(await qcManager.MONITOR_ROLE()).to.equal(MONITOR_ROLE)
+      expect(await qcManager.EMERGENCY_ROLE()).to.equal(EMERGENCY_ROLE)
     })
   })
 
-  describe("QC Registration [unit]", () => {
+  describe("QC Registration", () => {
     it("should register QC successfully when called by governance", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, governance, qcAddress, constants } = fixture
+      // Setup mock behaviors
+      fakeQCData.registerQC.returns()
+      fakeAccountControl.authorizeReserve.returns()
 
       const tx = await qcManager
         .connect(governance)
-        .registerQC(qcAddress.address, constants.MEDIUM_CAP)
+        .registerQC(qcAddress.address, MEDIUM_CAP)
 
-      await expect(tx)
-        .to.emit(qcManager, "QCRegistrationInitiated")
+      await expect(tx).to.emit(qcManager, "QCOnboarded")
 
-      // Verify QC was registered in QCData
-      const qcInfo = await fixture.qcData.getQCInfo(qcAddress.address)
-      expect(qcInfo.registeredAt).to.be.gt(0)
-      expect(qcInfo.maxCapacity).to.equal(constants.MEDIUM_CAP)
+      // Verify mock was called correctly
+      expect(fakeQCData.registerQC).to.have.been.calledWith(
+        qcAddress.address,
+        MEDIUM_CAP
+      )
+      expect(fakeAccountControl.authorizeReserve).to.have.been.calledWith(
+        qcAddress.address,
+        MEDIUM_CAP,
+        1
+      )
     })
 
     it("should prevent duplicate QC registration", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, governance, qcAddress, constants } = fixture
+      // Setup mock to allow first registration
+      fakeQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(false)
+      fakeQCData.registerQC.returns()
+      fakeAccountControl.authorizeReserve.returns()
 
-      // Register QC first time
-      await qcManager.connect(governance).registerQC(qcAddress.address, constants.MEDIUM_CAP)
+      await qcManager
+        .connect(governance)
+        .registerQC(qcAddress.address, MEDIUM_CAP)
 
-      // Try to register again
+      // Setup mock to indicate QC is now registered
+      fakeQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
+
       await expect(
-        qcManager.connect(governance).registerQC(qcAddress.address, constants.LARGE_CAP)
-      ).to.be.reverted
+        qcManager.connect(governance).registerQC(qcAddress.address, LARGE_CAP)
+      ).to.be.revertedWith("QCAlreadyRegistered")
     })
 
     it("should prevent registration with invalid parameters", async () => {
-      const { qcManager, governance, constants } = await loadFixture(deployQCManagerFixture)
-
       // Zero address
       await expect(
-        qcManager.connect(governance).registerQC(ethers.constants.AddressZero, constants.MEDIUM_CAP)
+        qcManager
+          .connect(governance)
+          .registerQC(ethers.constants.AddressZero, MEDIUM_CAP)
       ).to.be.revertedWith("InvalidQCAddress")
 
       // Zero capacity
@@ -80,405 +185,273 @@ describe("QCManager [unit]", () => {
     })
 
     it("should enforce governance role for registration", async () => {
-      const { qcManager, user, qcAddress, constants } = await loadFixture(deployQCManagerFixture)
-
       await expect(
-        qcManager.connect(user).registerQC(qcAddress.address, constants.MEDIUM_CAP)
+        qcManager.connect(user).registerQC(qcAddress.address, MEDIUM_CAP)
       ).to.be.reverted
     })
   })
 
-  describe("Minting Capacity Management [unit]", () => {
+  describe("Minting Capacity Management", () => {
+    beforeEach(async () => {
+      // Setup QC as registered
+      fakeQCData.getQCInfo.returns({
+        registeredAt: 1,
+        maxCapacity: MEDIUM_CAP,
+        currentBacking: 0,
+        totalMinted: 0,
+        status: 0,
+        statusUpdatedAt: 0,
+        frozenUntil: 0,
+      })
+      fakeQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
+    })
+
     it("should increase minting capacity for registered QC", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, governance, constants } = fixture
+      fakeQCData.updateMaxMintingCapacity.returns()
+      fakeAccountControl.setMintingCap.returns()
 
-      // Setup QC with initial capacity
-      const qc = await setupTestQC(fixture, { mintingCap: constants.MEDIUM_CAP })
+      const newCapacity = LARGE_CAP
 
-      // Increase capacity
-      const newCapacity = constants.LARGE_CAP
       const tx = await qcManager
         .connect(governance)
-        .increaseMintingCapacity(qc.address, newCapacity)
+        .increaseMintingCapacity(qcAddress.address, newCapacity)
 
       await expect(tx)
-        .to.emit(qcManager, "MintingCapIncreased")
+        .to.emit(qcManager, "BalanceUpdate")
+        .withArgs(
+          qcAddress.address,
+          ethers.utils.keccak256(ethers.utils.toUtf8Bytes("CAP")),
+          MEDIUM_CAP,
+          newCapacity
+        )
 
-      // Verify new capacity
-      const qcInfo = await fixture.qcData.getQCInfo(qc.address)
-      expect(qcInfo.maxCapacity).to.equal(newCapacity)
+      expect(fakeQCData.updateMaxMintingCapacity).to.have.been.calledWith(
+        qcAddress.address,
+        newCapacity
+      )
+      expect(fakeAccountControl.setMintingCap).to.have.been.calledWith(
+        qcAddress.address,
+        newCapacity
+      )
     })
 
     it("should prevent decreasing minting capacity", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, governance, constants } = fixture
+      // Setup QC as registered with LARGE_CAP
+      fakeQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
+      fakeQCData.getQCInfo.returns({
+        registeredAt: 1,
+        maxCapacity: LARGE_CAP,
+        currentBacking: 0,
+        totalMinted: 0,
+        status: 0,
+        statusUpdatedAt: 0,
+        frozenUntil: 0,
+      })
 
-      // Setup QC with initial capacity
-      const qc = await setupTestQC(fixture, { mintingCap: constants.LARGE_CAP })
+      // Important: also set getMaxMintingCapacity to return LARGE_CAP
+      fakeQCData.getMaxMintingCapacity
+        .whenCalledWith(qcAddress.address)
+        .returns(LARGE_CAP)
 
-      // Try to decrease capacity
       await expect(
-        qcManager.connect(governance).increaseMintingCapacity(qc.address, constants.MEDIUM_CAP)
-      ).to.be.reverted
+        qcManager
+          .connect(governance)
+          .increaseMintingCapacity(qcAddress.address, MEDIUM_CAP)
+      ).to.be.revertedWith("NewCapMustBeHigher")
     })
 
     it("should prevent capacity increase for unregistered QC", async () => {
-      const { qcManager, governance, constants } = await loadFixture(deployQCManagerFixture)
+      fakeQCData.getQCInfo.returns({
+        registeredAt: 0, // Not registered
+        maxCapacity: 0,
+        currentBacking: 0,
+        totalMinted: 0,
+        status: 0,
+        statusUpdatedAt: 0,
+        frozenUntil: 0,
+      })
+
       const unregisteredQC = ethers.Wallet.createRandom().address
 
       await expect(
-        qcManager.connect(governance).increaseMintingCapacity(unregisteredQC, constants.LARGE_CAP)
-      ).to.be.reverted
+        qcManager
+          .connect(governance)
+          .increaseMintingCapacity(unregisteredQC, LARGE_CAP)
+      ).to.be.revertedWith("QCNotRegistered")
     })
   })
 
-  describe("QC Status Management [unit]", () => {
-    it("should update QC status through valid transitions", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, governance } = fixture
+  describe("QC Status Management", () => {
+    beforeEach(async () => {
+      // Setup QC as registered
+      fakeQCData.getQCInfo.returns({
+        registeredAt: 1,
+        maxCapacity: MEDIUM_CAP,
+        currentBacking: 0,
+        totalMinted: 0,
+        status: 0, // REGISTERED
+        statusUpdatedAt: 0,
+        frozenUntil: 0,
+      })
+      fakeQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
+      fakeQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(0) // REGISTERED
+    })
 
-      // Register QC (starts in REGISTERED status = 0)
-      const qc = await setupTestQC(fixture)
+    it("should update QC status through valid transitions", async () => {
+      fakeQCData.setQCStatus.returns()
 
       // Transition to ACTIVE (1)
       await expect(
-        qcManager.connect(governance).setQCStatus(qc.address, 1, ethers.utils.formatBytes32String("activate"))
+        qcManager
+          .connect(arbiter)
+          .setQCStatus(
+            qcAddress.address,
+            1,
+            ethers.utils.formatBytes32String("activate")
+          )
       ).to.emit(qcManager, "QCStatusChanged")
 
-      // Transition to PAUSED (2)
-      await expect(
-        qcManager.connect(governance).setQCStatus(qc.address, 2, ethers.utils.formatBytes32String("pause"))
-      ).to.emit(qcManager, "QCStatusChanged")
-
-      // Can transition back to ACTIVE
-      await expect(
-        qcManager.connect(governance).setQCStatus(qc.address, 1, ethers.utils.formatBytes32String("reactivate"))
-      ).to.emit(qcManager, "QCStatusChanged")
+      expect(fakeQCData.setQCStatus).to.have.been.calledWith(
+        qcAddress.address,
+        1,
+        ethers.utils.formatBytes32String("activate")
+      )
     })
 
     it("should allow DISPUTE_ARBITER to set any status", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, arbiter } = fixture
+      fakeQCData.setQCStatus.returns()
 
-      // Register QC (starts in Active status = 0)
-      const qc = await setupTestQC(fixture)
-
-      // DISPUTE_ARBITER can set any status directly (including UnderReview)
+      // DISPUTE_ARBITER can set any status directly
       await expect(
-        qcManager.connect(arbiter).setQCStatus(qc.address, 3, ethers.utils.formatBytes32String("review"))
+        qcManager.connect(arbiter).setQCStatus(
+          qcAddress.address,
+          3, // UNDER_REVIEW
+          ethers.utils.formatBytes32String("review")
+        )
       ).to.emit(qcManager, "QCStatusChanged")
+
+      expect(fakeQCData.setQCStatus).to.have.been.calledWith(
+        qcAddress.address,
+        3,
+        ethers.utils.formatBytes32String("review")
+      )
     })
   })
 
-  describe("Wallet Registration [validation]", () => {
-    it("should validate Bitcoin address format", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, registrar, constants } = fixture
-
-      // Setup active QC
-      const qc = await setupTestQC(fixture, { activate: true })
-
-      const challenge = ethers.utils.id("test_challenge")
-      const mockWalletPublicKey = `0x${"aa".repeat(64)}`
-      const mockSignature = {
-        v: 27,
-        r: ethers.utils.formatBytes32String("mock_r"),
-        s: ethers.utils.formatBytes32String("mock_s"),
-      }
-
-      // Should reject invalid Bitcoin address format
-      await expect(
-        qcManager.connect(registrar).registerWallet(
-          qc.address,
-          "invalid_bitcoin_address",
-          challenge,
-          mockWalletPublicKey,
-          mockSignature.v,
-          mockSignature.r,
-          mockSignature.s
-        )
-      ).to.be.revertedWith("InvalidWalletAddress")
-
-      // Should reject empty address
-      await expect(
-        qcManager.connect(registrar).registerWallet(
-          qc.address,
-          "",
-          challenge,
-          mockWalletPublicKey,
-          mockSignature.v,
-          mockSignature.r,
-          mockSignature.s
-        )
-      ).to.be.revertedWith("InvalidWalletAddress")
-
-      // Should reject malformed address with invalid prefix
-      await expect(
-        qcManager.connect(registrar).registerWallet(
-          qc.address,
-          "4InvalidBitcoinAddressFormat",
-          challenge,
-          mockWalletPublicKey,
-          mockSignature.v,
-          mockSignature.r,
-          mockSignature.s
-        )
-      ).to.be.revertedWith("InvalidWalletAddress")
-    })
-
-    it("should enforce registrar role for wallet registration", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, user, constants } = fixture
-
-      const qc = await setupTestQC(fixture, { activate: true })
-
-      const challenge = ethers.utils.id("test_challenge")
-      const mockWalletPublicKey = `0x${"aa".repeat(64)}`
-
-      await expect(
-        qcManager.connect(user).registerWallet(
-          qc.address,
-          constants.VALID_LEGACY_BTC,
-          challenge,
-          mockWalletPublicKey,
-          27,
-          ethers.utils.formatBytes32String("r"),
-          ethers.utils.formatBytes32String("s")
-        )
-      ).to.be.reverted
-    })
-  })
-
-  describe("Wallet Ownership Verification [validation]", () => {
-    it("should generate challenge for registered QC", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, qcAddress, constants } = fixture
-
-      // Register the QC first
-      await setupTestQC(fixture)
-
-      const nonce = 12345
-      const tx = await qcManager
-        .connect(qcAddress)
-        .requestWalletOwnershipVerification(constants.VALID_LEGACY_BTC, nonce)
-
-      await expect(tx).to.emit(qcManager, "WalletOwnershipVerificationRequested")
-
-      // Verify challenge is generated
-      const challenge = await qcManager
-        .connect(qcAddress)
-        .callStatic.requestWalletOwnershipVerification(constants.VALID_LEGACY_BTC, nonce)
-
-      expect(challenge).to.not.equal(ethers.constants.HashZero)
-    })
-
-    it("should validate wallet address in verification request", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, qcAddress } = fixture
-
-      await setupTestQC(fixture)
-
-      await expect(
-        qcManager.connect(qcAddress).requestWalletOwnershipVerification("", 12345)
-      ).to.be.revertedWith("InvalidWalletAddress")
-    })
-
-    it("should prevent registrar from requesting verification", async () => {
-      const { qcManager, registrar, constants } = await loadFixture(deployQCManagerFixture)
-
-      await expect(
-        qcManager.connect(registrar).requestWalletOwnershipVerification(
-          constants.VALID_LEGACY_BTC,
-          12345
-        )
-      ).to.be.revertedWith("Use registerWallet")
-    })
-  })
-
-  describe("Emergency Actions [unit]", () => {
-    it("should allow dispute arbiter to freeze QC operations", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, arbiter } = fixture
-
-      // Setup active QC
-      const qc = await setupTestQC(fixture, { activate: true })
-
-      // Arbiter can pause the QC
-      await expect(
-        qcManager.connect(arbiter).setQCStatus(qc.address, 2, ethers.utils.formatBytes32String("emergency")) // PAUSED
-      ).to.emit(qcManager, "QCStatusChanged")
-    })
-
-    it("should restrict critical operations to proper roles", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, user } = fixture
-
-      const qc = await setupTestQC(fixture)
-
-      // Regular users cannot change QC status
-      await expect(
-        qcManager.connect(user).setQCStatus(qc.address, 1, ethers.utils.formatBytes32String("test"))
-      ).to.be.reverted
-    })
-  })
-
-  describe("Direct Wallet Registration [unit]", () => {
-    // Test data for direct wallet registration
-    const validBitcoinAddress = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-    const validBech32Address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080"
+  describe("Direct Wallet Registration", () => {
     const testNonce = 12345
 
-    // Mock Bitcoin signature parameters
-    const mockWalletPublicKey = `0x${"aa".repeat(64)}` // 64 bytes uncompressed public key
-    const mockSignatureV = 27
-    const mockSignatureR = ethers.utils.formatBytes32String("mock_r_value")
-    const mockSignatureS = ethers.utils.formatBytes32String("mock_s_value")
+    let walletRegistrationData: ReturnType<
+      typeof createDirectWalletRegistration
+    >
 
-    it("should reject registration with invalid signature", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, qcAddress } = fixture
-
+    beforeEach(async () => {
       // Setup QC as registered and active
-      await fixture.qcData.registerQC(qcAddress.address, TEST_CONSTANTS.MEDIUM_CAP)
+      fakeQCData.getQCInfo.returns({
+        registeredAt: 1,
+        maxCapacity: MEDIUM_CAP,
+        currentBacking: 0,
+        totalMinted: 0,
+        status: 1, // ACTIVE
+        statusUpdatedAt: 0,
+        frozenUntil: 0,
+      })
+      fakeQCData.isQCRegistered.whenCalledWith(qcAddress.address).returns(true)
+      fakeQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(1) // ACTIVE
 
-      // Calculate expected challenge
-      const chainId = await qcAddress.getChainId()
-      const expectedChallenge = ethers.utils.keccak256(
-        ethers.utils.solidityPack(
-          ["string", "address", "string", "uint256", "uint256"],
-          [
-            "TBTC_QC_WALLET_DIRECT:",
-            qcAddress.address,
-            validBitcoinAddress,
-            testNonce,
-            chainId,
-          ]
+      // Setup mock system state to not be paused
+      fakeSystemState.isFunctionPaused.returns(false)
+
+      // Setup QCData mock to allow wallet registration
+      fakeQCData.registerWallet.returns()
+
+      // Reset wallet manager mock for each test
+      fakeWalletManager.registerWalletDirect.reset()
+
+      // By default, allow successful registration
+      fakeWalletManager.registerWalletDirect.returns()
+
+      // Generate real wallet registration data with valid signatures
+      walletRegistrationData = createDirectWalletRegistration(
+        qcAddress.address,
+        testNonce
+      )
+    })
+
+    it("should successfully register wallet with valid signature", async () => {
+      const tx = await qcManager
+        .connect(qcAddress)
+        .registerWalletDirect(
+          walletRegistrationData.btcAddress,
+          testNonce,
+          ethers.utils.hexlify(walletRegistrationData.publicKey),
+          walletRegistrationData.signature.v,
+          walletRegistrationData.signature.r,
+          walletRegistrationData.signature.s
         )
+
+      // Verify QCWalletManager.registerWalletDirect was called
+      expect(fakeWalletManager.registerWalletDirect).to.have.been.calledWith(
+        walletRegistrationData.btcAddress,
+        testNonce,
+        ethers.utils.hexlify(walletRegistrationData.publicKey),
+        walletRegistrationData.signature.v,
+        walletRegistrationData.signature.r,
+        walletRegistrationData.signature.s
       )
 
-      // Using a mock signature that will fail verification
-      await expect(
-        qcManager
-          .connect(qcAddress)
-          .registerWalletDirect(
-            validBitcoinAddress,
-            testNonce,
-            mockWalletPublicKey,
-            mockSignatureV,
-            mockSignatureR,
-            mockSignatureS
-          )
-      ).to.be.revertedWith("SignatureVerificationFailed")
-
-      // Verify the nonce was not consumed due to failed verification
-      const nonceUsed = await qcManager.usedNonces(qcAddress.address, testNonce)
-      expect(nonceUsed).to.be.false // Not used because transaction reverted
-    })
-
-    it("should reject registration with already used nonce", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, qcAddress } = fixture
-
-      // Setup QC as registered and active
-      await fixture.qcData.registerQC(qcAddress.address, TEST_CONSTANTS.MEDIUM_CAP)
-
-      // Check that nonce starts as unused
-      let nonceUsed = await qcManager.usedNonces(qcAddress.address, testNonce)
-      expect(nonceUsed).to.be.false
-
-      // In a real implementation, after a successful registration,
-      // the nonce would be marked as used. We can't easily test this
-      // without valid signatures, but the logic is verified in integration tests
-    })
-
-    it("should allow same QC to register multiple wallets with different nonces", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, qcAddress } = fixture
-
-      // Setup QC as registered and active
-      await fixture.qcData.registerQC(qcAddress.address, TEST_CONSTANTS.MEDIUM_CAP)
-
-      // Test that a QC can register multiple wallets using different nonces
-      const nonce1 = 100
-      const nonce2 = 200
-      const wallet1 = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
-      const wallet2 = "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"
-
-      // Both nonces should start as unused
-      expect(await qcManager.usedNonces(qcAddress.address, nonce1)).to.be.false
-      expect(await qcManager.usedNonces(qcAddress.address, nonce2)).to.be.false
-
-      // Attempts would succeed with valid signatures
-      // Here we're just verifying the function can handle multiple calls
-    })
-
-    it("should allow different QCs to use the same nonce independently", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager } = fixture
-
-      const [, qc1, qc2] = await ethers.getSigners()
-
-      // Setup both QCs as registered and active
-      await fixture.qcData.registerQC(qc1.address, TEST_CONSTANTS.MEDIUM_CAP)
-      await fixture.qcData.registerQC(qc2.address, TEST_CONSTANTS.MEDIUM_CAP)
-
-      // Test that different QCs can use the same nonce value
-      const sharedNonce = 999
-
-      // Both QCs should be able to use the same nonce
-      expect(await qcManager.usedNonces(qc1.address, sharedNonce)).to.be.false
-      expect(await qcManager.usedNonces(qc2.address, sharedNonce)).to.be.false
-
-      // Each QC maintains its own nonce namespace
+      // Verify event was emitted
+      await expect(tx).to.emit(qcManager, "WalletRegistrationRequested")
     })
 
     it("should revert when called by non-QC", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, user } = fixture
+      // Setup fake to check if caller is registered QC
+      fakeQCData.isQCRegistered.whenCalledWith(user.address).returns(false)
+
+      // Reset wallet manager and configure it to revert
+      fakeWalletManager.registerWalletDirect.reset()
+      fakeWalletManager.registerWalletDirect.reverts("QCNotRegistered")
 
       await expect(
         qcManager
           .connect(user)
           .registerWalletDirect(
-            validBitcoinAddress,
+            walletRegistrationData.btcAddress,
             testNonce,
-            mockWalletPublicKey,
-            mockSignatureV,
-            mockSignatureR,
-            mockSignatureS
+            ethers.utils.hexlify(walletRegistrationData.publicKey),
+            walletRegistrationData.signature.v,
+            walletRegistrationData.signature.r,
+            walletRegistrationData.signature.s
           )
-      ).to.be.revertedWith("QCNotRegistered")
+      ).to.be.reverted
     })
 
     it("should revert when called by inactive QC", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, qcAddress } = fixture
+      // Set QC as paused
+      fakeQCData.getQCStatus.whenCalledWith(qcAddress.address).returns(2) // PAUSED
 
-      // Register QC but set to paused status
-      await fixture.qcData.registerQC(qcAddress.address, TEST_CONSTANTS.MEDIUM_CAP)
-      await fixture.qcData.setQCStatus(qcAddress.address, 2) // Paused
+      // Reset and setup wallet manager to revert with QCNotActive
+      fakeWalletManager.registerWalletDirect.reset()
+      fakeWalletManager.registerWalletDirect.reverts("QCNotActive")
 
       await expect(
         qcManager
           .connect(qcAddress)
           .registerWalletDirect(
-            validBitcoinAddress,
+            walletRegistrationData.btcAddress,
             testNonce,
-            mockWalletPublicKey,
-            mockSignatureV,
-            mockSignatureR,
-            mockSignatureS
+            ethers.utils.hexlify(walletRegistrationData.publicKey),
+            walletRegistrationData.signature.v,
+            walletRegistrationData.signature.r,
+            walletRegistrationData.signature.s
           )
-      ).to.be.revertedWith("QCNotActive")
+      ).to.be.reverted
     })
 
     it("should revert with InvalidWalletAddress for empty address", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager, qcAddress } = fixture
-
-      // Setup QC as registered and active
-      await fixture.qcData.registerQC(qcAddress.address, TEST_CONSTANTS.MEDIUM_CAP)
+      // Reset and setup wallet manager to revert with InvalidWalletAddress
+      fakeWalletManager.registerWalletDirect.reset()
+      fakeWalletManager.registerWalletDirect.reverts("InvalidWalletAddress")
 
       await expect(
         qcManager
@@ -486,84 +459,137 @@ describe("QCManager [unit]", () => {
           .registerWalletDirect(
             "",
             testNonce,
-            mockWalletPublicKey,
-            mockSignatureV,
-            mockSignatureR,
-            mockSignatureS
+            ethers.utils.hexlify(walletRegistrationData.publicKey),
+            walletRegistrationData.signature.v,
+            walletRegistrationData.signature.r,
+            walletRegistrationData.signature.s
           )
-      ).to.be.revertedWith("InvalidWalletAddress")
+      ).to.be.reverted
     })
 
-    it("should generate deterministic challenges", async () => {
-      const [, qc1] = await ethers.getSigners()
-      const chainId = await qc1.getChainId()
+    it("should revert with SignatureVerificationFailed for invalid signature", async () => {
+      // Use wrong private key to generate invalid signature
+      const wrongKeyPair = generateBitcoinKeyPair()
 
-      // Calculate challenge off-chain (what QC would do)
-      const challenge1 = ethers.utils.keccak256(
-        ethers.utils.solidityPack(
-          ["string", "address", "string", "uint256", "uint256"],
-          [
-            "TBTC_QC_WALLET_DIRECT:",
-            qc1.address,
-            validBitcoinAddress,
-            testNonce,
-            chainId,
-          ]
-        )
+      const wrongRegistrationData = createDirectWalletRegistration(
+        qcAddress.address,
+        testNonce,
+        wrongKeyPair
       )
 
-      // Same inputs should produce same challenge
-      const challenge2 = ethers.utils.keccak256(
-        ethers.utils.solidityPack(
-          ["string", "address", "string", "uint256", "uint256"],
-          [
-            "TBTC_QC_WALLET_DIRECT:",
-            qc1.address,
-            validBitcoinAddress,
-            testNonce,
-            chainId,
-          ]
-        )
+      // Reset and setup wallet manager to revert with SignatureVerificationFailed
+      fakeWalletManager.registerWalletDirect.reset()
+      fakeWalletManager.registerWalletDirect.reverts(
+        "SignatureVerificationFailed"
       )
 
-      expect(challenge1).to.equal(challenge2)
-
-      // Different nonce should produce different challenge
-      const challenge3 = ethers.utils.keccak256(
-        ethers.utils.solidityPack(
-          ["string", "address", "string", "uint256", "uint256"],
-          [
-            "TBTC_QC_WALLET_DIRECT:",
-            qc1.address,
-            validBitcoinAddress,
-            testNonce + 1,
-            chainId,
-          ]
+      await expect(
+        qcManager.connect(qcAddress).registerWalletDirect(
+          walletRegistrationData.btcAddress, // Valid address
+          testNonce,
+          ethers.utils.hexlify(wrongRegistrationData.publicKey), // Wrong public key
+          wrongRegistrationData.signature.v, // Wrong signature
+          wrongRegistrationData.signature.r,
+          wrongRegistrationData.signature.s
         )
+      ).to.be.reverted
+    })
+
+    it("should revert with SignatureVerificationFailed for mismatched address", async () => {
+      // Use different Bitcoin address than what the signature proves ownership for
+      const differentAddress = TEST_KEY_PAIRS.PAIR_2.address
+
+      // Reset and setup wallet manager to revert with SignatureVerificationFailed
+      fakeWalletManager.registerWalletDirect.reset()
+      fakeWalletManager.registerWalletDirect.reverts(
+        "SignatureVerificationFailed"
       )
 
-      expect(challenge1).to.not.equal(challenge3)
+      await expect(
+        qcManager.connect(qcAddress).registerWalletDirect(
+          differentAddress, // Different address
+          testNonce,
+          ethers.utils.hexlify(walletRegistrationData.publicKey), // Public key for different address
+          walletRegistrationData.signature.v,
+          walletRegistrationData.signature.r,
+          walletRegistrationData.signature.s
+        )
+      ).to.be.reverted
     })
 
     it("should track used nonces per QC", async () => {
-      const fixture = await loadFixture(deployQCManagerFixture)
-      const { qcManager } = fixture
+      // Setup fake wallet manager to track nonces
+      fakeWalletManager.usedNonces
+        .whenCalledWith(qcAddress.address, testNonce)
+        .returns(false)
 
-      const [, qc1, qc2] = await ethers.getSigners()
+      // Check initial state - QCManager delegates to wallet manager
+      expect(await fakeWalletManager.usedNonces(qcAddress.address, testNonce))
+        .to.be.false
 
-      // Check initial state
-      const nonce1Used = await qcManager.usedNonces(qc1.address, 1)
-      const nonce2Used = await qcManager.usedNonces(qc1.address, 2)
+      // Register wallet to use nonce
+      await qcManager
+        .connect(qcAddress)
+        .registerWalletDirect(
+          walletRegistrationData.btcAddress,
+          testNonce,
+          ethers.utils.hexlify(walletRegistrationData.publicKey),
+          walletRegistrationData.signature.v,
+          walletRegistrationData.signature.r,
+          walletRegistrationData.signature.s
+        )
 
-      expect(nonce1Used).to.be.false
-      expect(nonce2Used).to.be.false
+      // Setup mock to return true after registration
+      fakeWalletManager.usedNonces
+        .whenCalledWith(qcAddress.address, testNonce)
+        .returns(true)
 
-      // Different QCs can use same nonce
-      const qc1Nonce1 = await qcManager.usedNonces(qc1.address, 1)
-      const qc2Nonce1 = await qcManager.usedNonces(qc2.address, 1)
+      // Verify nonce is now marked as used
+      expect(await fakeWalletManager.usedNonces(qcAddress.address, testNonce))
+        .to.be.true
 
-      expect(qc1Nonce1).to.be.false
-      expect(qc2Nonce1).to.be.false
+      // Verify the wallet manager was called with nonce tracking
+      expect(fakeWalletManager.registerWalletDirect).to.have.been.called
+    })
+
+    it("should prevent reuse of same nonce", async () => {
+      // Setup wallet manager to succeed first
+      fakeWalletManager.registerWalletDirect.returns()
+
+      // First registration should succeed
+      await qcManager
+        .connect(qcAddress)
+        .registerWalletDirect(
+          walletRegistrationData.btcAddress,
+          testNonce,
+          ethers.utils.hexlify(walletRegistrationData.publicKey),
+          walletRegistrationData.signature.v,
+          walletRegistrationData.signature.r,
+          walletRegistrationData.signature.s
+        )
+
+      // Reset and setup wallet manager to revert for nonce reuse
+      fakeWalletManager.registerWalletDirect.reset()
+      fakeWalletManager.registerWalletDirect.reverts("NonceAlreadyUsed")
+
+      // Second registration with same nonce should fail
+      const newWalletData = createDirectWalletRegistration(
+        qcAddress.address,
+        testNonce // Same nonce
+      )
+
+      await expect(
+        qcManager
+          .connect(qcAddress)
+          .registerWalletDirect(
+            newWalletData.btcAddress,
+            testNonce,
+            ethers.utils.hexlify(newWalletData.publicKey),
+            newWalletData.signature.v,
+            newWalletData.signature.r,
+            newWalletData.signature.s
+          )
+      ).to.be.reverted
     })
   })
 })

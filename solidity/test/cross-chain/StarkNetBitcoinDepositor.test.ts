@@ -45,6 +45,7 @@ describe("StarkNetBitcoinDepositor", () => {
   let tbtcVault: MockTBTCVault
   let tbtcToken: MockTBTCToken
   let starkGateBridge: MockStarkGateBridge
+
   let fixture: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     fundingTx: any
@@ -55,8 +56,10 @@ describe("StarkNetBitcoinDepositor", () => {
   }
 
   const INITIAL_MESSAGE_FEE = ethers.utils.parseEther("0.01")
+
   const STARKNET_RECIPIENT =
     "0x04e3bc49f130f9d0379082c24efd397a0eddfccdc6023a2f02a74d8527140276"
+
   const STARKNET_TBTC_TOKEN = ethers.BigNumber.from("0x12345") // Mock StarkNet tBTC token address
 
   before(async () => {
@@ -67,17 +70,20 @@ describe("StarkNetBitcoinDepositor", () => {
     const MockBridge = await ethers.getContractFactory(
       "MockTBTCBridgeWithSweep"
     )
+
     bridge = await MockBridge.deploy()
 
     const MockTBTCVault = await ethers.getContractFactory(
       "contracts/test/MockTBTCVault.sol:MockTBTCVault"
     )
+
     tbtcVault = (await MockTBTCVault.deploy()) as MockTBTCVault
     await tbtcVault.setTbtcToken(tbtcToken.address)
 
     const MockStarkGateBridge = await ethers.getContractFactory(
       "MockStarkGateBridge"
     )
+
     starkGateBridge = await MockStarkGateBridge.deploy()
 
     fixture = loadFixture(tbtcVault.address)
@@ -86,15 +92,18 @@ describe("StarkNetBitcoinDepositor", () => {
     const StarkNetBitcoinDepositor = await ethers.getContractFactory(
       "StarkNetBitcoinDepositor"
     )
+
     const depositorImpl = await StarkNetBitcoinDepositor.deploy()
 
     // Deploy proxy
     const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
+
     const initData = depositorImpl.interface.encodeFunctionData("initialize", [
       bridge.address,
       tbtcVault.address,
       starkGateBridge.address,
     ])
+
     const proxy = await ProxyFactory.deploy(depositorImpl.address, initData)
 
     depositor = StarkNetBitcoinDepositor.attach(proxy.address)
@@ -117,9 +126,11 @@ describe("StarkNetBitcoinDepositor", () => {
       const StarkNetBitcoinDepositor = await ethers.getContractFactory(
         "StarkNetBitcoinDepositor"
       )
+
       const depositorImpl = await StarkNetBitcoinDepositor.deploy()
 
       const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
+
       const initData = depositorImpl.interface.encodeFunctionData(
         "initialize",
         [
@@ -138,9 +149,11 @@ describe("StarkNetBitcoinDepositor", () => {
       const StarkNetBitcoinDepositor = await ethers.getContractFactory(
         "StarkNetBitcoinDepositor"
       )
+
       const depositorImpl = await StarkNetBitcoinDepositor.deploy()
 
       const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
+
       const initData = depositorImpl.interface.encodeFunctionData(
         "initialize",
         [bridge.address, ethers.constants.AddressZero, starkGateBridge.address]
@@ -155,9 +168,11 @@ describe("StarkNetBitcoinDepositor", () => {
       const StarkNetBitcoinDepositor = await ethers.getContractFactory(
         "StarkNetBitcoinDepositor"
       )
+
       const depositorImpl = await StarkNetBitcoinDepositor.deploy()
 
       const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
+
       const initData = depositorImpl.interface.encodeFunctionData(
         "initialize",
         [bridge.address, tbtcVault.address, ethers.constants.AddressZero]
@@ -230,6 +245,7 @@ describe("StarkNetBitcoinDepositor", () => {
 
   describe("finalizeDeposit", () => {
     const expectedTbtcAmount = BigNumber.from("868140980000000000") // Actual calculated amount after fees (88800000 - 898000) * 1e10 * 0.999, without tx max fee reimbursement
+
     const depositKey =
       "0xebff13c2304229ab4a97bfbfabeac82c9c0704e4aae2acf022252ac8dc1101d1"
 
@@ -295,6 +311,7 @@ describe("StarkNetBitcoinDepositor", () => {
         depositor.address,
         starkGateBridge.address
       )
+
       expect(initialAllowance).to.equal(0) // Should start with 0 allowance
 
       await depositor.finalizeDeposit(depositKey, {
@@ -307,6 +324,7 @@ describe("StarkNetBitcoinDepositor", () => {
         depositor.address,
         starkGateBridge.address
       )
+
       expect(finalAllowance).to.equal(0) // Mock now consumes allowance via transferFrom
     })
   })

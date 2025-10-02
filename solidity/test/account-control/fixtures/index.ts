@@ -14,28 +14,82 @@
  *   createRedemptionScenario
  * } from "../fixtures"
  * ```
+ *
+ * @example New centralized constants usage
+ * ```typescript
+ * import {
+ *   TIMEOUTS,
+ *   AMOUNTS,
+ *   BTC_ADDRESSES,
+ *   ETH_ADDRESSES,
+ *   ROLES
+ * } from "../fixtures"
+ *
+ * const timeout = TIMEOUTS.REDEMPTION_24H
+ * const amount = AMOUNTS.STANDARD_100_ETH
+ * const address = BTC_ADDRESSES.BECH32_STANDARD
+ * ```
  */
 
-// Export all constants and utilities from test-data
+// =============================================================================
+// NEW CENTRALIZED CONSTANTS (RECOMMENDED)
+// =============================================================================
+
+// Export new centralized constants from constants.ts
 export {
-  // Constant groups
+  // Primary constant groups
+  TIMEOUTS,
+  AMOUNTS,
+  BTC_ADDRESSES,
+  ETH_ADDRESSES,
+  ROLES,
+  GAS_LIMITS,
+  ERROR_MESSAGES,
+  BLOCKCHAIN,
+  PERCENTAGES,
+  // Convenience aliases
+  TIME,
+  MONEY,
+  BITCOIN,
+  ETHEREUM,
+  ACCESS,
+  ERRORS,
+  GAS,
+  CHAIN,
+  PERCENT,
+  // Common values and scenarios
+  COMMON_TEST_VALUES,
+  TEST_SCENARIOS,
+  VALIDATION,
+  // Default export
+  default as Constants,
+} from "./constants"
+
+// =============================================================================
+// BACKWARD COMPATIBLE EXPORTS (LEGACY)
+// =============================================================================
+
+// Export all constants and utilities from test-data (backward compatibility)
+export {
+  // Constant groups (deprecated - use constants.ts instead)
   ROLE_CONSTANTS,
   BITCOIN_ADDRESSES,
   ETHEREUM_ADDRESSES,
   AMOUNT_CONSTANTS,
   TIMING_CONSTANTS,
-  SPV_CONSTANTS,
+  BLOCKCHAIN_CONSTANTS,
   GAS_CONSTANTS,
-
+  // SPV configuration (deprecated)
+  spvTestConfig,
+  SPV_CONSTANTS,
+  bitcoinTestAddresses,
   // Basic factory functions
   createTestWalletRegistration,
   createTestRedemptionScenario,
-  createTestSPVProof,
   createMockBitcoinTxInfo,
   createMockBitcoinTxProof,
   generateTestId,
   createRoleConfiguration,
-
   // Legacy exports (for backward compatibility)
   TEST_CONSTANTS,
 } from "./test-data"
@@ -51,7 +105,6 @@ export {
   createDisputeScenario,
   createWalletManagementScenario,
   createSystemStateScenario,
-
   // Utility functions
   createQCBatch,
   createTimeBasedScenario,
@@ -67,8 +120,10 @@ export {
  */
 export const COMMON_TEST_DATA = {
   // Most used roles
-  GOVERNANCE_ROLE: "0x71840dc4906352362b0cdaf79870196c8e42acafade72d5d5a6d59291253ceb1",
-  DISPUTE_ARBITER_ROLE: "0x4c42c6eb7a0c1a6a8f1e4b4d0c5e9e8e2e6e4f8f4c4e8e2e6e4f8f4c4e8e2e6",
+  GOVERNANCE_ROLE:
+    "0x71840dc4906352362b0cdaf79870196c8e42acafade72d5d5a6d59291253ceb1",
+  DISPUTE_ARBITER_ROLE:
+    "0x4c42c6eb7a0c1a6a8f1e4b4d0c5e9e8e2e6e4f8f4c4e8e2e6e4f8f4c4e8e2e6",
 
   // Most used addresses
   VALID_BTC_ADDRESS: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",

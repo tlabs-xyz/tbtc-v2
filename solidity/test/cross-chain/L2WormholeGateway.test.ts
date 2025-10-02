@@ -38,6 +38,7 @@ describe("L2WormholeGateway", () => {
         },
       }
     )
+
     const canonicalTbtc = deployment[0] as L2TBTC
 
     //
@@ -55,9 +56,11 @@ describe("L2WormholeGateway", () => {
     const WormholeBridgeStub = await ethers.getContractFactory(
       "WormholeBridgeStub"
     )
+
     const wormholeBridgeStub = await WormholeBridgeStub.deploy(
       wormholeTbtc.address
     )
+
     await wormholeBridgeStub.deployed()
 
     //
@@ -795,6 +798,7 @@ describe("L2WormholeGateway", () => {
       const converted = await gateway.toWormholeAddress(
         "0xef3776ccff55072e007c52d72b2763b7e2fcf0e7"
       )
+
       expect(converted).to.equal(
         "0x000000000000000000000000ef3776ccff55072e007c52d72b2763b7e2fcf0e7"
       )
@@ -806,6 +810,7 @@ describe("L2WormholeGateway", () => {
       const converted = await gateway.fromWormholeAddress(
         "0x000000000000000000000000ef3776ccff55072e007c52d72b2763b7e2fcf0e7"
       )
+
       expect(converted).to.equal("0xEf3776CCff55072e007C52d72B2763b7e2fCF0e7")
     })
   })

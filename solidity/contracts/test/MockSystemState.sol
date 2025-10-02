@@ -16,24 +16,24 @@ contract MockSystemState {
         return _mintingPaused;
     }
     
-    function setMintingPaused(bool paused) external {
-        _mintingPaused = paused;
+    function setMintingPaused(bool isPaused) external {
+        _mintingPaused = isPaused;
     }
     
     function isRedemptionPaused() external view returns (bool) {
         return _redemptionPaused;
     }
     
-    function setRedemptionPaused(bool paused) external {
-        _redemptionPaused = paused;
+    function setRedemptionPaused(bool isPaused) external {
+        _redemptionPaused = isPaused;
     }
     
     function isQCEmergencyPaused(address qc) external view returns (bool) {
         return _qcEmergencyPaused[qc];
     }
     
-    function setQCEmergencyPaused(address qc, bool paused) external {
-        _qcEmergencyPaused[qc] = paused;
+    function setQCEmergencyPaused(address qc, bool isPaused) external {
+        _qcEmergencyPaused[qc] = isPaused;
     }
     
     function minMintAmount() external view returns (uint256) {
@@ -60,11 +60,38 @@ contract MockSystemState {
         _redemptionTimeout = timeout;
     }
     
-    function isEmergencyActive() external view returns (bool) {
+    function isEmergencyActive() external pure returns (bool) {
         return false; // For testing, no emergency state
     }
     
     function isFunctionPaused(string calldata /* functionName */) external pure returns (bool) {
         return false; // For testing, no functions are paused
+    }
+
+    // General pause functionality for system-wide pause
+    bool public paused = false;
+
+    event Paused(address account);
+    event Unpaused(address account);
+
+    function pause() external {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    // System-specific pause functions (aliases for compatibility)
+    function pauseSystem() external {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpauseSystem() external {
+        paused = false;
+        emit Unpaused(msg.sender);
     }
 }

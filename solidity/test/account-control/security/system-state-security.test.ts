@@ -2,11 +2,14 @@ import { ethers, helpers, waffle } from "hardhat"
 import { expect } from "chai"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { SystemState } from "../../../typechain"
-import { expectCustomError, expectRevert } from "../helpers/error-helpers"
-import { createBaseTestEnvironment, restoreBaseTestEnvironment, TestSigners } from "../fixtures/base-setup"
+import {
+  createBaseTestEnvironment,
+  restoreBaseTestEnvironment,
+  TestSigners,
+} from "../fixtures/base-setup"
 
 const { loadFixture } = waffle
-const { createSnapshot, restoreSnapshot } = helpers.snapshot
+const { createSnapshot } = helpers.snapshot
 
 describe("SystemState Security Tests", () => {
   let signers: TestSigners
@@ -20,9 +23,11 @@ describe("SystemState Security Tests", () => {
 
   // Role constants
   const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
+
   const OPERATIONS_ROLE = ethers.utils.keccak256(
     ethers.utils.toUtf8Bytes("OPERATIONS_ROLE")
   )
+
   const EMERGENCY_ROLE = ethers.utils.keccak256(
     ethers.utils.toUtf8Bytes("EMERGENCY_ROLE")
   )
@@ -125,13 +130,16 @@ describe("SystemState Security Tests", () => {
       })
 
       it("should track pause timestamps", async () => {
-        const pauseTx = await systemState.connect(pauser).pauseMinting()
-        const block = await ethers.provider.getBlock("latest")
+        // Pause minting to set the timestamp
+        const tx = await systemState.connect(pauser).pauseMinting()
+        const receipt = await tx.wait()
+        const block = await ethers.provider.getBlock(receipt.blockNumber)
         const pauseTime = block.timestamp
 
         const mintingPauseKey = ethers.utils.keccak256(
           ethers.utils.toUtf8Bytes("minting")
         )
+
         expect(await systemState.pauseTimestamps(mintingPauseKey)).to.equal(
           pauseTime
         )
@@ -177,9 +185,11 @@ describe("SystemState Security Tests", () => {
         const mintingPauseKey = ethers.utils.keccak256(
           ethers.utils.toUtf8Bytes("minting")
         )
+
         const pauseTimestamp = await systemState.pauseTimestamps(
           mintingPauseKey
         )
+
         expect(pauseTimestamp).to.equal(pauseTime)
       })
     })
@@ -403,7 +413,9 @@ describe("SystemState Security Tests", () => {
       expect(await freshSystemState.maxMintAmount()).to.equal(
         ethers.utils.parseEther("1000")
       )
-      expect(await freshSystemState.redemptionTimeout()).to.equal(7 * 24 * 60 * 60) // 7 days
+      expect(await freshSystemState.redemptionTimeout()).to.equal(
+        7 * 24 * 60 * 60
+      ) // 7 days
       expect(await freshSystemState.staleThreshold()).to.equal(24 * 60 * 60) // 24 hours
       expect(await freshSystemState.minCollateralRatio()).to.equal(100) // 100%
     })
@@ -439,14 +451,18 @@ describe("SystemState Security Tests", () => {
       it("should prevent privilege escalation attempts", async () => {
         // Attacker tries to grant themselves roles
         await expect(
-          systemState.connect(attacker).grantRole(EMERGENCY_ROLE, attacker.address)
+          systemState
+            .connect(attacker)
+            .grantRole(EMERGENCY_ROLE, attacker.address)
         ).to.be.revertedWith(
           `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
         )
 
         // Another attacker tries different role
         await expect(
-          systemState.connect(attacker2).grantRole(OPERATIONS_ROLE, attacker2.address)
+          systemState
+            .connect(attacker2)
+            .grantRole(OPERATIONS_ROLE, attacker2.address)
         ).to.be.revertedWith(
           `AccessControl: account ${attacker2.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
         )
@@ -464,7 +480,9 @@ describe("SystemState Security Tests", () => {
 
         // Pauser cannot modify parameters (different role)
         await expect(
-          systemState.connect(pauser).setMinMintAmount(ethers.utils.parseEther("100"))
+          systemState
+            .connect(pauser)
+            .setMinMintAmount(ethers.utils.parseEther("100"))
         ).to.be.revertedWith(
           `AccessControl: account ${pauser.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
         )

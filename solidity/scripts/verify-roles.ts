@@ -217,7 +217,13 @@ async function getRoleHolders(
     const memberCount = contract.getRoleMemberCount
       ? await contract.getRoleMemberCount(role)
       : 0
-    const count = typeof memberCount === 'bigint' ? Number(memberCount) : (memberCount.toNumber ? memberCount.toNumber() : memberCount)
+
+    const count =
+      typeof memberCount === "bigint"
+        ? Number(memberCount)
+        : memberCount.toNumber
+        ? memberCount.toNumber()
+        : memberCount
 
     if (count > 0) {
       // Use getRoleMember to enumerate
@@ -297,10 +303,12 @@ async function verifyRoles(): Promise<void> {
       assignment.contract,
       contract
     )
+
     const actualHolders = await getRoleHolders(
       contractInstance,
       ROLES[assignment.role]
     )
+
     const expectedHolders = await resolveExpectedHolders(
       assignment.expectedHolders,
       deployer.address,
@@ -324,6 +332,7 @@ async function verifyRoles(): Promise<void> {
     const missingHolders = expectedHolders.filter(
       (e) => !actualHolders.includes(e)
     )
+
     const unexpectedHolders = actualHolders.filter(
       (a) => !expectedHolders.includes(a) && a !== deployer.address
     )

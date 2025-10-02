@@ -1,6 +1,6 @@
 import { task } from "hardhat/config"
 import { ethers } from "hardhat"
-import { HDNodeWallet, formatEther, parseEther } from "ethers"
+import { Wallet } from "ethers"
 import * as fs from "fs"
 import * as path from "path"
 
@@ -47,7 +47,7 @@ interface DerivedAccount {
   index: number
   address: string
   privateKey: string
-  wallet: HDNodeWallet
+  wallet: Wallet
   targetBalance: string
   currentBalance?: string
 }
@@ -63,7 +63,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
 
     // Validate seed phrase
     try {
-      HDNodeWallet.fromPhrase(seedPhrase)
+      ethers.utils.HDNode.fromMnemonic(seedPhrase)
     } catch (error) {
       console.log("❌ Error: Invalid seed phrase")
       console.log("Please provide a valid 12 or 24 word BIP39 seed phrase")
@@ -78,6 +78,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
       (sum, amount) => sum + parseFloat(amount),
       0
     )
+
     console.log(
       `💰 Total funding needed: ${totalFunding.toFixed(
         6
@@ -89,15 +90,18 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
     console.log("🔑 Deriving accounts from seed phrase...")
     console.log(`📊 Deriving ${ACCOUNT_COUNT} accounts\n`)
 
-    const masterNode = HDNodeWallet.fromPhrase(seedPhrase)
+    const masterNode = ethers.utils.HDNode.fromMnemonic(seedPhrase)
     const accounts: DerivedAccount[] = []
+
     const actorNames = Object.keys(ACTOR_ACCOUNTS) as Array<
       keyof typeof ACTOR_ACCOUNTS
     >
 
     for (let i = 0; i < ACCOUNT_COUNT; i++) {
       const derivationPath = `${DERIVATION_PATH_BASE}${i}`
-      const wallet = masterNode.derivePath(derivationPath).connect(ethers.provider)
+
+      const derivedNode = masterNode.derivePath(derivationPath)
+      const wallet = new ethers.Wallet(derivedNode.privateKey, ethers.provider)
 
       const actorName = actorNames[i]
       const targetBalance = FUNDING_AMOUNTS[actorName]
@@ -128,16 +132,16 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
     for (const account of accounts) {
       try {
         const balance = await account.wallet.getBalance()
-        account.currentBalance = formatEther(balance)
+        account.currentBalance = ethers.utils.formatEther(balance)
 
         const balanceNum = parseFloat(account.currentBalance)
         const targetNum = parseFloat(account.targetBalance)
         const status = balanceNum >= targetNum ? "✅" : "❌"
 
         console.log(
-          `${status} ${account.name.padEnd(18)} | ${formatEther(
-            balance
-          ).padStart(10)} ETH | Target: ${account.targetBalance} ETH`
+          `${status} ${account.name.padEnd(18)} | ${ethers.utils
+            .formatEther(balance)
+            .padStart(10)} ETH | Target: ${account.targetBalance} ETH`
         )
       } catch (error) {
         console.log(`❌ ${account.name.padEnd(18)} | ERROR: ${error.message}`)
@@ -216,7 +220,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
 
       if (current < target) {
         const needed = target - current
-        const amount = parseEther(needed.toFixed(6))
+        const amount = ethers.utils.parseEther(needed.toFixed(6))
 
         console.log(`💸 Funding ${account.name}: ${needed.toFixed(6)} ETH`)
 
@@ -337,7 +341,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
     for (const account of accounts) {
       try {
         const balance = await account.wallet.getBalance()
-        const current = formatEther(balance)
+        const current = ethers.utils.formatEther(balance)
         const target = parseFloat(account.targetBalance)
         const status = parseFloat(current) >= target ? "✅" : "❌"
 
@@ -356,7 +360,7 @@ task("setup-accounts", "Setup accounts from seed phrase and balance ETH")
     for (const account of accounts) {
       try {
         const balance = await account.wallet.getBalance()
-        finalTotal += parseFloat(formatEther(balance))
+        finalTotal += parseFloat(ethers.utils.formatEther(balance))
       } catch (error) {
         // Skip errored accounts
       }

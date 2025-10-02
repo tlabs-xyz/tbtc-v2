@@ -11,9 +11,9 @@ import {
   setupTestSigners,
   createBaseTestEnvironment,
   restoreBaseTestEnvironment,
-  TestSigners
+  TestSigners,
 } from "../fixtures/base-setup"
-import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-utils"
 import { TestMockFactory } from "../fixtures/mock-factory"
 import {
   performEcdsaDkg,

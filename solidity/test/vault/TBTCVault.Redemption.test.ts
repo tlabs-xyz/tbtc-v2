@@ -24,6 +24,7 @@ const { defaultAbiCoder } = ethers.utils
 
 describe("TBTCVault - Redemption", () => {
   const walletPubKeyHash = "0x8db50eb52063ea9d98b3eac91489a90f738986f6"
+
   const mainUtxo = {
     txHash:
       "0x3835ecdee2daa83c9a19b5012104ace55ecab197b5e16489c26d372e475f5d2a",
@@ -143,10 +144,13 @@ describe("TBTCVault - Redemption", () => {
     context("when there is a single redeemer", () => {
       const redeemerOutputScriptP2WPKH =
         "0x160014f4eedc8f40d4b8e30771f792b065ebec0abaddef"
+
       const redeemerOutputScriptP2WSH =
         "0x220020ef0b4d985752aa5ef6243e4c6f6bebc2a007e7d671ef27d4b1d0db8dcc93bc1c"
+
       const redeemerOutputScriptP2PKH =
         "0x1976a914f4eedc8f40d4b8e30771f792b065ebec0abaddef88ac"
+
       const redeemerOutputScriptP2SH =
         "0x17a914f4eedc8f40d4b8e30771f792b065ebec0abaddef87"
 
@@ -155,10 +159,12 @@ describe("TBTCVault - Redemption", () => {
       const redeemedAmount2 = to1e18(20)
       const redeemedAmount3 = to1e18(30)
       const redeemedAmount4 = to1e18(15)
+
       const totalRedeemedAmount = redeemedAmount1
         .add(redeemedAmount2)
         .add(redeemedAmount3)
         .add(redeemedAmount4)
+
       const notRedeemedAmount = mintedAmount.sub(totalRedeemedAmount)
 
       const transactions: ContractTransaction[] = []
@@ -216,6 +222,7 @@ describe("TBTCVault - Redemption", () => {
         const redemptionRequest1 = await bridge.pendingRedemptions(
           buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2WPKH)
         )
+
         expect(redemptionRequest1.redeemer).to.be.equal(account1.address)
         expect(redemptionRequest1.requestedAmount).to.be.equal(
           redeemedAmount1.div(constants.satoshiMultiplier)
@@ -224,6 +231,7 @@ describe("TBTCVault - Redemption", () => {
         const redemptionRequest2 = await bridge.pendingRedemptions(
           buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2WSH)
         )
+
         expect(redemptionRequest2.redeemer).to.be.equal(account1.address)
         expect(redemptionRequest2.requestedAmount).to.be.equal(
           redeemedAmount2.div(constants.satoshiMultiplier)
@@ -232,6 +240,7 @@ describe("TBTCVault - Redemption", () => {
         const redemptionRequest3 = await bridge.pendingRedemptions(
           buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2PKH)
         )
+
         expect(redemptionRequest3.redeemer).to.be.equal(account1.address)
         expect(redemptionRequest3.requestedAmount).to.be.equal(
           redeemedAmount3.div(constants.satoshiMultiplier)
@@ -240,6 +249,7 @@ describe("TBTCVault - Redemption", () => {
         const redemptionRequest4 = await bridge.pendingRedemptions(
           buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2SH)
         )
+
         expect(redemptionRequest4.redeemer).to.be.equal(account1.address)
         expect(redemptionRequest4.requestedAmount).to.be.equal(
           redeemedAmount4.div(constants.satoshiMultiplier)
@@ -310,6 +320,7 @@ describe("TBTCVault - Redemption", () => {
         const redemptionRequest1 = await bridge.pendingRedemptions(
           buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2WPKH)
         )
+
         expect(redemptionRequest1.redeemer).to.be.equal(account1.address)
         expect(redemptionRequest1.requestedAmount).to.be.equal(toSatoshis(3))
       })
@@ -331,6 +342,7 @@ describe("TBTCVault - Redemption", () => {
     context("when there are multiple redeemers", () => {
       const redeemerOutputScriptP2WPKH =
         "0x160014f4eedc8f40d4b8e30771f792b065ebec0abaddef"
+
       const redeemerOutputScriptP2WSH =
         "0x220020ef0b4d985752aa5ef6243e4c6f6bebc2a007e7d671ef27d4b1d0db8dcc93bc1c"
 
@@ -390,6 +402,7 @@ describe("TBTCVault - Redemption", () => {
         const redemptionRequest1 = await bridge.pendingRedemptions(
           buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2WPKH)
         )
+
         expect(redemptionRequest1.redeemer).to.be.equal(account1.address)
         expect(redemptionRequest1.requestedAmount).to.be.equal(
           redeemedAmount1.div(constants.satoshiMultiplier)
@@ -398,6 +411,7 @@ describe("TBTCVault - Redemption", () => {
         const redemptionRequest2 = await bridge.pendingRedemptions(
           buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2WSH)
         )
+
         expect(redemptionRequest2.redeemer).to.be.equal(account2.address)
         expect(redemptionRequest2.requestedAmount).to.be.equal(
           redeemedAmount2.div(constants.satoshiMultiplier)
@@ -453,10 +467,13 @@ describe("TBTCVault - Redemption", () => {
         context("when there is a single redeemer", () => {
           const redeemerOutputScriptP2WPKH =
             "0x160014f4eedc8f40d4b8e30771f792b065ebec0abaddef"
+
           const redeemerOutputScriptP2WSH =
             "0x220020ef0b4d985752aa5ef6243e4c6f6bebc2a007e7d671ef27d4b1d0db8dcc93bc1c"
+
           const redeemerOutputScriptP2PKH =
             "0x1976a914f4eedc8f40d4b8e30771f792b065ebec0abaddef88ac"
+
           const redeemerOutputScriptP2SH =
             "0x17a914f4eedc8f40d4b8e30771f792b065ebec0abaddef87"
 
@@ -465,10 +482,12 @@ describe("TBTCVault - Redemption", () => {
           const redeemedAmount2 = to1e18(20)
           const redeemedAmount3 = to1e18(30)
           const redeemedAmount4 = to1e18(15)
+
           const totalRedeemedAmount = redeemedAmount1
             .add(redeemedAmount2)
             .add(redeemedAmount3)
             .add(redeemedAmount4)
+
           const notRedeemedAmount = mintedAmount.sub(totalRedeemedAmount)
 
           const transactions: ContractTransaction[] = []
@@ -525,6 +544,7 @@ describe("TBTCVault - Redemption", () => {
             const redemptionRequest1 = await bridge.pendingRedemptions(
               buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2WPKH)
             )
+
             expect(redemptionRequest1.redeemer).to.be.equal(account1.address)
             expect(redemptionRequest1.requestedAmount).to.be.equal(
               redeemedAmount1.div(constants.satoshiMultiplier)
@@ -533,6 +553,7 @@ describe("TBTCVault - Redemption", () => {
             const redemptionRequest2 = await bridge.pendingRedemptions(
               buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2WSH)
             )
+
             expect(redemptionRequest2.redeemer).to.be.equal(account1.address)
             expect(redemptionRequest2.requestedAmount).to.be.equal(
               redeemedAmount2.div(constants.satoshiMultiplier)
@@ -541,6 +562,7 @@ describe("TBTCVault - Redemption", () => {
             const redemptionRequest3 = await bridge.pendingRedemptions(
               buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2PKH)
             )
+
             expect(redemptionRequest3.redeemer).to.be.equal(account1.address)
             expect(redemptionRequest3.requestedAmount).to.be.equal(
               redeemedAmount3.div(constants.satoshiMultiplier)
@@ -549,6 +571,7 @@ describe("TBTCVault - Redemption", () => {
             const redemptionRequest4 = await bridge.pendingRedemptions(
               buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2SH)
             )
+
             expect(redemptionRequest4.redeemer).to.be.equal(account1.address)
             expect(redemptionRequest4.requestedAmount).to.be.equal(
               redeemedAmount4.div(constants.satoshiMultiplier)
@@ -581,6 +604,7 @@ describe("TBTCVault - Redemption", () => {
         context("when there are multiple redeemers", () => {
           const redeemerOutputScriptP2WPKH =
             "0x160014f4eedc8f40d4b8e30771f792b065ebec0abaddef"
+
           const redeemerOutputScriptP2WSH =
             "0x220020ef0b4d985752aa5ef6243e4c6f6bebc2a007e7d671ef27d4b1d0db8dcc93bc1c"
 
@@ -591,6 +615,7 @@ describe("TBTCVault - Redemption", () => {
 
           const totalMintedAmount = mintedAmount1.add(mintedAmount2)
           const totalRedeemedAmount = redeemedAmount1.add(redeemedAmount2)
+
           const totalNotRedeemedAmount =
             totalMintedAmount.sub(totalRedeemedAmount)
 
@@ -635,6 +660,7 @@ describe("TBTCVault - Redemption", () => {
             const redemptionRequest1 = await bridge.pendingRedemptions(
               buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2WPKH)
             )
+
             expect(redemptionRequest1.redeemer).to.be.equal(account1.address)
             expect(redemptionRequest1.requestedAmount).to.be.equal(
               redeemedAmount1.div(constants.satoshiMultiplier)
@@ -643,6 +669,7 @@ describe("TBTCVault - Redemption", () => {
             const redemptionRequest2 = await bridge.pendingRedemptions(
               buildRedemptionKey(walletPubKeyHash, redeemerOutputScriptP2WSH)
             )
+
             expect(redemptionRequest2.redeemer).to.be.equal(account2.address)
             expect(redemptionRequest2.requestedAmount).to.be.equal(
               redeemedAmount2.div(constants.satoshiMultiplier)

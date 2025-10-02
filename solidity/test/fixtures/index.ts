@@ -1,4 +1,4 @@
-import { to1ePrecision } from "../helpers/contract-test-helpers"
+import { to1ePrecision } from "../helpers/math-utils"
 
 export const constants = {
   unmintFee: to1ePrecision(1, 15), // 0.001

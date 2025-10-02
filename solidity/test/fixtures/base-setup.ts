@@ -37,7 +37,8 @@ let baseEnvironment: BaseTestEnvironment | null = null
 let environmentSnapshot: string | null = null
 
 export async function setupTestSigners(): Promise<TestSigners> {
-  const [deployer, governance, spvMaintainer, ...others] = await ethers.getSigners()
+  const [deployer, governance, spvMaintainer, ...others] =
+    await ethers.getSigners()
 
   return {
     deployer,

@@ -87,9 +87,11 @@ async function registerOperators(
   const walletRegistry = await helpers.contracts.getContract<WalletRegistry>(
     "WalletRegistry"
   )
+
   const ecdsaSortitionPool = await helpers.contracts.getContract<SortitionPool>(
     "EcdsaSortitionPool"
   )
+
   const t = await helpers.contracts.getContract("T")
   const staking = await helpers.contracts.getContract("TokenStaking")
 
@@ -98,6 +100,7 @@ async function registerOperators(
   }
 
   const randomBeacon = await helpers.contracts.getContract("RandomBeacon")
+
   const beaconSortitionPool =
     await helpers.contracts.getContract<SortitionPool>("BeaconSortitionPool")
 
@@ -175,13 +178,17 @@ async function createWallet(
   const { governance } = await helpers.signers.getNamedSigners()
 
   const bridge = await helpers.contracts.getContract<Bridge>("Bridge")
+
   const walletRegistry = await helpers.contracts.getContract<WalletRegistry>(
     "WalletRegistry"
   )
+
   const walletRegistryGovernance = await helpers.contracts.getContract(
     "WalletRegistryGovernance"
   )
+
   const randomBeacon = await helpers.contracts.getContract("RandomBeacon")
+
   const randomBeaconGovernance = await helpers.contracts.getContract(
     "RandomBeaconGovernance"
   )
@@ -203,8 +210,10 @@ async function createWallet(
   )
 
   const signers = await selectGroup(hre, sortitionPool, genesisSeed)
+
   const { members, signingMembersIndices, signaturesBytes } =
     await signDkgResult(hre, signers, blsData.groupPubKey, [], genesisBlock, 33)
+
   const membersHash = hashDKGMembers(hre, members, [])
 
   const dkgResult = {

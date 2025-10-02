@@ -23,16 +23,18 @@ import {
 /**
  * Creates a complete QC registration scenario with all required data
  */
-export function createQCRegistrationScenario(overrides: {
-  qcAddress?: string
-  capacity?: BigNumber
-  btcAddress?: string
-  roles?: {
-    governance?: string
-    arbiter?: string
-    registrar?: string
-  }
-} = {}) {
+export function createQCRegistrationScenario(
+  overrides: {
+    qcAddress?: string
+    capacity?: BigNumber
+    btcAddress?: string
+    roles?: {
+      governance?: string
+      arbiter?: string
+      registrar?: string
+    }
+  } = {}
+) {
   return {
     qc: {
       address: overrides.qcAddress || ETHEREUM_ADDRESSES.QC_ADDRESS_1,
@@ -40,7 +42,8 @@ export function createQCRegistrationScenario(overrides: {
       btcAddress: overrides.btcAddress || BITCOIN_ADDRESSES.VALID_BECH32_BTC,
     },
     roles: {
-      governance: overrides.roles?.governance || ETHEREUM_ADDRESSES.QC_ADDRESS_2,
+      governance:
+        overrides.roles?.governance || ETHEREUM_ADDRESSES.QC_ADDRESS_2,
       arbiter: overrides.roles?.arbiter || ETHEREUM_ADDRESSES.QC_ADDRESS_3,
       registrar: overrides.roles?.registrar || ETHEREUM_ADDRESSES.QC_ADDRESS_4,
     },
@@ -55,17 +58,19 @@ export function createQCRegistrationScenario(overrides: {
 /**
  * Creates a complete minting scenario with all necessary components
  */
-export function createMintingScenario(overrides: {
-  qcAddress?: string
-  userAddress?: string
-  amount?: BigNumber
-  btcAddress?: string
-  systemState?: {
-    minMintAmount?: BigNumber
-    maxMintAmount?: BigNumber
-    isMintingPaused?: boolean
-  }
-} = {}) {
+export function createMintingScenario(
+  overrides: {
+    qcAddress?: string
+    userAddress?: string
+    amount?: BigNumber
+    btcAddress?: string
+    systemState?: {
+      minMintAmount?: BigNumber
+      maxMintAmount?: BigNumber
+      isMintingPaused?: boolean
+    }
+  } = {}
+) {
   const amount = overrides.amount || AMOUNT_CONSTANTS.STANDARD_MINT_AMOUNT
 
   return {
@@ -84,24 +89,29 @@ export function createMintingScenario(overrides: {
       expectedFee: amount.div(1000), // 0.1% fee
     },
     systemState: {
-      minMintAmount: overrides.systemState?.minMintAmount || AMOUNT_CONSTANTS.MIN_MINT_AMOUNT,
-      maxMintAmount: overrides.systemState?.maxMintAmount || AMOUNT_CONSTANTS.MAX_MINT_AMOUNT,
+      minMintAmount:
+        overrides.systemState?.minMintAmount ||
+        AMOUNT_CONSTANTS.MIN_MINT_AMOUNT,
+      maxMintAmount:
+        overrides.systemState?.maxMintAmount ||
+        AMOUNT_CONSTANTS.MAX_MINT_AMOUNT,
       isMintingPaused: overrides.systemState?.isMintingPaused || false,
     },
   }
 }
 
 /**
- * Creates a complete redemption scenario with SPV proof data
+ * Creates a complete redemption scenario
  */
-export function createRedemptionScenario(overrides: {
-  qcAddress?: string
-  userAddress?: string
-  btcAddress?: string
-  amount?: BigNumber
-  includeSpvProof?: boolean
-  redemptionTimeout?: number
-} = {}) {
+export function createRedemptionScenario(
+  overrides: {
+    qcAddress?: string
+    userAddress?: string
+    btcAddress?: string
+    amount?: BigNumber
+    redemptionTimeout?: number
+  } = {}
+) {
   const amount = overrides.amount || AMOUNT_CONSTANTS.REDEMPTION_AMOUNT
   const redemptionId = ethers.utils.id(`redemption_${Date.now()}`)
 
@@ -118,14 +128,11 @@ export function createRedemptionScenario(overrides: {
     redemption: {
       id: redemptionId,
       amount,
-      timeout: overrides.redemptionTimeout || TIMING_CONSTANTS.REDEMPTION_TIMEOUT_DEFAULT,
+      timeout:
+        overrides.redemptionTimeout ||
+        TIMING_CONSTANTS.REDEMPTION_TIMEOUT_DEFAULT,
       createdAt: Math.floor(Date.now() / 1000),
     },
-    spvProof: overrides.includeSpvProof ? {
-      txInfo: createMockBitcoinTxInfo(),
-      proof: createMockBitcoinTxProof(),
-      expectedTxHash: SPV_CONSTANTS.MOCK_TX_HASH,
-    } : null,
   }
 
   return scenario
@@ -134,15 +141,21 @@ export function createRedemptionScenario(overrides: {
 /**
  * Creates an undercollateralization scenario for watchdog testing
  */
-export function createUndercollateralizationScenario(overrides: {
-  qcAddress?: string
-  reserveBalance?: BigNumber
-  mintedAmount?: BigNumber
-  collateralizationRatio?: number // Ratio as percentage (e.g., 90 for 90%)
-} = {}) {
+export function createUndercollateralizationScenario(
+  overrides: {
+    qcAddress?: string
+    reserveBalance?: BigNumber
+    mintedAmount?: BigNumber
+    collateralizationRatio?: number // Ratio as percentage (e.g., 90 for 90%)
+  } = {}
+) {
   const collateralizationRatio = overrides.collateralizationRatio || 90
-  const mintedAmount = overrides.mintedAmount || AMOUNT_CONSTANTS.LARGE_MINT_AMOUNT
-  const reserveBalance = overrides.reserveBalance ||
+
+  const mintedAmount =
+    overrides.mintedAmount || AMOUNT_CONSTANTS.LARGE_MINT_AMOUNT
+
+  const reserveBalance =
+    overrides.reserveBalance ||
     mintedAmount.mul(collateralizationRatio).div(100)
 
   return {
@@ -167,13 +180,15 @@ export function createUndercollateralizationScenario(overrides: {
 /**
  * Creates a reserve oracle attestation scenario
  */
-export function createReserveOracleScenario(overrides: {
-  qcAddress?: string
-  attesters?: string[]
-  balances?: BigNumber[]
-  requiredAttestations?: number
-  stalenessTimeout?: number
-} = {}) {
+export function createReserveOracleScenario(
+  overrides: {
+    qcAddress?: string
+    attesters?: string[]
+    balances?: BigNumber[]
+    requiredAttestations?: number
+    stalenessTimeout?: number
+  } = {}
+) {
   const attesters = overrides.attesters || [
     ETHEREUM_ADDRESSES.QC_ADDRESS_1,
     ETHEREUM_ADDRESSES.QC_ADDRESS_2,
@@ -199,10 +214,13 @@ export function createReserveOracleScenario(overrides: {
     })),
     oracle: {
       requiredAttestations: overrides.requiredAttestations || 3,
-      stalenessTimeout: overrides.stalenessTimeout || TIMING_CONSTANTS.ATTESTATION_TIMEOUT,
+      stalenessTimeout:
+        overrides.stalenessTimeout || TIMING_CONSTANTS.ATTESTATION_TIMEOUT,
     },
     expected: {
-      consensusBalance: calculateMedianBalance(balances.slice(0, attesters.length)),
+      consensusBalance: calculateMedianBalance(
+        balances.slice(0, attesters.length)
+      ),
       isStale: false,
     },
   }
@@ -211,17 +229,19 @@ export function createReserveOracleScenario(overrides: {
 /**
  * Creates a dispute scenario with arbiter resolution
  */
-export function createDisputeScenario(overrides: {
-  qcAddress?: string
-  arbiterAddress?: string
-  disputeReason?: string
-  redemptionId?: string
-  evidence?: {
-    txHash?: string
-    blockHeight?: number
-    proof?: any
-  }
-} = {}) {
+export function createDisputeScenario(
+  overrides: {
+    qcAddress?: string
+    arbiterAddress?: string
+    disputeReason?: string
+    redemptionId?: string
+    evidence?: {
+      txHash?: string
+      blockHeight?: number
+      proof?: any
+    }
+  } = {}
+) {
   return {
     qc: {
       address: overrides.qcAddress || ETHEREUM_ADDRESSES.QC_ADDRESS_1,
@@ -233,12 +253,14 @@ export function createDisputeScenario(overrides: {
     },
     dispute: {
       reason: overrides.disputeReason || "Fraudulent redemption fulfillment",
-      redemptionId: overrides.redemptionId || ethers.utils.id("disputed_redemption"),
+      redemptionId:
+        overrides.redemptionId || ethers.utils.id("disputed_redemption"),
       createdAt: Math.floor(Date.now() / 1000),
     },
     evidence: {
       txHash: overrides.evidence?.txHash || SPV_CONSTANTS.MOCK_TX_HASH,
-      blockHeight: overrides.evidence?.blockHeight || SPV_CONSTANTS.TEST_BLOCK_HEIGHT,
+      blockHeight:
+        overrides.evidence?.blockHeight || SPV_CONSTANTS.TEST_BLOCK_HEIGHT,
       proof: overrides.evidence?.proof || createMockBitcoinTxProof(),
     },
   }
@@ -247,18 +269,29 @@ export function createDisputeScenario(overrides: {
 /**
  * Creates a wallet management scenario for testing wallet registration/deregistration
  */
-export function createWalletManagementScenario(overrides: {
-  qcAddress?: string
-  wallets?: {
-    btcAddress: string
-    status?: "Active" | "Deregistered" | "Pending"
-  }[]
-  registrarAddress?: string
-} = {}) {
+export function createWalletManagementScenario(
+  overrides: {
+    qcAddress?: string
+    wallets?: {
+      btcAddress: string
+      status?: "Active" | "Deregistered" | "Pending"
+    }[]
+    registrarAddress?: string
+  } = {}
+) {
   const defaultWallets = [
-    { btcAddress: BITCOIN_ADDRESSES.VALID_BECH32_BTC, status: "Active" as const },
-    { btcAddress: BITCOIN_ADDRESSES.VALID_LEGACY_BTC, status: "Deregistered" as const },
-    { btcAddress: BITCOIN_ADDRESSES.VALID_P2SH_BTC, status: "Pending" as const },
+    {
+      btcAddress: BITCOIN_ADDRESSES.VALID_BECH32_BTC,
+      status: "Active" as const,
+    },
+    {
+      btcAddress: BITCOIN_ADDRESSES.VALID_LEGACY_BTC,
+      status: "Deregistered" as const,
+    },
+    {
+      btcAddress: BITCOIN_ADDRESSES.VALID_P2SH_BTC,
+      status: "Pending" as const,
+    },
   ]
 
   return {
@@ -269,7 +302,7 @@ export function createWalletManagementScenario(overrides: {
       address: overrides.registrarAddress || ETHEREUM_ADDRESSES.QC_ADDRESS_2,
       role: ROLE_CONSTANTS.REGISTRAR_ROLE,
     },
-    wallets: (overrides.wallets || defaultWallets).map(wallet => ({
+    wallets: (overrides.wallets || defaultWallets).map((wallet) => ({
       ...wallet,
       registeredAt: Math.floor(Date.now() / 1000),
       owner: overrides.qcAddress || ETHEREUM_ADDRESSES.QC_ADDRESS_1,
@@ -280,27 +313,29 @@ export function createWalletManagementScenario(overrides: {
 /**
  * Creates a system state management scenario for testing pause/unpause functionality
  */
-export function createSystemStateScenario(overrides: {
-  emergencyCouncil?: string
-  operationsTeam?: string
-  governance?: string
-  currentState?: {
-    isMintingPaused?: boolean
-    isRedemptionPaused?: boolean
-    minMintAmount?: BigNumber
-    maxMintAmount?: BigNumber
-    redemptionTimeout?: number
-    staleThreshold?: number
-  }
-  targetChanges?: {
-    pauseMinting?: boolean
-    pauseRedemption?: boolean
-    newMinMintAmount?: BigNumber
-    newMaxMintAmount?: BigNumber
-    newRedemptionTimeout?: number
-    newStaleThreshold?: number
-  }
-} = {}) {
+export function createSystemStateScenario(
+  overrides: {
+    emergencyCouncil?: string
+    operationsTeam?: string
+    governance?: string
+    currentState?: {
+      isMintingPaused?: boolean
+      isRedemptionPaused?: boolean
+      minMintAmount?: BigNumber
+      maxMintAmount?: BigNumber
+      redemptionTimeout?: number
+      staleThreshold?: number
+    }
+    targetChanges?: {
+      pauseMinting?: boolean
+      pauseRedemption?: boolean
+      newMinMintAmount?: BigNumber
+      newMaxMintAmount?: BigNumber
+      newRedemptionTimeout?: number
+      newStaleThreshold?: number
+    }
+  } = {}
+) {
   return {
     roles: {
       emergencyCouncil: {
@@ -319,10 +354,18 @@ export function createSystemStateScenario(overrides: {
     currentState: {
       isMintingPaused: overrides.currentState?.isMintingPaused || false,
       isRedemptionPaused: overrides.currentState?.isRedemptionPaused || false,
-      minMintAmount: overrides.currentState?.minMintAmount || AMOUNT_CONSTANTS.MIN_MINT_AMOUNT,
-      maxMintAmount: overrides.currentState?.maxMintAmount || AMOUNT_CONSTANTS.MAX_MINT_AMOUNT,
-      redemptionTimeout: overrides.currentState?.redemptionTimeout || TIMING_CONSTANTS.REDEMPTION_TIMEOUT_DEFAULT,
-      staleThreshold: overrides.currentState?.staleThreshold || TIMING_CONSTANTS.STALE_THRESHOLD_DEFAULT,
+      minMintAmount:
+        overrides.currentState?.minMintAmount ||
+        AMOUNT_CONSTANTS.MIN_MINT_AMOUNT,
+      maxMintAmount:
+        overrides.currentState?.maxMintAmount ||
+        AMOUNT_CONSTANTS.MAX_MINT_AMOUNT,
+      redemptionTimeout:
+        overrides.currentState?.redemptionTimeout ||
+        TIMING_CONSTANTS.REDEMPTION_TIMEOUT_DEFAULT,
+      staleThreshold:
+        overrides.currentState?.staleThreshold ||
+        TIMING_CONSTANTS.STALE_THRESHOLD_DEFAULT,
     },
     targetChanges: overrides.targetChanges || {},
   }
@@ -338,20 +381,22 @@ export function createSystemStateScenario(overrides: {
 function calculateMedianBalance(balances: BigNumber[]): BigNumber {
   if (balances.length === 0) return ethers.constants.Zero
 
-  const sorted = [...balances].sort((a, b) => a.lt(b) ? -1 : a.gt(b) ? 1 : 0)
+  const sorted = [...balances].sort((a, b) => (a.lt(b) ? -1 : a.gt(b) ? 1 : 0))
   const mid = Math.floor(sorted.length / 2)
 
   if (sorted.length % 2 === 0) {
     return sorted[mid - 1].add(sorted[mid]).div(2)
-  } else {
-    return sorted[mid]
   }
+  return sorted[mid]
 }
 
 /**
  * Creates a batch of QC addresses for multi-QC testing scenarios
  */
-export function createQCBatch(count: number, startingIndex = 1): {
+export function createQCBatch(
+  count: number,
+  startingIndex = 1
+): {
   address: string
   btcAddress: string
   capacity: BigNumber
@@ -361,8 +406,10 @@ export function createQCBatch(count: number, startingIndex = 1): {
   for (let i = 0; i < count; i++) {
     const index = startingIndex + i
     batch.push({
-      address: ethers.utils.getAddress(`0x${index.toString().padStart(40, '0')}`),
-      btcAddress: `bc1qtest${index.toString().padStart(10, '0')}`,
+      address: ethers.utils.getAddress(
+        `0x${index.toString().padStart(40, "0")}`
+      ),
+      btcAddress: `bc1qtest${index.toString().padStart(10, "0")}`,
       capacity: AMOUNT_CONSTANTS.INITIAL_MINTING_CAPACITY,
     })
   }
@@ -373,34 +420,45 @@ export function createQCBatch(count: number, startingIndex = 1): {
 /**
  * Creates time-based scenario for testing timeouts and staleness
  */
-export function createTimeBasedScenario(overrides: {
-  baseTimestamp?: number
-  events?: {
-    name: string
-    offsetSeconds: number
-    data?: any
-  }[]
-} = {}) {
+export function createTimeBasedScenario(
+  overrides: {
+    baseTimestamp?: number
+    events?: {
+      name: string
+      offsetSeconds: number
+      data?: any
+    }[]
+  } = {}
+) {
   const baseTimestamp = overrides.baseTimestamp || Math.floor(Date.now() / 1000)
 
   const defaultEvents = [
     { name: "start", offsetSeconds: 0 },
-    { name: "first_hour", offsetSeconds: TIMING_CONSTANTS.REDEMPTION_TIMEOUT_SHORT },
-    { name: "one_day", offsetSeconds: TIMING_CONSTANTS.REDEMPTION_TIMEOUT_TEST },
-    { name: "one_week", offsetSeconds: TIMING_CONSTANTS.REDEMPTION_TIMEOUT_DEFAULT },
+    {
+      name: "first_hour",
+      offsetSeconds: TIMING_CONSTANTS.REDEMPTION_TIMEOUT_SHORT,
+    },
+    {
+      name: "one_day",
+      offsetSeconds: TIMING_CONSTANTS.REDEMPTION_TIMEOUT_TEST,
+    },
+    {
+      name: "one_week",
+      offsetSeconds: TIMING_CONSTANTS.REDEMPTION_TIMEOUT_DEFAULT,
+    },
   ]
 
   const events = overrides.events || defaultEvents
 
   return {
     baseTimestamp,
-    events: events.map(event => ({
+    events: events.map((event) => ({
       ...event,
       timestamp: baseTimestamp + event.offsetSeconds,
     })),
     helpers: {
       advanceToEvent: (eventName: string) => {
-        const event = events.find(e => e.name === eventName)
+        const event = events.find((e) => e.name === eventName)
         return event ? event.offsetSeconds : 0
       },
     },
@@ -419,11 +477,15 @@ export function createIntegrationTestScenario(): {
 } {
   return {
     qcs: [
-      createQCRegistrationScenario({ qcAddress: ETHEREUM_ADDRESSES.QC_ADDRESS_1 }),
-      createQCRegistrationScenario({ qcAddress: ETHEREUM_ADDRESSES.QC_ADDRESS_2 }),
+      createQCRegistrationScenario({
+        qcAddress: ETHEREUM_ADDRESSES.QC_ADDRESS_1,
+      }),
+      createQCRegistrationScenario({
+        qcAddress: ETHEREUM_ADDRESSES.QC_ADDRESS_2,
+      }),
     ],
     minting: createMintingScenario(),
-    redemption: createRedemptionScenario({ includeSpvProof: true }),
+    redemption: createRedemptionScenario(),
     monitoring: createUndercollateralizationScenario(),
     oracle: createReserveOracleScenario(),
   }

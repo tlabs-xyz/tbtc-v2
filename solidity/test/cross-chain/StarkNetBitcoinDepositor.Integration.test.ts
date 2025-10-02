@@ -39,10 +39,13 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
       depositData.reveal,
       depositData.l2Receiver
     )
+
     const receipt = await tx.wait()
+
     const depositInitEvent = receipt.events?.find(
       (e) => e.event === "DepositInitialized"
     )
+
     const bytes32 = depositInitEvent?.args?.depositKey
     const uint256 = BigNumber.from(bytes32)
 
@@ -58,6 +61,7 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
     const blindingFactorHex = `f9f0c90d0003${index
       .toString(16)
       .padStart(4, "0")}`
+
     // Ensure it's exactly 16 chars (8 bytes)
     const blindingFactor = `0x${blindingFactorHex.slice(0, 16)}`
 
@@ -102,33 +106,39 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
     const MockBridgeForStarkNet = await ethers.getContractFactory(
       "MockBridgeForStarkNet"
     )
+
     bridge = await MockBridgeForStarkNet.deploy()
 
     const MockTBTCVault = await ethers.getContractFactory(
       "contracts/test/MockTBTCVault.sol:MockTBTCVault"
     )
+
     tbtcVault = (await MockTBTCVault.deploy()) as MockTBTCVault
     await tbtcVault.setTbtcToken(tbtcToken.address)
 
     const MockStarkGateBridge = await ethers.getContractFactory(
       "MockStarkGateBridge"
     )
+
     starkGateBridge = await MockStarkGateBridge.deploy()
 
     // Deploy main contract with proxy pattern
     const StarkNetBitcoinDepositor = await ethers.getContractFactory(
       "StarkNetBitcoinDepositor"
     )
+
     const depositorImpl = await StarkNetBitcoinDepositor.deploy()
 
     // Deploy proxy
     const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
     const STARKNET_TBTC_TOKEN = ethers.BigNumber.from("0x12345")
+
     const initData = depositorImpl.interface.encodeFunctionData("initialize", [
       bridge.address,
       tbtcVault.address,
       starkGateBridge.address,
     ])
+
     const proxy = await ProxyFactory.deploy(depositorImpl.address, initData)
 
     depositor = StarkNetBitcoinDepositor.attach(proxy.address)
@@ -157,9 +167,11 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
 
       // Get the actual events to find the real deposit key
       const initReceipt = await initTx.wait()
+
       const depositInitEvent = initReceipt.events?.find(
         (e) => e.event === "DepositInitialized"
       )
+
       const depositKeyBytes32 = depositInitEvent?.args?.depositKey
       const depositKey = BigNumber.from(depositKeyBytes32)
 
@@ -272,6 +284,7 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
         const omFee = amountSubTreasury.div(1000)
         // txMaxFee = 1000000 * 10^10
         const txMaxFee = to1ePrecision(1000000, 10)
+
         // Final amount = amountSubTreasury - omFee - txMaxFee
         const bridgeCalculatedAmount = amountSubTreasury
           .sub(omFee)
@@ -458,6 +471,7 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
         const tx = await depositor.finalizeDeposit(keys.bytes32, {
           value: INITIAL_MESSAGE_FEE,
         })
+
         // eslint-disable-next-line no-await-in-loop
         const receipt = await tx.wait()
         gasUsages.push(receipt.gasUsed.toNumber())
@@ -499,10 +513,13 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
         depositData.reveal,
         depositData.l2Receiver
       )
+
       const initReceipt = await initTx.wait()
+
       const depositInitEvent = initReceipt.events?.find(
         (e) => e.event === "DepositInitialized"
       )
+
       const depositKeyBytes32 = depositInitEvent?.args?.depositKey
       const depositKey = BigNumber.from(depositKeyBytes32)
 
@@ -514,6 +531,7 @@ describe("StarkNetBitcoinDepositor - Integration Tests", () => {
       const finalizeTx = await depositor.finalizeDeposit(depositKeyBytes32, {
         value: INITIAL_MESSAGE_FEE,
       })
+
       const finalizeReceipt = await finalizeTx.wait()
 
       // Log gas breakdown

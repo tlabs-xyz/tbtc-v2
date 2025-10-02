@@ -31,21 +31,26 @@ describe("L2BTCRedeemerWormhole", () => {
   let testBTCUtilsHelper: TestBTCUtilsHelper
 
   const l1ChainId = 1
+
   const l1BtcRedeemerWormholeAddress =
     "0x0000000000000000000000000000000000000001"
 
   const exampleAmount = ethers.utils.parseUnits("1", 18)
+
   // Use a raw 25-byte P2PKH script structure, consistent with how L2BTCRedeemerWormhole uses BTCUtils.extractHashAt
   // prefix with 0x19 (25 bytes length)
   const exampleRedeemerOutputScript =
     "0x1976a9140102030405060708090a0b0c0d0e0f101112131488ac"
+
   const exampleNonce = 123
 
   // New example scripts
   const exampleP2WPKHOutputScript =
     "0x1600140102030405060708090a0b0c0d0e0f1011121314" // 22 bytes: OP_0 <20-byte-hash>
+
   const exampleP2SHOutputScript =
     "0x17a9140102030405060708090a0b0c0d0e0f101112131487" // 23 bytes: OP_HASH160 <20-byte-hash> OP_EQUAL
+
   const exampleP2WSHOutputScript =
     "0x2200200102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20" // 34 bytes: OP_0 <32-byte-hash>
 
@@ -63,8 +68,9 @@ describe("L2BTCRedeemerWormhole", () => {
       "TestBTCUtilsHelper",
       _deployer
     )
-    const _testBTCUtilsHelper =
-      (await TestBTCUtilsHelperFactory.deploy()) as TestBTCUtilsHelper
+
+    const _testBTCUtilsHelper = await TestBTCUtilsHelperFactory.deploy()
+
     await _testBTCUtilsHelper.deployed()
 
     // Deploy L2TBTC using the project's deployProxy helper structure
@@ -77,6 +83,7 @@ describe("L2BTCRedeemerWormhole", () => {
         proxyOpts: { kind: "transparent" },
       }
     )
+
     const _tbtc = tbtcDeployment[0] as L2TBTC
 
     // The deployer of L2TBTC is its owner. The owner needs to add itself as a minter.
@@ -96,6 +103,7 @@ describe("L2BTCRedeemerWormhole", () => {
         proxyOpts: { kind: "transparent" },
       }
     )
+
     const _l2BtcRedeemer = l2RedeemerDeployment[0] as L2BTCRedeemerWormhole
 
     const currentOwner = await _l2BtcRedeemer.owner()
@@ -251,6 +259,7 @@ describe("L2BTCRedeemerWormhole", () => {
 
   describe("requestRedemption", () => {
     const SATOSHI_MULTIPLIER_PRECISION = 10
+
     const normalizedExampleAmount = exampleAmount.div(
       BigNumber.from(10).pow(18 - SATOSHI_MULTIPLIER_PRECISION)
     )
@@ -314,6 +323,7 @@ describe("L2BTCRedeemerWormhole", () => {
           l2BtcRedeemer.address,
           gateway.address
         )
+
         expect(allowance).to.be.gte(exampleAmount)
       })
 
@@ -352,6 +362,7 @@ describe("L2BTCRedeemerWormhole", () => {
             exampleRedeemerOutputScript,
             exampleNonce
           )
+
         expect(sequence).to.equal(expectedGatewaySequence)
       })
 

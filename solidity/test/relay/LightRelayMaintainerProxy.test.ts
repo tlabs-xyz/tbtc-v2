@@ -332,6 +332,7 @@ describe("LightRelayMaintainerProxy", () => {
       it("should update retargetGasOffset", async () => {
         const updatedOffset =
           await lightRelayMaintainerProxy.retargetGasOffset()
+
         expect(updatedOffset).to.be.equal(123456)
       })
     })
@@ -411,6 +412,7 @@ describe("LightRelayMaintainerProxy", () => {
           const postMaintainerBalance = await provider.getBalance(
             maintainer.address
           )
+
           const diff = postMaintainerBalance.sub(initialMaintainerBalance)
 
           expect(diff).to.be.gt(0)
@@ -463,6 +465,7 @@ describe("LightRelayMaintainerProxy", () => {
           const postMaintainerBalance = await provider.getBalance(
             maintainer.address
           )
+
           const diff = postMaintainerBalance.sub(initialMaintainerBalance)
 
           expect(diff).to.be.gt(0)
@@ -519,6 +522,7 @@ describe("LightRelayMaintainerProxy", () => {
           const postMaintainerBalance = await provider.getBalance(
             maintainer.address
           )
+
           const diff = postMaintainerBalance.sub(initialMaintainerBalance)
 
           expect(diff).to.be.gt(0)

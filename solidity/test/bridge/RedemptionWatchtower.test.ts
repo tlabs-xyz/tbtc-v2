@@ -452,6 +452,7 @@ describe("RedemptionWatchtower", () => {
       const data: RedemptionTestData = JSON.parse(
         JSON.stringify(SinglePendingRequestedRedemption)
       )
+
       data.redemptionRequests[0].redeemerOutputScript =
         "0x1976a9142cd680318747b720d67bf4246eb7403b476adb3488ac"
       const redemptions = await createRedemptionRequests(data)
@@ -493,6 +494,7 @@ describe("RedemptionWatchtower", () => {
         // No need to create the redemption request. The caller check is
         // performed before the redemption request existence check.
         const { pubKeyHash } = SinglePendingRequestedRedemption.wallet
+
         const { redeemerOutputScript } =
           SinglePendingRequestedRedemption.redemptionRequests[0]
 
@@ -514,6 +516,7 @@ describe("RedemptionWatchtower", () => {
           const redemptions = await createRedemptionRequests(
             SinglePendingRequestedRedemption
           )
+
           // eslint-disable-next-line prefer-destructuring
           redemption = redemptions[0]
 
@@ -574,6 +577,7 @@ describe("RedemptionWatchtower", () => {
             const redemptions = await createRedemptionRequests(
               SinglePendingRequestedRedemption
             )
+
             // eslint-disable-next-line prefer-destructuring
             redemption = redemptions[0]
 
@@ -606,6 +610,7 @@ describe("RedemptionWatchtower", () => {
           context("when redemption request does not exist", () => {
             it("should revert", async () => {
               const { pubKeyHash } = SinglePendingRequestedRedemption.wallet
+
               const { redeemerOutputScript } =
                 SinglePendingRequestedRedemption.redemptionRequests[0]
 
@@ -629,6 +634,7 @@ describe("RedemptionWatchtower", () => {
                   const redemptions = await createRedemptionRequests(
                     SinglePendingRequestedRedemption
                   )
+
                   // eslint-disable-next-line prefer-destructuring
                   redemption = redemptions[0]
 
@@ -673,6 +679,7 @@ describe("RedemptionWatchtower", () => {
                 const redemptions = await createRedemptionRequests(
                   SinglePendingRequestedRedemption
                 )
+
                 // eslint-disable-next-line prefer-destructuring
                 redemption = redemptions[0]
 
@@ -725,6 +732,7 @@ describe("RedemptionWatchtower", () => {
                   const redemptions = await createRedemptionRequests(
                     SinglePendingRequestedRedemption
                   )
+
                   // eslint-disable-next-line prefer-destructuring
                   redemption = redemptions[0]
                 })
@@ -781,6 +789,7 @@ describe("RedemptionWatchtower", () => {
                     // is mined exactly at the timestamp the delay expires.
                     const delayExpiresAt =
                       redemption.requestedAt + levelOneDelay
+
                     await increaseTime(
                       delayExpiresAt - (await lastBlockTime()) - 1
                     )
@@ -828,6 +837,7 @@ describe("RedemptionWatchtower", () => {
                     // is mined exactly at the timestamp the delay expires.
                     const delayExpiresAt =
                       redemption.requestedAt + levelTwoDelay
+
                     await increaseTime(
                       delayExpiresAt - (await lastBlockTime()) - 1
                     )
@@ -862,8 +872,10 @@ describe("RedemptionWatchtower", () => {
                   // (use the maximum level-two delay).
                   const levelTwoDelay =
                     await redemptionWatchtower.levelTwoDelay()
+
                   const delayExpiresAt =
                     legacyRedemption.requestedAt + levelTwoDelay
+
                   await increaseTime(delayExpiresAt - (await lastBlockTime()))
                 })
 
@@ -1067,6 +1079,7 @@ describe("RedemptionWatchtower", () => {
                   it("should update veto state properly", async () => {
                     // Penalty fee is 5% of the redemption amount.
                     const penaltyFee = legacyRedemption.amount.mul(5).div(100)
+
                     // The withdrawable amount left on the watchtower should
                     // be equal to the redemption amount minus the penalty fee.
                     const withdrawableAmount =
@@ -1201,6 +1214,7 @@ describe("RedemptionWatchtower", () => {
                 const redemptions = await createRedemptionRequests(
                   SinglePendingRequestedRedemption
                 )
+
                 // eslint-disable-next-line prefer-destructuring
                 redemption = redemptions[0]
               })
@@ -1571,6 +1585,7 @@ describe("RedemptionWatchtower", () => {
         const redemptions = await createRedemptionRequests(
           SinglePendingRequestedRedemption
         )
+
         // eslint-disable-next-line prefer-destructuring
         redemption = redemptions[0]
       })
@@ -2097,6 +2112,7 @@ describe("RedemptionWatchtower", () => {
       const redemptionData = JSON.parse(
         JSON.stringify(SinglePendingRequestedRedemption)
       )
+
       redemptionData.redemptionRequests[0].redeemerOutputScript =
         "0x17a914011beb6fb8499e075a57027fb0a58384f2d3f78487"
       // eslint-disable-next-line prefer-destructuring
@@ -2262,6 +2278,7 @@ describe("RedemptionWatchtower", () => {
           const redemptions = await createRedemptionRequests(
             SinglePendingRequestedRedemption
           )
+
           // eslint-disable-next-line prefer-destructuring
           redemption = redemptions[0]
 
@@ -2324,6 +2341,7 @@ describe("RedemptionWatchtower", () => {
       const redemptions = await createRedemptionRequests(
         SinglePendingRequestedRedemption
       )
+
       // eslint-disable-next-line prefer-destructuring
       redemption = redemptions[0]
 
@@ -2573,6 +2591,7 @@ describe("RedemptionWatchtower", () => {
                 const currentWatchtowerBalance = await bank.balanceOf(
                   redemptionWatchtower.address
                 )
+
                 const currentRedeemerBalance = await bank.balanceOf(
                   redemption.redeemer
                 )
@@ -2581,6 +2600,7 @@ describe("RedemptionWatchtower", () => {
                 const watchtowerDifference = initialWatchtowerBalance.sub(
                   currentWatchtowerBalance
                 )
+
                 // Redeemer's balance increased.
                 const redeemerDifference = currentRedeemerBalance.sub(
                   initialRedeemerBalance

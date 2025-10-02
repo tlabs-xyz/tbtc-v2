@@ -18,6 +18,7 @@ describe("StarkNet Bitcoin Depositor - StarkGate Integration Tests", () => {
     const MockStarkGateBridge = await ethers.getContractFactory(
       "MockStarkGateBridge"
     )
+
     starkGateBridge = await MockStarkGateBridge.deploy()
 
     const MockTBTCToken = await ethers.getContractFactory("MockTBTCToken")

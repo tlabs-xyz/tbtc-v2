@@ -12,6 +12,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     "0x0000402089138e40cd8b4832beb8013bc80b1425c8bcbe10fc28040000000000000000" +
     "0058a06ab0edc5653a6ab78490675a954f8d8b4d4f131728dcf965cd0022a02cdde59f8e" +
     "63303808176bbe3919"
+
   const genesisHeight = 766080
   const genesisProofLength = 20
 

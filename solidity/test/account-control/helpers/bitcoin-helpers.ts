@@ -38,7 +38,7 @@ export function isValidBitcoinAddress(address: string): boolean {
     testnetSegwit: /^tb1[a-z0-9]{39,59}$/,
   }
 
-  return Object.values(patterns).some(pattern => pattern.test(address))
+  return Object.values(patterns).some((pattern) => pattern.test(address))
 }
 
 /**
@@ -51,22 +51,26 @@ export function getTestBitcoinAddresses() {
 /**
  * Creates a deterministic Bitcoin address for testing
  */
-export function createTestBitcoinAddress(seed: string, type: "legacy" | "segwit" = "legacy"): string {
+export function createTestBitcoinAddress(
+  seed: string,
+  type: "legacy" | "segwit" = "legacy"
+): string {
   const hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(seed))
   const shortHash = hash.slice(2, 42) // 20 bytes
 
   if (type === "segwit") {
     return `bc1q${shortHash}`
-  } else {
-    // Simplified legacy address generation (not real Base58Check)
-    return `1${shortHash.substring(0, 33)}`
   }
+  // Simplified legacy address generation (not real Base58Check)
+  return `1${shortHash.substring(0, 33)}`
 }
 
 /**
  * Extracts address type from Bitcoin address
  */
-export function getBitcoinAddressType(address: string): "legacy" | "p2sh" | "segwit" | "unknown" {
+export function getBitcoinAddressType(
+  address: string
+): "legacy" | "p2sh" | "segwit" | "unknown" {
   if (!address) return "unknown"
 
   if (address.startsWith("1")) return "legacy"
@@ -79,7 +83,10 @@ export function getBitcoinAddressType(address: string): "legacy" | "p2sh" | "seg
 /**
  * Creates mock Bitcoin transaction output script
  */
-export function createBitcoinOutputScript(address: string, amount: number): string {
+export function createBitcoinOutputScript(
+  address: string,
+  amount: number
+): string {
   const addressType = getBitcoinAddressType(address)
 
   switch (addressType) {
@@ -100,7 +107,10 @@ export function createBitcoinOutputScript(address: string, amount: number): stri
 /**
  * Creates a complete Bitcoin output for testing
  */
-export function createBitcoinOutput(address: string, amount: number): {
+export function createBitcoinOutput(
+  address: string,
+  amount: number
+): {
   value: string
   script: string
 } {
@@ -111,7 +121,7 @@ export function createBitcoinOutput(address: string, amount: number): {
   )
 
   // Reverse bytes for little-endian
-  const reversedValue = valueHex.match(/../g)!.reverse().join("")
+  const reversedValue = valueHex.match(/../g).reverse().join("")
 
   return {
     value: reversedValue,
@@ -122,23 +132,29 @@ export function createBitcoinOutput(address: string, amount: number): {
 /**
  * Creates a Bitcoin output vector for multiple outputs
  */
-export function createBitcoinOutputVector(outputs: Array<{ address: string; amount: number }>): string {
-  const outputCount = ethers.utils.hexZeroPad(
-    ethers.BigNumber.from(outputs.length).toHexString(),
-    1
-  ).slice(2) // Remove 0x prefix
+export function createBitcoinOutputVector(
+  outputs: Array<{ address: string; amount: number }>
+): string {
+  const outputCount = ethers.utils
+    .hexZeroPad(ethers.BigNumber.from(outputs.length).toHexString(), 1)
+    .slice(2) // Remove 0x prefix
 
-  const outputData = outputs.map(output => {
-    const { value, script } = createBitcoinOutput(output.address, output.amount)
-    const scriptLength = ethers.utils.hexZeroPad(
-      ethers.BigNumber.from(script.length / 2).toHexString(),
-      1
-    ).slice(2)
+  const outputData = outputs
+    .map((output) => {
+      const { value, script } = createBitcoinOutput(
+        output.address,
+        output.amount
+      )
 
-    return value + scriptLength + script
-  }).join("")
+      const scriptLength = ethers.utils
+        .hexZeroPad(ethers.BigNumber.from(script.length / 2).toHexString(), 1)
+        .slice(2)
 
-  return "0x" + outputCount + outputData
+      return value + scriptLength + script
+    })
+    .join("")
+
+  return `0x${outputCount}${outputData}`
 }
 
 /**
@@ -150,7 +166,9 @@ export function parseBitcoinOutputVector(outputVector: string): Array<{
   address?: string
 }> {
   // Remove 0x prefix
-  let data = outputVector.startsWith("0x") ? outputVector.slice(2) : outputVector
+  let data = outputVector.startsWith("0x")
+    ? outputVector.slice(2)
+    : outputVector
 
   // First byte is output count
   const outputCount = parseInt(data.slice(0, 2), 16)
@@ -160,7 +178,7 @@ export function parseBitcoinOutputVector(outputVector: string): Array<{
   for (let i = 0; i < outputCount; i++) {
     // 8 bytes for value (little-endian)
     const valueHex = data.slice(0, 16)
-    const value = BigInt(`0x${valueHex.match(/../g)!.reverse().join("")}`)
+    const value = BigInt(`0x${valueHex.match(/../g).reverse().join("")}`)
     data = data.slice(16)
 
     // 1 byte for script length
@@ -204,7 +222,12 @@ export function validateBitcoinTx(txInfo: {
 }): boolean {
   try {
     // Basic validation - check that all fields are present and non-empty
-    if (!txInfo.version || !txInfo.inputVector || !txInfo.outputVector || !txInfo.locktime) {
+    if (
+      !txInfo.version ||
+      !txInfo.inputVector ||
+      !txInfo.outputVector ||
+      !txInfo.locktime
+    ) {
       return false
     }
 

@@ -7,9 +7,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await getNamedAccounts()
 
   // Only deploy for test networks
-  if (hre.network.name !== "hardhat" &&
-      hre.network.name !== "localhost" &&
-      hre.network.name !== "development") {
+  if (
+    hre.network.name !== "hardhat" &&
+    hre.network.name !== "localhost" &&
+    hre.network.name !== "development"
+  ) {
     log("Skipping test WalletRegistry deployment for non-test network")
     return
   }
@@ -30,9 +32,8 @@ export default func
 
 func.tags = ["WalletRegistry"]
 func.id = "deploy_test_wallet_registry" // unique ID to prevent conflicts
-func.skip = async (hre: HardhatRuntimeEnvironment) => {
+func.skip = async (hre: HardhatRuntimeEnvironment) =>
   // Skip if not a test network
-  return hre.network.name !== "hardhat" &&
-         hre.network.name !== "localhost" &&
-         hre.network.name !== "development"
-}
+  hre.network.name !== "hardhat" &&
+  hre.network.name !== "localhost" &&
+  hre.network.name !== "development"

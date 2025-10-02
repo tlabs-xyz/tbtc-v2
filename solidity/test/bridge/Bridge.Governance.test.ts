@@ -850,6 +850,7 @@ describe("Bridge - Governance", () => {
         it("should update the redemption dust threshold", async () => {
           const { redemptionDustThreshold } =
             await bridge.redemptionParameters()
+
           expect(redemptionDustThreshold).to.be.equal(
             constants.depositDustThreshold + 1
           )
@@ -893,6 +894,7 @@ describe("Bridge - Governance", () => {
       it("should not update the redemption treasury fee divisor", async () => {
         const { redemptionTreasuryFeeDivisor } =
           await bridge.redemptionParameters()
+
         expect(redemptionTreasuryFeeDivisor).to.be.equal(
           constants.redemptionTreasuryFeeDivisor
         )
@@ -981,6 +983,7 @@ describe("Bridge - Governance", () => {
         it("should update the redemption treasury fee divisor", async () => {
           const { redemptionTreasuryFeeDivisor } =
             await bridge.redemptionParameters()
+
           expect(redemptionTreasuryFeeDivisor).to.be.equal(7331)
         })
 
@@ -1114,6 +1117,7 @@ describe("Bridge - Governance", () => {
         it("should update the redemption tx max total fee", async () => {
           const { redemptionTxMaxTotalFee } =
             await bridge.redemptionParameters()
+
           expect(redemptionTxMaxTotalFee).to.be.equal(
             constants.redemptionTxMaxTotalFee * 3
           )
@@ -1271,6 +1275,7 @@ describe("Bridge - Governance", () => {
       it("should not update the redemption timeout slashing amount", async () => {
         const { redemptionTimeoutSlashingAmount } =
           await bridge.redemptionParameters()
+
         expect(redemptionTimeoutSlashingAmount).to.be.equal(
           constants.redemptionTimeoutSlashingAmount
         )
@@ -1359,6 +1364,7 @@ describe("Bridge - Governance", () => {
         it("should update the redemption timeout slashing amount", async () => {
           const { redemptionTimeoutSlashingAmount } =
             await bridge.redemptionParameters()
+
           expect(redemptionTimeoutSlashingAmount).to.be.equal(7331)
         })
 
@@ -1400,6 +1406,7 @@ describe("Bridge - Governance", () => {
       it("should not update the redemption timeout notifier reward multiplier", async () => {
         const { redemptionTimeoutNotifierRewardMultiplier } =
           await bridge.redemptionParameters()
+
         expect(redemptionTimeoutNotifierRewardMultiplier).to.be.equal(
           constants.redemptionTimeoutNotifierRewardMultiplier
         )
@@ -1488,6 +1495,7 @@ describe("Bridge - Governance", () => {
         it("should update the redemption timeout notifier reward multiplier", async () => {
           const { redemptionTimeoutNotifierRewardMultiplier } =
             await bridge.redemptionParameters()
+
           expect(redemptionTimeoutNotifierRewardMultiplier).to.be.equal(42)
         })
 
@@ -1532,6 +1540,7 @@ describe("Bridge - Governance", () => {
       it("should not update the moving funds tx max total fee", async () => {
         const { movingFundsTxMaxTotalFee } =
           await bridge.movingFundsParameters()
+
         expect(movingFundsTxMaxTotalFee).to.be.equal(
           constants.movingFundsTxMaxTotalFee
         )
@@ -1617,6 +1626,7 @@ describe("Bridge - Governance", () => {
         it("should update the moving funds tx max total fee", async () => {
           const { movingFundsTxMaxTotalFee } =
             await bridge.movingFundsParameters()
+
           expect(movingFundsTxMaxTotalFee).to.be.equal(7331)
         })
 
@@ -1658,6 +1668,7 @@ describe("Bridge - Governance", () => {
       it("should not update the moving funds dust threshold", async () => {
         const { movingFundsDustThreshold } =
           await bridge.movingFundsParameters()
+
         expect(movingFundsDustThreshold).to.be.equal(
           constants.movingFundsDustThreshold
         )
@@ -1743,6 +1754,7 @@ describe("Bridge - Governance", () => {
         it("should update the moving funds dust threshold", async () => {
           const { movingFundsDustThreshold } =
             await bridge.movingFundsParameters()
+
           expect(movingFundsDustThreshold).to.be.equal(7331)
         })
 
@@ -1784,6 +1796,7 @@ describe("Bridge - Governance", () => {
       it("should not update the moving funds timeout reset delay", async () => {
         const { movingFundsTimeoutResetDelay } =
           await bridge.movingFundsParameters()
+
         expect(movingFundsTimeoutResetDelay).to.be.equal(
           constants.movingFundsTimeoutResetDelay
         )
@@ -1872,6 +1885,7 @@ describe("Bridge - Governance", () => {
         it("should update the moving funds timeout reset delay", async () => {
           const { movingFundsTimeoutResetDelay } =
             await bridge.movingFundsParameters()
+
           expect(movingFundsTimeoutResetDelay).to.be.equal(7331)
         })
 
@@ -2035,6 +2049,7 @@ describe("Bridge - Governance", () => {
       it("should not update the moving funds timeout slashing amount", async () => {
         const { movingFundsTimeoutSlashingAmount } =
           await bridge.movingFundsParameters()
+
         expect(movingFundsTimeoutSlashingAmount).to.be.equal(
           constants.movingFundsTimeoutSlashingAmount
         )
@@ -2123,6 +2138,7 @@ describe("Bridge - Governance", () => {
         it("should update the moving funds timeout slashing amount", async () => {
           const { movingFundsTimeoutSlashingAmount } =
             await bridge.movingFundsParameters()
+
           expect(movingFundsTimeoutSlashingAmount).to.be.equal(7331)
         })
 
@@ -2167,6 +2183,7 @@ describe("Bridge - Governance", () => {
       it("should not update the moving funds timeout notifier reward multiplier", async () => {
         const { movingFundsTimeoutNotifierRewardMultiplier } =
           await bridge.movingFundsParameters()
+
         expect(movingFundsTimeoutNotifierRewardMultiplier).to.be.equal(
           constants.movingFundsTimeoutNotifierRewardMultiplier
         )
@@ -2255,6 +2272,7 @@ describe("Bridge - Governance", () => {
         it("should update the moving funds timeout notifier reward multiplier", async () => {
           const { movingFundsTimeoutNotifierRewardMultiplier } =
             await bridge.movingFundsParameters()
+
           expect(movingFundsTimeoutNotifierRewardMultiplier).to.be.equal(42)
         })
 
@@ -2299,6 +2317,7 @@ describe("Bridge - Governance", () => {
       it("should not update the moving funds commitment gas offset", async () => {
         const { movingFundsCommitmentGasOffset } =
           await bridge.movingFundsParameters()
+
         expect(movingFundsCommitmentGasOffset).to.be.equal(
           constants.movingFundsCommitmentGasOffset
         )
@@ -2387,6 +2406,7 @@ describe("Bridge - Governance", () => {
         it("should update the moving funds commitment gas offset", async () => {
           const { movingFundsCommitmentGasOffset } =
             await bridge.movingFundsParameters()
+
           expect(movingFundsCommitmentGasOffset).to.be.equal(20122)
         })
 
@@ -2428,6 +2448,7 @@ describe("Bridge - Governance", () => {
       it("should not update the moved funds sweep tx max total fee", async () => {
         const { movedFundsSweepTxMaxTotalFee } =
           await bridge.movingFundsParameters()
+
         expect(movedFundsSweepTxMaxTotalFee).to.be.equal(
           constants.movedFundsSweepTxMaxTotalFee
         )
@@ -2516,6 +2537,7 @@ describe("Bridge - Governance", () => {
         it("should update the moved funds sweep tx max total fee", async () => {
           const { movedFundsSweepTxMaxTotalFee } =
             await bridge.movingFundsParameters()
+
           expect(movedFundsSweepTxMaxTotalFee).to.be.equal(7331)
         })
 
@@ -2641,6 +2663,7 @@ describe("Bridge - Governance", () => {
         it("should update the moved funds sweep timeout", async () => {
           const { movedFundsSweepTimeout } =
             await bridge.movingFundsParameters()
+
           expect(movedFundsSweepTimeout).to.be.equal(7331)
         })
 
@@ -2682,6 +2705,7 @@ describe("Bridge - Governance", () => {
       it("should not update the moved funds sweep timeout slashing amount", async () => {
         const { movedFundsSweepTimeoutSlashingAmount } =
           await bridge.movingFundsParameters()
+
         expect(movedFundsSweepTimeoutSlashingAmount).to.be.equal(
           constants.movedFundsSweepTimeoutSlashingAmount
         )
@@ -2770,6 +2794,7 @@ describe("Bridge - Governance", () => {
         it("should update the moved funds sweep timeout slashing amount", async () => {
           const { movedFundsSweepTimeoutSlashingAmount } =
             await bridge.movingFundsParameters()
+
           expect(movedFundsSweepTimeoutSlashingAmount).to.be.equal(7331)
         })
 
@@ -2814,6 +2839,7 @@ describe("Bridge - Governance", () => {
       it("should not update the moved funds sweep timeout notifier reward multiplier", async () => {
         const { movedFundsSweepTimeoutNotifierRewardMultiplier } =
           await bridge.movingFundsParameters()
+
         expect(movedFundsSweepTimeoutNotifierRewardMultiplier).to.be.equal(
           constants.movedFundsSweepTimeoutNotifierRewardMultiplier
         )
@@ -2902,6 +2928,7 @@ describe("Bridge - Governance", () => {
         it("should update the moved funds sweep timeout notifier reward multiplier", async () => {
           const { movedFundsSweepTimeoutNotifierRewardMultiplier } =
             await bridge.movingFundsParameters()
+
           expect(movedFundsSweepTimeoutNotifierRewardMultiplier).to.be.equal(42)
         })
 
@@ -3152,6 +3179,7 @@ describe("Bridge - Governance", () => {
         it("should update the wallet creation min btc balance", async () => {
           const { walletCreationMinBtcBalance } =
             await bridge.walletParameters()
+
           expect(walletCreationMinBtcBalance).to.be.equal(7331)
         })
 
@@ -3281,6 +3309,7 @@ describe("Bridge - Governance", () => {
         it("should update the wallet creation max btc balance", async () => {
           const { walletCreationMaxBtcBalance } =
             await bridge.walletParameters()
+
           expect(walletCreationMaxBtcBalance).to.be.equal(
             constants.walletCreationMinBtcBalance.add(1)
           )
@@ -4257,6 +4286,7 @@ describe("Bridge - Governance", () => {
         it("should update the fraud notifier reward multiplier", async () => {
           const { fraudNotifierRewardMultiplier } =
             await bridge.fraudParameters()
+
           expect(fraudNotifierRewardMultiplier).to.be.equal(42)
         })
 

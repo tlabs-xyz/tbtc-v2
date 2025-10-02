@@ -313,6 +313,7 @@ describe("LightRelay", () => {
           const tx = await relay
             .connect(governance)
             .setAuthorizationStatus(false)
+
           await expect(tx)
             .to.emit(relay, "AuthorizationRequirementChanged")
             .withArgs(false)
@@ -335,6 +336,7 @@ describe("LightRelay", () => {
           const tx = await relay
             .connect(governance)
             .authorize(thirdParty.address)
+
           await expect(tx)
             .to.emit(relay, "SubmitterAuthorized")
             .withArgs(thirdParty.address)
@@ -368,6 +370,7 @@ describe("LightRelay", () => {
           const tx = await relay
             .connect(governance)
             .deauthorize(thirdParty.address)
+
           await expect(tx)
             .to.emit(relay, "SubmitterDeauthorized")
             .withArgs(thirdParty.address)
@@ -584,6 +587,7 @@ describe("LightRelay", () => {
 
       context("with proof length 6", () => {
         let tx: ContractTransaction
+
         const retargetHeaders = concatenateHexStrings(
           longHeaderHex.slice(89, 101)
         )
@@ -613,6 +617,7 @@ describe("LightRelay", () => {
 
       context("with proof length 50", () => {
         let tx: ContractTransaction
+
         const retargetHeaders = concatenateHexStrings(
           longHeaderHex.slice(45, 145)
         )

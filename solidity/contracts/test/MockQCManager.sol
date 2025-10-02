@@ -1,6 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.17;
 
+interface IQCData {
+    function registerQC(address qc, uint256 maxMintingCap) external;
+    function setQCStatus(address qc, uint8 status, bytes32 reason) external;
+}
+
+interface IMockAccountControl {
+    enum ReserveType {
+        UNINITIALIZED,
+        QC_PERMISSIONED
+    }
+    function authorizeReserve(address reserve, uint256 mintingCap, ReserveType rType) external;
+    function setMintingCap(address reserve, uint256 newCap) external;
+}
+
 /// @title MockQCManager
 /// @notice Mock implementation of QCManager for testing
 contract MockQCManager {
@@ -11,9 +25,17 @@ contract MockQCManager {
     mapping(string => bool) public walletRegistered; // Track wallet registration
     mapping(string => bool) public walletActive; // Track wallet active status
 
+    // Mock AccountControl address
+    address public accountControl;
+
+    // QCData reference for integration
+    IQCData public qcData;
+
     event QCRegistered(address indexed qc, uint256 maxMintingCap);
+    event QCOnboarded(address indexed qc, uint256 maxMintingCap);
     event MintingCapUpdated(address indexed qc, uint256 newCap);
     event WalletRegistered(address indexed qc, string btcAddress);
+    event AccountControlUpdated(address indexed oldAddress, address indexed newAddress);
 
     /// @notice Custom errors to match real QCManager behavior
     error QCNotRegistered(address qc);
@@ -28,12 +50,25 @@ contract MockQCManager {
     function registerQC(address qc, uint256 maxMintingCap) external {
         if (qc == address(0)) revert InvalidWalletAddress();
         if (isQCRegistered[qc]) revert QCAlreadyRegistered(qc);
-        
+
         isQCRegistered[qc] = true;
         qcActive[qc] = true; // Set as active by default
         maxMintingCaps[qc] = maxMintingCap;
+
+        // Also register in QCData if available
+        if (address(qcData) != address(0)) {
+            qcData.registerQC(qc, maxMintingCap);
+            qcData.setQCStatus(qc, 0, bytes32("Active"));
+        }
+
+        // Also authorize in AccountControl if available
+        if (accountControl != address(0)) {
+            IMockAccountControl(accountControl).authorizeReserve(qc, maxMintingCap, IMockAccountControl.ReserveType.QC_PERMISSIONED);
+        }
+
         emit QCRegistered(qc, maxMintingCap);
     }
+
 
     function getMaxMintingCap(address qc) external view returns (uint256) {
         return maxMintingCaps[qc];
@@ -45,9 +80,20 @@ contract MockQCManager {
     }
 
     function increaseMintingCap(address qc, uint256 newCap) external {
-        require(newCap > maxMintingCaps[qc], "New cap must be higher");
+        require(newCap >= maxMintingCaps[qc], "New cap must be higher or equal");
         maxMintingCaps[qc] = newCap;
+        
+        // Update AccountControl if configured
+        if (accountControl != address(0)) {
+            IMockAccountControl(accountControl).setMintingCap(qc, newCap);
+        }
+        
         emit MintingCapUpdated(qc, newCap);
+    }
+    
+    // Alias for increaseMintingCap to match test expectations
+    function increaseMintingCapacity(address qc, uint256 newCap) external {
+        this.increaseMintingCap(qc, newCap);
     }
 
     function getQCMintedAmount(address qc) external view returns (uint256) {
@@ -121,7 +167,7 @@ contract MockQCManager {
 
     /// @notice Mock signature verification that fails for testing
     function verifySignature(
-        address qc,
+        address, // qc parameter unused in mock
         bytes memory signature,
         bytes memory message
     ) external pure {
@@ -145,5 +191,17 @@ contract MockQCManager {
     function setWalletActive(string memory btcAddress, bool active) external {
         if (!walletRegistered[btcAddress]) revert WalletNotRegistered(btcAddress);
         walletActive[btcAddress] = active;
+    }
+
+    /// @notice Set AccountControl address for testing
+    function setAccountControl(address _accountControl) external {
+        address oldAddress = accountControl;
+        accountControl = _accountControl;
+        emit AccountControlUpdated(oldAddress, _accountControl);
+    }
+
+    /// @notice Set QCData address for testing integration
+    function setQCData(address _qcData) external {
+        qcData = IQCData(_qcData);
     }
 }

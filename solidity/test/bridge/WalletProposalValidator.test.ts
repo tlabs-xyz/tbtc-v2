@@ -46,6 +46,7 @@ describe("WalletProposalValidator", () => {
     const WalletProposalValidator = await ethers.getContractFactory(
       "WalletProposalValidator"
     )
+
     walletProposalValidator = await WalletProposalValidator.connect(
       deployer
     ).deploy(bridge.address)
@@ -53,8 +54,10 @@ describe("WalletProposalValidator", () => {
 
   describe("validateDepositSweepProposal", () => {
     const walletPubKeyHash = "0x7ac2d9378a1c47e589dfb8095ca95ed2140d2726"
+
     const ecdsaWalletID =
       "0x4ad6b3ccbca81645865d8d0d575797a15528e98ced22f29a6f906d3259569863"
+
     const vault = "0x2553E09f832c9f5C656808bb7A24793818877732"
     const bridgeDepositTxMaxFee = 10000
 
@@ -822,9 +825,11 @@ describe("WalletProposalValidator", () => {
                                   // moment than allowed by the refund safety margin.
                                   const safetyMarginViolatedAt =
                                     await lastBlockTime()
+
                                   const depositRefundableAt =
                                     safetyMarginViolatedAt +
                                     (await walletProposalValidator.DEPOSIT_REFUND_SAFETY_MARGIN())
+
                                   const depositRevealedAt =
                                     depositRefundableAt - depositLocktime
 
@@ -1284,6 +1289,7 @@ describe("WalletProposalValidator", () => {
 
   describe("validateRedemptionProposal", () => {
     const walletPubKeyHash = "0x7ac2d9378a1c47e589dfb8095ca95ed2140d2726"
+
     const ecdsaWalletID =
       "0x4ad6b3ccbca81645865d8d0d575797a15528e98ced22f29a6f906d3259569863"
 
@@ -1744,9 +1750,11 @@ describe("WalletProposalValidator", () => {
                           // a timeout timestamp being closer to the current
                           // moment than allowed by the refund safety margin.
                           const safetyMarginViolatedAt = await lastBlockTime()
+
                           const requestTimedOutAt =
                             safetyMarginViolatedAt +
                             (await walletProposalValidator.REDEMPTION_REQUEST_TIMEOUT_SAFETY_MARGIN())
+
                           const requestCreatedAt =
                             requestTimedOutAt - bridgeRedemptionTimeout
 
@@ -2158,20 +2166,24 @@ describe("WalletProposalValidator", () => {
     const movingFundsTxMaxTotalFee = 20000
     const movingFundsDustThreshold = 5000
     const walletPubKeyHash = "0x7ac2d9378a1c47e589dfb8095ca95ed2140d2726"
+
     const targetWallets = [
       "0x84a70187011e156686788e0a2bc50944a4721e83",
       "0xf64a45c07e3778b8ce58cb0058477c821c543aad",
       "0xcaea95433d9bfa80bb8dc8819a48e2a9aa96147c",
     ]
+
     // Hash calculated from the above target wallets.
     const targetWalletsHash =
       "0x16311d424d513a1743fbc9c0e4fea5b70eddefd15f54613503e5cdfab24f8877"
+
     const walletMainUtxo = {
       txHash:
         "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       txOutputIndex: 0,
       txOutputValue: movingFundsDustThreshold,
     }
+
     // Hash calculated from the above main UTXO.
     const walletMainUtxoHash =
       "0x4cfb92c890e30ff736656e519167cbfcacb408c730fd21bec415359b45769d20"
@@ -2548,6 +2560,7 @@ describe("WalletProposalValidator", () => {
                         },
                         walletMainUtxo
                       )
+
                     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
                     expect(result).to.be.true
                   })
@@ -2567,6 +2580,7 @@ describe("WalletProposalValidator", () => {
     // Hash and index representing a pending moved funds sweep request.
     const movingFundsTxHash =
       "0xfedaee64895aebdd94d21d932960f96fcdb95d17ca64b25aee0450631a1291a9"
+
     const movingFundsTxOutputIndex = 0
 
     before(async () => {
@@ -2817,6 +2831,7 @@ describe("WalletProposalValidator", () => {
                           movedFundsSweepTxFee: movedFundsSweepTxMaxTotalFee,
                         }
                       )
+
                     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
                     expect(result).to.be.true
                   })

@@ -13,6 +13,7 @@ contract MockQCData {
     mapping(address => uint256) private maxCapacities;
     mapping(address => uint256) private registeredAt;
     mapping(address => bool) private selfPaused;
+    mapping(address => QCData.PauseLevel) private pauseLevels;
     
     function isQCRegistered(address qc) external view returns (bool) {
         return registered[qc];
@@ -36,6 +37,7 @@ contract MockQCData {
         uint256 totalMinted,
         uint256 maxCapacity,
         uint256 regAt,
+        QCData.PauseLevel pauseLevel,
         bool selfPausedStatus
     ) {
         return (
@@ -43,6 +45,7 @@ contract MockQCData {
             mintedAmounts[qc],
             maxCapacities[qc],
             registeredAt[qc],
+            pauseLevels[qc],
             selfPaused[qc]
         );
     }
@@ -75,8 +78,9 @@ contract MockQCData {
         qcStatuses[qc] = newStatus;
     }
     
-    function setQCSelfPaused(address qc, bool paused) external {
-        selfPaused[qc] = paused;
+    function setQCPauseLevel(address qc, QCData.PauseLevel pauseLevel, bool selfInitiated) external {
+        pauseLevels[qc] = pauseLevel;
+        selfPaused[qc] = selfInitiated;
     }
     
     function isWalletRegistered(string calldata /* btcAddress */) external pure returns (bool) {

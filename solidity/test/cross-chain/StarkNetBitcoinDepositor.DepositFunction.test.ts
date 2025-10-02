@@ -59,27 +59,32 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     const MockTBTCVault = await ethers.getContractFactory(
       "contracts/test/MockTBTCVault.sol:MockTBTCVault"
     )
+
     tbtcVault = (await MockTBTCVault.deploy()) as MockTBTCVault
     await tbtcVault.setTbtcToken(tbtcToken.address) // Must set token before initializing depositor
 
     const MockStarkGateBridge = await ethers.getContractFactory(
       "MockStarkGateBridge"
     )
+
     starkGateBridge = await MockStarkGateBridge.deploy()
 
     // Deploy StarkNetBitcoinDepositor with proxy
     const StarkNetBitcoinDepositor = await ethers.getContractFactory(
       "StarkNetBitcoinDepositor"
     )
+
     const depositorImpl = await StarkNetBitcoinDepositor.deploy()
 
     // Deploy proxy
     const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy")
+
     const initData = depositorImpl.interface.encodeFunctionData("initialize", [
       bridge.address,
       tbtcVault.address,
       starkGateBridge.address,
     ])
+
     const proxy = await ProxyFactory.deploy(depositorImpl.address, initData)
 
     depositor = StarkNetBitcoinDepositor.attach(proxy.address)
@@ -100,7 +105,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     it("should call deposit() instead of depositWithMessage()", async () => {
       // This test verifies the implementation uses deposit() instead of depositWithMessage()
       const fixture = loadFixture(tbtcVault.address)
-      
+
       // Calculate the exact amount that _calculateTbtcAmount returns:
       // The mock bridge uses 88800000 satoshi (0.888 BTC) with 898000 treasury fee
       // amountSubTreasury = (88800000 - 898000) * 10^10 = 87902000 * 10^10
@@ -148,7 +153,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     it("should not create empty message array", async () => {
       // GREEN: This test verifies no empty array is created
       const fixture = loadFixture(tbtcVault.address)
-      
+
       // Calculate the exact amount that _calculateTbtcAmount returns:
       // The mock bridge uses 88800000 satoshi (0.888 BTC) with 898000 treasury fee
       // amountSubTreasury = (88800000 - 898000) * 10^10 = 87902000 * 10^10
@@ -201,7 +206,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     it("should reduce gas usage by ~2000", async () => {
       // GREEN: This test will measure gas difference
       const fixture = loadFixture(tbtcVault.address)
-      
+
       // Calculate the exact amount that _calculateTbtcAmount returns:
       // The mock bridge uses 88800000 satoshi (0.888 BTC) with 898000 treasury fee
       // amountSubTreasury = (88800000 - 898000) * 10^10 = 87902000 * 10^10
@@ -234,6 +239,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       const tx = await depositor.finalizeDeposit(depositKey, {
         value: INITIAL_MESSAGE_FEE,
       })
+
       const receipt = await tx.wait()
       const { gasUsed } = receipt
 
@@ -248,7 +254,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     it("should maintain same functionality with deposit()", async () => {
       // GREEN: Verify end-to-end functionality is preserved
       const fixture = loadFixture(tbtcVault.address)
-      
+
       // Calculate the exact amount that _calculateTbtcAmount returns:
       // The mock bridge uses 88800000 satoshi (0.888 BTC) with 898000 treasury fee
       // amountSubTreasury = (88800000 - 898000) * 10^10 = 87902000 * 10^10
@@ -322,6 +328,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
         123,
         { value: ethers.utils.parseEther("0.1") }
       )
+
       await mockTx.wait()
 
       // Verify the mock recorded the call

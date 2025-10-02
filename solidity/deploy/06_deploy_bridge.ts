@@ -28,10 +28,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const Deposit = await deploy("Deposit", deployOptions)
   const DepositSweep = await deploy("DepositSweep", deployOptions)
   const Redemption = await deploy("Redemption", deployOptions)
+
   const Wallets = await deploy("Wallets", {
     contract: "contracts/bridge/Wallets.sol:Wallets",
     ...deployOptions,
   })
+
   const Fraud = await deploy("Fraud", deployOptions)
   const MovingFunds = await deploy("MovingFunds", deployOptions)
 

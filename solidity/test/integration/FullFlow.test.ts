@@ -20,11 +20,15 @@ import {
   setupTestSigners,
   createBaseTestEnvironment,
   restoreBaseTestEnvironment,
-  TestSigners
+  TestSigners,
 } from "../fixtures/base-setup"
-import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
+import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-utils"
 import { TestMockFactory } from "../fixtures/mock-factory"
-import { integrationProfiler, setStandardBaselines, profileCrossContractFlow } from "../helpers/performance-helpers"
+import {
+  integrationProfiler,
+  setStandardBaselines,
+  profileCrossContractFlow,
+} from "../helpers/performance-utils"
 import {
   performEcdsaDkg,
   updateWalletRegistryDkgResultChallengePeriodLength,
@@ -128,8 +132,12 @@ describeFn("Integration Test - Full flow", async () => {
           txOutputIndex: 0,
           txOutputValue: 0,
         }
+
         const requestNewWalletTx = await bridge.requestNewWallet(NO_MAIN_UTXO)
-        await integrationProfiler.profileTransaction("Bridge.requestNewWallet", requestNewWalletTx)
+        await integrationProfiler.profileTransaction(
+          "Bridge.requestNewWallet",
+          requestNewWalletTx
+        )
 
         await produceRelayEntry(walletRegistry, randomBeacon)
         await performEcdsaDkg(
@@ -181,6 +189,7 @@ describeFn("Integration Test - Full flow", async () => {
               0,
             ]
           )
+
           const deposit = await bridge.deposits(depositKey)
 
           expect(deposit.revealedAt).to.be.greaterThan(0)
@@ -225,6 +234,7 @@ describeFn("Integration Test - Full flow", async () => {
             ["bytes32", "uint32", "uint64"],
             [depositSweepData.sweepTx.hash, 0, 98400]
           )
+
           const { mainUtxoHash } = await bridge.wallets(walletPubKeyHash)
           expect(mainUtxoHash).to.be.equal(expectedMainUtxo)
         })
@@ -278,6 +288,7 @@ describeFn("Integration Test - Full flow", async () => {
               walletPubKeyHash,
             ]
           )
+
           const pendingRedemption = await bridge.pendingRedemptions(
             redemptionKey
           )
@@ -295,6 +306,7 @@ describeFn("Integration Test - Full flow", async () => {
           const { pendingRedemptionsValue } = await bridge.wallets(
             walletPubKeyHash
           )
+
           // The expected wallet's pending redemptions value is equal to
           // the redemption amount - treasury fee = 50000 - 25 = 49975
           expect(pendingRedemptionsValue).to.be.equal(49975)
@@ -331,6 +343,7 @@ describeFn("Integration Test - Full flow", async () => {
           const { pendingRedemptionsValue } = await bridge.wallets(
             walletPubKeyHash
           )
+
           expect(pendingRedemptionsValue).to.be.equal(0)
         })
 
@@ -344,6 +357,7 @@ describeFn("Integration Test - Full flow", async () => {
             ["bytes32", "uint32", "uint64"],
             [redemptionData.redemptionTx.hash, 1, 48425]
           )
+
           const { mainUtxoHash } = await bridge.wallets(walletPubKeyHash)
           expect(mainUtxoHash).to.be.equal(expectedMainUtxo)
         })

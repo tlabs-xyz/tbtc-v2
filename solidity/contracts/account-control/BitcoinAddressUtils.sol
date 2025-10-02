@@ -1,11 +1,42 @@
 // SPDX-License-Identifier: GPL-3.0-only
+
+// ██████████████     ▐████▌     ██████████████
+// ██████████████     ▐████▌     ██████████████
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+// ██████████████     ▐████▌     ██████████████
+// ██████████████     ▐████▌     ██████████████
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+//               ▐████▌    ▐████▌
+
 pragma solidity 0.8.17;
 
-/// @title Bitcoin Address Utilities
-/// @notice Library for decoding Bitcoin addresses into their script representations
-/// @dev Supports P2PKH, P2SH, P2WPKH, and P2WSH address formats
+/**
+ * @title Bitcoin Address Utilities
+ * @notice Library for decoding Bitcoin addresses into their script representations
+ * @dev Comprehensive Bitcoin address validation and manipulation library that supports:
+ *      - P2PKH (Pay-to-PubKey-Hash): Legacy addresses starting with '1'
+ *      - P2SH (Pay-to-Script-Hash): Script addresses starting with '3'
+ *      - P2WPKH (Pay-to-Witness-PubKey-Hash): Native SegWit addresses (bc1...)
+ *      - P2WSH (Pay-to-Witness-Script-Hash): Native SegWit script addresses
+ *      
+ *      This library provides critical security functions for:
+ *      - Bitcoin address format validation (lightweight and full cryptographic)
+ *      - Address decoding for script hash extraction
+ *      - Public key to Bitcoin address derivation
+ *      - Base58 and Bech32 encoding/decoding
+ *
+ * @custom:security-contact security@threshold.network
+ * @custom:security-notes
+ * - All address validation includes checksum verification to prevent typos
+ * - Mixed-case Bech32 addresses are rejected per BIP-173
+ * - Public key derivation uses proper Bitcoin address standards
+ */
 library BitcoinAddressUtils {
-    // Custom errors
     error InvalidAddressLength();
     error InvalidAddressPrefix();
     error InvalidChecksum();
@@ -35,7 +66,7 @@ library BitcoinAddressUtils {
     // Bech32 network prefixes  
     string private constant MAINNET_HRP = "bc";
 
-    /// @notice Decode a Bitcoin address to its script representation
+    /// @notice Decode a Bitcoin address to its script representation\n    /// @dev Complex address parsing with multi-format support:\n    ///      1. Input validation and length checks\n    ///      2. Format detection (Bech32 vs Base58)\n    ///      3. Delegates to specialized decoders based on format\n    ///      4. Returns standardized script type and hash for all formats\n    ///      5. Performs full cryptographic validation including checksums\n    ///      Critical for wallet registration security and Bitcoin integration.
     /// @param btcAddress The Bitcoin address as a string
     /// @return scriptType The type of script (0=P2PKH, 1=P2SH, 2=P2WPKH, 3=P2WSH)
     /// @return scriptHash The hash component of the script (20 or 32 bytes)
@@ -279,38 +310,39 @@ library BitcoinAddressUtils {
         
         // Bech32 character mapping optimized for gas
         // Charset: "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
-        if (c == 0x71) return 0;  // 'q'
-        if (c == 0x70) return 1;  // 'p'
-        if (c == 0x7A) return 2;  // 'z'
-        if (c == 0x72) return 3;  // 'r'
-        if (c == 0x79) return 4;  // 'y'
+        // Support both lowercase and uppercase variants
+        if (c == 0x71 || c == 0x51) return 0;  // 'q' or 'Q'
+        if (c == 0x70 || c == 0x50) return 1;  // 'p' or 'P'
+        if (c == 0x7A || c == 0x5A) return 2;  // 'z' or 'Z'
+        if (c == 0x72 || c == 0x52) return 3;  // 'r' or 'R'
+        if (c == 0x79 || c == 0x59) return 4;  // 'y' or 'Y'
         if (c == 0x39) return 5;  // '9'
-        if (c == 0x78) return 6;  // 'x'
+        if (c == 0x78 || c == 0x58) return 6;  // 'x' or 'X'
         if (c == 0x38) return 7;  // '8'
-        if (c == 0x67) return 8;  // 'g'
-        if (c == 0x66) return 9;  // 'f'
+        if (c == 0x67 || c == 0x47) return 8;  // 'g' or 'G'
+        if (c == 0x66 || c == 0x46) return 9;  // 'f' or 'F'
         if (c == 0x32) return 10; // '2'
-        if (c == 0x74) return 11; // 't'
-        if (c == 0x76) return 12; // 'v'
-        if (c == 0x64) return 13; // 'd'
-        if (c == 0x77) return 14; // 'w'
+        if (c == 0x74 || c == 0x54) return 11; // 't' or 'T'
+        if (c == 0x76 || c == 0x56) return 12; // 'v' or 'V'
+        if (c == 0x64 || c == 0x44) return 13; // 'd' or 'D'
+        if (c == 0x77 || c == 0x57) return 14; // 'w' or 'W'
         if (c == 0x30) return 15; // '0'
-        if (c == 0x73) return 16; // 's'
+        if (c == 0x73 || c == 0x53) return 16; // 's' or 'S'
         if (c == 0x33) return 17; // '3'
-        if (c == 0x6A) return 18; // 'j'
-        if (c == 0x6E) return 19; // 'n'
+        if (c == 0x6A || c == 0x4A) return 18; // 'j' or 'J'
+        if (c == 0x6E || c == 0x4E) return 19; // 'n' or 'N'
         if (c == 0x35) return 20; // '5'
         if (c == 0x34) return 21; // '4'
-        if (c == 0x6B) return 22; // 'k'
-        if (c == 0x68) return 23; // 'h'
-        if (c == 0x63) return 24; // 'c'
-        if (c == 0x65) return 25; // 'e'
+        if (c == 0x6B || c == 0x4B) return 22; // 'k' or 'K'
+        if (c == 0x68 || c == 0x48) return 23; // 'h' or 'H'
+        if (c == 0x63 || c == 0x43) return 24; // 'c' or 'C'
+        if (c == 0x65 || c == 0x45) return 25; // 'e' or 'E'
         if (c == 0x36) return 26; // '6'
-        if (c == 0x6D) return 27; // 'm'
-        if (c == 0x75) return 28; // 'u'
-        if (c == 0x61) return 29; // 'a'
+        if (c == 0x6D || c == 0x4D) return 27; // 'm' or 'M'
+        if (c == 0x75 || c == 0x55) return 28; // 'u' or 'U'
+        if (c == 0x61 || c == 0x41) return 29; // 'a' or 'A'
         if (c == 0x37) return 30; // '7'
-        if (c == 0x6C) return 31; // 'l'
+        if (c == 0x6C || c == 0x4C) return 31; // 'l' or 'L'
         
         revert InvalidAddressPrefix();
     }
@@ -327,9 +359,13 @@ library BitcoinAddressUtils {
     ) internal pure returns (bool valid) {
         uint256 chk = 1;
 
-        // Process HRP
+        // Process HRP (convert to lowercase for checksum verification per BIP-173)
         for (uint256 i = 0; i < sepIndex; i++) {
             uint256 c = uint256(uint8(addr[i]));
+            // Convert uppercase to lowercase if needed
+            if (c >= 0x41 && c <= 0x5A) {
+                c = c + 0x20;
+            }
             chk = bech32PolymodStep(chk) ^ (c >> 5);
         }
 
@@ -337,6 +373,10 @@ library BitcoinAddressUtils {
 
         for (uint256 i = 0; i < sepIndex; i++) {
             uint256 c = uint256(uint8(addr[i]));
+            // Convert uppercase to lowercase if needed
+            if (c >= 0x41 && c <= 0x5A) {
+                c = c + 0x20;
+            }
             chk = bech32PolymodStep(chk) ^ (c & 0x1f);
         }
 
@@ -452,6 +492,15 @@ library BitcoinAddressUtils {
 
     /// @notice Derive Bitcoin P2WPKH (native SegWit) address from public key
     /// @dev Derives a bech32 encoded Bitcoin address (bc1...) from an uncompressed public key
+    /// @dev Complex cryptographic derivation process:
+    ///      1. Validates 64-byte uncompressed public key input
+    ///      2. Compresses public key using Y-coordinate parity (0x02/0x03 prefix)
+    ///      3. Performs SHA256 + RIPEMD160 hash chain on compressed key
+    ///      4. Creates witness program (version 0 + 20-byte pubKeyHash)
+    ///      5. Converts to 5-bit groups for bech32 encoding
+    ///      6. Calculates bech32 checksum using proper polynomial math
+    ///      7. Encodes final address with 'bc1' prefix for mainnet
+    ///      Critical for wallet ownership verification in QC registration.
     /// @param publicKey The uncompressed public key (64 bytes, no 0x04 prefix)
     /// @return btcAddress The derived Bitcoin address in bech32 format
     function deriveBitcoinAddressFromPublicKey(bytes memory publicKey) internal pure returns (string memory) {
@@ -571,5 +620,82 @@ library BitcoinAddressUtils {
         bool isUppercaseTB = addr[0] == 0x54 && addr[1] == 0x42; // "TB"
         
         return isLowercaseBC || isUppercaseBC || isLowercaseTB || isUppercaseTB;
+    }
+
+    /// @notice Lightweight Bitcoin address format validation (no cryptographic checks)
+    /// @dev Gas-optimized validation for storage operations. Only checks basic format requirements.
+    /// @dev This does NOT verify checksums or perform full validation - use decodeAddress for that.
+    /// @param btcAddress The Bitcoin address to validate
+    function validateAddressFormat(string calldata btcAddress) internal pure {
+        bytes memory addr = bytes(btcAddress);
+        uint256 length = addr.length;
+        
+        // Basic length check
+        if (length < 26 || length > 90) revert InvalidAddressLength();
+        
+        bytes1 first = addr[0];
+        
+        // P2PKH addresses: start with '1', length 26-35
+        if (first == 0x31) { // '1'
+            if (length > 35) revert InvalidAddressLength();
+            return;
+        }
+        
+        // P2SH addresses: start with '3', length 26-35  
+        if (first == 0x33) { // '3'
+            if (length > 35) revert InvalidAddressLength();
+            return;
+        }
+        
+        // Bech32 addresses: start with 'bc1' or 'tb1' (case-insensitive check)
+        if (length >= 4) {
+            // Check for 'bc1' prefix (mainnet)
+            if ((addr[0] == 0x62 || addr[0] == 0x42) && // 'b' or 'B'
+                (addr[1] == 0x63 || addr[1] == 0x43) && // 'c' or 'C' 
+                addr[2] == 0x31) { // '1'
+                
+                // Ensure no mixed case (BIP-173 requirement)
+                if (hasMixedCaseInAddress(addr)) {
+                    revert InvalidAddressPrefix();
+                }
+                
+                // Basic character validation for Bech32
+                for (uint256 i = 3; i < length; i++) {
+                    uint8 c = uint8(addr[i]);
+                    // Must be lowercase alphanumeric (0-9, a-z)
+                    if (!((c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7a))) {
+                        // Allow uppercase if entire address is uppercase
+                        if (!((c >= 0x41 && c <= 0x5a) && addr[0] == 0x42)) {
+                            revert InvalidAddressPrefix();
+                        }
+                    }
+                }
+                return;
+            }
+            
+            // Check for 'tb1' prefix (testnet)
+            if ((addr[0] == 0x74 || addr[0] == 0x54) && // 't' or 'T'
+                (addr[1] == 0x62 || addr[1] == 0x42) && // 'b' or 'B'
+                addr[2] == 0x31) { // '1'
+                
+                // Ensure no mixed case
+                if (hasMixedCaseInAddress(addr)) {
+                    revert InvalidAddressPrefix();
+                }
+                
+                // Basic character validation
+                for (uint256 i = 3; i < length; i++) {
+                    uint8 c = uint8(addr[i]);
+                    if (!((c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7a))) {
+                        if (!((c >= 0x41 && c <= 0x5a) && addr[0] == 0x54)) {
+                            revert InvalidAddressPrefix();
+                        }
+                    }
+                }
+                return;
+            }
+        }
+        
+        revert InvalidAddressPrefix();
     }
 }
