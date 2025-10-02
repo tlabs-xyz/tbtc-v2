@@ -74,8 +74,9 @@ const config: HardhatUserConfig = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 1, // Minimum runs to optimize for size
+            runs: 200, // Optimize for size with reasonable gas efficiency
           },
+          viaIR: true, // Enable intermediate representation for better optimization
         },
       },
     },
@@ -268,7 +269,7 @@ const config: HardhatUserConfig = {
   mocha: {
     timeout: 600_000, // Increased timeout for complex tests (10 minutes)
     slow: 5000, // Mark tests taking >5s as slow
-    reporter: 'spec',
+    reporter: "spec",
     // Reduce parallel execution to help with lock file conflicts
     parallel: false,
   },

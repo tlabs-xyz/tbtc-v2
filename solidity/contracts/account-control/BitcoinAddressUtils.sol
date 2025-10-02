@@ -24,6 +24,16 @@ library BitcoinAddressUtils {
     // Bech32 constants
     bytes private constant BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
     uint256 private constant BECH32_GENERATOR = 0x3b6a57b2;
+    uint256 private constant BECH32_POLY_2 = 0x26508e6d;
+    uint256 private constant BECH32_POLY_4 = 0x1ea119fa;
+    uint256 private constant BECH32_POLY_8 = 0x3d4233dd;
+    uint256 private constant BECH32_POLY_16 = 0x2a1462b3;
+    
+    // Character constants
+    bytes1 private constant SEPARATOR_CHAR = 0x31; // '1'
+    
+    // Bech32 network prefixes  
+    string private constant MAINNET_HRP = "bc";
 
     /// @notice Decode a Bitcoin address to its script representation
     /// @param btcAddress The Bitcoin address as a string
@@ -106,8 +116,7 @@ library BitcoinAddressUtils {
         // Find separator
         uint256 sepIndex = 0;
         for (uint256 i = 0; i < addr.length; i++) {
-            if (addr[i] == 0x31) {
-                // '1'
+            if (addr[i] == SEPARATOR_CHAR) {
                 sepIndex = i;
                 break;
             }
@@ -163,41 +172,70 @@ library BitcoinAddressUtils {
         pure
         returns (bytes memory decoded)
     {
-        uint256 result = 0;
-        uint256 multi = 1;
-
-        // Process from right to left
-        for (int256 i = int256(source.length) - 1; i >= 0; i--) {
-            uint256 digit = base58CharToValue(source[uint256(i)]);
-            result += digit * multi;
-            multi *= 58;
+        if (source.length == 0) {
+            return new bytes(0);
         }
-
-        // Convert to bytes
-        bytes memory temp = new bytes(32);
-        uint256 len = 0;
-        while (result > 0) {
-            temp[len++] = bytes1(uint8(result % 256));
-            result /= 256;
-        }
-
-        // Count leading zeros in source
-        uint256 leadingZeros = 0;
+        
+        // Count leading '1's which represent leading zeros
+        uint256 leadingOnes = 0;
         for (uint256 i = 0; i < source.length && source[i] == 0x31; i++) {
-            leadingZeros++;
+            leadingOnes++;
         }
-
-        // Build final result with correct length
-        decoded = new bytes(leadingZeros + len);
-
-        // Add leading zeros
-        for (uint256 i = 0; i < leadingZeros; i++) {
+        
+        // If all characters are '1', return that many zero bytes
+        if (leadingOnes == source.length) {
+            return new bytes(leadingOnes);
+        }
+        
+        // Use fixed size for Bitcoin addresses to avoid overflow
+        // Bitcoin addresses decode to at most 25 bytes (1 version + 20 hash + 4 checksum)
+        // Use 32 bytes to be safe for any base58 decoding
+        uint256 WORK_SIZE = 32;
+        bytes memory num = new bytes(WORK_SIZE);
+        
+        // Process each character
+        for (uint256 i = leadingOnes; i < source.length; i++) {
+            uint256 carry = base58CharToValue(source[i]);
+            
+            // Big integer multiply by 58 and add carry
+            for (uint256 j = 0; j < WORK_SIZE; j++) {
+                uint256 idx = WORK_SIZE - 1 - j;
+                carry += 58 * uint256(uint8(num[idx]));
+                num[idx] = bytes1(uint8(carry % 256));
+                carry /= 256;
+            }
+            
+            if (carry != 0) revert InvalidAddressLength();
+        }
+        
+        // Find first non-zero byte
+        uint256 firstNonZero = WORK_SIZE;
+        for (uint256 i = 0; i < WORK_SIZE; i++) {
+            if (num[i] != 0) {
+                firstNonZero = i;
+                break;
+            }
+        }
+        
+        // If no non-zero bytes found, but we have non-leading-one characters, it's an error
+        if (firstNonZero == WORK_SIZE && leadingOnes < source.length) {
+            revert InvalidAddressLength();
+        }
+        
+        // Calculate result size
+        uint256 significantBytes = firstNonZero == WORK_SIZE ? 0 : WORK_SIZE - firstNonZero;
+        uint256 totalSize = leadingOnes + significantBytes;
+        
+        decoded = new bytes(totalSize);
+        
+        // Copy leading zeros
+        for (uint256 i = 0; i < leadingOnes; i++) {
             decoded[i] = 0x00;
         }
-
-        // Add decoded bytes in reverse order
-        for (uint256 i = 0; i < len; i++) {
-            decoded[leadingZeros + i] = temp[len - 1 - i];
+        
+        // Copy significant bytes
+        for (uint256 i = 0; i < significantBytes; i++) {
+            decoded[leadingOnes + i] = num[firstNonZero + i];
         }
     }
 
@@ -209,11 +247,23 @@ library BitcoinAddressUtils {
         pure
         returns (uint256 value)
     {
-        for (uint256 i = 0; i < 58; i++) {
-            if (BASE58_ALPHABET[i] == char) {
-                return i;
-            }
+        uint8 c = uint8(char);
+        
+        // Base58 character mapping optimized for gas
+        if (c >= 0x31 && c <= 0x39) { // '1' to '9'
+            return c - 0x31; // 0-8
+        } else if (c >= 0x41 && c <= 0x48) { // 'A' to 'H'
+            return c - 0x41 + 9; // 9-16
+        } else if (c >= 0x4A && c <= 0x4E) { // 'J' to 'N'
+            return c - 0x4A + 17; // 17-21
+        } else if (c >= 0x50 && c <= 0x5A) { // 'P' to 'Z'
+            return c - 0x50 + 22; // 22-32
+        } else if (c >= 0x61 && c <= 0x6B) { // 'a' to 'k'
+            return c - 0x61 + 33; // 33-43
+        } else if (c >= 0x6D && c <= 0x7A) { // 'm' to 'z'
+            return c - 0x6D + 44; // 44-57
         }
+        
         revert InvalidAddressPrefix();
     }
 
@@ -225,11 +275,43 @@ library BitcoinAddressUtils {
         pure
         returns (uint256 value)
     {
-        for (uint256 i = 0; i < 32; i++) {
-            if (BECH32_CHARSET[i] == char) {
-                return i;
-            }
-        }
+        uint8 c = uint8(char);
+        
+        // Bech32 character mapping optimized for gas
+        // Charset: "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+        if (c == 0x71) return 0;  // 'q'
+        if (c == 0x70) return 1;  // 'p'
+        if (c == 0x7A) return 2;  // 'z'
+        if (c == 0x72) return 3;  // 'r'
+        if (c == 0x79) return 4;  // 'y'
+        if (c == 0x39) return 5;  // '9'
+        if (c == 0x78) return 6;  // 'x'
+        if (c == 0x38) return 7;  // '8'
+        if (c == 0x67) return 8;  // 'g'
+        if (c == 0x66) return 9;  // 'f'
+        if (c == 0x32) return 10; // '2'
+        if (c == 0x74) return 11; // 't'
+        if (c == 0x76) return 12; // 'v'
+        if (c == 0x64) return 13; // 'd'
+        if (c == 0x77) return 14; // 'w'
+        if (c == 0x30) return 15; // '0'
+        if (c == 0x73) return 16; // 's'
+        if (c == 0x33) return 17; // '3'
+        if (c == 0x6A) return 18; // 'j'
+        if (c == 0x6E) return 19; // 'n'
+        if (c == 0x35) return 20; // '5'
+        if (c == 0x34) return 21; // '4'
+        if (c == 0x6B) return 22; // 'k'
+        if (c == 0x68) return 23; // 'h'
+        if (c == 0x63) return 24; // 'c'
+        if (c == 0x65) return 25; // 'e'
+        if (c == 0x36) return 26; // '6'
+        if (c == 0x6D) return 27; // 'm'
+        if (c == 0x75) return 28; // 'u'
+        if (c == 0x61) return 29; // 'a'
+        if (c == 0x37) return 30; // '7'
+        if (c == 0x6C) return 31; // 'l'
+        
         revert InvalidAddressPrefix();
     }
 
@@ -273,11 +355,11 @@ library BitcoinAddressUtils {
         uint256 b = pre >> 25;
         return
             ((pre & 0x1ffffff) << 5) ^
-            (b & 1 != 0 ? 0x3b6a57b2 : 0) ^
-            (b & 2 != 0 ? 0x26508e6d : 0) ^
-            (b & 4 != 0 ? 0x1ea119fa : 0) ^
-            (b & 8 != 0 ? 0x3d4233dd : 0) ^
-            (b & 16 != 0 ? 0x2a1462b3 : 0);
+            (b & 1 != 0 ? BECH32_GENERATOR : 0) ^
+            (b & 2 != 0 ? BECH32_POLY_2 : 0) ^
+            (b & 4 != 0 ? BECH32_POLY_4 : 0) ^
+            (b & 8 != 0 ? BECH32_POLY_8 : 0) ^
+            (b & 16 != 0 ? BECH32_POLY_16 : 0);
     }
 
     /// @notice Check if address is a valid Bech32 format
@@ -286,26 +368,9 @@ library BitcoinAddressUtils {
     function isBech32Address(bytes memory addr) internal pure returns (bool) {
         if (addr.length < 4) return false;
         
-        // Check for mainnet prefixes: "bc1" or "BC1"
-        if (addr.length >= 3 && addr[2] == 0x31) { // ends with '1'
-            bool isLowercaseBC = addr[0] == 0x62 && addr[1] == 0x63; // "bc"
-            bool isUppercaseBC = addr[0] == 0x42 && addr[1] == 0x43; // "BC"
-            
-            if (isLowercaseBC || isUppercaseBC) {
-                // Verify no mixed case in the prefix and reject mixed-case per BIP-173
-                return !hasMixedCaseInAddress(addr);
-            }
-        }
-        
-        // Check for testnet prefixes: "tb1" or "TB1"
-        if (addr.length >= 3 && addr[2] == 0x31) { // ends with '1'
-            bool isLowercaseTB = addr[0] == 0x74 && addr[1] == 0x62; // "tb"
-            bool isUppercaseTB = addr[0] == 0x54 && addr[1] == 0x42; // "TB"
-            
-            if (isLowercaseTB || isUppercaseTB) {
-                // Verify no mixed case in the prefix and reject mixed-case per BIP-173
-                return !hasMixedCaseInAddress(addr);
-            }
+        // Check for Bech32 prefixes (bc1/BC1/tb1/TB1)
+        if (addr.length >= 3 && addr[2] == SEPARATOR_CHAR) {
+            return isBech32Prefix(addr) && !hasMixedCaseInAddress(addr);
         }
         
         return false;
@@ -355,6 +420,8 @@ library BitcoinAddressUtils {
         uint256 toBits,
         bool pad
     ) internal pure returns (bytes memory output) {
+        if (start >= end) return output; // Return empty bytes for empty input
+        
         uint256 acc = 0;
         uint256 bits = 0;
         uint256 maxv = (1 << toBits) - 1;
@@ -381,5 +448,128 @@ library BitcoinAddressUtils {
         for (uint256 i = 0; i < length; i++) {
             output[i] = result[i];
         }
+    }
+
+    /// @notice Derive Bitcoin P2WPKH (native SegWit) address from public key
+    /// @dev Derives a bech32 encoded Bitcoin address (bc1...) from an uncompressed public key
+    /// @param publicKey The uncompressed public key (64 bytes, no 0x04 prefix)
+    /// @return btcAddress The derived Bitcoin address in bech32 format
+    function deriveBitcoinAddressFromPublicKey(bytes memory publicKey) internal pure returns (string memory) {
+        if (publicKey.length != 64) revert InvalidAddressLength();
+        
+        // Step 1: Compress the public key
+        // Take the X coordinate (first 32 bytes)
+        bytes memory compressed = new bytes(33);
+        // Determine prefix based on Y coordinate parity
+        // Y coordinate is the last 32 bytes of the public key
+        bytes32 yCoordBytes;
+        for (uint i = 0; i < 32; i++) {
+            yCoordBytes |= bytes32(uint256(uint8(publicKey[32 + i]))) << ((31 - i) * 8);
+        }
+        uint256 yCoord = uint256(yCoordBytes);
+        compressed[0] = (yCoord % 2 == 0) ? bytes1(0x02) : bytes1(0x03);
+        // Copy X coordinate
+        for (uint i = 0; i < 32; i++) {
+            compressed[i + 1] = publicKey[i];
+        }
+        
+        // Step 2: Hash the compressed public key
+        bytes20 pubKeyHash = ripemd160(abi.encodePacked(sha256(compressed)));
+        
+        // Step 3: Witness program is implicitly version 0 with 20 bytes pubKeyHash
+        
+        // Step 4: Convert to 5-bit groups for bech32
+        // Need 33 entries: 1 witness version + 32 payload groups (20 bytes * 8 bits / 5 bits = 32)
+        uint256[] memory values = new uint256[](39); // Extra space for checksum calculation
+        values[0] = 0; // witness version
+        
+        // Convert 20 bytes to 5-bit groups
+        uint256 accumulator = 0;
+        uint256 bits = 0;
+        uint256 idx = 1;
+        
+        for (uint256 i = 0; i < 20; i++) {
+            uint8 b = uint8(pubKeyHash[i]);
+            accumulator = (accumulator << 8) | b;
+            bits += 8;
+            
+            while (bits >= 5) {
+                bits -= 5;
+                values[idx++] = (accumulator >> bits) & 0x1f;
+            }
+        }
+        if (bits > 0) {
+            values[idx++] = (accumulator << (5 - bits)) & 0x1f;
+        }
+        
+        // Step 5: Calculate bech32 checksum
+        uint256 checksum = bech32ChecksumForDerivation(MAINNET_HRP, values, idx);
+        
+        // Append checksum (6 characters) - extract in correct order
+        for (uint256 i = 0; i < 6; i++) {
+            values[idx++] = (checksum >> (5 * (5 - i))) & 0x1f;
+        }
+        
+        // Step 6: Encode as bech32
+        bytes memory result = "bc1";
+        
+        for (uint256 i = 0; i < idx; i++) {
+            result = abi.encodePacked(result, BECH32_CHARSET[values[i]]);
+        }
+        
+        return string(result);
+    }
+
+    /// @notice Calculate bech32 checksum for address derivation (internal helper)
+    /// @param hrp Human readable part (e.g., "bc")
+    /// @param data The data part in 5-bit groups
+    /// @param dataLen Length of data array to process
+    /// @return checksum The 30-bit checksum
+    function bech32ChecksumForDerivation(string memory hrp, uint256[] memory data, uint256 dataLen) internal pure returns (uint256) {
+        uint256 chk = 1;
+        
+        // Process HRP
+        bytes memory hrpBytes = bytes(hrp);
+        for (uint256 i = 0; i < hrpBytes.length; i++) {
+            chk = bech32PolymodStep(chk) ^ (uint256(uint8(hrpBytes[i])) >> 5);
+        }
+        chk = bech32PolymodStep(chk);
+        
+        for (uint256 i = 0; i < hrpBytes.length; i++) {
+            chk = bech32PolymodStep(chk) ^ (uint256(uint8(hrpBytes[i])) & 0x1f);
+        }
+        
+        // Process data
+        for (uint256 i = 0; i < dataLen; i++) {
+            chk = bech32PolymodStep(chk) ^ data[i];
+        }
+        
+        // Process 6 zeros for checksum
+        for (uint256 i = 0; i < 6; i++) {
+            chk = bech32PolymodStep(chk);
+        }
+        
+        return chk ^ 1;
+    }
+
+    /// @notice Check if address has a valid Bech32 prefix
+    /// @param addr The address bytes to check
+    /// @return True if valid Bech32 prefix (bc1/BC1/tb1/TB1)
+    function isBech32Prefix(bytes memory addr) internal pure returns (bool) {
+        // Need at least 3 characters for a valid prefix (e.g., "bc1")
+        if (addr.length < 3) return false;
+        
+        // Third character must be '1' (separator)
+        if (addr[2] != 0x31) return false;
+        
+        // Check for mainnet prefixes: "bc" or "BC"
+        bool isLowercaseBC = addr[0] == 0x62 && addr[1] == 0x63; // "bc"
+        bool isUppercaseBC = addr[0] == 0x42 && addr[1] == 0x43; // "BC"
+        
+        // Check for testnet prefixes: "tb" or "TB"
+        bool isLowercaseTB = addr[0] == 0x74 && addr[1] == 0x62; // "tb"
+        bool isUppercaseTB = addr[0] == 0x54 && addr[1] == 0x42; // "TB"
+        
+        return isLowercaseBC || isUppercaseBC || isLowercaseTB || isUppercaseTB;
     }
 }
