@@ -22,6 +22,13 @@ describe("QCRedeemer Integration Tests", () => {
       await fixture.qcData.registerQC(qcAddress.address, constants.LARGE_CAP)
       const qcWalletAddress = constants.VALID_LEGACY_BTC
       await fixture.qcData.registerWallet(qcAddress.address, qcWalletAddress)
+      await fixture.qcData.activateWallet(qcWalletAddress)
+
+      // Setup minted balance for the QC in MockAccountControl
+      await fixture.mockAccountControl.setMintedForTesting(
+        qcAddress.address,
+        ethers.utils.parseUnits("1000", 8) // 1000 BTC in satoshis
+      )
 
       // Mint some tBTC for the user
       await fixture.tbtc.mint(user.address, ethers.utils.parseEther("10"))
@@ -114,6 +121,7 @@ describe("QCRedeemer Integration Tests", () => {
       const qcWalletAddress = constants.VALID_LEGACY_BTC
       await fixture.qcData.registerQC(qcAddress.address, constants.LARGE_CAP)
       await fixture.qcData.registerWallet(qcAddress.address, qcWalletAddress)
+      await fixture.qcData.activateWallet(qcWalletAddress)
 
       // Mint tBTC for user
       const amount = ethers.BigNumber.from(constants.SMALL_MINT).mul(
@@ -144,6 +152,7 @@ describe("QCRedeemer Integration Tests", () => {
       const qcWalletAddress = constants.VALID_LEGACY_BTC
       await fixture.qcData.registerQC(qcAddress.address, constants.LARGE_CAP)
       await fixture.qcData.registerWallet(qcAddress.address, qcWalletAddress)
+      await fixture.qcData.activateWallet(qcWalletAddress)
 
       // Mint tBTC for user
       const belowMinAmount = ethers.BigNumber.from(constants.MIN_MINT - 1).mul(
@@ -297,6 +306,7 @@ describe("QCRedeemer Integration Tests", () => {
       const qcWalletAddress = constants.VALID_LEGACY_BTC
       await fixture.qcData.registerQC(qcAddress.address, constants.LARGE_CAP)
       await fixture.qcData.registerWallet(qcAddress.address, qcWalletAddress)
+      await fixture.qcData.activateWallet(qcWalletAddress)
 
       // Mint tBTC for user
       const amount = ethers.BigNumber.from(constants.SMALL_MINT).mul(
@@ -389,6 +399,7 @@ describe("QCRedeemer Integration Tests", () => {
       const qcWalletAddress = constants.VALID_LEGACY_BTC
       await fixture.qcData.registerQC(qcAddress.address, constants.LARGE_CAP)
       await fixture.qcData.registerWallet(qcAddress.address, qcWalletAddress)
+      await fixture.qcData.activateWallet(qcWalletAddress)
 
       // Mint tBTC for user
       await fixture.tbtc.mint(user.address, ethers.utils.parseEther("10"))
@@ -423,6 +434,18 @@ describe("QCRedeemer Integration Tests", () => {
     it("should complete full redemption lifecycle with multiple participants", async () => {
       const fixture = await loadFixture(deployQCRedeemerFixture)
       const { qcRedeemer, watchdog, user, user2, qcAddress } = fixture
+
+      // Setup QC and wallet
+      await fixture.qcData.registerQC(qcAddress.address, TEST_CONSTANTS.LARGE_CAP)
+      const qcWalletAddress = TEST_CONSTANTS.VALID_LEGACY_BTC
+      await fixture.qcData.registerWallet(qcAddress.address, qcWalletAddress)
+      await fixture.qcData.activateWallet(qcWalletAddress)
+      
+      // Setup minted balance for the QC
+      await fixture.mockAccountControl.setMintedForTesting(
+        qcAddress.address,
+        ethers.utils.parseUnits("1000", 8) // 1000 BTC
+      )
 
       // Setup multiple users with different amounts
       const amounts = [
@@ -624,6 +647,9 @@ describe("QCRedeemer Integration Tests", () => {
       const fixture = await loadFixture(deployQCRedeemerFixture)
       const { qcRedeemer, user, user2, qcAddress, watchdog } = fixture
 
+      // Setup first QC
+      await fixture.qcData.registerQC(qcAddress.address, TEST_CONSTANTS.LARGE_CAP)
+      
       // Setup second QC
       const qc2Address = fixture.governance.address
       await fixture.qcData.registerQC(qc2Address, TEST_CONSTANTS.LARGE_CAP)
@@ -632,7 +658,20 @@ describe("QCRedeemer Integration Tests", () => {
       const wallet1 = TEST_CONSTANTS.VALID_LEGACY_BTC
       const wallet2 = "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"
 
+      await fixture.qcData.registerWallet(qcAddress.address, wallet1)
+      await fixture.qcData.activateWallet(wallet1)
       await fixture.qcData.registerWallet(qc2Address, wallet2)
+      await fixture.qcData.activateWallet(wallet2)
+      
+      // Setup minted balances for both QCs
+      await fixture.mockAccountControl.setMintedForTesting(
+        qcAddress.address,
+        ethers.utils.parseUnits("1000", 8)
+      )
+      await fixture.mockAccountControl.setMintedForTesting(
+        qc2Address,
+        ethers.utils.parseUnits("1000", 8)
+      )
 
       // Setup users with tBTC
       const amount = ethers.BigNumber.from(TEST_CONSTANTS.MEDIUM_MINT).mul(

@@ -212,6 +212,8 @@ export async function deployQCRedeemerFixture() {
     watchdog.address
   )
   await qcData.grantRole(TEST_CONSTANTS.ROLES.QC_MANAGER, qcRedeemer.address)
+  // Grant QC_MANAGER role to deployer for test setup
+  await qcData.grantRole(TEST_CONSTANTS.ROLES.QC_MANAGER, deployer.address)
 
   // Set reasonable defaults for testing
   await mockAccountControl.setTotalMintedForTesting(
