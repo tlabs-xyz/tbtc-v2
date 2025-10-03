@@ -12,7 +12,7 @@ import {
   IQCPauseManager,
   IQCWalletManager,
 } from "../../../typechain"
-import { deployQCManagerFixture } from "../fixtures/account-control-fixtures"
+import { deployQCManagerFixture } from "../../fixtures"
 
 /**
  * Transaction Atomicity Integration Tests

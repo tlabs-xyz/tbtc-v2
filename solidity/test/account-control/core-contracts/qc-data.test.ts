@@ -2,26 +2,26 @@ import { expect } from "chai"
 import { ethers } from "hardhat"
 import { QCData } from "../../../typechain"
 import {
-  setupTestSigners,
+  setupAccountControlTestSigners,
   createBaseTestEnvironment,
   restoreBaseTestEnvironment,
-  TestSigners,
-} from "../fixtures/base-setup"
-import { BITCOIN_ADDRESSES } from "../fixtures/test-data"
+  AccountControlTestSigners,
+} from "../../fixtures"
+import { BTC_ADDRESSES } from "../fixtures"
 
 describe("QCData", () => {
-  let signers: TestSigners
+  let signers: AccountControlTestSigners
   let qcData: QCData
   let qcManager: any
 
   // Test data - use valid Bitcoin addresses from test-data
-  const testBtcAddress = BITCOIN_ADDRESSES.VALID_BECH32_BTC
-  const testBtcAddress2 = BITCOIN_ADDRESSES.VALID_P2WSH_BTC
+  const testBtcAddress = BTC_ADDRESSES.VALID_BECH32_BTC
+  const testBtcAddress2 = BTC_ADDRESSES.VALID_P2WSH_BTC
   const testReason = ethers.utils.id("TEST_REASON")
   const mintedAmount = ethers.utils.parseEther("5")
 
   before(async () => {
-    signers = await setupTestSigners()
+    signers = await setupAccountControlTestSigners()
 
     // Setup qcManager as a separate signer (use deployer for this)
     qcManager = signers.deployer

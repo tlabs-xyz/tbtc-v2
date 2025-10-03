@@ -5,7 +5,7 @@ import {
   deployQCRedeemerFixture,
   createTestRedemption,
   TEST_CONSTANTS,
-} from "../fixtures/account-control-fixtures"
+} from "../../fixtures"
 import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot

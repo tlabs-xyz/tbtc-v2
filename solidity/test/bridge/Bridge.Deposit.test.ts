@@ -20,7 +20,7 @@ import type {
   DepositRevealInfoStruct,
   InfoStruct as BitcoinTxInfoStruct,
 } from "../../typechain/Bridge"
-import bridgeFixture from "../fixtures/bridge"
+import bridgeFixture from "../fixtures"
 import { constants, walletState } from "../fixtures"
 import {
   DepositSweepTestData,

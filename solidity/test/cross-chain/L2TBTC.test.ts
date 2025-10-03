@@ -3,7 +3,7 @@ import { randomBytes } from "crypto"
 import { ethers, getUnnamedAccounts, helpers, waffle } from "hardhat"
 import { expect } from "chai"
 import { ContractTransaction, Wallet } from "ethers"
-import { to1e18 } from "../helpers/contract-test-helpers"
+import { to1e18 } from "../helpers/math-utils"
 
 import type { L2TBTC, TestERC20, TestERC721 } from "../../typechain"
 

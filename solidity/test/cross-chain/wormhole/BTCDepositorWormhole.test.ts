@@ -14,7 +14,7 @@ import {
   ReimbursementPool,
   TestERC20,
 } from "../../../typechain"
-import { to1ePrecision } from "../../helpers/contract-test-helpers"
+import { to1ePrecision } from "../../helpers/math-utils"
 import { initializeDepositFixture } from "./L1BTCDepositorWormhole.test"
 
 chai.use(smock.matchers)

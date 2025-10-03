@@ -1,6 +1,10 @@
 import { FakeContract, smock } from "@defi-wonderland/smock"
-import type { BigNumber } from "ethers"
+import { ethers } from "hardhat"
+import type { BigNumber, BytesLike, BigNumberish } from "ethers"
 import type { IRelay, IRandomBeacon, ReserveOracle } from "../../typechain"
+
+// Import constants from the centralized location
+import { BLOCKCHAIN, BTC_ADDRESSES } from "./constants"
 
 export interface MockConfiguration {
   relay?: {
@@ -17,11 +21,14 @@ export interface MockConfiguration {
   }
 }
 
+/**
+ * Unified mock factory that provides both FakeContract and plain mock object patterns
+ */
 export class TestMockFactory {
   private mocks: Map<string, FakeContract<any>> = new Map()
 
   /**
-   * Create a mock IRelay contract
+   * Create a mock IRelay contract using smock
    */
   async createMockRelay(
     config?: MockConfiguration["relay"]
@@ -30,10 +37,10 @@ export class TestMockFactory {
 
     // Set default behaviors
     mockRelay.getCurrentEpochDifficulty.returns(
-      config?.currentEpochDifficulty || 1000000
+      config?.currentEpochDifficulty || BLOCKCHAIN.DEFAULT_DIFFICULTY
     )
     mockRelay.getPrevEpochDifficulty.returns(
-      config?.prevEpochDifficulty || 1000000
+      config?.prevEpochDifficulty || BLOCKCHAIN.DEFAULT_DIFFICULTY
     )
 
     this.mocks.set("relay", mockRelay)
@@ -41,7 +48,26 @@ export class TestMockFactory {
   }
 
   /**
-   * Create a mock IRandomBeacon contract
+   * Create a plain mock relay object (for tests not using smock)
+   */
+  createPlainMockRelay(
+    difficulty: number = BLOCKCHAIN.DEFAULT_DIFFICULTY
+  ) {
+    return {
+      getCurrentEpochDifficulty: () => difficulty,
+      getPrevEpochDifficulty: () => difficulty,
+      getBlockDifficulty: () => difficulty,
+      getCurrentAndPrevEpochDifficulty: () => [difficulty, difficulty],
+      getEpochDifficulty: () => difficulty,
+      ready: () => true,
+      setCurrentEpochDifficulty: () => Promise.resolve(),
+      setPrevEpochDifficulty: () => Promise.resolve(),
+      setReady: () => Promise.resolve(),
+    }
+  }
+
+  /**
+   * Create a mock IRandomBeacon contract using smock
    */
   async createMockRandomBeacon(
     config?: MockConfiguration["randomBeacon"]
@@ -53,6 +79,77 @@ export class TestMockFactory {
 
     this.mocks.set("randomBeacon", mockRandomBeacon)
     return mockRandomBeacon
+  }
+
+  /**
+   * Create a mock transaction receipt (plain object)
+   */
+  createMockTransactionReceipt(
+    overrides: Partial<{
+      gasUsed: BigNumberish
+      status: number
+      blockNumber: number
+    }> = {}
+  ) {
+    const receipt = {
+      gasUsed: ethers.BigNumber.from(overrides.gasUsed ?? 100000),
+      status: overrides.status ?? 1,
+      blockNumber: overrides.blockNumber ?? BLOCKCHAIN.TEST_BLOCK_HEIGHT,
+      wait: () => Promise.resolve(receipt),
+    }
+    return receipt
+  }
+
+  /**
+   * Create a plain mock contract with common patterns
+   */
+  createMockContract(methods: Record<string, any> = {}) {
+    const defaultMethods = {
+      connect: function() { return this },
+      deployed: () => Promise.resolve(this),
+      interface: {
+        encodeFunctionData: () => "0x",
+        decodeFunctionResult: () => [],
+      },
+    }
+
+    return {
+      ...defaultMethods,
+      ...methods,
+    }
+  }
+
+  /**
+   * Create a mock signer with standard properties
+   */
+  createMockSigner(address?: string) {
+    const signerAddress = address ?? ethers.Wallet.createRandom().address
+    return {
+      address: signerAddress,
+      getAddress: async () => signerAddress,
+      signMessage: async () => "0x",
+      connect: function() { return this },
+    }
+  }
+
+  /**
+   * Create mock Bitcoin transaction data
+   */
+  createMockBitcoinTx(
+    overrides: Partial<{
+      version: BytesLike
+      inputVector: BytesLike
+      outputVector: BytesLike
+      locktime: BytesLike
+    }> = {}
+  ) {
+    return {
+      version: overrides.version ?? "0x01000000",
+      inputVector:
+        overrides.inputVector ?? `0x01${"00".repeat(36)}00${"00".repeat(4)}`,
+      outputVector: overrides.outputVector ?? `0x01${"00".repeat(8)}00`,
+      locktime: overrides.locktime ?? "0x00000000",
+    }
   }
 
   /**
@@ -166,10 +263,26 @@ export class TestMockFactory {
   applyStandardIntegrationBehavior(): void {
     const relay = this.getMock<IRelay>("relay")
     if (relay) {
-      relay.getCurrentEpochDifficulty.returns(1000000)
-      relay.getPrevEpochDifficulty.returns(1000000)
+      relay.getCurrentEpochDifficulty.returns(BLOCKCHAIN.DEFAULT_DIFFICULTY)
+      relay.getPrevEpochDifficulty.returns(BLOCKCHAIN.DEFAULT_DIFFICULTY)
     }
 
     // Add other standard behaviors as needed
   }
 }
+
+// Export convenience functions for backward compatibility
+export const createMockRelay = (difficulty?: number) => 
+  new TestMockFactory().createPlainMockRelay(difficulty)
+
+export const createMockTransactionReceipt = (overrides?: any) =>
+  new TestMockFactory().createMockTransactionReceipt(overrides)
+
+export const createMockContract = (methods?: Record<string, any>) =>
+  new TestMockFactory().createMockContract(methods)
+
+export const createMockSigner = (address?: string) =>
+  new TestMockFactory().createMockSigner(address)
+
+export const createMockBitcoinTx = (overrides?: any) =>
+  new TestMockFactory().createMockBitcoinTx(overrides)

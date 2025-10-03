@@ -1,15 +1,17 @@
 import { ethers } from "hardhat"
 import type { BigNumber } from "ethers"
 import {
-  ROLE_CONSTANTS,
-  BITCOIN_ADDRESSES,
-  ETHEREUM_ADDRESSES,
-  AMOUNT_CONSTANTS,
-  TIMING_CONSTANTS,
   SPV_CONSTANTS,
   createMockBitcoinTxInfo,
   createMockBitcoinTxProof,
 } from "./test-data"
+import {
+  ROLES as ROLE_CONSTANTS,
+  BTC_ADDRESSES as BITCOIN_ADDRESSES,
+  ETH_ADDRESSES as ETHEREUM_ADDRESSES,
+  AMOUNTS as AMOUNT_CONSTANTS,
+  TIMEOUTS as TIMING_CONSTANTS,
+} from "../../fixtures/constants"
 
 /**
  * Advanced factory functions for creating complex test scenarios

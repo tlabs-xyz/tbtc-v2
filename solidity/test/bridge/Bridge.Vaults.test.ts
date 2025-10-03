@@ -2,7 +2,7 @@ import { expect } from "chai"
 import { ContractTransaction } from "ethers"
 import { helpers, waffle } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import bridgeFixture from "../fixtures/bridge"
+import bridgeFixture from "../fixtures"
 import type { Bridge, BridgeStub, BridgeGovernance } from "../../typechain"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot

@@ -3,13 +3,13 @@ import { ethers, helpers } from "hardhat"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { QCPauseManager, QCData, IQCManager } from "../../../typechain"
-import { setupTestSigners, type TestSigners } from "../fixtures/base-setup"
-import { TEST_CONSTANTS } from "../fixtures/account-control-fixtures"
+import { setupAccountControlTestSigners, type AccountControlTestSigners } from "../../fixtures"
+import { TEST_CONSTANTS } from "../../fixtures"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
 describe("QCPauseManager", () => {
-  let signers: TestSigners
+  let signers: AccountControlTestSigners
   let qcPauseManager: QCPauseManager
   let qcData: QCData
   let mockQCManager: FakeContract<IQCManager>
@@ -20,7 +20,7 @@ describe("QCPauseManager", () => {
   const MIN_REDEMPTION_BUFFER = 8 * 60 * 60 // 8 hours
 
   before(async () => {
-    signers = await setupTestSigners()
+    signers = await setupAccountControlTestSigners()
   })
 
   beforeEach(async () => {

@@ -8,8 +8,8 @@ import {
   to1e18,
   to1ePrecision,
   getBlockTime,
-} from "../helpers/contract-test-helpers"
-import bridgeFixture from "../fixtures/bridge"
+} from "../helpers/math-utils"
+import bridgeFixture from "../fixtures"
 
 const ZERO_ADDRESS = ethers.constants.AddressZero
 

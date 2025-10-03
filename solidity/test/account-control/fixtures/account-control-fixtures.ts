@@ -1,15 +1,13 @@
 import { ethers } from "hardhat"
 import { BigNumber } from "ethers"
 import { LibraryLinkingHelper } from "../helpers/library-linking-helper"
-import { ROLES, BTC_ADDRESSES } from "./constants"
+import { ROLES, BTC_ADDRESSES } from "../../fixtures/constants"
 
 /**
- * Common test constants for QC Manager fixtures
- * @deprecated Use centralized constants from ./constants.ts instead
- * This file maintains backward compatibility for existing fixture users
+ * Bitcoin amounts in satoshis for QC testing
+ * These are specific to account control tests and use Bitcoin units
  */
-export const TEST_CONSTANTS = {
-  // Amounts in satoshis (Bitcoin units)
+const BTC_AMOUNTS = {
   MIN_MINT: 10000, // 0.0001 BTC
   SMALL_MINT: 500000, // 0.005 BTC
   MEDIUM_MINT: 1000000, // 0.01 BTC
@@ -18,24 +16,7 @@ export const TEST_CONSTANTS = {
   MEDIUM_CAP: 10000000, // 0.1 BTC
   LARGE_CAP: 100000000, // 1 BTC
   MAX_CAP: ethers.utils.parseUnits("100", 8), // 100 BTC
-
-  // Bitcoin addresses (using centralized constants)
-  VALID_LEGACY_BTC: BTC_ADDRESSES.GENESIS_BLOCK,
-  VALID_P2SH_BTC: BTC_ADDRESSES.P2SH_STANDARD,
-  VALID_BECH32_BTC: BTC_ADDRESSES.BECH32_STANDARD,
-
-  // Role hashes (using centralized constants)
-  ROLES: {
-    DEFAULT_ADMIN: ROLES.DEFAULT_ADMIN,
-    GOVERNANCE: ROLES.GOVERNANCE,
-    REGISTRAR: ROLES.REGISTRAR,
-    DISPUTE_ARBITER: ROLES.DISPUTE_ARBITER,
-    ENFORCEMENT: ROLES.ENFORCEMENT,
-    MONITOR: ROLES.MONITOR,
-    EMERGENCY: ROLES.EMERGENCY,
-    QC_MANAGER: ROLES.QC_MANAGER,
-  },
-}
+} as const
 
 /**
  * Fixture for QCManager with minimal real contracts
@@ -121,22 +102,22 @@ export async function deployQCManagerFixture() {
   await qcManager.setAccountControl(accountControl.address)
 
   // Setup basic roles
-  await qcData.grantRole(TEST_CONSTANTS.ROLES.QC_MANAGER, qcManager.address)
+  await qcData.grantRole(ROLES.QC_MANAGER, qcManager.address)
   await systemState.grantRole(
-    TEST_CONSTANTS.ROLES.QC_MANAGER,
+    ROLES.QC_MANAGER,
     qcManager.address
   )
-  await qcManager.grantRole(TEST_CONSTANTS.ROLES.GOVERNANCE, governance.address)
-  await qcManager.grantRole(TEST_CONSTANTS.ROLES.REGISTRAR, registrar.address)
+  await qcManager.grantRole(ROLES.GOVERNANCE, governance.address)
+  await qcManager.grantRole(ROLES.REGISTRAR, registrar.address)
   await qcManager.grantRole(
-    TEST_CONSTANTS.ROLES.DISPUTE_ARBITER,
+    ROLES.DISPUTE_ARBITER,
     arbiter.address
   )
   await qcManager.grantRole(
-    TEST_CONSTANTS.ROLES.DISPUTE_ARBITER,
+    ROLES.DISPUTE_ARBITER,
     governance.address
   ) // Allow governance to set status in tests
-  await qcManager.grantRole(TEST_CONSTANTS.ROLES.ENFORCEMENT, watchdog.address)
+  await qcManager.grantRole(ROLES.ENFORCEMENT, watchdog.address)
 
   // Grant RESERVE_ROLE and ORACLE_ROLE to QCManager in AccountControl
   await accountControl.connect(governance).grantReserveRole(qcManager.address)
@@ -160,7 +141,7 @@ export async function deployQCManagerFixture() {
     pauser,
     user,
     // Constants
-    constants: TEST_CONSTANTS,
+    constants: BTC_AMOUNTS,
   }
 }
 
@@ -208,12 +189,12 @@ export async function deployQCRedeemerFixture() {
 
   // Setup basic configuration
   await qcRedeemer.grantRole(
-    TEST_CONSTANTS.ROLES.DISPUTE_ARBITER,
+    ROLES.DISPUTE_ARBITER,
     watchdog.address
   )
-  await qcData.grantRole(TEST_CONSTANTS.ROLES.QC_MANAGER, qcRedeemer.address)
+  await qcData.grantRole(ROLES.QC_MANAGER, qcRedeemer.address)
   // Grant QC_MANAGER role to deployer for test setup
-  await qcData.grantRole(TEST_CONSTANTS.ROLES.QC_MANAGER, deployer.address)
+  await qcData.grantRole(ROLES.QC_MANAGER, deployer.address)
 
   // Set reasonable defaults for testing
   await mockAccountControl.setTotalMintedForTesting(
@@ -246,7 +227,7 @@ export async function deployQCRedeemerFixture() {
     watchdog,
     thirdParty,
     // Constants
-    constants: TEST_CONSTANTS,
+    constants: BTC_AMOUNTS,
   }
 }
 
@@ -274,7 +255,7 @@ export async function deployAccountControlFixture() {
   // Authorize reserve with default cap
   await accountControl
     .connect(owner)
-    .authorizeReserve(reserve.address, TEST_CONSTANTS.SMALL_CAP, 1) // ReserveType.QC_PERMISSIONED
+    .authorizeReserve(reserve.address, BTC_AMOUNTS.SMALL_CAP, 1) // ReserveType.QC_PERMISSIONED
 
   return {
     accountControl,
@@ -283,7 +264,7 @@ export async function deployAccountControlFixture() {
     emergencyCouncil,
     reserve,
     user,
-    constants: TEST_CONSTANTS,
+    constants: BTC_AMOUNTS,
   }
 }
 
@@ -298,7 +279,7 @@ export async function setupTestQC(
   } = {}
 ) {
   const { qcManager, governance, qcAddress, constants } = fixture
-  const mintingCap = options.mintingCap || constants.MEDIUM_CAP
+  const mintingCap = options.mintingCap || ethers.BigNumber.from(constants.MEDIUM_CAP)
 
   // Register QC (automatically sets status to Active)
   await qcManager.connect(governance).registerQC(qcAddress.address, mintingCap)
@@ -329,7 +310,7 @@ export async function createTestRedemption(
     tbtc,
   } = fixture
 
-  const amountSatoshis = options.amount || constants.MEDIUM_MINT
+  const amountSatoshis = options.amount || BTC_AMOUNTS.MEDIUM_MINT
   const user = options.user || defaultUser
   const qcAddress = options.qcAddress || defaultQC
 
@@ -337,8 +318,8 @@ export async function createTestRedemption(
     ethers.BigNumber.from(10).pow(10)
   ) // Convert to tBTC Wei
 
-  const btcAddress = options.btcAddress || constants.VALID_LEGACY_BTC
-  const walletAddress = options.walletAddress || constants.VALID_P2SH_BTC
+  const btcAddress = options.btcAddress || BTC_ADDRESSES.GENESIS_BLOCK
+  const walletAddress = options.walletAddress || BTC_ADDRESSES.P2SH_STANDARD
 
   // Setup QC and wallet in QCData
   const isRegistered = await fixture.qcData.isQCRegistered(
@@ -348,7 +329,7 @@ export async function createTestRedemption(
   if (!isRegistered) {
     await fixture.qcData.registerQC(
       qcAddress.address || qcAddress,
-      constants.LARGE_CAP
+      BTC_AMOUNTS.LARGE_CAP
     )
   }
   const qcWalletAddress = walletAddress
@@ -425,7 +406,7 @@ export async function createTestRedemptionBatch(
     // Slightly vary amounts to avoid identical transactions
     const options = {
       ...baseOptions,
-      amount: (baseOptions.amount || TEST_CONSTANTS.MEDIUM_MINT) + i * 10000,
+      amount: (baseOptions.amount || BTC_AMOUNTS.MEDIUM_MINT) + i * 10000,
     }
 
     const result = await createTestRedemption(fixture, options)
@@ -453,7 +434,7 @@ export async function setupComplexTestScenario(
   const qcs = [fixture.qcAddress.address]
   for (let i = 1; i < qcCount; i++) {
     const qcAddr = allSigners[10 + i].address // Start from signer index 10
-    await fixture.qcData.registerQC(qcAddr, TEST_CONSTANTS.LARGE_CAP)
+    await fixture.qcData.registerQC(qcAddr, BTC_AMOUNTS.LARGE_CAP)
     qcs.push(qcAddr)
   }
 
@@ -467,7 +448,7 @@ export async function setupComplexTestScenario(
   const walletsByQC: Record<string, string[]> = {}
 
   const allWallets = [
-    TEST_CONSTANTS.VALID_LEGACY_BTC,
+    BTC_ADDRESSES.GENESIS_BLOCK,
     "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2",
     "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
     "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",

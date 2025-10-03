@@ -9,13 +9,13 @@ import {
   ReserveOracle,
   IQCRedeemer,
 } from "../../../typechain"
-import { setupTestSigners, type TestSigners } from "../fixtures/base-setup"
-import { TEST_CONSTANTS } from "../fixtures/account-control-fixtures"
+import { setupAccountControlTestSigners, type AccountControlTestSigners } from "../../fixtures"
+import { TEST_CONSTANTS } from "../../fixtures"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
 describe("QCWalletManager", () => {
-  let signers: TestSigners
+  let signers: AccountControlTestSigners
   let qcWalletManager: QCWalletManager
   let qcData: QCData
   let systemState: SystemState
@@ -45,7 +45,7 @@ describe("QCWalletManager", () => {
   }
 
   before(async () => {
-    signers = await setupTestSigners()
+    signers = await setupAccountControlTestSigners()
   })
 
   beforeEach(async () => {

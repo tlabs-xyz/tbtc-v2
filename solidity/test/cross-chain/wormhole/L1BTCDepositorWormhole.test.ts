@@ -19,7 +19,7 @@ import type {
   BitcoinTxInfoStruct,
   DepositRevealInfoStruct,
 } from "../../../typechain/L2BTCDepositorWormhole"
-import { to1ePrecision } from "../../helpers/contract-test-helpers"
+import { to1ePrecision } from "../../helpers/math-utils"
 
 chai.use(smock.matchers)
 

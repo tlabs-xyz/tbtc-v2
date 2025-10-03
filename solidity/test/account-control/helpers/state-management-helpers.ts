@@ -1,5 +1,15 @@
 import { ethers } from "hardhat"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
+import type { 
+  AccountControl, 
+  QCData, 
+  MockBank,
+  ReserveOracle,
+  SystemState,
+  QCManager,
+  Contract
+} from "../../../typechain"
+import type { TestContracts, BridgeAccountControlTestSigners } from "./types"
 
 /**
  * State Management Helpers for Test Isolation
@@ -16,10 +26,10 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
  * This addresses ownership transfer and authorization state issues
  */
 export async function resetAccountControlState(
-  accountControl: any,
+  accountControl: AccountControl,
   owner: SignerWithAddress,
   emergencyCouncil: SignerWithAddress,
-  mockBank: any
+  mockBank: MockBank
 ) {
   try {
     const currentOwner = await accountControl.owner()
@@ -92,7 +102,7 @@ export async function resetAccountControlState(
  * Reset QCData state for clean test isolation
  * Clears QC registrations and wallet associations
  */
-export async function resetQCDataState(qcData: any, owner: SignerWithAddress) {
+export async function resetQCDataState(qcData: QCData, owner: SignerWithAddress) {
   try {
     // We can't easily iterate through all QCs, so we'll reset known test QCs
     const signers = await ethers.getSigners()
@@ -125,8 +135,8 @@ export async function resetQCDataState(qcData: any, owner: SignerWithAddress) {
  * Clears stale attestations that persist between tests
  */
 export async function resetOracleState(
-  reserveOracle: any,
-  systemState: any,
+  reserveOracle: ReserveOracle,
+  systemState: SystemState,
   owner: SignerWithAddress
 ) {
   try {
@@ -165,7 +175,7 @@ export async function resetOracleState(
  * Addresses role and permission contamination
  */
 export async function resetQCManagerState(
-  qcManager: any,
+  qcManager: QCManager,
   owner: SignerWithAddress,
   defaultRoles: { [roleName: string]: string }
 ) {
@@ -201,11 +211,11 @@ export async function resetQCManagerState(
  * Reset mock contract states to prevent cross-test contamination
  * Addresses accumulated mock expectations and return values
  */
-export async function resetMockContractStates(mocks: { [name: string]: any }) {
+export async function resetMockContractStates(mocks: { [name: string]: Contract }) {
   try {
     for (const [name, mock] of Object.entries(mocks)) {
-      if (mock && typeof mock.reset === "function") {
-        mock.reset()
+      if (mock && typeof (mock as any).reset === "function") {
+        (mock as any).reset()
         // console.log(`🔄 Reset mock ${name}`);
       }
     }
@@ -220,18 +230,12 @@ export async function resetMockContractStates(mocks: { [name: string]: any }) {
  * Use this in beforeEach hooks to ensure clean test state
  */
 export async function resetAllTestState(
-  contracts: {
-    accountControl?: any
-    qcData?: any
-    qcManager?: any
-    reserveOracle?: any
-    systemState?: any
-  },
+  contracts: Partial<TestContracts>,
   signers: {
     owner: SignerWithAddress
     emergencyCouncil: SignerWithAddress
   },
-  mocks: { [name: string]: any } = {},
+  mocks: { [name: string]: Contract } = {},
   options: {
     resetAccountControl?: boolean
     resetQCData?: boolean
@@ -277,7 +281,7 @@ export async function resetAllTestState(
         contracts.accountControl,
         signers.owner,
         signers.emergencyCouncil,
-        null // mockBank can be null for reset
+        contracts.mockBank || ({} as MockBank) // Provide empty mock if not available
       )
     }
 
@@ -292,9 +296,9 @@ export async function resetAllTestState(
  * Use this to replace standard beforeEach in tests with state issues
  */
 export async function createEnhancedSnapshot(
-  contracts: any,
-  signers: any,
-  mocks: any = {},
+  contracts: Partial<TestContracts>,
+  signers: Partial<BridgeAccountControlTestSigners>,
+  mocks: { [name: string]: Contract } = {},
   useStateReset: boolean = true
 ) {
   // Create Hardhat snapshot first
@@ -324,7 +328,7 @@ export async function restoreEnhancedSnapshot() {
 /**
  * Verify clean state helper - use to debug state contamination
  */
-export async function verifyCleanTestState(contracts: any): Promise<boolean> {
+export async function verifyCleanTestState(contracts: Partial<TestContracts>): Promise<boolean> {
   const issues: string[] = []
 
   try {

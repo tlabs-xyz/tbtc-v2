@@ -43,7 +43,7 @@ export class QCRedeemerTestUtils {
     HUGE: 100000000, // 1 BTC
   }
 
-  public static readonly BITCOIN_ADDRESSES = {
+  public static readonly BTC_ADDRESSES = {
     // Valid P2PKH addresses (mainnet)
     P2PKH_MAINNET: [
       "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", // Genesis block
@@ -123,7 +123,7 @@ export class QCRedeemerTestUtils {
     const testCases: ValidBitcoinAddressTestCase[] = []
 
     // Valid P2PKH addresses
-    this.BITCOIN_ADDRESSES.P2PKH_MAINNET.forEach((address, index) => {
+    this.BTC_ADDRESSES.P2PKH_MAINNET.forEach((address, index) => {
       testCases.push({
         address,
         type: "P2PKH",
@@ -134,7 +134,7 @@ export class QCRedeemerTestUtils {
     })
 
     // Valid P2SH addresses
-    this.BITCOIN_ADDRESSES.P2SH_MAINNET.forEach((address, index) => {
+    this.BTC_ADDRESSES.P2SH_MAINNET.forEach((address, index) => {
       testCases.push({
         address,
         type: "P2SH",
@@ -145,7 +145,7 @@ export class QCRedeemerTestUtils {
     })
 
     // Valid Bech32 addresses
-    this.BITCOIN_ADDRESSES.BECH32_MAINNET.forEach((address, index) => {
+    this.BTC_ADDRESSES.BECH32_MAINNET.forEach((address, index) => {
       testCases.push({
         address,
         type: "P2WPKH",
@@ -156,7 +156,7 @@ export class QCRedeemerTestUtils {
     })
 
     // Valid testnet addresses
-    this.BITCOIN_ADDRESSES.TESTNET.forEach((address, index) => {
+    this.BTC_ADDRESSES.TESTNET.forEach((address, index) => {
       testCases.push({
         address,
         type: address.startsWith("tb1") ? "P2WPKH" : "P2SH",
@@ -167,7 +167,7 @@ export class QCRedeemerTestUtils {
     })
 
     // Invalid addresses
-    this.BITCOIN_ADDRESSES.INVALID.forEach((address, index) => {
+    this.BTC_ADDRESSES.INVALID.forEach((address, index) => {
       testCases.push({
         address,
         type: "INVALID",
@@ -189,8 +189,8 @@ export class QCRedeemerTestUtils {
     Object.entries(this.DEFAULT_AMOUNTS).forEach(([name, amount]) => {
       testCases.push({
         amount,
-        userBtcAddress: this.BITCOIN_ADDRESSES.P2PKH_MAINNET[0],
-        walletAddress: this.BITCOIN_ADDRESSES.P2PKH_MAINNET[1],
+        userBtcAddress: this.BTC_ADDRESSES.P2PKH_MAINNET[0],
+        walletAddress: this.BTC_ADDRESSES.P2PKH_MAINNET[1],
         description: `${name} amount redemption (${amount} satoshis)`,
       })
     })
@@ -198,23 +198,23 @@ export class QCRedeemerTestUtils {
     // Different address type combinations
     const addressTypes = [
       {
-        user: this.BITCOIN_ADDRESSES.P2PKH_MAINNET[0],
-        wallet: this.BITCOIN_ADDRESSES.P2PKH_MAINNET[1],
+        user: this.BTC_ADDRESSES.P2PKH_MAINNET[0],
+        wallet: this.BTC_ADDRESSES.P2PKH_MAINNET[1],
         desc: "P2PKH to P2PKH",
       },
       {
-        user: this.BITCOIN_ADDRESSES.P2PKH_MAINNET[0],
-        wallet: this.BITCOIN_ADDRESSES.P2SH_MAINNET[0],
+        user: this.BTC_ADDRESSES.P2PKH_MAINNET[0],
+        wallet: this.BTC_ADDRESSES.P2SH_MAINNET[0],
         desc: "P2PKH to P2SH",
       },
       {
-        user: this.BITCOIN_ADDRESSES.P2SH_MAINNET[0],
-        wallet: this.BITCOIN_ADDRESSES.BECH32_MAINNET[0],
+        user: this.BTC_ADDRESSES.P2SH_MAINNET[0],
+        wallet: this.BTC_ADDRESSES.BECH32_MAINNET[0],
         desc: "P2SH to Bech32",
       },
       {
-        user: this.BITCOIN_ADDRESSES.BECH32_MAINNET[0],
-        wallet: this.BITCOIN_ADDRESSES.P2PKH_MAINNET[0],
+        user: this.BTC_ADDRESSES.BECH32_MAINNET[0],
+        wallet: this.BTC_ADDRESSES.P2PKH_MAINNET[0],
         desc: "Bech32 to P2PKH",
       },
     ]
@@ -249,8 +249,8 @@ export class QCRedeemerTestUtils {
   }> {
     const defaults = {
       amount: this.DEFAULT_AMOUNTS.MEDIUM,
-      userBtcAddress: this.BITCOIN_ADDRESSES.P2PKH_MAINNET[0],
-      walletAddress: this.BITCOIN_ADDRESSES.P2PKH_MAINNET[1],
+      userBtcAddress: this.BTC_ADDRESSES.P2PKH_MAINNET[0],
+      walletAddress: this.BTC_ADDRESSES.P2PKH_MAINNET[1],
     }
 
     const params = { ...defaults, ...options }
@@ -524,14 +524,14 @@ export class QCRedeemerTestUtils {
 
       // Register multiple wallets per QC
       const wallets = [
-        this.BITCOIN_ADDRESSES.P2PKH_MAINNET[
-          i % this.BITCOIN_ADDRESSES.P2PKH_MAINNET.length
+        this.BTC_ADDRESSES.P2PKH_MAINNET[
+          i % this.BTC_ADDRESSES.P2PKH_MAINNET.length
         ],
-        this.BITCOIN_ADDRESSES.P2SH_MAINNET[
-          i % this.BITCOIN_ADDRESSES.P2SH_MAINNET.length
+        this.BTC_ADDRESSES.P2SH_MAINNET[
+          i % this.BTC_ADDRESSES.P2SH_MAINNET.length
         ],
-        this.BITCOIN_ADDRESSES.BECH32_MAINNET[
-          i % this.BITCOIN_ADDRESSES.BECH32_MAINNET.length
+        this.BTC_ADDRESSES.BECH32_MAINNET[
+          i % this.BTC_ADDRESSES.BECH32_MAINNET.length
         ],
       ]
 

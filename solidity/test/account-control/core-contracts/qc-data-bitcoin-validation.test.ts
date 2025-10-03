@@ -2,14 +2,14 @@ import { expect } from "chai"
 import { ethers } from "hardhat"
 import { QCData } from "../../../../typechain"
 import {
-  setupTestSigners,
+  setupAccountControlTestSigners,
   createBaseTestEnvironment,
   restoreBaseTestEnvironment,
-  TestSigners,
-} from "../../fixtures/base-setup"
+  AccountControlTestSigners,
+} from "../../fixtures"
 
 describe("QCData - Bitcoin Address Validation", () => {
-  let signers: TestSigners
+  let signers: AccountControlTestSigners
   let qcData: QCData
   let qcManager: any
 
@@ -77,7 +77,7 @@ describe("QCData - Bitcoin Address Validation", () => {
   }
 
   before(async () => {
-    signers = await setupTestSigners()
+    signers = await setupAccountControlTestSigners()
     qcManager = signers.deployer
   })
 

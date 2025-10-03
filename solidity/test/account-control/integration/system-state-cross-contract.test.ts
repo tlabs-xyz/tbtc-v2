@@ -13,7 +13,7 @@ import {
   MockReserveOracle,
   MockSystemState,
 } from "../../../typechain"
-import { deployQCManagerFixture } from "../fixtures/account-control-fixtures"
+import { deployQCManagerFixture } from "../../fixtures"
 
 describe("SystemState Cross-Contract Integration Tests", () => {
   let systemState: SystemState

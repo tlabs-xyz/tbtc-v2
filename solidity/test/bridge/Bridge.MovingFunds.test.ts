@@ -14,7 +14,7 @@ import type {
   BridgeGovernance,
   ReimbursementPool,
 } from "../../typechain"
-import bridgeFixture from "../fixtures/bridge"
+import bridgeFixture from "../fixtures"
 import {
   constants,
   movedFundsSweepRequestState,
@@ -38,7 +38,7 @@ import {
 } from "../data/moving-funds"
 import { ecdsaWalletTestData } from "../data/ecdsa"
 import { NO_MAIN_UTXO } from "../data/deposit-sweep"
-import { to1ePrecision } from "../helpers/contract-test-helpers"
+import { to1ePrecision } from "../helpers/math-utils"
 
 chai.use(smock.matchers)
 

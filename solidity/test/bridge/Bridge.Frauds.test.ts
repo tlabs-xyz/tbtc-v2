@@ -18,7 +18,7 @@ import {
   wrongSighashType,
 } from "../data/fraud"
 import { walletState } from "../fixtures"
-import bridgeFixture from "../fixtures/bridge"
+import bridgeFixture from "../fixtures"
 import { ecdsaWalletTestData } from "../data/ecdsa"
 
 chai.use(smock.matchers)

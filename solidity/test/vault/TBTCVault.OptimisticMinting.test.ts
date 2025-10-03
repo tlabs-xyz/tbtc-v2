@@ -5,7 +5,7 @@ import { ContractTransaction } from "ethers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 
 import { walletState, constants } from "../fixtures"
-import bridgeFixture from "../fixtures/bridge"
+import bridgeFixture from "../fixtures"
 
 import {
   Bank,

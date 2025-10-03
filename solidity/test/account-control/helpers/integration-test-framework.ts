@@ -7,53 +7,13 @@
 
 import { ethers } from "hardhat"
 import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import type {
-  AccountControl,
-  QCManager,
-  QCMinter,
-  QCRedeemer,
-  ReserveOracle,
-  SystemState,
-  TBTC,
-  QCData,
-} from "../../typechain"
 import { setupSystemStateDefaults } from "../../helpers/role-setup-utils"
 import { LibraryLinkingHelper } from "./library-linking-helper"
-
-export interface SystemState {
-  totalMinted: any
-  qcMinted: any
-  systemPaused: boolean
-}
-
-export interface TestContracts {
-  accountControl: AccountControl
-  qcManager: QCManager
-  qcWalletManager: any
-  qcMinter: QCMinter
-  qcRedeemer: QCRedeemer
-  reserveOracle: ReserveOracle
-  systemState: SystemState
-  tbtcToken: TBTC
-  qcData: QCData
-  mockBank: any
-  mockTbtcVault: any
-  testRelay: any
-}
+import type { TestContracts, BridgeAccountControlTestSigners } from "./types"
 
 export class IntegrationTestFramework {
   public contracts!: TestContracts
-  public signers!: {
-    owner: SignerWithAddress
-    emergencyCouncil: SignerWithAddress
-    user: SignerWithAddress
-    watchdog: SignerWithAddress
-    arbiter: SignerWithAddress
-    attester1: SignerWithAddress
-    attester2: SignerWithAddress
-    attester3: SignerWithAddress
-    qcAddress: SignerWithAddress
-  }
+  public signers!: BridgeAccountControlTestSigners
 
   // Helper constants for unit conversions
   public readonly ONE_SATOSHI_IN_WEI = ethers.utils.parseEther("0.00000001") // 1e10
@@ -84,7 +44,7 @@ export class IntegrationTestFramework {
     const mockBank = await MockBank.deploy()
 
     const MockTBTCToken = await ethers.getContractFactory("MockTBTCToken")
-    const tbtcToken = (await MockTBTCToken.deploy()) as TBTC
+    const tbtcToken = await MockTBTCToken.deploy()
 
     const MockTBTCVault = await ethers.getContractFactory(
       "contracts/test/MockTBTCVault.sol:MockTBTCVault"
@@ -93,22 +53,22 @@ export class IntegrationTestFramework {
     const mockTbtcVault = await MockTBTCVault.deploy()
 
     const SystemStateFactory = await ethers.getContractFactory("SystemState")
-    const systemState = (await SystemStateFactory.deploy()) as SystemState
+    const systemState = await SystemStateFactory.deploy()
 
     const TestRelay = await ethers.getContractFactory("TestRelay")
     const testRelay = await TestRelay.deploy()
 
     const QCDataFactory = await ethers.getContractFactory("QCData")
-    const qcData = (await QCDataFactory.deploy()) as QCData
+    const qcData = await QCDataFactory.deploy()
 
     // Deploy real ReserveOracle for integration testing
     const ReserveOracleFactory = await ethers.getContractFactory(
       "ReserveOracle"
     )
 
-    const reserveOracle = (await ReserveOracleFactory.deploy(
+    const reserveOracle = await ReserveOracleFactory.deploy(
       systemState.address
-    )) as ReserveOracle
+    )
 
     // Deploy real AccountControl for integration testing
     // This ensures we test actual contract interactions
@@ -116,11 +76,11 @@ export class IntegrationTestFramework {
       "AccountControl"
     )
 
-    const accountControl = (await AccountControlFactory.deploy(
+    const accountControl = await AccountControlFactory.deploy(
       this.signers.owner.address,
       this.signers.emergencyCouncil.address,
       mockBank.address
-    )) as AccountControl
+    )
 
     // Deploy QCPauseManager first (required by QCManager)
     const QCPauseManagerFactory = await ethers.getContractFactory(
@@ -144,13 +104,13 @@ export class IntegrationTestFramework {
     // Deploy real QCManager with proper library linking
     const QCManagerFactory = await LibraryLinkingHelper.getQCManagerFactory()
 
-    const qcManager = (await QCManagerFactory.deploy(
+    const qcManager = await QCManagerFactory.deploy(
       qcData.address,
       systemState.address,
       reserveOracle.address,
       pauseManager.address,
       qcWalletManager.address
-    )) as QCManager
+    )
 
     // Update pauseManager with correct QCManager address
     const QC_MANAGER_ROLE = await pauseManager.QC_MANAGER_ROLE()
@@ -164,26 +124,26 @@ export class IntegrationTestFramework {
     // Deploy QCMinter
     const QCMinterFactory = await ethers.getContractFactory("QCMinter")
 
-    const qcMinter = (await QCMinterFactory.deploy(
+    const qcMinter = await QCMinterFactory.deploy(
       qcData.address,
       systemState.address,
       qcManager.address,
       accountControl.address
-    )) as QCMinter
+    )
 
     // Deploy QCRedeemer with proper library linking
-    let qcRedeemer: QCRedeemer
+    let qcRedeemer
     try {
       // First deploy the required libraries
       const libraries = await LibraryLinkingHelper.deployAllLibraries()
 
-      qcRedeemer = (await LibraryLinkingHelper.deployQCRedeemer(
+      qcRedeemer = await LibraryLinkingHelper.deployQCRedeemer(
         tbtcToken.address,
         qcData.address,
         systemState.address,
         accountControl.address,
         libraries // Provide the libraries explicitly
-      )) as QCRedeemer
+      )
     } catch (error) {
       console.error("❌ Error deploying QCRedeemer:", error)
       throw error
@@ -200,6 +160,7 @@ export class IntegrationTestFramework {
       systemState,
       tbtcToken,
       qcData,
+      qcPauseManager: pauseManager,
       mockBank,
       mockTbtcVault,
       testRelay,
@@ -420,7 +381,7 @@ export class IntegrationTestFramework {
    */
   async executeRedemption(
     qcAddress: string,
-    amount: any,
+    amount: ethers.BigNumber | number | string,
     btcAddress: string,
     qcWallet: string
   ): Promise<string> {

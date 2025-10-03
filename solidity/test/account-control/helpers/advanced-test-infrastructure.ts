@@ -15,83 +15,29 @@ import { time } from "@nomicfoundation/hardhat-network-helpers"
 import { BigNumber, Contract } from "ethers"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 
-// =================== TYPES AND INTERFACES ===================
+import type { 
+  SystemStateData,
+  ValidationResult,
+  ValidationIssue,
+  ValidationMetrics,
+  FailureScenario,
+  RecoveryPlan,
+  RecoveryPhase,
+  WorkflowStep,
+  PerformanceMetrics
+} from "./types"
 
-export interface SystemState {
-  qcStatus: number
-  maxCapacity: BigNumber
-  totalMinted: BigNumber
-  currentBacking: BigNumber
-  registeredAt: BigNumber
-  authorized: boolean
-  mintingCap: BigNumber
-  mintingPaused: boolean
-  redeemingPaused: boolean
-  lastKnownReserveBalance: BigNumber
-  lastKnownBalanceTimestamp: BigNumber
-  oracleFailureDetected: boolean
-  isPaused: boolean
-  selfPauseTimestamp: BigNumber
-  escalated?: boolean
-}
-
-export interface ValidationResult {
-  success: boolean
-  issues: ValidationIssue[]
-  metrics: ValidationMetrics
-}
-
-export interface ValidationIssue {
-  severity: "ERROR" | "WARNING" | "INFO"
-  contract: string
-  issue: string
-  details: string
-}
-
-export interface ValidationMetrics {
-  checksPerformed: number
-  timeElapsed: number
-  gasUsed: BigNumber
-}
-
-export interface FailureScenario {
-  name: string
-  description: string
-  setup: () => Promise<void>
-  trigger: () => Promise<void>
-  validate: () => Promise<ValidationResult>
-  cleanup: () => Promise<void>
-}
-
-export interface RecoveryPlan {
-  phases: RecoveryPhase[]
-  rollbackEnabled: boolean
-  timeoutPeriod: number
-}
-
-export interface RecoveryPhase {
-  name: string
-  description: string
-  actions: (() => Promise<void>)[]
-  validations: (() => Promise<boolean>)[]
-  timeout: number
-}
-
-export interface WorkflowStep {
-  id: number
-  name: string
-  description: string
-  dependencies: number[]
-  execute: () => Promise<void>
-  validate: () => Promise<boolean>
-  rollback: () => Promise<void>
-}
-
-export interface PerformanceMetrics {
-  gasUsed: BigNumber
-  executionTime: number
-  blockHeight: number
-  timestamp: number
+// Re-export for backward compatibility
+export type {
+  SystemStateData as SystemState,
+  ValidationResult,
+  ValidationIssue,
+  ValidationMetrics,
+  FailureScenario,
+  RecoveryPlan,
+  RecoveryPhase,
+  WorkflowStep,
+  PerformanceMetrics
 }
 
 // =================== CORE INFRASTRUCTURE CLASSES ===================

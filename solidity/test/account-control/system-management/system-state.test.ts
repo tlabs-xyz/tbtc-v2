@@ -2,15 +2,15 @@ import { expect } from "chai"
 import { ethers, helpers } from "hardhat"
 import { SystemState } from "../../../typechain"
 import {
-  setupTestSigners,
+  setupAccountControlTestSigners,
   createBaseTestEnvironment,
   restoreBaseTestEnvironment,
-  TestSigners,
-} from "../fixtures/base-setup"
+  AccountControlTestSigners,
+} from "../../fixtures"
 import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
 describe("SystemState ", () => {
-  let signers: TestSigners
+  let signers: AccountControlTestSigners
   let systemState: SystemState
   let pauserAccount: any
   let adminAccount: any
@@ -26,7 +26,7 @@ describe("SystemState ", () => {
   const testStaleThreshold = 3600 // 1 hour
 
   before(async () => {
-    signers = await setupTestSigners()
+    signers = await setupAccountControlTestSigners()
 
     // Use watchdog and liquidator as pauser and admin accounts
     pauserAccount = signers.watchdog

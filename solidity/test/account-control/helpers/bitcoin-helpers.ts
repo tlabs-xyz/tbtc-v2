@@ -1,11 +1,69 @@
 import { ethers } from "hardhat"
 import type { BytesLike } from "ethers"
-import { bitcoinTestAddresses, TEST_CONSTANTS } from "../fixtures/test-data"
 
 /**
  * Bitcoin address and transaction utilities for testing
  * Provides standardized methods for Bitcoin-related operations
  */
+
+/**
+ * Consolidated Bitcoin test addresses for all test scenarios
+ */
+export const BITCOIN_TEST_DATA = {
+  addresses: {
+    // Valid P2PKH addresses (mainnet)
+    p2pkh: {
+      mainnet: [
+        "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", // Genesis block
+        "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2",
+        "1JfbZRwdDHKZmuiZgYArJZhcuuzuw2HuMu",
+        "16AKHntBwUjCyKVxGY5zz8DFZr66YzXtU2",
+      ],
+      testnet: ["mzBc4XEFSdzCDcTxAgf6EZXgsZWpztRhef", "mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn"],
+    },
+    // Valid P2SH addresses (mainnet)
+    p2sh: {
+      mainnet: [
+        "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+        "3QJmV3qfvL9SuYo34YihAf3sRCW3qSinyC",
+        "342ftSRCvFHfCeFFBuz4xwbeqnDw6BGUey",
+        "3Cbq7aT1tY8kMxWLbitaG7yT6bPbKChq64",
+      ],
+      testnet: ["2MzQwSSnBHWHqSAqtTVQ6v47XtaisrJa1Vc", "2N2KANgjH1RTPQWeHQcwYq24fT2zLqJGhNz"],
+    },
+    // Valid Bech32 addresses
+    bech32: {
+      mainnet: [
+        "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+        "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080",
+        "bc1qrp33g0554cgvn8t6rt0v2cyzgg6kz5z4vqx8v5w0c8z2jj8r6mjhqxnxnxj",
+        "bc1ql49ydapnjafl5t2cp9zqpjwe6pdgmxy98859v2",
+        "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      ],
+      testnet: [
+        "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx",
+        "tb1qrp33g0554cgvn8t6rt0v2cyzgg6kz5z4vqx8v5w0c8z2jj8r6mjhqy9fjqh",
+      ],
+    },
+    // Invalid addresses for testing
+    invalid: [
+      "", // Empty
+      "1", // Too short
+      "invalid_address", // Invalid chars
+      "0x742d35cc6574d94532f6b3b49e0f2b6aa8b5cd7", // Ethereum address
+      "2A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", // Invalid prefix
+      "bc2qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", // Invalid bech32
+      "1".repeat(100), // Too long
+      `bc1${"q".repeat(100)}`, // Too long bech32
+    ],
+  },
+  // Commonly used addresses for quick access
+  common: {
+    validLegacy: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+    validBech32: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+    validP2sh: "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+  },
+}
 
 /**
  * Creates a Bitcoin address from a public key hash for testing
@@ -45,7 +103,7 @@ export function isValidBitcoinAddress(address: string): boolean {
  * Gets test Bitcoin addresses for different formats
  */
 export function getTestBitcoinAddresses() {
-  return bitcoinTestAddresses
+  return BITCOIN_TEST_DATA.addresses
 }
 
 /**

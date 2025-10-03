@@ -11,7 +11,7 @@ import {
   IQCPauseManager,
   IQCWalletManager,
 } from "../../../typechain"
-import { deployQCManagerFixture } from "../fixtures/account-control-fixtures"
+import { deployQCManagerFixture } from "../../fixtures"
 
 /**
  * State Synchronization Integration Tests

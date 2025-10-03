@@ -10,7 +10,7 @@ import type {
   BridgeStub,
   RedemptionWatchtower,
 } from "../../typechain"
-import bridgeFixture from "../fixtures/bridge"
+import bridgeFixture from "../fixtures"
 import {
   RedemptionTestData,
   SinglePendingRequestedRedemption,

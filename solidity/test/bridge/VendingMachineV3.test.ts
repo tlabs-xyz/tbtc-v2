@@ -2,7 +2,7 @@ import { ethers, waffle, helpers, getUnnamedAccounts } from "hardhat"
 import { expect } from "chai"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { ContractTransaction } from "ethers"
-import bridgeFixture from "../fixtures/bridge"
+import bridgeFixture from "../fixtures"
 
 import type { TestERC20, TBTC, VendingMachineV3 } from "../../typechain"
 

@@ -4,7 +4,7 @@ import { randomBytes } from "crypto"
 import { expect } from "chai"
 import { ethers, getUnnamedAccounts, helpers, waffle } from "hardhat"
 import { ContractTransaction } from "ethers"
-import { to1e18 } from "../helpers/contract-test-helpers"
+import { to1e18 } from "../helpers/math-utils"
 
 import type {
   L2TBTC,

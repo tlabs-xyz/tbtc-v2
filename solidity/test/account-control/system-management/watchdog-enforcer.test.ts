@@ -11,17 +11,17 @@ import {
   SystemState,
 } from "../../../typechain"
 import {
-  setupTestSigners,
+  setupAccountControlTestSigners,
   createBaseTestEnvironment,
   restoreBaseTestEnvironment,
-  TestSigners,
-} from "../fixtures/base-setup"
+  AccountControlTestSigners,
+} from "../../fixtures"
 import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
 chai.use(smock.matchers)
 
 describe("WatchdogEnforcer", () => {
-  let signers: TestSigners
+  let signers: AccountControlTestSigners
   let watchdogEnforcer: WatchdogEnforcer
   let mockReserveOracle: FakeContract<ReserveOracle>
   let mockQcManager: FakeContract<QCManager>
@@ -45,7 +45,7 @@ describe("WatchdogEnforcer", () => {
   const minCollateralRatio = 100 // 100% = 1:1 ratio
 
   before(async () => {
-    signers = await setupTestSigners()
+    signers = await setupAccountControlTestSigners()
 
     // Generate role hashes
     DEFAULT_ADMIN_ROLE = ethers.constants.HashZero

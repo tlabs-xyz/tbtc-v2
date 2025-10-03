@@ -4,7 +4,7 @@ import { expect } from "chai"
 import { FakeContract } from "@defi-wonderland/smock"
 
 import { constants, walletState } from "../fixtures"
-import bridgeFixture from "../fixtures/bridge"
+import bridgeFixture from "../fixtures"
 
 import { DepositSweepTestData, SingleP2SHDeposit } from "../data/deposit-sweep"
 

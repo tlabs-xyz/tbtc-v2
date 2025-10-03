@@ -40,7 +40,7 @@ import {
   SingleProvablyUnspendable,
 } from "../data/redemption"
 import { constants, walletState } from "../fixtures"
-import bridgeFixture from "../fixtures/bridge"
+import bridgeFixture from "../fixtures"
 import { RedemptionRequestStructOutput } from "../../typechain/Bridge"
 
 chai.use(smock.matchers)

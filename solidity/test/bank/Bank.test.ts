@@ -5,7 +5,7 @@ import { FakeContract, smock } from "@defi-wonderland/smock"
 
 import { ContractTransaction, Signature, Wallet } from "ethers"
 import type { Bank, IVault } from "../../typechain"
-import { to1e18, toSatoshis } from "../helpers/contract-test-helpers"
+import { to1e18, toSatoshis } from "../helpers/math-utils"
 
 chai.use(smock.matchers)
 

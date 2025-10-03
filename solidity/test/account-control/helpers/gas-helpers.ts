@@ -1,6 +1,6 @@
 import { expect } from "chai"
 import type { ContractTransaction, ContractReceipt } from "ethers"
-import { spvTestConfig } from "../fixtures/test-data"
+import { spvTestConfig } from "../fixtures"
 
 /**
  * Gas measurement and analysis utilities for account-control tests

@@ -2,14 +2,14 @@ import { expect } from "chai"
 import { ethers } from "hardhat"
 import { QCData } from "../../../../typechain"
 import {
-  setupTestSigners,
+  setupAccountControlTestSigners,
   createBaseTestEnvironment,
   restoreBaseTestEnvironment,
-  TestSigners,
-} from "../../fixtures/base-setup"
+  AccountControlTestSigners,
+} from "../../fixtures"
 
 describe("QCData - Oracle Integration", () => {
-  let signers: TestSigners
+  let signers: AccountControlTestSigners
   let qcData: QCData
   let qcManager: any
 
@@ -34,7 +34,7 @@ describe("QCData - Oracle Integration", () => {
   }
 
   before(async () => {
-    signers = await setupTestSigners()
+    signers = await setupAccountControlTestSigners()
     qcManager = signers.deployer
   })
 

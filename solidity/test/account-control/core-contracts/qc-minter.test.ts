@@ -9,16 +9,16 @@ import {
   QCManager,
 } from "../../../typechain"
 import {
-  setupTestSigners,
+  setupAccountControlTestSigners,
   createBaseTestEnvironment,
   restoreBaseTestEnvironment,
-  TestSigners,
-} from "../fixtures/base-setup"
+  AccountControlTestSigners,
+} from "../../fixtures"
 
 chai.use(smock.matchers)
 
 describe("QCMinter", () => {
-  let signers: TestSigners
+  let signers: AccountControlTestSigners
   let qcMinter: QCMinter
   let mockSystemState: FakeContract<SystemState>
   let mockQCData: FakeContract<QCData>
@@ -31,7 +31,7 @@ describe("QCMinter", () => {
   const maxMintingCapacity = ethers.utils.parseEther("100") // 100 tBTC in wei
 
   before(async () => {
-    signers = await setupTestSigners()
+    signers = await setupAccountControlTestSigners()
   })
 
   beforeEach(async () => {

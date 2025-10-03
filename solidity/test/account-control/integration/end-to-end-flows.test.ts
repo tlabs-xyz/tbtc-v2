@@ -3,7 +3,7 @@ import { ethers, upgrades } from "hardhat"
 import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 
 import { IntegrationTestFramework } from "../helpers/integration-test-framework"
-import { setupTestEnvironment } from "../fixtures/base-setup"
+import { setupTestEnvironment } from "../../fixtures"
 
 /**
  * End-to-End Integration Flow Tests

@@ -26,4 +26,4 @@ export * from "./integration-test-framework"
 export * from "./library-linking-helper"
 
 // Re-export commonly used types for convenience
-export type { GasUsageResult, GasComparisonResult } from "./gas-helpers"
+export * from "./types"

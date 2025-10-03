@@ -35,7 +35,7 @@
 // NEW CENTRALIZED CONSTANTS (RECOMMENDED)
 // =============================================================================
 
-// Export new centralized constants from constants.ts
+// Re-export centralized constants from main fixtures
 export {
   // Primary constant groups
   TIMEOUTS,
@@ -63,7 +63,7 @@ export {
   VALIDATION,
   // Default export
   default as Constants,
-} from "./constants"
+} from "../../fixtures/constants"
 
 // =============================================================================
 // BACKWARD COMPATIBLE EXPORTS (LEGACY)
@@ -71,15 +71,7 @@ export {
 
 // Export all constants and utilities from test-data (backward compatibility)
 export {
-  // Constant groups (deprecated - use constants.ts instead)
-  ROLE_CONSTANTS,
-  BITCOIN_ADDRESSES,
-  ETHEREUM_ADDRESSES,
-  AMOUNT_CONSTANTS,
-  TIMING_CONSTANTS,
-  BLOCKCHAIN_CONSTANTS,
-  GAS_CONSTANTS,
-  // SPV configuration (deprecated)
+  // SPV configuration
   spvTestConfig,
   SPV_CONSTANTS,
   bitcoinTestAddresses,
@@ -93,6 +85,17 @@ export {
   // Legacy exports (for backward compatibility)
   TEST_CONSTANTS,
 } from "./test-data"
+
+// Map legacy constants to new ones for backward compatibility
+export {
+  ROLES as ROLE_CONSTANTS,
+  BTC_ADDRESSES as BITCOIN_ADDRESSES,
+  ETH_ADDRESSES as ETHEREUM_ADDRESSES,
+  AMOUNTS as AMOUNT_CONSTANTS,
+  TIMEOUTS as TIMING_CONSTANTS,
+  BLOCKCHAIN as BLOCKCHAIN_CONSTANTS,
+  GAS_LIMITS as GAS_CONSTANTS,
+} from "../../fixtures/constants"
 
 // Export all advanced factory functions from test-factories
 export {
@@ -110,6 +113,41 @@ export {
   createTimeBasedScenario,
   createIntegrationTestScenario,
 } from "./test-factories"
+
+// Re-export base setup utilities from main fixtures
+export {
+  setupTestSigners,
+  createBaseTestEnvironment,
+  createEnhancedTestEnvironment,
+  restoreTestEnvironment,
+  setupRelayForTesting,
+  captureContractState,
+  validateContractState,
+  TestIsolationVerifier,
+  handleTestSetupError,
+  // Types
+  type BaseTestSigners,
+  type BridgeTestSigners,
+  type AccountControlTestSigners,
+  type BaseTestEnvironment,
+  type BridgeTestEnvironment,
+  type EnhancedTestEnvironment,
+  type ContractStateSnapshot,
+} from "../../fixtures/base-setup"
+
+// Re-export mock factory utilities from main fixtures  
+export {
+  TestMockFactory,
+  createMockRelay,
+  createMockTransactionReceipt,
+  createMockContract,
+  createMockSigner,
+  createMockBitcoinTx,
+  type MockConfiguration,
+} from "../../fixtures/mock-factory"
+
+// For backward compatibility, re-export TestSigners as AccountControlTestSigners
+export { type AccountControlTestSigners as TestSigners } from "../../fixtures/base-setup"
 
 // =============================================================================
 // CONVENIENCE IMPORTS

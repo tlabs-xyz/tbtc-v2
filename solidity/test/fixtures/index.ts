@@ -1,3 +1,23 @@
+/**
+ * Main fixtures barrel export
+ * 
+ * This file exports all test fixtures, constants, and utilities
+ * for use across the test suite.
+ */
+
+// Export all from base-setup
+export * from './base-setup'
+
+// Export all from mock-factory
+export * from './mock-factory'
+
+// Export all from bridge fixture
+export { default as bridgeFixture } from './bridge'
+
+// Export centralized constants
+export * from './constants'
+
+// Legacy exports for backward compatibility
 import { to1ePrecision } from "../helpers/math-utils"
 
 export const constants = {

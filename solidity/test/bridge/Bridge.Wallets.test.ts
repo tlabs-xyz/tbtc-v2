@@ -14,7 +14,7 @@ import type {
 import { NO_MAIN_UTXO } from "../data/deposit-sweep"
 import { ecdsaWalletTestData } from "../data/ecdsa"
 import { constants, ecdsaDkgState, walletState } from "../fixtures"
-import bridgeFixture from "../fixtures/bridge"
+import bridgeFixture from "../fixtures"
 
 chai.use(smock.matchers)
 
