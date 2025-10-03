@@ -29,11 +29,9 @@ describe("L2BTCDepositorWormhole", () => {
     const wormholeRelayer = await smock.fake<IWormholeRelayer>(
       "IWormholeRelayer"
     )
-
     const l2WormholeGateway = await smock.fake<IWormholeGateway>(
       "IWormholeGateway"
     )
-
     // Just an arbitrary chain ID.
     const l1ChainId = 2
     // Just an arbitrary L1BTCDepositorWormhole address.
@@ -57,7 +55,6 @@ describe("L2BTCDepositorWormhole", () => {
         },
       }
     )
-
     const l2BtcDepositor = deployment[0] as L2BTCDepositorWormhole
 
     await l2BtcDepositor.connect(deployer).transferOwnership(governance.address)
@@ -183,7 +180,6 @@ describe("L2BTCDepositorWormhole", () => {
     it("should emit DepositInitialized event", async () => {
       const { fundingTx, reveal, destinationChainDepositOwner } =
         initializeDepositFixture
-
       const l2DepositOwnerInEthereumAddress = ethers.utils.hexDataSlice(
         destinationChainDepositOwner,
         12

@@ -56,7 +56,6 @@ describe("Bridge - Moving funds", () => {
   let bridge: Bridge & BridgeStub
   let bridgeGovernance: BridgeGovernance
   let reimbursementPool: ReimbursementPool
-
   let deployBridge: (
     txProofDifficultyFactor: number
   ) => Promise<[Contract, Deployment]>
@@ -315,7 +314,6 @@ describe("Bridge - Moving funds", () => {
                                               await provider.getBalance(
                                                 caller.address
                                               )
-
                                             const diff =
                                               postCallerBalance.sub(
                                                 initialCallerBalance
@@ -2021,7 +2019,6 @@ describe("Bridge - Moving funds", () => {
         "when accumulated difficulty in headers chain is insufficient",
         () => {
           let otherBridge: BridgeStub
-
           const data: MovingFundsTestData = JSON.parse(
             JSON.stringify(SingleTargetWallet)
           )
@@ -2371,7 +2368,6 @@ describe("Bridge - Moving funds", () => {
             const wallet = await bridge.wallets(
               ecdsaWalletTestData.pubKeyHash160
             )
-
             expect(wallet.closingStartedAt).to.be.equal(await lastBlockTime())
           })
 
@@ -3622,7 +3618,6 @@ describe("Bridge - Moving funds", () => {
         "when accumulated difficulty in headers chain is insufficient",
         () => {
           let otherBridge: Bridge
-
           const data: MovedFundsSweepTestData = JSON.parse(
             JSON.stringify(MovedFundsSweepWithMainUtxo)
           )

@@ -5,7 +5,7 @@ import { FakeContract, smock } from "@defi-wonderland/smock"
 
 import { ContractTransaction, Signature, Wallet } from "ethers"
 import type { Bank, IVault } from "../../typechain"
-import { to1e18, toSatoshis } from "../helpers/math-utils"
+import { to1e18, toSatoshis } from "../helpers/contract-test-helpers"
 
 chai.use(smock.matchers)
 
@@ -58,7 +58,6 @@ describe("Bank", () => {
           "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
         )
       )
-
       expect(await bank.PERMIT_TYPEHASH()).to.equal(expected)
       // double-checking...
       expect(await bank.PERMIT_TYPEHASH()).to.equal(
@@ -983,7 +982,6 @@ describe("Bank", () => {
       context("when owner does not match the permitting one", () => {
         it("should revert", async () => {
           const deadline = tomorrow
-
           const signature = await getApproval(
             permittedBalance,
             spender,
@@ -1007,7 +1005,6 @@ describe("Bank", () => {
       context("when spender does not match the signature", () => {
         it("should revert", async () => {
           const deadline = tomorrow
-
           const signature = await getApproval(
             permittedBalance,
             spender,
@@ -1031,7 +1028,6 @@ describe("Bank", () => {
       context("when permitted balance does not match the signature", () => {
         it("should revert", async () => {
           const deadline = tomorrow
-
           const signature = await getApproval(
             permittedBalance,
             spender,
@@ -1055,7 +1051,6 @@ describe("Bank", () => {
       context("when permitted deadline does not match the signature", () => {
         it("should revert", async () => {
           const deadline = tomorrow
-
           const signature = await getApproval(
             permittedBalance,
             spender,
@@ -1080,7 +1075,6 @@ describe("Bank", () => {
     context("when the spender is the zero address", () => {
       it("should revert", async () => {
         const deadline = tomorrow
-
         const signature = await getApproval(
           permittedBalance,
           ZERO_ADDRESS,
@@ -1256,7 +1250,7 @@ describe("Bank", () => {
       it("should revert", async () => {
         await expect(
           bank.connect(thirdParty).increaseBalance(recipient, amount)
-        ).to.be.revertedWith("Unauthorized balance increaser")
+        ).to.be.revertedWith("Caller is not the bridge")
       })
     })
 
@@ -1321,7 +1315,7 @@ describe("Bank", () => {
               [recipient1, recipient2, recipient3],
               [amount1, amount2, amount3]
             )
-        ).to.be.revertedWith("Unauthorized balance increaser")
+        ).to.be.revertedWith("Caller is not the bridge")
       })
     })
 
@@ -1439,7 +1433,7 @@ describe("Bank", () => {
               [depositor1, depositor2],
               [depositedAmount1, depositedAmount2]
             )
-        ).to.be.revertedWith("Unauthorized balance increaser")
+        ).to.be.revertedWith("Caller is not the bridge")
       })
     })
 
@@ -1571,7 +1565,6 @@ describe("Bank", () => {
           ]
         )
       )
-
       expect(await bank.DOMAIN_SEPARATOR()).to.equal(expected)
     })
   })

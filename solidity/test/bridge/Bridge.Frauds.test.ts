@@ -621,7 +621,6 @@ describe("Bridge - Fraud", () => {
               heartbeatWalletPublicKey,
               sighash
             )
-
             const fraudChallenge = await bridge.fraudChallenges(challengeKey)
             expect(fraudChallenge.resolved).to.equal(true)
           })
@@ -1590,7 +1589,6 @@ describe("Bridge - Fraud", () => {
             state: walletState.Unknown,
             movingFundsTargetWalletsCommitmentHash: ethers.constants.HashZero,
           }
-
           const walletMembersIDs = [1, 2, 3, 4, 5]
 
           context(

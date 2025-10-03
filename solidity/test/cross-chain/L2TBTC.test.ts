@@ -40,7 +40,6 @@ describe("L2TBTC", () => {
         },
       }
     )
-
     token = deployment[0] as L2TBTC
 
     await token.connect(deployer).transferOwnership(governance.address)
@@ -837,7 +836,6 @@ describe("L2TBTC", () => {
           ]
         )
       )
-
       expect(await token.DOMAIN_SEPARATOR()).to.equal(expected)
     })
   })
@@ -1074,13 +1072,11 @@ describe("L2TBTC", () => {
       )
 
       const domainSeparator = await token.DOMAIN_SEPARATOR()
-
       const permitTypehash = ethers.utils.keccak256(
         ethers.utils.toUtf8Bytes(
           "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
         )
       )
-
       const nonce = await token.nonces(permittingHolder.address)
 
       const approvalDigest = ethers.utils.keccak256(

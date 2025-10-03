@@ -1,12 +1,12 @@
 import { expect } from "chai"
 import { ethers } from "hardhat"
-import { EcdsaLibStub } from "../../typechain"
+import { TestEcdsaLib } from "../../typechain"
 
 describe("EcdsaLib", () => {
-  let ecdsaLib: EcdsaLibStub
+  let ecdsaLib: TestEcdsaLib
 
   before(async () => {
-    const EcdsaLib = await ethers.getContractFactory("EcdsaLibStub")
+    const EcdsaLib = await ethers.getContractFactory("TestEcdsaLib")
     ecdsaLib = await EcdsaLib.deploy()
   })
 

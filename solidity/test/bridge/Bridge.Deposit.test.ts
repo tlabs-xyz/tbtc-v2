@@ -50,7 +50,6 @@ describe("Bridge - Deposit", () => {
   let relay: FakeContract<IRelay>
   let bridge: Bridge & BridgeStub
   let bridgeGovernance: BridgeGovernance
-
   let deployBridge: (
     txProofDifficultyFactor: number
   ) => Promise<[Contract, Deployment]>
@@ -731,12 +730,10 @@ describe("Bridge - Deposit", () => {
           )
             .toHexString()
             .substring(2)
-
           const refundLocktimeBuffer = Buffer.from(
             refundLocktimeTimestampHex,
             "hex"
           )
-
           return `0x${refundLocktimeBuffer.reverse().toString("hex")}`
         }
 
@@ -759,7 +756,6 @@ describe("Bridge - Deposit", () => {
             const now = Math.floor(Date.now() / 1000)
             const refundLocktimeDuration = 2592000 // 30 days
             const refundLocktimeTimestamp = now + refundLocktimeDuration
-
             const latestPossibleRevealTimestamp =
               refundLocktimeTimestamp - constants.depositRevealAheadPeriod
 
@@ -789,7 +785,6 @@ describe("Bridge - Deposit", () => {
             const now = Math.floor(Date.now() / 1000)
             const refundLocktimeDuration = 2592000 // 30 days
             const refundLocktimeTimestamp = now + refundLocktimeDuration
-
             const latestPossibleRevealTimestamp =
               refundLocktimeTimestamp - constants.depositRevealAheadPeriod
 
@@ -1552,12 +1547,10 @@ describe("Bridge - Deposit", () => {
             )
               .toHexString()
               .substring(2)
-
             const refundLocktimeBuffer = Buffer.from(
               refundLocktimeTimestampHex,
               "hex"
             )
-
             return `0x${refundLocktimeBuffer.reverse().toString("hex")}`
           }
 
@@ -1580,7 +1573,6 @@ describe("Bridge - Deposit", () => {
               const now = Math.floor(Date.now() / 1000)
               const refundLocktimeDuration = 2592000 // 30 days
               const refundLocktimeTimestamp = now + refundLocktimeDuration
-
               const latestPossibleRevealTimestamp =
                 refundLocktimeTimestamp - constants.depositRevealAheadPeriod
 
@@ -1614,7 +1606,6 @@ describe("Bridge - Deposit", () => {
               const now = Math.floor(Date.now() / 1000)
               const refundLocktimeDuration = 2592000 // 30 days
               const refundLocktimeTimestamp = now + refundLocktimeDuration
-
               const latestPossibleRevealTimestamp =
                 refundLocktimeTimestamp - constants.depositRevealAheadPeriod
 
@@ -1966,7 +1957,6 @@ describe("Bridge - Deposit", () => {
                             // Enrich the test data with the vault parameter.
                             const dataWithVault: DepositSweepTestData =
                               JSON.parse(JSON.stringify(data))
-
                             dataWithVault.vault = vault.address
                             dataWithVault.deposits[0].reveal.vault =
                               vault.address
@@ -2150,7 +2140,6 @@ describe("Bridge - Deposit", () => {
                             // Enrich the test data with the vault parameter.
                             const dataWithVault: DepositSweepTestData =
                               JSON.parse(JSON.stringify(data))
-
                             dataWithVault.vault = vault.address
                             dataWithVault.deposits[0].reveal.vault =
                               vault.address
@@ -2268,7 +2257,6 @@ describe("Bridge - Deposit", () => {
                             // value than in the deposit.
                             const dataWithVault: DepositSweepTestData =
                               JSON.parse(JSON.stringify(data))
-
                             dataWithVault.vault = ethers.constants.AddressZero
                             dataWithVault.deposits[0].reveal.vault =
                               vault.address
@@ -2293,9 +2281,7 @@ describe("Bridge - Deposit", () => {
                         () => {
                           const previousData: DepositSweepTestData =
                             SingleP2SHDeposit
-
                           const data: DepositSweepTestData = SingleMainUtxo
-
                           // Take wallet public key hash from first deposit. All
                           // deposits in same sweep batch should have the same value
                           // of that field.
@@ -2437,13 +2423,10 @@ describe("Bridge - Deposit", () => {
                         "when input vector consists only of revealed unswept deposits and the expected main UTXO",
                         () => {
                           let tx: ContractTransaction
-
                           const previousData: DepositSweepTestData =
                             MultipleDepositsNoMainUtxo
-
                           const data: DepositSweepTestData =
                             MultipleDepositsWithMainUtxo
-
                           // Take wallet public key hash from first deposit. All
                           // deposits in same sweep batch should have the same value
                           // of that field.
@@ -2590,10 +2573,8 @@ describe("Bridge - Deposit", () => {
 
                           const previousData: DepositSweepTestData =
                             MultipleDepositsNoMainUtxo
-
                           const data: DepositSweepTestData =
                             MultipleDepositsWithMainUtxo
-
                           // Take wallet public key hash from first deposit. All
                           // deposits in same sweep batch should have the same value
                           // of that field.
@@ -2622,7 +2603,6 @@ describe("Bridge - Deposit", () => {
                             // Enrich the test data with the vault parameter.
                             const dataWithVault: DepositSweepTestData =
                               JSON.parse(JSON.stringify(data))
-
                             dataWithVault.vault = vault.address
                             dataWithVault.deposits[0].reveal.vault =
                               vault.address
@@ -2777,10 +2757,8 @@ describe("Bridge - Deposit", () => {
 
                           const previousData: DepositSweepTestData =
                             MultipleDepositsNoMainUtxo
-
                           const data: DepositSweepTestData =
                             MultipleDepositsWithMainUtxo
-
                           // Take wallet public key hash from first deposit. All
                           // deposits in same sweep batch should have the same value
                           // of that field.
@@ -2809,7 +2787,6 @@ describe("Bridge - Deposit", () => {
                             // Enrich the test data with the vault parameter.
                             const dataWithVault: DepositSweepTestData =
                               JSON.parse(JSON.stringify(data))
-
                             dataWithVault.vault = vault.address
                             dataWithVault.deposits[0].reveal.vault =
                               vault.address
@@ -2961,10 +2938,8 @@ describe("Bridge - Deposit", () => {
 
                           const previousData: DepositSweepTestData =
                             MultipleDepositsNoMainUtxo
-
                           const data: DepositSweepTestData =
                             MultipleDepositsWithMainUtxo
-
                           // Take wallet public key hash from first deposit. All
                           // deposits in same sweep batch should have the same value
                           // of that field.
@@ -2997,7 +2972,6 @@ describe("Bridge - Deposit", () => {
                             // Enrich the test data with the vault parameter.
                             const dataWithVault: DepositSweepTestData =
                               JSON.parse(JSON.stringify(data))
-
                             dataWithVault.vault = vaultA.address
                             dataWithVault.deposits[0].reveal.vault =
                               vaultA.address
@@ -3029,10 +3003,8 @@ describe("Bridge - Deposit", () => {
                         "when input vector consists only of revealed unswept deposits but there is no main UTXO since it is not expected",
                         () => {
                           let tx: ContractTransaction
-
                           const data: DepositSweepTestData =
                             MultipleDepositsNoMainUtxo
-
                           // Take wallet public key hash from first deposit. All
                           // deposits in same sweep batch should have the same value
                           // of that field.
@@ -3142,11 +3114,9 @@ describe("Bridge - Deposit", () => {
                         () => {
                           const previousData: DepositSweepTestData =
                             SingleP2WSHDeposit
-
                           const data: DepositSweepTestData = JSON.parse(
                             JSON.stringify(MultipleDepositsNoMainUtxo)
                           )
-
                           // Take wallet public key hash from first deposit. All
                           // deposits in same sweep batch should have the same value
                           // of that field.
@@ -3197,7 +3167,6 @@ describe("Bridge - Deposit", () => {
                         () => {
                           const data: DepositSweepTestData =
                             MultipleDepositsNoMainUtxo
-
                           // Take wallet public key hash from first deposit. All
                           // deposits in same sweep batch should have the same value
                           // of that field.
@@ -3251,7 +3220,6 @@ describe("Bridge - Deposit", () => {
                         () => {
                           const data: DepositSweepTestData =
                             MultipleDepositsWithMainUtxo
-
                           // Take wallet public key hash from first deposit. All
                           // deposits in same sweep batch should have the same value
                           // of that field.
@@ -3326,11 +3294,9 @@ describe("Bridge - Deposit", () => {
               context("when main UTXO data are invalid", () => {
                 const previousData: DepositSweepTestData =
                   MultipleDepositsNoMainUtxo
-
                 const data: DepositSweepTestData = JSON.parse(
                   JSON.stringify(MultipleDepositsWithMainUtxo)
                 )
-
                 // Take wallet public key hash from first deposit. All
                 // deposits in same sweep batch should have the same value
                 // of that field.
@@ -3539,7 +3505,6 @@ describe("Bridge - Deposit", () => {
           const data: DepositSweepTestData = JSON.parse(
             JSON.stringify(SingleP2SHDeposit)
           )
-
           // Take wallet public key hash from first deposit. All
           // deposits in same sweep batch should have the same value
           // of that field.
@@ -3584,7 +3549,6 @@ describe("Bridge - Deposit", () => {
           const data: DepositSweepTestData = JSON.parse(
             JSON.stringify(SingleP2SHDeposit)
           )
-
           // Take wallet public key hash from first deposit. All
           // deposits in same sweep batch should have the same value
           // of that field.
@@ -3624,7 +3588,6 @@ describe("Bridge - Deposit", () => {
             const data: DepositSweepTestData = JSON.parse(
               JSON.stringify(SingleP2SHDeposit)
             )
-
             // Take wallet public key hash from first deposit. All
             // deposits in same sweep batch should have the same value
             // of that field.
@@ -3664,7 +3627,6 @@ describe("Bridge - Deposit", () => {
           const data: DepositSweepTestData = JSON.parse(
             JSON.stringify(SingleP2SHDeposit)
           )
-
           // Take wallet public key hash from first deposit. All
           // deposits in same sweep batch should have the same value
           // of that field.
@@ -3700,7 +3662,6 @@ describe("Bridge - Deposit", () => {
           const data: DepositSweepTestData = JSON.parse(
             JSON.stringify(SingleP2SHDeposit)
           )
-
           // Take wallet public key hash from first deposit. All
           // deposits in same sweep batch should have the same value
           // of that field.
@@ -3737,7 +3698,6 @@ describe("Bridge - Deposit", () => {
           const data: DepositSweepTestData = JSON.parse(
             JSON.stringify(SingleP2SHDeposit)
           )
-
           // Take wallet public key hash from first deposit. All
           // deposits in same sweep batch should have the same value
           // of that field.
@@ -3774,7 +3734,6 @@ describe("Bridge - Deposit", () => {
           const data: DepositSweepTestData = JSON.parse(
             JSON.stringify(SingleP2SHDeposit)
           )
-
           // Take wallet public key hash from first deposit. All
           // deposits in same sweep batch should have the same value
           // of that field.
@@ -3816,7 +3775,6 @@ describe("Bridge - Deposit", () => {
           const data: DepositSweepTestData = JSON.parse(
             JSON.stringify(SingleP2SHDeposit)
           )
-
           // Take wallet public key hash from first deposit. All
           // deposits in same sweep batch should have the same value
           // of that field.
@@ -3862,7 +3820,6 @@ describe("Bridge - Deposit", () => {
           const data: DepositSweepTestData = JSON.parse(
             JSON.stringify(SingleP2SHDeposit)
           )
-
           // Take wallet public key hash from first deposit. All
           // deposits in same sweep batch should have the same value
           // of that field.
@@ -3904,11 +3861,9 @@ describe("Bridge - Deposit", () => {
           "when accumulated difficulty in headers chain is insufficient",
           () => {
             let otherBridge: Bridge & BridgeStub
-
             const data: DepositSweepTestData = JSON.parse(
               JSON.stringify(SingleP2SHDeposit)
             )
-
             // Take wallet public key hash from first deposit. All
             // deposits in same sweep batch should have the same value
             // of that field.
@@ -3969,7 +3924,6 @@ describe("Bridge - Deposit", () => {
           const data: DepositSweepTestData = JSON.parse(
             JSON.stringify(SingleP2SHDeposit)
           )
-
           // Take wallet public key hash from first deposit. All
           // deposits in same sweep batch should have the same value
           // of that field.
@@ -4045,7 +3999,6 @@ describe("Bridge - Deposit", () => {
           from: governance,
           value: 10,
         })
-
         await bridge.connect(depositorSigner).revealDeposit(fundingTx, reveal)
 
         // Simulate the wallet's state has changed to MovingFunds
@@ -4115,7 +4068,6 @@ describe("Bridge - Deposit", () => {
               from: governance,
               value: 10,
             })
-
             await bridge
               .connect(depositorSigner)
               .revealDeposit(fundingTx, reveal)

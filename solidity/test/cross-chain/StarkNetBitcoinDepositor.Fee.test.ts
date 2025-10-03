@@ -18,31 +18,29 @@ describe("StarkNetBitcoinDepositor - Dynamic Fee Estimation", () => {
     await createSnapshot()
 
     const MockTBTCToken = await ethers.getContractFactory("MockTBTCToken")
-    const tbtcToken = await MockTBTCToken.deploy()
+    const tbtcToken = (await MockTBTCToken.deploy()) as MockTBTCToken
 
     const MockBridgeForStarkNet = await ethers.getContractFactory(
       "MockBridgeForStarkNet"
     )
-
-    const bridge = await MockBridgeForStarkNet.deploy()
+    const bridge =
+      (await MockBridgeForStarkNet.deploy()) as MockBridgeForStarkNet
 
     const MockTBTCVault = await ethers.getContractFactory(
       "contracts/test/MockTBTCVault.sol:MockTBTCVault"
     )
-
     const tbtcVault = (await MockTBTCVault.deploy()) as MockTBTCVault
     await tbtcVault.setTbtcToken(tbtcToken.address)
 
     const MockStarkGateBridge = await ethers.getContractFactory(
       "MockStarkGateBridge"
     )
-
-    starkGateBridge = await MockStarkGateBridge.deploy()
+    starkGateBridge =
+      (await MockStarkGateBridge.deploy()) as MockStarkGateBridge
 
     const StarkNetBitcoinDepositor = await ethers.getContractFactory(
       "StarkNetBitcoinDepositor"
     )
-
     depositor = (await upgrades.deployProxy(StarkNetBitcoinDepositor, [
       bridge.address,
       tbtcVault.address,

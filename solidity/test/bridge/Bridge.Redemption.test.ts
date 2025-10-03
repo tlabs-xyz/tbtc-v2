@@ -174,13 +174,10 @@ describe("Bridge - Redemption", () => {
               // Arbitrary standard output scripts.
               const redeemerOutputScriptP2WPKH =
                 "0x160014f4eedc8f40d4b8e30771f792b065ebec0abaddef"
-
               const redeemerOutputScriptP2WSH =
                 "0x220020ef0b4d985752aa5ef6243e4c6f6bebc2a007e7d671ef27d4b1d0db8dcc93bc1c"
-
               const redeemerOutputScriptP2PKH =
                 "0x1976a914f4eedc8f40d4b8e30771f792b065ebec0abaddef88ac"
-
               const redeemerOutputScriptP2SH =
                 "0x17a914f4eedc8f40d4b8e30771f792b065ebec0abaddef87"
 
@@ -329,14 +326,12 @@ describe("Bridge - Redemption", () => {
                                     const bridgeBalance = await bank.balanceOf(
                                       bridge.address
                                     )
-
                                     expect(
                                       bridgeBalance.sub(initialBridgeBalance)
                                     ).to.equal(requestedAmount)
 
                                     const redeemerBalance =
                                       await bank.balanceOf(redeemer.address)
-
                                     expect(
                                       redeemerBalance.sub(
                                         initialRedeemerBalance
@@ -1040,7 +1035,6 @@ describe("Bridge - Redemption", () => {
                         ).pendingRedemptionsValue
 
                         const { defaultAbiCoder } = ethers.utils
-
                         const data = defaultAbiCoder.encode(
                           [
                             "address",
@@ -1059,7 +1053,6 @@ describe("Bridge - Redemption", () => {
                             redeemerOutputScriptP2WPKH,
                           ]
                         )
-
                         tx = await bank
                           .connect(balanceOwner)
                           .approveBalanceAndCall(
@@ -1126,7 +1119,6 @@ describe("Bridge - Redemption", () => {
                         const bridgeBalance = await bank.balanceOf(
                           bridge.address
                         )
-
                         expect(
                           bridgeBalance.sub(initialBridgeBalance)
                         ).to.equal(requestedAmount)
@@ -1137,7 +1129,6 @@ describe("Bridge - Redemption", () => {
                         const balanceOwnerBalance = await bank.balanceOf(
                           balanceOwner.address
                         )
-
                         expect(
                           balanceOwnerBalance.sub(initialBalanceOwnerBalance)
                         ).to.equal(requestedAmount.mul(-1))
@@ -3309,7 +3300,6 @@ describe("Bridge - Redemption", () => {
                       const wallet = await bridge.wallets(
                         data.wallet.pubKeyHash
                       )
-
                       await bridge.setWallet(data.wallet.pubKeyHash, {
                         ...wallet,
                         state: walletState.MovingFunds,
@@ -3369,7 +3359,6 @@ describe("Bridge - Redemption", () => {
                             const wallet = await bridge.wallets(
                               data.wallet.pubKeyHash
                             )
-
                             await bridge.setWallet(data.wallet.pubKeyHash, {
                               ...wallet,
                               state: test.walletState,
@@ -3796,7 +3785,6 @@ describe("Bridge - Redemption", () => {
         "when accumulated difficulty in headers chain is insufficient",
         () => {
           let otherBridge: Bridge & BridgeStub
-
           const data: RedemptionTestData = JSON.parse(
             JSON.stringify(SinglePendingRequestedRedemption)
           )
@@ -3905,7 +3893,6 @@ describe("Bridge - Redemption", () => {
             let tx: ContractTransaction
             let initialPendingRedemptionsValue: BigNumber
             let initialRedeemerBalance: BigNumber
-
             let redemptionRequest: {
               redeemer: string
               requestedAmount: BigNumber
@@ -4010,11 +3997,9 @@ describe("Bridge - Redemption", () => {
               const expectedRedeemerBalance = initialRedeemerBalance.add(
                 data.redemptionRequests[0].amount
               )
-
               const currentRedeemerBalance = await bank.balanceOf(
                 data.redemptionRequests[0].redeemer
               )
-
               expect(currentRedeemerBalance).to.be.equal(
                 expectedRedeemerBalance
               )
@@ -4025,7 +4010,6 @@ describe("Bridge - Redemption", () => {
                 data.wallet.pubKeyHash,
                 data.redemptionRequests[0].redeemerOutputScript
               )
-
               const request = await bridge.pendingRedemptions(redemptionKey)
 
               expect(request.requestedAt).to.be.equal(0)
@@ -4106,7 +4090,6 @@ describe("Bridge - Redemption", () => {
 
           context("when the wallet is not the active wallet", () => {
             const data: RedemptionTestData = SinglePendingRequestedRedemption
-
             // Public key hash of a different wallet
             const anotherWalletPublicKeyHash =
               "0x123456789abcdef01234567891abcdef01234567"
@@ -4188,7 +4171,6 @@ describe("Bridge - Redemption", () => {
           let tx: ContractTransaction
           let initialPendingRedemptionsValue: BigNumber
           let initialRedeemerBalance: BigNumber
-
           let redemptionRequest: {
             redeemer: string
             requestedAmount: BigNumber
@@ -4308,11 +4290,9 @@ describe("Bridge - Redemption", () => {
             const expectedRedeemerBalance = initialRedeemerBalance.add(
               data.redemptionRequests[0].amount
             )
-
             const currentRedeemerBalance = await bank.balanceOf(
               data.redemptionRequests[0].redeemer
             )
-
             expect(currentRedeemerBalance).to.be.equal(expectedRedeemerBalance)
           })
 
@@ -4321,7 +4301,6 @@ describe("Bridge - Redemption", () => {
               data.wallet.pubKeyHash,
               data.redemptionRequests[0].redeemerOutputScript
             )
-
             const request = await bridge.pendingRedemptions(redemptionKey)
 
             expect(request.requestedAt).to.be.equal(0)
@@ -4383,7 +4362,6 @@ describe("Bridge - Redemption", () => {
           let tx: ContractTransaction
           let initialPendingRedemptionsValue: BigNumber
           let initialRedeemerBalance: BigNumber
-
           let redemptionRequest: {
             redeemer: string
             requestedAmount: BigNumber
@@ -4500,7 +4478,6 @@ describe("Bridge - Redemption", () => {
               data.wallet.pubKeyHash,
               data.redemptionRequests[0].redeemerOutputScript
             )
-
             const request = await bridge.pendingRedemptions(redemptionKey)
 
             expect(request.requestedAt).to.be.equal(0)
@@ -4550,11 +4527,9 @@ describe("Bridge - Redemption", () => {
             const expectedRedeemerBalance = initialRedeemerBalance.add(
               data.redemptionRequests[0].amount
             )
-
             const currentRedeemerBalance = await bank.balanceOf(
               data.redemptionRequests[0].redeemer
             )
-
             expect(currentRedeemerBalance).to.be.equal(expectedRedeemerBalance)
           })
 
@@ -4905,7 +4880,6 @@ describe("Bridge - Redemption", () => {
 
         it("should transfer the requested amount of tokens to the watchtower", async () => {
           const currentBridgeBalance = await bank.balanceOf(bridge.address)
-
           const currentWatchtowerBalance = await bank.balanceOf(
             watchtower.address
           )
@@ -4913,7 +4887,6 @@ describe("Bridge - Redemption", () => {
           // Bridge has a balance decrease.
           const bridgeDifference =
             initialBridgeBalance.sub(currentBridgeBalance)
-
           // Watchtower has a balance increase.
           const watchtowerDifference = currentWatchtowerBalance.sub(
             initialWatchtowerBalance
@@ -4994,11 +4967,9 @@ describe("Bridge - Redemption", () => {
     }
 
     const bridgeBalanceBeforeProof = await bank.balanceOf(bridge.address)
-
     const walletPendingRedemptionsValueBeforeProof = (
       await bridge.wallets(data.wallet.pubKeyHash)
     ).pendingRedemptionsValue
-
     const treasuryBalanceBeforeProof = await bank.balanceOf(treasury.address)
 
     const redeemersBalancesBeforeProof = []
@@ -5018,11 +4989,9 @@ describe("Bridge - Redemption", () => {
       )
 
     const bridgeBalanceAfterProof = await bank.balanceOf(bridge.address)
-
     const walletPendingRedemptionsValueAfterProof = (
       await bridge.wallets(data.wallet.pubKeyHash)
     ).pendingRedemptionsValue
-
     const treasuryBalanceAfterProof = await bank.balanceOf(treasury.address)
 
     const redeemersBalances = []

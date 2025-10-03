@@ -682,7 +682,6 @@ describe("Bridge - Wallets", () => {
               const wallet = await bridge.wallets(
                 ecdsaWalletTestData.pubKeyHash160
               )
-
               expect(wallet.closingStartedAt).to.be.equal(await lastBlockTime())
             })
 
@@ -742,7 +741,6 @@ describe("Bridge - Wallets", () => {
               const wallet = await bridge.wallets(
                 ecdsaWalletTestData.pubKeyHash160
               )
-
               expect(wallet.closingStartedAt).to.be.equal(await lastBlockTime())
             })
 
@@ -1047,7 +1045,6 @@ describe("Bridge - Wallets", () => {
               const wallet = await bridge.wallets(
                 ecdsaWalletTestData.pubKeyHash160
               )
-
               expect(wallet.closingStartedAt).to.be.equal(await lastBlockTime())
             })
 
@@ -1159,7 +1156,6 @@ describe("Bridge - Wallets", () => {
                 const wallet = await bridge.wallets(
                   ecdsaWalletTestData.pubKeyHash160
                 )
-
                 expect(wallet.closingStartedAt).to.be.equal(
                   await lastBlockTime()
                 )
