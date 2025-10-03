@@ -7,9 +7,6 @@ import "../bridge/IRelay.sol";
 
 /// @notice Test relay contract for SPV testing
 /// @dev Extends SystemTestRelay functionality with additional test methods
-/// TODO: This contract bypasses actual SPV validation for testing purposes.
-///       In production, proper SPV validation through a real relay is critical
-///       for security. The bypassSPVValidation flag should never exist in production code.
 contract TestRelay is IRelay {
     using BTCUtils for bytes;
     using BTCUtils for uint256;
@@ -17,7 +14,6 @@ contract TestRelay is IRelay {
     uint256 private currentEpochDifficulty;
     uint256 private prevEpochDifficulty;
     uint256 private validateHeaderChainResult;
-    bool private bypassSPVValidation;
 
     function setCurrentEpochDifficulty(uint256 _difficulty) external {
         currentEpochDifficulty = _difficulty;
@@ -64,12 +60,6 @@ contract TestRelay is IRelay {
     /// @param _result The result to return (normal difficulty or error codes)
     function setValidateHeaderChainResult(uint256 _result) external {
         validateHeaderChainResult = _result;
-    }
-    
-    /// @dev Enable or disable SPV validation bypass for testing
-    /// @param _bypass True to bypass validation, false to use normal validation
-    function setBypassSPVValidation(bool _bypass) external {
-        bypassSPVValidation = _bypass;
     }
 
     /// @dev Mock implementation of header chain validation
