@@ -2558,10 +2558,8 @@ describe("SystemState ", () => {
         ).to.be.reverted
       })
     })
-  })
-  })
-
-  describe("Concurrent Pause Attempts Security", () => {
+  
+    describe("Concurrent Pause Attempts Security", () => {
       it("should handle concurrent pause attempts safely", async () => {
         // Grant EMERGENCY_ROLE to multiple addresses
         await systemState
@@ -2871,7 +2869,6 @@ describe("SystemState ", () => {
         ).to.be.reverted
       })
     })
-  })
   })
 
   describe("Security Pattern Validation", () => {
