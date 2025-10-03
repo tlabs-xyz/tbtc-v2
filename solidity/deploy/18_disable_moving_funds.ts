@@ -59,7 +59,6 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const movingFundsTimeoutSlashingAmount = ethers.BigNumber.from("0")
   const movedFundsSweepTimeoutSlashingAmount = ethers.BigNumber.from("0")
   const movingFundsTimeoutNotifierRewardMultiplier = ethers.BigNumber.from("0")
-
   const movedFundsSweepTimeoutNotifierRewardMultiplier =
     ethers.BigNumber.from("0")
 

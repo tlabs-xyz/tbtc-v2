@@ -31,12 +31,10 @@ const func: DeployFunction = async function TransferRolesToGovernance(
 
   // First check if governance already has the role
   const qcManager = await get("QCManager")
-
   const qcManagerContract = await ethers.getContractAt(
     "QCManager",
     qcManager.address
   )
-
   const governanceHasRole = await qcManagerContract.hasRole(
     GOVERNANCE_ROLE,
     governance
@@ -60,7 +58,6 @@ const func: DeployFunction = async function TransferRolesToGovernance(
     GOVERNANCE_ROLE,
     deployer
   )
-
   if (deployerHasRole && deployer !== governance) {
     log("Revoking GOVERNANCE_ROLE from deployer...")
     await execute(
@@ -97,13 +94,11 @@ const func: DeployFunction = async function TransferRolesToGovernance(
     try {
       // eslint-disable-next-line no-await-in-loop
       const contractDeployment = await get(contractName)
-
       // eslint-disable-next-line no-await-in-loop
       const contract = await ethers.getContractAt(
         contractName,
         contractDeployment.address
       )
-
       // eslint-disable-next-line no-await-in-loop
       const governanceIsAdmin = await contract.hasRole(
         DEFAULT_ADMIN_ROLE,
@@ -134,12 +129,10 @@ const func: DeployFunction = async function TransferRolesToGovernance(
   log("Step 3: Transferring EMERGENCY_ROLE in SystemState...")
   const EMERGENCY_ROLE = ethers.utils.id("EMERGENCY_ROLE")
   const systemStateDeployment = await get("SystemState")
-
   const systemState = await ethers.getContractAt(
     "SystemState",
     systemStateDeployment.address
   )
-
   const governanceHasEmergencyRole = await systemState.hasRole(
     EMERGENCY_ROLE,
     governance
