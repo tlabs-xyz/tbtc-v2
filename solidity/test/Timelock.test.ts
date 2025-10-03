@@ -18,12 +18,10 @@ describe("Timelock", () => {
 
   const zeroBytes32 =
     "0x0000000000000000000000000000000000000000000000000000000000000000"
-
   const timelockDelay = 86400 // 24h governance delay
 
   before(async () => {
     const { esdm } = await helpers.signers.getNamedSigners()
-
     // eslint-disable-next-line @typescript-eslint/no-extra-semi
     ;({ governance, bridge, tbtcVault } = await waffle.loadFixture(
       bridgeFixture
@@ -38,17 +36,10 @@ describe("Timelock", () => {
       }
     )
 
-    timelock = await helpers.contracts.getContract("Timelock")
+    timelock = (await helpers.contracts.getContract("Timelock")) as Timelock
     proxyAdmin = (await upgrades.admin.getInstance()) as ProxyAdmin
 
-    console.log("ProxyAdmin address:", proxyAdmin.address)
-    console.log("ProxyAdmin owner:", await proxyAdmin.owner())
-    console.log("esdm address:", esdm.address)
-    console.log("Timelock address:", timelock.address)
-
-    // The deployer owns the ProxyAdmin, not esdm
-    const { deployer } = await helpers.signers.getNamedSigners()
-    await proxyAdmin.connect(deployer).transferOwnership(timelock.address)
+    await proxyAdmin.connect(esdm).transferOwnership(timelock.address)
   })
 
   context("when upgrading Bridge implementation via Timelock", async () => {
@@ -92,7 +83,6 @@ describe("Timelock", () => {
       const newImplementation = await upgrades.erc1967.getImplementationAddress(
         bridge.address
       )
-
       expect(newImplementation).to.equal(expectedNewImplementation)
     })
   })

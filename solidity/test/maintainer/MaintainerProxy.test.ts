@@ -210,7 +210,6 @@ describe("MaintainerProxy", () => {
         const postMaintainerBalance = await provider.getBalance(
           walletMaintainer.address
         )
-
         const diff = postMaintainerBalance.sub(initialWalletMaintainerBalance)
 
         expect(diff).to.be.gt(0)
@@ -321,7 +320,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -358,7 +356,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -391,7 +388,6 @@ describe("MaintainerProxy", () => {
               const dataWithVault: DepositSweepTestData = JSON.parse(
                 JSON.stringify(data)
               )
-
               dataWithVault.vault = vault.address
               dataWithVault.deposits[0].reveal.vault = vault.address
 
@@ -410,7 +406,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -443,7 +438,6 @@ describe("MaintainerProxy", () => {
               const dataWithVault: DepositSweepTestData = JSON.parse(
                 JSON.stringify(data)
               )
-
               dataWithVault.vault = vault.address
               dataWithVault.deposits[0].reveal.vault = vault.address
 
@@ -473,7 +467,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -494,7 +487,6 @@ describe("MaintainerProxy", () => {
           () => {
             const previousData: DepositSweepTestData =
               MultipleDepositsNoMainUtxo
-
             const data: DepositSweepTestData = MultipleDepositsWithMainUtxo
             let tx: ContractTransaction
 
@@ -520,7 +512,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -539,7 +530,6 @@ describe("MaintainerProxy", () => {
           () => {
             const previousData: DepositSweepTestData =
               MultipleDepositsNoMainUtxo
-
             const data: DepositSweepTestData = MultipleDepositsWithMainUtxo
             let vault: FakeContract<IVault>
             let tx: ContractTransaction
@@ -561,7 +551,6 @@ describe("MaintainerProxy", () => {
               const dataWithVault: DepositSweepTestData = JSON.parse(
                 JSON.stringify(data)
               )
-
               dataWithVault.vault = vault.address
               dataWithVault.deposits[0].reveal.vault = vault.address
               dataWithVault.deposits[1].reveal.vault = vault.address
@@ -584,7 +573,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -602,7 +590,6 @@ describe("MaintainerProxy", () => {
           () => {
             const previousData: DepositSweepTestData =
               MultipleDepositsNoMainUtxo
-
             const data: DepositSweepTestData = MultipleDepositsWithMainUtxo
             let vault: FakeContract<IVault>
             let tx: ContractTransaction
@@ -624,7 +611,6 @@ describe("MaintainerProxy", () => {
               const dataWithVault: DepositSweepTestData = JSON.parse(
                 JSON.stringify(data)
               )
-
               dataWithVault.vault = vault.address
               dataWithVault.deposits[0].reveal.vault = vault.address
               dataWithVault.deposits[1].reveal.vault = vault.address
@@ -658,7 +644,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -676,7 +661,6 @@ describe("MaintainerProxy", () => {
           () => {
             const previousData: DepositSweepTestData =
               MultipleDepositsNoMainUtxo
-
             const data: DepositSweepTestData = MultipleDepositsWithMainUtxo
             let vaultA: FakeContract<IVault>
             let vaultB: FakeContract<IVault>
@@ -703,7 +687,6 @@ describe("MaintainerProxy", () => {
               const dataWithVault: DepositSweepTestData = JSON.parse(
                 JSON.stringify(data)
               )
-
               dataWithVault.vault = vaultA.address
               dataWithVault.deposits[0].reveal.vault = vaultA.address
               dataWithVault.deposits[1].reveal.vault = vaultA.address
@@ -726,7 +709,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -764,7 +746,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -797,7 +778,6 @@ describe("MaintainerProxy", () => {
 
       it("should revert", async () => {
         const data: RedemptionTestData = SinglePendingRequestedRedemption
-
         const tx = maintainerProxy
           .connect(thirdParty)
           .submitRedemptionProof(
@@ -806,7 +786,6 @@ describe("MaintainerProxy", () => {
             data.mainUtxo,
             data.wallet.pubKeyHash
           )
-
         await expect(tx).to.be.revertedWith("Caller is not authorized")
       })
     })
@@ -821,7 +800,6 @@ describe("MaintainerProxy", () => {
 
         it("should revert", async () => {
           const data: RedemptionTestData = SinglePendingRequestedRedemption
-
           const tx = maintainerProxy
             .connect(walletMaintainer)
             .submitRedemptionProof(
@@ -830,7 +808,6 @@ describe("MaintainerProxy", () => {
               data.mainUtxo,
               data.wallet.pubKeyHash
             )
-
           await expect(tx).to.be.revertedWith("Caller is not authorized")
         })
       }
@@ -870,7 +847,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -926,7 +902,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -987,7 +962,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -1034,7 +1008,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -1052,7 +1025,6 @@ describe("MaintainerProxy", () => {
           () => {
             const data: RedemptionTestData =
               MultiplePendingRequestedRedemptionsWithP2WPKHChange
-
             let tx: ContractTransaction
 
             before(async () => {
@@ -1078,7 +1050,6 @@ describe("MaintainerProxy", () => {
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
-
               expect(diff).to.be.gt(0)
               expect(diff).to.be.lt(
                 ethers.utils.parseUnits("9000000", "gwei") // 0,009 ETH
@@ -1139,7 +1110,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -1161,7 +1131,6 @@ describe("MaintainerProxy", () => {
           () => {
             const data: RedemptionTestData =
               MultiplePendingRequestedRedemptionsWithP2WPKHChange
-
             let tx: ContractTransaction
 
             before(async () => {
@@ -1203,7 +1172,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -1274,7 +1242,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -1292,7 +1259,6 @@ describe("MaintainerProxy", () => {
           () => {
             const data: RedemptionTestData =
               MultiplePendingRequestedRedemptionsWithP2WPKHChange
-
             let tx: ContractTransaction
 
             before(async () => {
@@ -1336,7 +1302,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -1450,7 +1415,6 @@ describe("MaintainerProxy", () => {
             const postMaintainerBalance = await provider.getBalance(
               walletMaintainer.address
             )
-
             const diff = postMaintainerBalance.sub(
               initialWalletMaintainerBalance
             )
@@ -1500,7 +1464,6 @@ describe("MaintainerProxy", () => {
             const postMaintainerBalance = await provider.getBalance(
               walletMaintainer.address
             )
-
             const diff = postMaintainerBalance.sub(
               initialWalletMaintainerBalance
             )
@@ -1542,7 +1505,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 walletMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialWalletMaintainerBalance
               )
@@ -1592,7 +1554,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 walletMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialWalletMaintainerBalance
               )
@@ -1674,7 +1635,6 @@ describe("MaintainerProxy", () => {
               const postThirdPartyBalance = await provider.getBalance(
                 thirdParty.address
               )
-
               const diff = postThirdPartyBalance.sub(initialThirdPartyBalance)
 
               expect(diff).to.be.gt(0)
@@ -1750,7 +1710,6 @@ describe("MaintainerProxy", () => {
               const postThirdPartyBalance = await provider.getBalance(
                 thirdParty.address
               )
-
               const diff = postThirdPartyBalance.sub(initialThirdPartyBalance)
 
               expect(diff).to.be.gt(0)
@@ -1828,7 +1787,6 @@ describe("MaintainerProxy", () => {
               const postThirdPartyBalance = await provider.getBalance(
                 thirdParty.address
               )
-
               const diff = postThirdPartyBalance.sub(initialThirdPartyBalance)
 
               expect(diff).to.be.gt(0)
@@ -1904,7 +1862,6 @@ describe("MaintainerProxy", () => {
               const postThirdPartyBalance = await provider.getBalance(
                 thirdParty.address
               )
-
               const diff = postThirdPartyBalance.sub(initialThirdPartyBalance)
 
               expect(diff).to.be.gt(0)
@@ -1997,7 +1954,6 @@ describe("MaintainerProxy", () => {
       const postThirdPartyBalance = await provider.getBalance(
         thirdParty.address
       )
-
       const diff = postThirdPartyBalance.sub(initialThirdPartyBalance)
 
       expect(diff).to.be.gt(0)
@@ -2096,7 +2052,6 @@ describe("MaintainerProxy", () => {
             const postMaintainerBalance = await provider.getBalance(
               spvMaintainer.address
             )
-
             const diff = postMaintainerBalance.sub(initialSpvMaintainerBalance)
 
             expect(diff).to.be.gt(0)
@@ -2148,7 +2103,6 @@ describe("MaintainerProxy", () => {
       const postThirdPartyBalance = await provider.getBalance(
         thirdParty.address
       )
-
       const diff = postThirdPartyBalance.sub(initialThirdPartyBalance)
 
       expect(diff).to.be.gt(0)
@@ -2247,7 +2201,6 @@ describe("MaintainerProxy", () => {
         const postMaintainerBalance = await provider.getBalance(
           walletMaintainer.address
         )
-
         const diff = postMaintainerBalance.sub(initialWalletMaintainerBalance)
 
         expect(diff).to.be.gt(0)
@@ -2267,7 +2220,6 @@ describe("MaintainerProxy", () => {
 
       it("should revert", async () => {
         const data: MovedFundsSweepTestData = MovedFundsSweepWithoutMainUtxo
-
         const tx = maintainerProxy
           .connect(thirdParty)
           .submitMovedFundsSweepProof(
@@ -2275,7 +2227,6 @@ describe("MaintainerProxy", () => {
             data.sweepProof,
             data.mainUtxo
           )
-
         await expect(tx).to.be.revertedWith("Caller is not authorized")
       })
     })
@@ -2290,7 +2241,6 @@ describe("MaintainerProxy", () => {
 
         it("should revert", async () => {
           const data: MovedFundsSweepTestData = MovedFundsSweepWithoutMainUtxo
-
           const tx = maintainerProxy
             .connect(walletMaintainer)
             .submitMovedFundsSweepProof(
@@ -2298,7 +2248,6 @@ describe("MaintainerProxy", () => {
               data.sweepProof,
               data.mainUtxo
             )
-
           await expect(tx).to.be.revertedWith("Caller is not authorized")
         })
       }
@@ -2330,7 +2279,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -2370,7 +2318,6 @@ describe("MaintainerProxy", () => {
               const postMaintainerBalance = await provider.getBalance(
                 spvMaintainer.address
               )
-
               const diff = postMaintainerBalance.sub(
                 initialSpvMaintainerBalance
               )
@@ -2474,7 +2421,6 @@ describe("MaintainerProxy", () => {
         const postMaintainerBalance = await provider.getBalance(
           walletMaintainer.address
         )
-
         const diff = postMaintainerBalance.sub(initialWalletMaintainerBalance)
 
         expect(diff).to.be.gt(0)
@@ -2624,7 +2570,6 @@ describe("MaintainerProxy", () => {
       it("should be a total of 0 authorized maintainers", async () => {
         const authorizedMaintainers =
           await maintainerProxy.allWalletMaintainers()
-
         await expect(authorizedMaintainers.length).to.be.equal(0)
       })
 
@@ -2653,7 +2598,6 @@ describe("MaintainerProxy", () => {
             before(async () => {
               await createSnapshot()
               const signers = await helpers.signers.getUnnamedSigners()
-
               const maintainers = [
                 signers[1],
                 signers[2],
@@ -2744,7 +2688,6 @@ describe("MaintainerProxy", () => {
           maintainer6 = signers[6]
           maintainer7 = signers[7]
           maintainer8 = signers[8]
-
           /* eslint-enable */
           const maintainers = [
             maintainer1,
@@ -2823,7 +2766,6 @@ describe("MaintainerProxy", () => {
                 await maintainerProxy.allWalletMaintainers()
 
               expect(authorizedMaintainers.length).to.be.equal(6)
-
               const expectedMaintainers = [
                 maintainer8.address,
                 maintainer2.address,
@@ -2906,7 +2848,6 @@ describe("MaintainerProxy", () => {
                 await maintainerProxy.allWalletMaintainers()
 
               expect(authorizedMaintainers.length).to.be.equal(6)
-
               const expectedMaintainers = [
                 maintainer1.address,
                 maintainer2.address,
@@ -2983,7 +2924,6 @@ describe("MaintainerProxy", () => {
                 await maintainerProxy.allWalletMaintainers()
 
               expect(authorizedMaintainers.length).to.be.equal(6)
-
               const expectedMaintainers = [
                 maintainer1.address,
                 maintainer2.address,
@@ -3069,7 +3009,6 @@ describe("MaintainerProxy", () => {
             before(async () => {
               await createSnapshot()
               const signers = await helpers.signers.getUnnamedSigners()
-
               const maintainers = [
                 signers[1],
                 signers[2],
@@ -3160,7 +3099,6 @@ describe("MaintainerProxy", () => {
           maintainer6 = signers[6]
           maintainer7 = signers[7]
           maintainer8 = signers[8]
-
           /* eslint-enable */
           const maintainers = [
             maintainer1,
@@ -3239,7 +3177,6 @@ describe("MaintainerProxy", () => {
                 await maintainerProxy.allSpvMaintainers()
 
               expect(authorizedMaintainers.length).to.be.equal(6)
-
               const expectedMaintainers = [
                 maintainer8.address,
                 maintainer2.address,
@@ -3322,7 +3259,6 @@ describe("MaintainerProxy", () => {
                 await maintainerProxy.allSpvMaintainers()
 
               expect(authorizedMaintainers.length).to.be.equal(6)
-
               const expectedMaintainers = [
                 maintainer1.address,
                 maintainer2.address,
@@ -3399,7 +3335,6 @@ describe("MaintainerProxy", () => {
                 await maintainerProxy.allSpvMaintainers()
 
               expect(authorizedMaintainers.length).to.be.equal(6)
-
               const expectedMaintainers = [
                 maintainer1.address,
                 maintainer2.address,
@@ -3528,35 +3463,30 @@ describe("MaintainerProxy", () => {
       it("should update submitRedemptionProofGasOffset", async () => {
         const updatedOffset =
           await maintainerProxy.submitRedemptionProofGasOffset()
-
         expect(updatedOffset).to.be.equal(41)
       })
 
       it("should update resetMovingFundsTimeoutGasOffset", async () => {
         const updatedOffset =
           await maintainerProxy.resetMovingFundsTimeoutGasOffset()
-
         expect(updatedOffset).to.be.equal(42)
       })
 
       it("should update submitMovingFundsProofGasOffset", async () => {
         const updatedOffset =
           await maintainerProxy.submitMovingFundsProofGasOffset()
-
         expect(updatedOffset).to.be.equal(43)
       })
 
       it("should update notifyMovingFundsBelowDustGasOffset", async () => {
         const updatedOffset =
           await maintainerProxy.notifyMovingFundsBelowDustGasOffset()
-
         expect(updatedOffset).to.be.equal(44)
       })
 
       it("should update submitMovedFundsSweepProofGasOffset", async () => {
         const updatedOffset =
           await maintainerProxy.submitMovedFundsSweepProofGasOffset()
-
         expect(updatedOffset).to.be.equal(45)
       })
 
@@ -3568,28 +3498,24 @@ describe("MaintainerProxy", () => {
       it("should update notifyWalletCloseableGasOffset", async () => {
         const updatedOffset =
           await maintainerProxy.notifyWalletCloseableGasOffset()
-
         expect(updatedOffset).to.be.equal(47)
       })
 
       it("should update notifyWalletClosingPeriodElapsedGasOffset", async () => {
         const updatedOffset =
           await maintainerProxy.notifyWalletClosingPeriodElapsedGasOffset()
-
         expect(updatedOffset).to.be.equal(48)
       })
 
       it("should update defeatFraudChallengeGasOffset", async () => {
         const updatedOffset =
           await maintainerProxy.defeatFraudChallengeGasOffset()
-
         expect(updatedOffset).to.be.equal(49)
       })
 
       it("should update defeatFraudChallengeWithHeartbeatGasOffset", async () => {
         const updatedOffset =
           await maintainerProxy.defeatFraudChallengeWithHeartbeatGasOffset()
-
         expect(updatedOffset).to.be.equal(50)
       })
     })
@@ -3657,13 +3583,11 @@ describe("MaintainerProxy", () => {
 
     for (let i = 0; i < data.deposits.length; i++) {
       const { fundingTx, depositor, reveal } = data.deposits[i]
-
       // eslint-disable-next-line no-await-in-loop
       const depositorSigner = await impersonateAccount(depositor, {
         from: governance,
         value: 10,
       })
-
       // eslint-disable-next-line no-await-in-loop
       await bridge.connect(depositorSigner).revealDeposit(fundingTx, reveal)
     }

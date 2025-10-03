@@ -81,7 +81,6 @@ describe("TBTCVault - OptimisticMinting", () => {
     const bitcoinTestData: DepositSweepTestData = JSON.parse(
       JSON.stringify(SingleP2SHDeposit)
     )
-
     depositor = await impersonateAccount(
       bitcoinTestData.deposits[0].depositor,
       {
@@ -263,7 +262,6 @@ describe("TBTCVault - OptimisticMinting", () => {
             const revealToAnotherVault = JSON.parse(
               JSON.stringify(depositRevealInfo)
             )
-
             revealToAnotherVault.vault = anotherVault
 
             await bridge
@@ -306,7 +304,6 @@ describe("TBTCVault - OptimisticMinting", () => {
             const request = await tbtcVault.optimisticMintingRequests(
               depositKey
             )
-
             expect(request.requestedAt).to.be.equal(await lastBlockTime())
             expect(request.finalizedAt).to.be.equal(0)
           })
@@ -548,7 +545,6 @@ describe("TBTCVault - OptimisticMinting", () => {
             const request = await tbtcVault.optimisticMintingRequests(
               depositKey
             )
-
             expect(request.requestedAt).to.not.be.equal(0)
             expect(request.finalizedAt).to.be.equal(await lastBlockTime())
           })
@@ -637,7 +633,6 @@ describe("TBTCVault - OptimisticMinting", () => {
             const request = await tbtcVault.optimisticMintingRequests(
               depositKey
             )
-
             expect(request.requestedAt).to.not.be.equal(0)
             expect(request.finalizedAt).to.be.equal(await lastBlockTime())
           })
@@ -727,7 +722,6 @@ describe("TBTCVault - OptimisticMinting", () => {
             const request = await tbtcVault.optimisticMintingRequests(
               depositKey
             )
-
             expect(request.requestedAt).to.not.be.equal(0)
             expect(request.finalizedAt).to.be.equal(await lastBlockTime())
           })
@@ -802,7 +796,6 @@ describe("TBTCVault - OptimisticMinting", () => {
             const request = await tbtcVault.optimisticMintingRequests(
               depositKey
             )
-
             expect(request.requestedAt).to.not.be.equal(0)
             expect(request.finalizedAt).to.be.equal(await lastBlockTime())
           })
@@ -1747,7 +1740,6 @@ describe("TBTCVault - OptimisticMinting", () => {
         const tbtc = await TBTCFactory.connect(deployer).deploy()
 
         const TBTCVaultFactory = await ethers.getContractFactory("TBTCVault")
-
         // eslint-disable-next-line @typescript-eslint/no-shadow
         const tbtcVault = await TBTCVaultFactory.connect(deployer).deploy(
           mockBank.address,
@@ -1786,12 +1778,10 @@ describe("TBTCVault - OptimisticMinting", () => {
             fundingTxHash,
             1
           )
-
           const secondDepositID = await tbtcVault.calculateDepositKey(
             fundingTxHash,
             2
           )
-
           f.mockBridge.deposits.whenCalledWith(firstDepositID).returns({
             depositor: depositorAddress,
             amount: 1000,
@@ -1900,7 +1890,6 @@ describe("TBTCVault - OptimisticMinting", () => {
             fundingTxHash,
             1
           )
-
           f.mockBridge.deposits.whenCalledWith(firstDepositID).returns({
             depositor: depositorAddress,
             amount: 1000,

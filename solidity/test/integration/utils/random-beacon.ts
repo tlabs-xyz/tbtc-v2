@@ -54,12 +54,10 @@ export async function selectGroup(
   seed: BigNumber
 ): Promise<Operator[]> {
   const { ethers } = hre
-
   const identifiers = await sortitionPool.selectGroup(
     64,
     ethers.utils.hexZeroPad(seed.toHexString(), 32)
   )
-
   const addresses = await sortitionPool.getIDOperators(identifiers)
 
   return Promise.all(

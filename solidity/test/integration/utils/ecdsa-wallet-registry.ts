@@ -107,10 +107,10 @@ async function selectGroup(
 ): Promise<Operators> {
   const { ethers } = hre
 
-  const sortitionPool = await ethers.getContractAt(
+  const sortitionPool = (await ethers.getContractAt(
     "SortitionPool",
     await walletRegistry.sortitionPool()
-  )
+  )) as SortitionPool
 
   const identifiers: number[] = await walletRegistry.selectGroup()
 
@@ -142,7 +142,6 @@ export async function produceOperatorInactivityClaim(
   numberOfSignatures: number
 ): Promise<ClaimStruct> {
   const { ethers } = hre
-
   const messageHash = ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
       ["uint256", "uint256", "bytes", "uint8[]", "bool"],

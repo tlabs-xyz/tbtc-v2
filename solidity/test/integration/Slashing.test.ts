@@ -23,14 +23,6 @@ import type {
 } from "../../typechain"
 
 import {
-  setupTestSigners,
-  createBaseTestEnvironment,
-  restoreBaseTestEnvironment,
-  TestSigners,
-} from "../fixtures/base-setup"
-import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-utils"
-import { TestMockFactory } from "../fixtures/mock-factory"
-import {
   Operators,
   performEcdsaDkg,
   produceOperatorInactivityClaim,
@@ -65,55 +57,46 @@ describeFn("Integration Test - Slashing", async () => {
   let walletRegistry: WalletRegistry
   let randomBeacon: FakeContract<IRandomBeacon>
   let relay: FakeContract<IRelay>
-  let signers: TestSigners
-  let mockFactory: TestMockFactory
+  let deployer: SignerWithAddress
+  let governance: SignerWithAddress
+  let spvMaintainer: SignerWithAddress
   let thirdParty: SignerWithAddress
 
   const dkgResultChallengePeriodLength = 10
 
   before(async () => {
-    signers = await setupTestSigners()
-    mockFactory = new TestMockFactory()
-
-    const baseEnv = await createBaseTestEnvironment()
-    tbtc = baseEnv.tbtc
-    bridge = baseEnv.bridge
-    bridgeGovernance = baseEnv.bridgeGovernance
-    tbtcVault = baseEnv.tbtcVault
-    walletRegistry = baseEnv.walletRegistry
-    relay = baseEnv.relay
-    randomBeacon = baseEnv.randomBeacon
-
-    // Get additional signers
+    ;({
+      deployer,
+      governance,
+      spvMaintainer,
+      tbtc,
+      bridge,
+      tbtcVault,
+      staking,
+      walletRegistry,
+      relay,
+      randomBeacon,
+      bridgeGovernance,
+    } = await waffle.loadFixture(fixture))
     ;[thirdParty] = await helpers.signers.getUnnamedSigners()
 
     // Update only the parameters that are crucial for this test.
     await updateWalletRegistryDkgResultChallengePeriodLength(
       hre,
       walletRegistry,
-      signers.governance,
+      governance,
       dkgResultChallengePeriodLength
     )
 
     // Disable the reveal ahead period since refund locktimes are fixed
     // within transactions used in this test suite.
     await bridgeGovernance
-      .connect(signers.governance)
+      .connect(governance)
       .beginDepositRevealAheadPeriodUpdate(0)
     await increaseTime(constants.governanceDelay)
     await bridgeGovernance
-      .connect(signers.governance)
+      .connect(governance)
       .finalizeDepositRevealAheadPeriodUpdate()
-  })
-
-  beforeEach(async () => {
-    await createBaseTestEnvironment()
-    mockFactory.applyStandardIntegrationBehavior()
-  })
-
-  afterEach(async () => {
-    await restoreBaseTestEnvironment()
-    mockFactory.resetAllMocks()
   })
 
   describe("notifyFraudChallengeDefeatTimeout", async () => {
@@ -303,7 +286,6 @@ describeFn("Integration Test - Slashing", async () => {
           deposit.depositor,
           { from: deployer, value: 10 }
         )
-
         const redemptionAmount = 3_000 * constants.satoshiMultiplier
         redeemerOutputScript =
           "0x17a91486884e6be1525dab5ae0b451bd2c72cee67dcf4187"
@@ -459,7 +441,6 @@ describeFn("Integration Test - Slashing", async () => {
         const walletMembersIDs = walletMembers.getIds()
 
         const inactiveMembersIndices = [26, 40, 63, 78, 89]
-
         const claim = await produceOperatorInactivityClaim(
           hre,
           ecdsaWalletID,
