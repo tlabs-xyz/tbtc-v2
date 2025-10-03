@@ -85,17 +85,6 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
     depositor = StarkNetBitcoinDepositor.attach(proxy.address)
 
     // Verify initialization
-    // console.log("Vault address:", tbtcVault.address)
-    // console.log("Vault tbtcToken:", await tbtcVault.tbtcToken())
-    // console.log("Depositor tbtcToken:", await depositor.tbtcToken())
-    // console.log("Depositor tbtcVault:", await depositor.tbtcVault())
-
-    // Debug: Check if we can manually get the token from vault
-    // const ITBTCVault = await ethers.getContractAt(
-    //   "ITBTCVault",
-    //   tbtcVault.address
-    // )
-    // console.log("Manual vault.tbtcToken():", await ITBTCVault.tbtcToken())
   })
 
   beforeEach(async () => {
@@ -108,8 +97,8 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
   })
 
   describe("_transferTbtc Implementation", () => {
-    it.skip("should call deposit() instead of depositWithMessage() - SKIPPED DUE TO TBTC TOKEN INIT ISSUE", async () => {
-      // RED: This test will fail because implementation still uses depositWithMessage
+    it("should call deposit() instead of depositWithMessage()", async () => {
+      // This test verifies the implementation uses deposit() instead of depositWithMessage()
       const fixture = loadFixture(tbtcVault.address)
       const depositAmount = to1ePrecision(10000, 10) // 0.0001 BTC
       // const starkNetRecipient = ethers.BigNumber.from(fixture.extraData)
@@ -135,33 +124,18 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       // In real scenario, vault would mint to depositor after sweep
       await tbtcToken.mint(depositor.address, depositAmount)
 
-      // Debug logging
-      // console.log("=== Debug Info ===")
-      // console.log(
-      //   "tbtcToken address from depositor:",
-      //   await depositor.tbtcToken()
-      // )
-      // console.log("Expected tbtcToken address:", tbtcToken.address)
-      // console.log("Depositor address:", depositor.address)
-      // console.log(
-      //   "Depositor tBTC balance:",
-      //   await tbtcToken.balanceOf(depositor.address)
-      // )
-      // console.log("==================")
-
       // Finalize deposit - this should call deposit(), not depositWithMessage()
       await depositor.finalizeDeposit(depositKey, {
         value: INITIAL_MESSAGE_FEE,
       })
 
-      // Verify deposit() was called
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(await starkGateBridge.getDepositCount()).to.be.true
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      // Verify deposit() was called (not depositWithMessage())
+      expect(await starkGateBridge.depositCalled()).to.be.true
       expect(await starkGateBridge.depositWithMessageCalled()).to.be.false
+      expect(await starkGateBridge.getDepositCount()).to.equal(1)
     })
 
-    it.skip("should not create empty message array - SKIPPED DUE TO TBTC TOKEN INIT ISSUE", async () => {
+    it("should not create empty message array", async () => {
       // GREEN: This test verifies no empty array is created
       const fixture = loadFixture(tbtcVault.address)
       // Mock bridge uses 1 BTC = 100000000 satoshis
@@ -204,15 +178,14 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
 
       // Verify no message array exists (deposit() doesn't have message parameter)
       // This confirms we're using the simpler function
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(await starkGateBridge.getDepositCount()).to.be.true
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      expect(await starkGateBridge.depositCalled()).to.be.true
       expect(await starkGateBridge.depositWithMessageCalled()).to.be.false
+      expect(await starkGateBridge.getDepositCount()).to.equal(1)
     })
   })
 
   describe("Gas Optimization Verification", () => {
-    it.skip("should reduce gas usage by ~2000 - SKIPPED DUE TO TBTC TOKEN INIT ISSUE", async () => {
+    it("should reduce gas usage by ~2000", async () => {
       // GREEN: This test will measure gas difference
       const fixture = loadFixture(tbtcVault.address)
       // Calculate expected amount based on MockBridgeForStarkNet
@@ -255,7 +228,7 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
   })
 
   describe("Functionality Preservation", () => {
-    it.skip("should maintain same functionality with deposit() - SKIPPED DUE TO TBTC TOKEN INIT ISSUE", async () => {
+    it("should maintain same functionality with deposit()", async () => {
       // GREEN: Verify end-to-end functionality is preserved
       const fixture = loadFixture(tbtcVault.address)
       // Calculate expected amount based on MockBridgeForStarkNet
@@ -301,10 +274,9 @@ describe("StarkNetBitcoinDepositor - deposit() Implementation", () => {
       expect(lastDeposit.messageFee).to.equal(INITIAL_MESSAGE_FEE)
 
       // Verify deposit() was called correctly
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(await starkGateBridge.getDepositCount()).to.be.true
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      expect(await starkGateBridge.depositCalled()).to.be.true
       expect(await starkGateBridge.depositWithMessageCalled()).to.be.false
+      expect(await starkGateBridge.getDepositCount()).to.equal(1)
 
       // The mock doesn't actually transfer tokens, but in production
       // the StarkGate would lock the tokens and mint them on L2
