@@ -160,14 +160,4 @@ interface IQCPauseManager {
     /// @param qc QC address
     /// @return timeUntilRenewal Seconds until renewal (0 if available now)
     function getTimeUntilRenewal(address qc) external view returns (uint256 timeUntilRenewal);
-    
-    // =================== MIGRATION FUNCTIONS ===================
-    
-    /// @notice Migrate pause credit data from old system (admin only)
-    /// @param qcs Array of QC addresses
-    /// @param credits Array of pause credit data
-    function migratePauseCredits(
-        address[] calldata qcs,
-        PauseCredit[] calldata credits
-    ) external;
 }

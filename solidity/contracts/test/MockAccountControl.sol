@@ -82,7 +82,7 @@ contract MockAccountControl {
     }
 
     /// @notice Set totalMinted for testing purposes
-    /// @param amount The amount to set as totalMinted (in wei)
+    /// @param amount The amount to set as totalMinted (in satoshis)
     function setTotalMintedForTesting(uint256 amount) external {
         totalMinted = amount;
     }
@@ -96,7 +96,7 @@ contract MockAccountControl {
 
     /// @notice Set minted amount for a reserve for testing purposes
     /// @param reserve The reserve address
-    /// @param amount The minted amount to set (in wei)
+    /// @param amount The minted amount to set (in satoshis)
     function setMintedForTesting(address reserve, uint256 amount) external {
         minted[reserve] = amount;
         reserveMinted[reserve] = amount;
@@ -125,18 +125,18 @@ contract MockAccountControl {
             // Check minting cap - simplified for testing
             // In production, QCMinter handles cap checks at QC level
             if (mintingCaps[msg.sender] > 0) {
-                require(minted[msg.sender] + amount <= mintingCaps[msg.sender], "Minting cap exceeded");
+                require(minted[msg.sender] + satoshis <= mintingCaps[msg.sender], "Minting cap exceeded");
             }
 
             // Enforce backing >= minted invariant
             require(
-                backing[msg.sender] >= minted[msg.sender] + amount,
+                backing[msg.sender] >= minted[msg.sender] + satoshis,
                 "Insufficient backing for mint"
             );
 
-            totalMinted += amount;
-            minted[msg.sender] += amount;
-            reserveMinted[msg.sender] += amount;
+            totalMinted += satoshis;
+            minted[msg.sender] += satoshis;
+            reserveMinted[msg.sender] += satoshis;
         }
 
         // Create bank balance for the user
@@ -155,24 +155,24 @@ contract MockAccountControl {
     /// @dev For QCRedeemer integration - reduces minted from the QCRedeemer's balance
     /// @return success True if redemption was successful
     function redeemTBTC(uint256 amount) external whenNotPaused returns (bool success) {
-        // Amount is already in wei - no conversion needed
-        uint256 amountWei = amount;
+        // Amount is in wei - convert to satoshis for consistency
+        uint256 satoshis = amount / 1e10;
 
         // Only enforce limits when AccountControl is enabled
         if (accountControlEnabled) {
             // Check if reserve has sufficient minted balance
-            if (minted[msg.sender] < amountWei) {
-                revert InsufficientMinted(minted[msg.sender], amountWei);
+            if (minted[msg.sender] < satoshis) {
+                revert InsufficientMinted(minted[msg.sender], satoshis);
             }
 
             // Update both global and per-reserve minted balance
-            totalMinted -= amountWei;
-            minted[msg.sender] -= amountWei;
-            reserveMinted[msg.sender] -= amountWei;
+            totalMinted -= satoshis;
+            minted[msg.sender] -= satoshis;
+            reserveMinted[msg.sender] -= satoshis;
         }
 
         emit TBTCRedeemed(msg.sender, amount);
-        emit RedemptionProcessed(msg.sender, amountWei);
+        emit RedemptionProcessed(msg.sender, satoshis);
         return true;
     }
 

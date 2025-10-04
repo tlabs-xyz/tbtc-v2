@@ -105,17 +105,6 @@ contract MockQCPauseManager is IQCPauseManager {
         return pauseCredits[qc].creditRenewTime - block.timestamp;
     }
     
-    /// @notice Migrate pause credit data from old system (admin only)
-    function migratePauseCredits(
-        address[] calldata qcs,
-        PauseCredit[] calldata credits
-    ) external override {
-        require(qcs.length == credits.length, "Array length mismatch");
-        for (uint256 i = 0; i < qcs.length; i++) {
-            pauseCredits[qcs[i]] = credits[i];
-        }
-    }
-    
     /// @notice QC initiates self-pause with chosen level
     function selfPause(QCData.PauseLevel level) external override {
         address qc = msg.sender;

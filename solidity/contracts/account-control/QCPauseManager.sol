@@ -630,21 +630,6 @@ contract QCPauseManager is AccessControl, QCErrors {
     
     
     
-    // =================== MIGRATION FUNCTIONS ===================
-    
-    /// @notice Migrate pause credit data from old system
-    /// @param qcs Array of QC addresses
-    /// @param credits Array of pause credit data
-    function migratePauseCredits(
-        address[] calldata qcs,
-        PauseCredit[] calldata credits
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(qcs.length == credits.length, "QCPauseManager: array length mismatch");
-        
-        for (uint256 i = 0; i < qcs.length; i++) {
-            pauseCredits[qcs[i]] = credits[i];
-        }
-    }
     
     // =================== INTERNAL HELPER FUNCTIONS ===================
     

@@ -174,6 +174,42 @@ contract ReserveOracle is AccessControl {
         qcManager = _qcManager;
     }
 
+    /// @notice Get the current consensus threshold
+    /// @return The minimum number of attestations required for consensus
+    function consensusThreshold() external view returns (uint256) {
+        return systemState.oracleConsensusThreshold();
+    }
+
+    /// @notice Set the consensus threshold (delegated to SystemState)
+    /// @param threshold The new consensus threshold
+    function setConsensusThreshold(uint256 threshold) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        revert("Use SystemState.setOracleConsensusThreshold() instead");
+    }
+
+    /// @notice Get the current attestation timeout
+    /// @return The timeout period for attestations in seconds
+    function attestationTimeout() external view returns (uint256) {
+        return systemState.oracleAttestationTimeout();
+    }
+
+    /// @notice Set the attestation timeout (delegated to SystemState)
+    /// @param timeout The new attestation timeout in seconds
+    function setAttestationTimeout(uint256 timeout) external onlyRole(DISPUTE_ARBITER_ROLE) {
+        revert("Use SystemState.setOracleAttestationTimeout() instead");
+    }
+
+    /// @notice Get the current maximum staleness period
+    /// @return The maximum staleness period in seconds
+    function maxStaleness() external view returns (uint256) {
+        return systemState.oracleMaxStaleness();
+    }
+
+    /// @notice Set the maximum staleness period (delegated to SystemState)
+    /// @param staleness The new maximum staleness period in seconds
+    function setMaxStaleness(uint256 staleness) external onlyRole(DISPUTE_ARBITER_ROLE) {
+        revert("Use SystemState.setOracleMaxStaleness() instead");
+    }
+
     /// @notice Submit balance attestations for multiple QCs in batch
     /// @param qcs Array of Qualified Custodian addresses
     /// @param balances Array of attested reserve balances (must match qcs length)
@@ -195,17 +231,6 @@ contract ReserveOracle is AccessControl {
         emit BatchAttestationSubmitted(msg.sender, qcs, balances, qcs.length, block.timestamp);
     }
     
-    /// @notice Submit single balance attestation for a QC (for backward compatibility)
-    /// @param qc The address of the Qualified Custodian
-    /// @param balance The attested reserve balance
-    function attestBalance(address qc, uint256 balance)
-        external
-        onlyRole(ATTESTER_ROLE)
-    {
-        _ensureAttesterRegistered(msg.sender);
-        _attestBalanceInternal(qc, balance);
-        emit AttestationSubmitted(msg.sender, qc, balance, block.timestamp);
-    }
 
     /// @notice Get reserve balance and staleness for a QC
     /// @param qc The address of the Qualified Custodian

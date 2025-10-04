@@ -11,7 +11,10 @@ contract MockSystemState {
     uint256 private _minMintAmount = 10000; // 0.0001 BTC in satoshis
     uint256 private _maxMintAmount = 100000000; // 1 BTC in satoshis
     uint256 private _redemptionTimeout = 86400; // 24 hours
-    
+    uint256 private _oracleConsensusThreshold = 3;
+    uint256 private _oracleAttestationTimeout = 21600; // 6 hours
+    uint256 private _oracleMaxStaleness = 86400; // 24 hours
+
     function isMintingPaused() external view returns (bool) {
         return _mintingPaused;
     }
@@ -93,5 +96,30 @@ contract MockSystemState {
     function unpauseSystem() external {
         paused = false;
         emit Unpaused(msg.sender);
+    }
+
+    // Oracle configuration functions
+    function oracleConsensusThreshold() external view returns (uint256) {
+        return _oracleConsensusThreshold;
+    }
+
+    function setOracleConsensusThreshold(uint256 threshold) external {
+        _oracleConsensusThreshold = threshold;
+    }
+
+    function oracleAttestationTimeout() external view returns (uint256) {
+        return _oracleAttestationTimeout;
+    }
+
+    function setOracleAttestationTimeout(uint256 timeout) external {
+        _oracleAttestationTimeout = timeout;
+    }
+
+    function oracleMaxStaleness() external view returns (uint256) {
+        return _oracleMaxStaleness;
+    }
+
+    function setOracleMaxStaleness(uint256 staleness) external {
+        _oracleMaxStaleness = staleness;
     }
 }
