@@ -199,6 +199,21 @@ export async function createEnhancedTestEnvironment(
 }
 
 /**
+ * Convenience function for setting up Account Control test signers
+ * Wraps setupTestSigners with account-control configuration
+ */
+export async function setupAccountControlTestSigners(): Promise<AccountControlTestSigners> {
+  return setupTestSigners<AccountControlTestSigners>({ type: "account-control" })
+}
+
+/**
+ * Convenience function for setting up Base test environment
+ */
+export async function restoreBaseTestEnvironment(snapshot?: string): Promise<void> {
+  return restoreTestEnvironment(snapshot)
+}
+
+/**
  * Restores test environment from snapshot
  */
 export async function restoreTestEnvironment(snapshot?: string): Promise<void> {

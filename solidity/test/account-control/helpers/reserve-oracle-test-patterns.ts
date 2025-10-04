@@ -58,7 +58,7 @@ export async function submitAttestationsForConsensus(
 
     const tx = await reserveOracle
       .connect(attesters[i])
-      .attestBalance(qcAddress, attestationBalance)
+      .batchAttestBalances([qcAddress], [attestationBalance])
 
     attestationCount++
 
@@ -128,7 +128,7 @@ export async function testMedianCalculation(
   for (let i = 0; i < requiredAttesters; i++) {
     await reserveOracle
       .connect(attesters[i])
-      .attestBalance(qcAddress, balances[i])
+      .batchAttestBalances([qcAddress], [balances[i]])
   }
 
   // Verify median was calculated correctly
@@ -150,7 +150,7 @@ export async function testAttestationExpiry(
   balance: ethers.BigNumber
 ): Promise<void> {
   // Submit attestation
-  await reserveOracle.connect(attester).attestBalance(qcAddress, balance)
+  await reserveOracle.connect(attester).batchAttestBalances([qcAddress], [balance])
 
   // Verify attestation is pending
   const beforeCount = await reserveOracle.getPendingAttestationCount(qcAddress)
@@ -162,7 +162,7 @@ export async function testAttestationExpiry(
   await ethers.provider.send("evm_mine", [])
 
   // Submit another attestation to trigger cleanup
-  await reserveOracle.connect(attester).attestBalance(qcAddress, balance)
+  await reserveOracle.connect(attester).batchAttestBalances([qcAddress], [balance])
 
   // Should emit AttestationExpired event during cleanup
   // Note: The specific event checking would need to be done in the calling test

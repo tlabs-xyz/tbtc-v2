@@ -297,18 +297,3 @@ export function validateBitcoinTx(txInfo: {
   }
 }
 
-/**
- * Legacy exports for backward compatibility
- */
-export const bitcoinAddressUtils = {
-  createP2PKHAddress,
-  isValidBitcoinAddress,
-  getTestBitcoinAddresses,
-  createTestBitcoinAddress,
-  getBitcoinAddressType,
-  createBitcoinOutputScript,
-  createBitcoinOutput,
-  createBitcoinOutputVector,
-  parseBitcoinOutputVector,
-  validateBitcoinTx,
-}

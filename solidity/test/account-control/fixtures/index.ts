@@ -8,8 +8,8 @@
  * @example
  * ```typescript
  * import {
- *   ROLE_CONSTANTS,
- *   BITCOIN_ADDRESSES,
+ *   ROLES,
+ *   BTC_ADDRESSES,
  *   createMintingScenario,
  *   createRedemptionScenario
  * } from "../fixtures"
@@ -66,10 +66,10 @@ export {
 } from "../../fixtures/constants"
 
 // =============================================================================
-// BACKWARD COMPATIBLE EXPORTS (LEGACY)
+// TEST DATA AND UTILITIES
 // =============================================================================
 
-// Export all constants and utilities from test-data (backward compatibility)
+// Export all constants and utilities from test-data
 export {
   // SPV configuration
   spvTestConfig,
@@ -82,20 +82,10 @@ export {
   createMockBitcoinTxProof,
   generateTestId,
   createRoleConfiguration,
-  // Legacy exports (for backward compatibility)
+  // Test constants
   TEST_CONSTANTS,
 } from "./test-data"
 
-// Map legacy constants to new ones for backward compatibility
-export {
-  ROLES as ROLE_CONSTANTS,
-  BTC_ADDRESSES as BITCOIN_ADDRESSES,
-  ETH_ADDRESSES as ETHEREUM_ADDRESSES,
-  AMOUNTS as AMOUNT_CONSTANTS,
-  TIMEOUTS as TIMING_CONSTANTS,
-  BLOCKCHAIN as BLOCKCHAIN_CONSTANTS,
-  GAS_LIMITS as GAS_CONSTANTS,
-} from "../../fixtures/constants"
 
 // Export all advanced factory functions from test-factories
 export {
@@ -135,6 +125,21 @@ export {
   type ContractStateSnapshot,
 } from "../../fixtures/base-setup"
 
+
+// Export account control specific fixtures
+export {
+  deployQCManagerFixture,
+  deployQCRedeemerFixture,
+  deployAccountControlFixture,
+  setupTestQC,
+  createTestRedemption,
+  createTestRedemptionBatch,
+  setupComplexTestScenario,
+  verifyRedemptionState,
+  fulfillTestRedemption,
+  defaultTestRedemption,
+} from "./account-control-fixtures"
+
 // Re-export mock factory utilities from main fixtures  
 export {
   TestMockFactory,
@@ -146,8 +151,6 @@ export {
   type MockConfiguration,
 } from "../../fixtures/mock-factory"
 
-// For backward compatibility, re-export TestSigners as AccountControlTestSigners
-export { type AccountControlTestSigners as TestSigners } from "../../fixtures/base-setup"
 
 // =============================================================================
 // CONVENIENCE IMPORTS

@@ -17,7 +17,7 @@ export { default as bridgeFixture } from './bridge'
 // Export centralized constants
 export * from './constants'
 
-// Legacy exports for backward compatibility
+// Bridge system constants (maintained for bridge compatibility)
 import { to1ePrecision } from "../helpers/math-utils"
 
 export const constants = {
@@ -58,6 +58,7 @@ export const constants = {
   governanceDelay: 172800, // 48 hours
   satoshiMultiplier: 1e10, // Converts satoshi to TBTC token units
 }
+
 
 export const walletState = {
   Unknown: 0,

@@ -3,7 +3,7 @@ import { ethers } from "hardhat"
 /**
  * Centralized Test Constants for Account Control Tests
  *
- * This file consolidates all commonly used constants across the test suite
+ * This file consolidates commonly used constants across the test suite
  * to reduce duplication and improve maintainability.
  *
  * Usage:
@@ -25,15 +25,10 @@ import { ethers } from "hardhat"
  * All values in seconds for consistency
  */
 export const TIMEOUTS = {
-  // Common time intervals
+  // Time interval boundaries for validation
   MINUTE_1: 60,
-  MINUTES_30: 1800,
-  HOUR_1: 3600,
-  HOURS_2: 7200,
-  HOURS_6: 21600,
-  HOURS_7: 25200,
-  DAY_1: 86400,
   DAYS_7: 604800,
+  DAY_1: 86400,
 
   // Redemption specific timeouts
   REDEMPTION_SHORT: 3600, // 1 hour - for quick tests
@@ -46,17 +41,10 @@ export const TIMEOUTS = {
   ORACLE_STALE_STANDARD: 3600, // 1 hour
   ORACLE_STALE_DEFAULT: 86400, // 24 hours
 
-  // System timeouts
-  PAUSE_TIMEOUT: 86400, // 24 hours
-  SELF_PAUSE_TIMEOUT: 172800, // 48 hours
-
-  // Test advancement values
-  ADVANCE_SMALL: 3700, // Just over 1 hour
-  ADVANCE_LARGE: 25200, // 7 hours
 } as const
 
 // =============================================================================
-// AMOUNT CONSTANTS (in wei/gwei)
+// AMOUNT CONSTANTS (in wei)
 // =============================================================================
 
 /**
@@ -64,32 +52,14 @@ export const TIMEOUTS = {
  * All ETH amounts in wei for precision
  */
 export const AMOUNTS = {
-  // Zero and minimal amounts
-  ZERO: ethers.constants.Zero,
-  WEI_1: ethers.BigNumber.from(1),
-  GWEI_1: ethers.utils.parseUnits("1", "gwei"),
-
-  // Small amounts (< 1 ETH)
+  // Small amounts for specific test cases
   ETH_0_001: ethers.utils.parseEther("0.001"), // Micro amount
-  ETH_0_01: ethers.utils.parseEther("0.01"), // Small test amount
   ETH_0_1: ethers.utils.parseEther("0.1"), // Tenth of ETH
 
-  // Standard amounts (1-10 ETH)
+  // Standard test amounts
   ETH_1: ethers.utils.parseEther("1"), // Standard unit
-  ETH_5: ethers.utils.parseEther("5"), // Common test amount
-  ETH_10: ethers.utils.parseEther("10"), // Medium capacity
-
-  // Large amounts (10-1000 ETH)
-  ETH_30: ethers.utils.parseEther("30"), // Available capacity test
   ETH_100: ethers.utils.parseEther("100"), // Standard large amount
-  ETH_200: ethers.utils.parseEther("200"), // Balance test amount
-  ETH_500: ethers.utils.parseEther("500"), // High balance test
-  ETH_1000: ethers.utils.parseEther("1000"), // Maximum test amount
-
-  // Very large amounts (> 1000 ETH)
-  ETH_2000: ethers.utils.parseEther("2000"), // Updated capacity
-  ETH_10000: ethers.utils.parseEther("10000"), // Stress test amount
-  ETH_1000000: ethers.utils.parseEther("1000000"), // Maximum possible
+  ETH_1000000: ethers.utils.parseEther("1000000"), // Maximum validation bound
 
   // Commonly used specific amounts
   STANDARD_100_ETH: ethers.utils.parseEther("100"), // Most common test amount
@@ -97,10 +67,6 @@ export const AMOUNTS = {
   MINTING_CAP_100: ethers.utils.parseEther("100"), // Initial minting capacity
   MINTING_CAP_2000: ethers.utils.parseEther("2000"), // Updated capacity
 
-  // Reserve balance test amounts
-  RESERVE_LOW: ethers.utils.parseEther("9"), // Below threshold
-  RESERVE_STANDARD: ethers.utils.parseEther("10"), // At threshold
-  RESERVE_HIGH: ethers.utils.parseEther("100"), // Well above threshold
 } as const
 
 // =============================================================================
@@ -109,7 +75,7 @@ export const AMOUNTS = {
 
 /**
  * Standardized Bitcoin addresses for different test scenarios
- * Includes valid addresses of different types and invalid addresses for negative testing
+ * Includes valid addresses of different types for testing
  */
 export const BTC_ADDRESSES = {
   // Valid mainnet addresses
@@ -119,17 +85,6 @@ export const BTC_ADDRESSES = {
     "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3", // P2WSH
   P2SH_STANDARD: "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", // Standard P2SH
 
-  // Test addresses
-  TEST_ADDRESS_1: "bc1qtest123456789", // Short test address
-  TEST_ADDRESS_2: "bc1qtest987654321", // Alternative test address
-  TEST_LONG: `bc1q${"a".repeat(60)}`, // Very long valid format
-
-  // Invalid addresses for negative testing
-  INVALID_FORMAT: "not_a_bitcoin_address", // Completely invalid format
-  INVALID_SHORT: "bc1q", // Too short
-  INVALID_BECH32: "bc1qinvalid", // Invalid bech32
-  INVALID_P2PKH: "1InvalidAddress", // Invalid P2PKH format
-  EMPTY: "", // Empty string
 } as const
 
 // =============================================================================
@@ -140,9 +95,6 @@ export const BTC_ADDRESSES = {
  * Standardized Ethereum addresses for test scenarios
  */
 export const ETH_ADDRESSES = {
-  // Zero address
-  ZERO: ethers.constants.AddressZero,
-
   // Test QC addresses
   QC_1: "0x1234567890123456789012345678901234567890",
   QC_2: "0x9876543210987654321098765432109876543210",
@@ -150,12 +102,6 @@ export const ETH_ADDRESSES = {
   QC_4: "0x0000000000000000000000000000000000000002",
   QC_5: "0x0000000000000000000000000000000000000003",
 
-  // Role-specific test addresses
-  GOVERNANCE: "0x0000000000000000000000000000000000000001",
-  ARBITER: "0x0000000000000000000000000000000000000002",
-  REGISTRAR: "0x0000000000000000000000000000000000000003",
-  WATCHDOG: "0x0000000000000000000000000000000000000004",
-  MONITOR: "0x0000000000000000000000000000000000000005",
 } as const
 
 // =============================================================================
@@ -166,25 +112,19 @@ export const ETH_ADDRESSES = {
  * Standardized role constants using consistent hashing
  */
 export const ROLES = {
-  // OpenZeppelin standard
-  DEFAULT_ADMIN: ethers.constants.HashZero,
-
   // System governance roles
-  GOVERNANCE: ethers.utils.id("GOVERNANCE_ROLE"),
-  EMERGENCY: ethers.utils.id("EMERGENCY_ROLE"),
-  OPERATIONS: ethers.utils.id("OPERATIONS_ROLE"),
+  GOVERNANCE_ROLE: ethers.utils.id("GOVERNANCE_ROLE"),
 
   // Functional roles
-  DISPUTE_ARBITER: ethers.utils.id("DISPUTE_ARBITER_ROLE"),
-  REGISTRAR: ethers.utils.id("REGISTRAR_ROLE"),
-  ENFORCEMENT: ethers.utils.id("ENFORCEMENT_ROLE"),
-  MONITOR: ethers.utils.id("MONITOR_ROLE"),
-  ATTESTER: ethers.utils.id("ATTESTER_ROLE"),
-
-  // Contract-specific roles
-  MINTER: ethers.utils.id("MINTER_ROLE"),
-  QC_MANAGER: ethers.utils.id("QC_MANAGER_ROLE"),
-  PAUSER: ethers.utils.id("PAUSER_ROLE"),
+  DISPUTE_ARBITER_ROLE: ethers.utils.id("DISPUTE_ARBITER_ROLE"),
+  REGISTRAR_ROLE: ethers.utils.id("REGISTRAR_ROLE"),
+  ENFORCEMENT_ROLE: ethers.utils.id("ENFORCEMENT_ROLE"),
+  MONITOR_ROLE: ethers.utils.id("MONITOR_ROLE"),
+  EMERGENCY_ROLE: ethers.utils.id("EMERGENCY_ROLE"),
+  OPERATIONS_ROLE: ethers.utils.id("OPERATIONS_ROLE"),
+  MINTER_ROLE: ethers.utils.id("MINTER_ROLE"),
+  QC_MANAGER_ROLE: ethers.utils.id("QC_MANAGER_ROLE"),
+  ATTESTER_ROLE: ethers.utils.id("ATTESTER_ROLE"),
 } as const
 
 // =============================================================================
@@ -195,9 +135,7 @@ export const ROLES = {
  * Standardized gas limits for different operation types
  */
 export const GAS_LIMITS = {
-  // Basic operations
-  SIMPLE_TX: 100000,
-  COMPLEX_TX: 500000,
+  // Deployment
   DEPLOYMENT: 3000000,
 
   // SPV operations
@@ -205,10 +143,6 @@ export const GAS_LIMITS = {
   SPV_MIN: 200000,
   SPV_MAX: 800000,
 
-  // Contract interactions
-  MINT_OPERATION: 300000,
-  REDEEM_OPERATION: 400000,
-  WALLET_REGISTRATION: 250000,
 } as const
 
 // =============================================================================
@@ -259,105 +193,9 @@ export const ERROR_MESSAGES = {
 export const BLOCKCHAIN = {
   // Bitcoin difficulty for testing
   DEFAULT_DIFFICULTY: 1000000,
-  TEST_DIFFICULTY: 100000,
-
-  // Block advancement
-  BLOCKS_PER_HOUR: 6, // Approximation for Ethereum
-  BLOCKS_PER_DAY: 144, // Approximation for Bitcoin
-
-  // Chain IDs for testing
-  ETHEREUM_MAINNET: 1,
-  ETHEREUM_GOERLI: 5,
-  ETHEREUM_SEPOLIA: 11155111,
 
   // SPV test values
-  TEST_BLOCK_HEIGHT: 700000, // Typical Bitcoin mainnet height for testing
   MOCK_TX_HASH: `0x${"a".repeat(64)}`, // Mock transaction hash
-} as const
-
-// =============================================================================
-// PERCENTAGE CONSTANTS
-// =============================================================================
-
-/**
- * Percentage values for various calculations
- */
-export const PERCENTAGES = {
-  // Common percentages as basis points (10000 = 100%)
-  PERCENT_1: 100, // 1%
-  PERCENT_5: 500, // 5%
-  PERCENT_10: 1000, // 10%
-  PERCENT_25: 2500, // 25%
-  PERCENT_50: 5000, // 50%
-  PERCENT_100: 10000, // 100%
-
-  // Reserve ratios
-  RESERVE_RATIO_LOW: 900, // 9%
-  RESERVE_RATIO_STANDARD: 1000, // 10%
-  RESERVE_RATIO_HIGH: 1500, // 15%
-} as const
-
-// =============================================================================
-// CONVENIENCE GROUPINGS
-// =============================================================================
-
-/**
- * Grouped constants for common test scenarios
- */
-export const COMMON_TEST_VALUES = {
-  // Most frequently used timeout
-  DEFAULT_TIMEOUT: TIMEOUTS.DAY_1,
-
-  // Most frequently used amount
-  DEFAULT_AMOUNT: AMOUNTS.STANDARD_100_ETH,
-
-  // Most frequently used Bitcoin address
-  DEFAULT_BTC_ADDRESS: BTC_ADDRESSES.BECH32_STANDARD,
-
-  // Most frequently used Ethereum address
-  DEFAULT_ETH_ADDRESS: ETH_ADDRESSES.QC_1,
-
-  // Most frequently used role
-  DEFAULT_ROLE: ROLES.GOVERNANCE,
-} as const
-
-// =============================================================================
-// TEST SCENARIO PRESETS
-// =============================================================================
-
-/**
- * Pre-configured test scenarios with commonly used combinations
- */
-export const TEST_SCENARIOS = {
-  MINIMAL_REDEMPTION: {
-    amount: AMOUNTS.ETH_1,
-    timeout: TIMEOUTS.REDEMPTION_SHORT,
-    btcAddress: BTC_ADDRESSES.BECH32_STANDARD,
-  },
-
-  STANDARD_REDEMPTION: {
-    amount: AMOUNTS.REDEMPTION_5_ETH,
-    timeout: TIMEOUTS.REDEMPTION_24H,
-    btcAddress: BTC_ADDRESSES.BECH32_STANDARD,
-  },
-
-  LARGE_REDEMPTION: {
-    amount: AMOUNTS.ETH_100,
-    timeout: TIMEOUTS.REDEMPTION_DEFAULT,
-    btcAddress: BTC_ADDRESSES.BECH32_STANDARD,
-  },
-
-  QC_REGISTRATION: {
-    capacity: AMOUNTS.MINTING_CAP_100,
-    qcAddress: ETH_ADDRESSES.QC_1,
-    btcAddress: BTC_ADDRESSES.BECH32_STANDARD,
-  },
-
-  HIGH_CAPACITY_QC: {
-    capacity: AMOUNTS.MINTING_CAP_2000,
-    qcAddress: ETH_ADDRESSES.QC_1,
-    btcAddress: BTC_ADDRESSES.BECH32_STANDARD,
-  },
 } as const
 
 // =============================================================================
@@ -391,40 +229,3 @@ export const VALIDATION = {
       address.startsWith("bc1")) &&
     address.length >= 26,
 } as const
-
-// =============================================================================
-// EXPORT GROUPS FOR CONVENIENCE
-// =============================================================================
-
-/**
- * Export common constant groups for easier importing
- */
-export const TIME = TIMEOUTS
-export const MONEY = AMOUNTS
-export const BITCOIN = BTC_ADDRESSES
-export const ETHEREUM = ETH_ADDRESSES
-export const ACCESS = ROLES
-export const ERRORS = ERROR_MESSAGES
-export const GAS = GAS_LIMITS
-export const CHAIN = BLOCKCHAIN
-export const PERCENT = PERCENTAGES
-export const COMMON = COMMON_TEST_VALUES
-export const SCENARIOS = TEST_SCENARIOS
-
-/**
- * Default exports for backward compatibility
- */
-export default {
-  TIMEOUTS,
-  AMOUNTS,
-  BTC_ADDRESSES,
-  ETH_ADDRESSES,
-  ROLES,
-  GAS_LIMITS,
-  ERROR_MESSAGES,
-  BLOCKCHAIN,
-  PERCENTAGES,
-  COMMON_TEST_VALUES,
-  TEST_SCENARIOS,
-  VALIDATION,
-}

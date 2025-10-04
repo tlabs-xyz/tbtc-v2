@@ -208,6 +208,7 @@ export class LibraryLinkingHelper {
     qcDataAddress: string,
     systemStateAddress: string,
     reserveOracleAddress: string,
+    accountControlAddress: string,
     pauseManagerAddress: string,
     walletManagerAddress: string,
     libraries?: LibraryLinks
@@ -218,6 +219,7 @@ export class LibraryLinkingHelper {
       qcDataAddress,
       systemStateAddress,
       reserveOracleAddress,
+      accountControlAddress,
       pauseManagerAddress,
       walletManagerAddress
     )

@@ -37,43 +37,43 @@ describe("Account Control Test Data Validation", () => {
     })
 
     it("should have valid Bitcoin addresses", () => {
-      expect(BTC_ADDRESSES.VALID_LEGACY_BTC).to.match(
+      expect(BTC_ADDRESSES.GENESIS_BLOCK).to.match(
         /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/
       )
-      expect(BTC_ADDRESSES.VALID_P2SH_BTC).to.match(
+      expect(BTC_ADDRESSES.P2SH_STANDARD).to.match(
         /^3[a-km-zA-HJ-NP-Z1-9]{25,34}$/
       )
-      expect(BTC_ADDRESSES.VALID_BECH32_BTC).to.match(
+      expect(BTC_ADDRESSES.BECH32_STANDARD).to.match(
         /^bc1[a-z0-9]{39,59}$/
       )
-      expect(BTC_ADDRESSES.VALID_P2WSH_BTC).to.match(/^bc1[a-z0-9]{39,59}$/)
+      expect(BTC_ADDRESSES.BECH32_P2WSH).to.match(/^bc1[a-z0-9]{39,59}$/)
     })
 
     it("should have valid Ethereum addresses", () => {
-      expect(ethers.utils.isAddress(ETH_ADDRESSES.QC_ADDRESS_1)).to.be.true
-      expect(ethers.utils.isAddress(ETH_ADDRESSES.QC_ADDRESS_2)).to.be.true
-      expect(ethers.utils.isAddress(ETH_ADDRESSES.QC_ADDRESS_3)).to.be.true
-      expect(ethers.utils.isAddress(ETH_ADDRESSES.ZERO_ADDRESS)).to.be.true
+      expect(ethers.utils.isAddress(ETH_ADDRESSES.QC_1)).to.be.true
+      expect(ethers.utils.isAddress(ETH_ADDRESSES.QC_2)).to.be.true
+      expect(ethers.utils.isAddress(ETH_ADDRESSES.QC_3)).to.be.true
+      expect(ethers.utils.isAddress("0x0000000000000000000000000000000000000000")).to.be.true
     })
 
     it("should have properly formatted amount constants", () => {
-      expect(AMOUNTS.MIN_MINT_AMOUNT._isBigNumber).to.be.true
-      expect(AMOUNTS.STANDARD_MINT_AMOUNT._isBigNumber).to.be.true
-      expect(AMOUNTS.REDEMPTION_AMOUNT._isBigNumber).to.be.true
-      expect(AMOUNTS.INITIAL_MINTING_CAPACITY._isBigNumber).to.be.true
+      expect(AMOUNTS.ETH_0_001._isBigNumber).to.be.true
+      expect(AMOUNTS.ETH_1._isBigNumber).to.be.true
+      expect(AMOUNTS.REDEMPTION_5_ETH._isBigNumber).to.be.true
+      expect(AMOUNTS.MINTING_CAP_100._isBigNumber).to.be.true
     })
 
     it("should have reasonable timing constants", () => {
-      expect(TIMEOUTS.REDEMPTION_TIMEOUT_DEFAULT).to.equal(604800) // 7 days
-      expect(TIMEOUTS.STALE_THRESHOLD_DEFAULT).to.equal(86400) // 24 hours
-      expect(TIMEOUTS.ATTESTATION_TIMEOUT).to.equal(21600) // 6 hours
+      expect(TIMEOUTS.REDEMPTION_DEFAULT).to.equal(604800) // 7 days
+      expect(TIMEOUTS.ORACLE_STALE_DEFAULT).to.equal(86400) // 24 hours
+      expect(TIMEOUTS.ORACLE_ATTESTATION).to.equal(21600) // 6 hours
     })
 
     it("should have gas constants within reasonable ranges", () => {
-      expect(GAS_LIMITS.DEPLOYMENT_GAS).to.be.greaterThan(1000000)
-      expect(GAS_LIMITS.SPV_VALIDATION_GAS).to.be.greaterThan(500000)
-      expect(GAS_LIMITS.SPV_GAS_RANGE.min).to.be.lessThan(
-        GAS_LIMITS.SPV_GAS_RANGE.max
+      expect(GAS_LIMITS.DEPLOYMENT).to.be.greaterThan(1000000)
+      expect(GAS_LIMITS.SPV_VALIDATION).to.be.greaterThan(500000)
+      expect(GAS_LIMITS.SPV_MIN).to.be.lessThan(
+        GAS_LIMITS.SPV_MAX
       )
     })
   })
@@ -136,19 +136,19 @@ describe("Account Control Test Data Validation", () => {
     })
   })
 
-  describe("Legacy Compatibility", () => {
-    it("should maintain backward compatibility with TEST_CONSTANTS", () => {
+  describe("Data Structure Validation", () => {
+    it("should have well-formed TEST_CONSTANTS mapping", () => {
       expect(TEST_CONSTANTS.GOVERNANCE_ROLE).to.equal(
         ROLES.GOVERNANCE_ROLE
       )
       expect(TEST_CONSTANTS.VALID_LEGACY_BTC).to.equal(
-        BTC_ADDRESSES.VALID_LEGACY_BTC
+        BTC_ADDRESSES.GENESIS_BLOCK
       )
       expect(TEST_CONSTANTS.VALID_BECH32_BTC).to.equal(
-        BTC_ADDRESSES.VALID_BECH32_BTC
+        BTC_ADDRESSES.BECH32_STANDARD
       )
       expect(TEST_CONSTANTS.SMALL_MINT).to.equal(
-        AMOUNTS.SMALL_MINT_AMOUNT
+        AMOUNTS.ETH_0_1
       )
     })
   })
@@ -166,32 +166,32 @@ describe("Account Control Test Data Validation", () => {
 
     it("should have amount constants in proper hierarchy", () => {
       expect(
-        AMOUNTS.MIN_MINT_AMOUNT.lt(AMOUNTS.SMALL_MINT_AMOUNT)
+        AMOUNTS.ETH_0_001.lt(AMOUNTS.ETH_0_1)
       ).to.be.true
       expect(
-        AMOUNTS.SMALL_MINT_AMOUNT.lt(
-          AMOUNTS.STANDARD_MINT_AMOUNT
+        AMOUNTS.ETH_0_1.lt(
+          AMOUNTS.ETH_1
         )
       ).to.be.true
       expect(
-        AMOUNTS.STANDARD_MINT_AMOUNT.lt(
-          AMOUNTS.LARGE_MINT_AMOUNT
+        AMOUNTS.ETH_1.lt(
+          AMOUNTS.ETH_100
         )
       ).to.be.true
     })
 
     it("should have timing constants in logical order", () => {
-      expect(TIMEOUTS.STALE_THRESHOLD_SHORT).to.be.lessThan(
-        TIMEOUTS.STALE_THRESHOLD_TEST
+      expect(TIMEOUTS.ORACLE_STALE_SHORT).to.be.lessThan(
+        TIMEOUTS.ORACLE_STALE_STANDARD
       )
-      expect(TIMEOUTS.STALE_THRESHOLD_TEST).to.be.lessThan(
-        TIMEOUTS.STALE_THRESHOLD_DEFAULT
+      expect(TIMEOUTS.ORACLE_STALE_STANDARD).to.be.lessThan(
+        TIMEOUTS.ORACLE_STALE_DEFAULT
       )
-      expect(TIMEOUTS.REDEMPTION_TIMEOUT_SHORT).to.be.lessThan(
-        TIMEOUTS.REDEMPTION_TIMEOUT_TEST
+      expect(TIMEOUTS.REDEMPTION_SHORT).to.be.lessThan(
+        TIMEOUTS.REDEMPTION_24H
       )
-      expect(TIMEOUTS.REDEMPTION_TIMEOUT_TEST).to.be.lessThan(
-        TIMEOUTS.REDEMPTION_TIMEOUT_DEFAULT
+      expect(TIMEOUTS.REDEMPTION_24H).to.be.lessThan(
+        TIMEOUTS.REDEMPTION_DEFAULT
       )
     })
   })

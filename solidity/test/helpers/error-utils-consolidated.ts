@@ -338,11 +338,10 @@ export async function testInvalidInputs(
 }
 
 /**
- * Legacy compatibility export
+ * Error test utilities object
  */
 export const errorTestUtils = {
   expectRevert,
-  expectRevertAny: expectRevert, // Alias for compatibility
   expectCustomError,
   expectCustomErrorWithArgs,
   expectCustomErrorName,

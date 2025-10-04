@@ -27,7 +27,7 @@ import type {
   PerformanceMetrics
 } from "./types"
 
-// Re-export for backward compatibility
+// Re-export types
 export type {
   SystemStateData as SystemState,
   ValidationResult,

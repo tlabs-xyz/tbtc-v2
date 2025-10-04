@@ -3,8 +3,7 @@ import { ethers } from "hardhat"
 import type { BigNumber, BytesLike, BigNumberish } from "ethers"
 import type { IRelay, IRandomBeacon, ReserveOracle } from "../../typechain"
 
-// Import constants from the centralized location
-import { BLOCKCHAIN, BTC_ADDRESSES } from "./constants"
+import { BLOCKCHAIN } from "./constants"
 
 export interface MockConfiguration {
   relay?: {
@@ -271,7 +270,7 @@ export class TestMockFactory {
   }
 }
 
-// Export convenience functions for backward compatibility
+// Export convenience functions
 export const createMockRelay = (difficulty?: number) => 
   new TestMockFactory().createPlainMockRelay(difficulty)
 

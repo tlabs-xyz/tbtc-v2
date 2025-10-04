@@ -108,6 +108,7 @@ export class IntegrationTestFramework {
       qcData.address,
       systemState.address,
       reserveOracle.address,
+      accountControl.address,
       pauseManager.address,
       qcWalletManager.address
     )
@@ -216,8 +217,7 @@ export class IntegrationTestFramework {
     const GOVERNANCE_ROLE = await qcManager.GOVERNANCE_ROLE()
     await qcManager.grantRole(GOVERNANCE_ROLE, owner.address)
 
-    // Link QCManager to AccountControl for integration
-    await qcManager.connect(owner).setAccountControl(accountControl.address)
+    // QCManager is linked to AccountControl through constructor
 
     // Grant MINTER_ROLE to QCMinter in QCManager (required for minting operations)
     const MINTER_ROLE = ethers.utils.keccak256(
@@ -438,9 +438,9 @@ export class IntegrationTestFramework {
     const { reserveOracle } = this.contracts
 
     // Real ReserveOracle requires attestations from multiple attesters
-    await reserveOracle.connect(attester1).attestBalance(qcAddress, balance)
-    await reserveOracle.connect(attester2).attestBalance(qcAddress, balance)
-    await reserveOracle.connect(attester3).attestBalance(qcAddress, balance)
+    await reserveOracle.connect(attester1).batchAttestBalances([qcAddress], [balance])
+    await reserveOracle.connect(attester2).batchAttestBalances([qcAddress], [balance])
+    await reserveOracle.connect(attester3).batchAttestBalances([qcAddress], [balance])
   }
 
   /**

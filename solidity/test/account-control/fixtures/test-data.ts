@@ -140,16 +140,14 @@ export function createRoleConfiguration(
 }
 
 /**
- * SPV test configuration for backward compatibility
- * @deprecated Import BLOCKCHAIN, GAS_LIMITS, and TIMEOUTS directly from constants.ts
+ * SPV test configuration
  */
 export const spvTestConfig = {
   chainDifficulty: BLOCKCHAIN.DEFAULT_DIFFICULTY,
 } as const
 
 /**
- * SPV constants for backward compatibility
- * @deprecated Import BLOCKCHAIN and GAS_LIMITS directly from constants.ts
+ * SPV constants
  */
 export const SPV_CONSTANTS = {
   DEFAULT_BLOCK_HEIGHT: BLOCKCHAIN.DEFAULT_DIFFICULTY,
@@ -158,28 +156,72 @@ export const SPV_CONSTANTS = {
 } as const
 
 /**
- * Bitcoin test addresses for backward compatibility
- * @deprecated Import BTC_ADDRESSES directly from constants.ts
+ * Bitcoin test addresses
  */
 export const bitcoinTestAddresses = BTC_ADDRESSES
 
 /**
- * Minimal backward compatibility exports
- * @deprecated Import directly from constants.ts instead
- * These exports will be removed in the next major version
+ * Test constants mapping for validation tests
+ * Maps centralized constants to test-specific names
  */
 export const TEST_CONSTANTS = {
   // Role constants
-  GOVERNANCE_ROLE: ROLES.GOVERNANCE,
-  
+  GOVERNANCE_ROLE: ROLES.GOVERNANCE_ROLE,
+  DISPUTE_ARBITER_ROLE: ROLES.DISPUTE_ARBITER_ROLE,
+  REGISTRAR_ROLE: ROLES.REGISTRAR_ROLE,
+  ENFORCEMENT_ROLE: ROLES.ENFORCEMENT_ROLE || ethers.utils.id("ENFORCEMENT_ROLE"),
+  MONITOR_ROLE: ROLES.MONITOR_ROLE || ethers.utils.id("MONITOR_ROLE"),
+  EMERGENCY_ROLE: ROLES.EMERGENCY_ROLE || ethers.utils.id("EMERGENCY_ROLE"),
+  OPERATIONS_ROLE: ROLES.OPERATIONS_ROLE || ethers.utils.id("OPERATIONS_ROLE"),
+  MINTER_ROLE: ROLES.MINTER_ROLE || ethers.utils.id("MINTER_ROLE"),
+  QC_MANAGER_ROLE: ROLES.QC_MANAGER_ROLE || ethers.utils.id("QC_MANAGER_ROLE"),
+  ATTESTER_ROLE: ROLES.ATTESTER_ROLE || ethers.utils.id("ATTESTER_ROLE"),
+
   // Bitcoin addresses
   VALID_LEGACY_BTC: BTC_ADDRESSES.GENESIS_BLOCK,
+  VALID_P2SH_BTC: BTC_ADDRESSES.P2SH_STANDARD,
   VALID_BECH32_BTC: BTC_ADDRESSES.BECH32_STANDARD,
-  
+  VALID_P2WSH_BTC: BTC_ADDRESSES.BECH32_P2WSH,
+
+  // Ethereum addresses
+  QC_ADDRESS_1: ETH_ADDRESSES.QC_1,
+  QC_ADDRESS_2: ETH_ADDRESSES.QC_2,
+  QC_ADDRESS_3: ETH_ADDRESSES.QC_3,
+  ZERO_ADDRESS: "0x0000000000000000000000000000000000000000",
+
   // Amounts
+  MIN_MINT_AMOUNT: AMOUNTS.ETH_0_001,
+  SMALL_MINT_AMOUNT: AMOUNTS.ETH_0_1,
+  STANDARD_MINT_AMOUNT: AMOUNTS.ETH_1,
+  MEDIUM_CAP: AMOUNTS.ETH_100, // Medium capacity for testing
+  LARGE_MINT_AMOUNT: AMOUNTS.ETH_100,
+  REDEMPTION_AMOUNT: AMOUNTS.REDEMPTION_5_ETH,
+  INITIAL_MINTING_CAPACITY: AMOUNTS.MINTING_CAP_100,
+
+  // Timeouts
+  REDEMPTION_TIMEOUT_DEFAULT: TIMEOUTS.REDEMPTION_DEFAULT,
+  REDEMPTION_TIMEOUT_SHORT: TIMEOUTS.REDEMPTION_SHORT,
+  REDEMPTION_TIMEOUT_TEST: TIMEOUTS.REDEMPTION_24H,
+  STALE_THRESHOLD_DEFAULT: TIMEOUTS.ORACLE_STALE_DEFAULT,
+  STALE_THRESHOLD_SHORT: TIMEOUTS.ORACLE_STALE_SHORT,
+  STALE_THRESHOLD_TEST: TIMEOUTS.ORACLE_STALE_STANDARD,
+  ATTESTATION_TIMEOUT: TIMEOUTS.ORACLE_ATTESTATION,
+
+  // Gas limits
+  DEPLOYMENT_GAS: GAS_LIMITS.DEPLOYMENT,
+  SPV_VALIDATION_GAS: GAS_LIMITS.SPV_VALIDATION,
+  SPV_GAS_RANGE: {
+    min: GAS_LIMITS.SPV_MIN,
+    max: GAS_LIMITS.SPV_MAX,
+  },
+
+  // Test aliases
   SMALL_MINT: AMOUNTS.ETH_0_1,
-  
-  // Re-export ROLES for compatibility
+  MEDIUM_MINT: AMOUNTS.ETH_1,
+  MEDIUM_CAP: AMOUNTS.ETH_100,
+  LARGE_CAP: AMOUNTS.ETH_100,
+
+  // Re-export ROLES
   ROLES,
 } as const
 

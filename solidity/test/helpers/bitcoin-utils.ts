@@ -456,5 +456,3 @@ export class BitcoinUtils {
   }
 }
 
-// Legacy export for backward compatibility
-export const BitcoinTransactionUtils = BitcoinUtils

@@ -106,9 +106,6 @@ export default async function bridgeFixture() {
     address: await (await bridge.contractReferences()).relay,
   })
 
-  // Bridge is already updated in Bank via deployment scripts
-  // await bank.connect(governance).updateBridge(bridge.address)
-
   const redemptionWatchtower: RedemptionWatchtower =
     await helpers.contracts.getContract("RedemptionWatchtower")
 

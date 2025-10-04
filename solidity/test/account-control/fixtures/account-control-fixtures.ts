@@ -1,6 +1,6 @@
 import { ethers } from "hardhat"
 import { BigNumber } from "ethers"
-import { LibraryLinkingHelper } from "../helpers/library-linking-helper"
+import * as LibraryLinkingHelper from "../helpers/library-linking-helper"
 import { ROLES, BTC_ADDRESSES } from "../../fixtures/constants"
 
 /**
@@ -45,7 +45,7 @@ export async function deployQCManagerFixture() {
   const reserveOracle = await ReserveOracleFactory.deploy(systemState.address)
 
   // Deploy libraries using the helper
-  const libraries = await LibraryLinkingHelper.deployAllLibraries()
+  const libraries = await LibraryLinkingHelper.setupLibraryLinking()
 
   // Deploy QCPauseManager first with deployer as temporary QCManager
   const QCPauseManagerFactory = await ethers.getContractFactory(
@@ -66,26 +66,11 @@ export async function deployQCManagerFixture() {
 
   const walletManager = await MockQCWalletManagerFactory.deploy()
 
-  // Deploy QCManager using the helper with new signature
-  const qcManager = await LibraryLinkingHelper.deployQCManager(
-    qcData.address,
-    systemState.address,
-    reserveOracle.address,
-    pauseManager.address,
-    walletManager.address,
-    libraries
-  )
-
-  // Grant QC_MANAGER_ROLE to the real QCManager and revoke from deployer
-  const QC_MANAGER_ROLE = await pauseManager.QC_MANAGER_ROLE()
-  await pauseManager.grantRole(QC_MANAGER_ROLE, qcManager.address)
-  await pauseManager.revokeRole(QC_MANAGER_ROLE, deployer.address)
-
-  // Deploy MockBank for AccountControl
+  // Deploy MockBank for AccountControl first
   const MockBankFactory = await ethers.getContractFactory("MockBank")
   const mockBank = await MockBankFactory.deploy()
 
-  // Deploy AccountControl
+  // Deploy AccountControl first
   const AccountControlFactory = await ethers.getContractFactory(
     "AccountControl"
   )
@@ -98,8 +83,21 @@ export async function deployQCManagerFixture() {
 
   await accountControl.deployed()
 
-  // Setup AccountControl in QCManager
-  await qcManager.setAccountControl(accountControl.address)
+  // Now deploy QCManager with AccountControl address
+  const qcManager = await LibraryLinkingHelper.LibraryLinkingHelper.deployQCManager(
+    qcData.address,
+    systemState.address,
+    reserveOracle.address,
+    accountControl.address,
+    pauseManager.address,
+    walletManager.address,
+    libraries
+  )
+
+  // Grant QC_MANAGER_ROLE to the real QCManager and revoke from deployer
+  const QC_MANAGER_ROLE = await pauseManager.QC_MANAGER_ROLE()
+  await pauseManager.grantRole(QC_MANAGER_ROLE, qcManager.address)
+  await pauseManager.revokeRole(QC_MANAGER_ROLE, deployer.address)
 
   // Setup basic roles
   await qcData.grantRole(ROLES.QC_MANAGER, qcManager.address)
@@ -130,6 +128,8 @@ export async function deployQCManagerFixture() {
     systemState,
     reserveOracle,
     accountControl,
+    pauseManager,
+    walletManager,
     mockBank,
     // Signers
     deployer,
@@ -179,7 +179,7 @@ export async function deployQCRedeemerFixture() {
   )
 
   // Deploy QCRedeemer using the helper with proper AccountControl address
-  const qcRedeemer = await LibraryLinkingHelper.deployQCRedeemer(
+  const qcRedeemer = await LibraryLinkingHelper.LibraryLinkingHelper.deployQCRedeemer(
     tbtc.address,
     qcData.address,
     systemState.address,

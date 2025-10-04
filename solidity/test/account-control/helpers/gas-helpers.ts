@@ -318,7 +318,7 @@ export const GAS_EXPECTATIONS = {
 } as const
 
 /**
- * Legacy gas testing utilities
+ * Gas testing utilities
  */
 export const gasTestUtils = {
   measureGasUsage,
