@@ -37,6 +37,10 @@ const ecdsaSolidityCompilerConfig = {
       enabled: true,
       runs: 200,
     },
+    // Ensure debug info is generated for stack traces
+    debug: {
+      revertStrings: "debug",
+    },
   },
 }
 
@@ -48,6 +52,10 @@ const bridgeGovernanceCompilerConfig = {
     optimizer: {
       enabled: true,
       runs: 200,
+    },
+    // Ensure debug info is generated for stack traces
+    debug: {
+      revertStrings: "debug",
     },
   },
 }
@@ -77,6 +85,10 @@ const config: HardhatUserConfig = {
             enabled: true,
             runs: isTestEnv ? 100 : 1000, // Optimize for size in tests, gas efficiency in production
           },
+          // Ensure debug info is generated for stack traces
+          debug: {
+            revertStrings: "debug",
+          },
         },
       },
     ],
@@ -91,7 +103,12 @@ const config: HardhatUserConfig = {
             enabled: true,
             runs: 200, // Optimize for size with reasonable gas efficiency
           },
-          viaIR: true, // Enable intermediate representation for better optimization
+          // Disable viaIR in test environment to improve stack trace generation
+          viaIR: !isTestEnv, // Enable intermediate representation for better optimization in production only
+          // Ensure debug info is generated for stack traces
+          debug: {
+            revertStrings: "debug",
+          },
         },
       },
       "contracts/account-control/QCManagerLib.sol": {
@@ -101,7 +118,12 @@ const config: HardhatUserConfig = {
             enabled: true,
             runs: 200, // Optimize for size with reasonable gas efficiency
           },
-          viaIR: true, // Enable intermediate representation for better optimization
+          // Disable viaIR in test environment to improve stack trace generation
+          viaIR: !isTestEnv, // Enable intermediate representation for better optimization in production only
+          // Ensure debug info is generated for stack traces
+          debug: {
+            revertStrings: "debug",
+          },
         },
       },
     },

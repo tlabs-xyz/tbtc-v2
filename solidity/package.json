@@ -26,7 +26,7 @@
     "lint:fix:sol": "solhint 'contracts/**/*.sol' --fix",
     "test": "USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test",
     "test:local": "TEST_ENV=true hardhat test",
-    "test:ac": "USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test test/account-control/**/*.test.ts",
+    "test:ac": "TEST_ENV=true USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test test/account-control/**/*.test.ts",
     "test:integration": "NODE_ENV=integration-test USE_EXTERNAL_DEPLOY=true TEST_USE_STUBS_TBTC=true hardhat test ./test/integration/*.test.ts",
     "typecheck": "tsc --noEmit",
     "setup:accounts": "hardhat setup-accounts --network sepolia --seed",

@@ -6,7 +6,7 @@ dist/
 .vscode/
 .envrc
 
-yarn-error.log
+*.log
 CLAUDE.md
 CLAUDE.local.md
 .claude/

@@ -215,10 +215,15 @@ The account-control test suite has been fully organized into a clean, modular st
 - ✅ Integration tests enhanced
 - ✅ Legacy files migrated to appropriate directories
 
-### Backward Compatibility
-Helper files in the `helpers/` directory maintain backward compatibility:
-- `account-control-test-helpers.ts` - Consolidated test helpers
-For new code, import directly from the specific helper modules in the `helpers/` directory.
+### Helper Files
+The `helpers/` directory contains specialized test utilities:
+- `integration-test-framework.ts` - Core test setup and deployment utilities
+- `bitcoin-helpers.ts` - Bitcoin transaction and address utilities
+- `gas-helpers.ts` - Gas profiling and performance analysis
+- `error-helpers.ts` - Error testing and validation utilities
+- `library-linking-helper.ts` - Contract deployment with library linking
+
+Import directly from the specific helper modules based on your testing needs.
 
 ## Performance and Gas Analysis
 
