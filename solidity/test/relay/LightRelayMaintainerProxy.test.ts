@@ -10,7 +10,7 @@ import type {
   LightRelayMaintainerProxy,
   ReimbursementPool,
 } from "../../typechain"
-import { concatenateHexStrings } from "../helpers/math-utils"
+import { concatenateHexStrings } from "../helpers/contract-test-helpers"
 import longHeaders from "./longHeaders.json"
 
 const { provider } = waffle

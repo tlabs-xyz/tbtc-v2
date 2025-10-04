@@ -55,7 +55,7 @@ import {
   SingleTargetWallet,
 } from "../data/moving-funds"
 
-import bridgeFixture from "../fixtures"
+import bridgeFixture from "../fixtures/bridge"
 import { constants, walletState } from "../fixtures"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot

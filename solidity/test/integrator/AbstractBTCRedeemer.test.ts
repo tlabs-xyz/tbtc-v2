@@ -8,7 +8,7 @@ import type {
   MockBank,
 } from "../../typechain"
 
-import { to1ePrecision } from "../helpers/math-utils"
+import { to1ePrecision } from "../helpers/contract-test-helpers"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
@@ -44,19 +44,16 @@ describe("AbstractBTCRedeemer", () => {
     const MockTBTCTokenFactory = await ethers.getContractFactory(
       "MockTBTCToken"
     )
-
     tbtcToken = await MockTBTCTokenFactory.deploy()
 
     const MockBankFactory = await ethers.getContractFactory(
       "contracts/test/MockBank.sol:MockBank" // Specify the path to MockBank.sol
     )
-
     bank = (await MockBankFactory.deploy()) as MockBank
 
     const TestBTCRedeemerFactory = await ethers.getContractFactory(
       "TestBTCRedeemer"
     )
-
     redeemer = await TestBTCRedeemerFactory.deploy()
     await redeemer.initialize(bridge.address, tbtcToken.address, bank.address)
 
@@ -150,7 +147,6 @@ describe("AbstractBTCRedeemer", () => {
 
       // Calculate expected key using ethers.js for verification
       const scriptHash = ethers.utils.keccak256(outputScript)
-
       const expectedKey = ethers.utils.keccak256(
         ethers.utils.solidityPack(
           ["bytes32", "bytes20"],
@@ -162,7 +158,6 @@ describe("AbstractBTCRedeemer", () => {
         walletPkh,
         outputScript
       )
-
       expect(calculatedKey).to.equal(expectedKey)
     })
   })
@@ -204,7 +199,6 @@ describe("AbstractBTCRedeemer", () => {
       // Calculation: (1 BTC in sat - 0.5% treasury fee sat) - txMaxFee sat = (100,000,000 - 500,000) - 10,000 = 99,490,000 sat
       // This amount is then multiplied by SATOSHI_MULTIPLIER (10**10) in the contract.
       const expectedSatEquivalent = BigNumber.from(99490000)
-
       const expectedTbtcAmount = expectedSatEquivalent.mul(
         BigNumber.from(10).pow(10)
       )
@@ -250,7 +244,6 @@ describe("AbstractBTCRedeemer", () => {
           redeemer.address,
           bridge.address
         )
-
         expect(allowance).to.equal(fixture.amountToRedeemSat)
       })
     })
@@ -297,12 +290,10 @@ describe("AbstractBTCRedeemer", () => {
     context("when transaction max fee is zero", () => {
       before(async () => {
         await createSnapshot()
-
-        const mockBridge = await ethers.getContractAt(
+        const mockBridge = (await ethers.getContractAt(
           "MockTBTCBridge",
           bridge.address
-        )
-
+        )) as MockTBTCBridge
         await mockBridge.setRedemptionTxMaxFeeInternal(0)
       })
 
@@ -328,12 +319,10 @@ describe("AbstractBTCRedeemer", () => {
     context("when all fees are zero", () => {
       before(async () => {
         await createSnapshot()
-
-        const mockBridge = await ethers.getContractAt(
+        const mockBridge = (await ethers.getContractAt(
           "MockTBTCBridge",
           bridge.address
-        )
-
+        )) as MockTBTCBridge
         await mockBridge.setRedemptionTxMaxFeeInternal(0)
       })
 
@@ -455,7 +444,6 @@ describe("AbstractBTCRedeemer", () => {
 
       it("should transfer tBTC from contract to recipient", async () => {
         const finalContractBalance = await tbtcToken.balanceOf(redeemer.address)
-
         const finalRecipientBalance = await tbtcToken.balanceOf(
           deployer.address
         )
@@ -487,7 +475,6 @@ describe("AbstractBTCRedeemer", () => {
       it("should succeed and transfer zero tokens", async () => {
         const zeroAmount = BigNumber.from(0)
         const initialOwnerBalance = await tbtcToken.balanceOf(deployer.address)
-
         const initialContractBalance = await tbtcToken.balanceOf(
           redeemer.address
         )

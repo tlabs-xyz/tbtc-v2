@@ -504,9 +504,6 @@ contract AccountControl is ReentrancyGuard, Ownable, AccessControl {
         _mintTokensInternal(recipient, satoshis);
         _creditMintedInternal(reserve, satoshis);
 
-        // Emit original event for backward compatibility
-        emit MintExecuted(reserve, recipient, satoshis, msg.sender, block.timestamp);
-
         return satoshis;
     }
 

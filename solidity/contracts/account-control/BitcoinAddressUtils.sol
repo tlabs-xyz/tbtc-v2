@@ -15,6 +15,8 @@
 
 pragma solidity 0.8.17;
 
+import "./QCErrors.sol";
+
 /**
  * @title Bitcoin Address Utilities
  * @notice Library for decoding Bitcoin addresses into their script representations
@@ -23,7 +25,7 @@ pragma solidity 0.8.17;
  *      - P2SH (Pay-to-Script-Hash): Script addresses starting with '3'
  *      - P2WPKH (Pay-to-Witness-PubKey-Hash): Native SegWit addresses (bc1...)
  *      - P2WSH (Pay-to-Witness-Script-Hash): Native SegWit script addresses
- *      
+ *
  *      This library provides critical security functions for:
  *      - Bitcoin address format validation (lightweight and full cryptographic)
  *      - Address decoding for script hash extraction
@@ -37,10 +39,6 @@ pragma solidity 0.8.17;
  * - Public key derivation uses proper Bitcoin address standards
  */
 library BitcoinAddressUtils {
-    error InvalidAddressLength();
-    error InvalidAddressPrefix();
-    error InvalidChecksum();
-    error UnsupportedAddressType();
 
     // Bitcoin address version bytes
     uint8 private constant P2PKH_MAINNET_PREFIX = 0x00; // Addresses starting with '1'
@@ -76,7 +74,7 @@ library BitcoinAddressUtils {
         returns (uint8 scriptType, bytes memory scriptHash)
     {
         bytes memory addr = bytes(btcAddress);
-        if (addr.length == 0) revert InvalidAddressLength();
+        if (addr.length == 0) revert QCErrors.InvalidWalletAddress();
 
         // Check for Bech32 addresses (P2WPKH or P2WSH)
         if (isBech32Address(addr)) {
@@ -100,7 +98,7 @@ library BitcoinAddressUtils {
         bytes memory decoded = base58Decode(addr);
 
         // Verify minimum length (1 byte version + 20 bytes hash + 4 bytes checksum)
-        if (decoded.length != 25) revert InvalidAddressLength();
+        if (decoded.length != 25) revert QCErrors.InvalidBitcoinAddressLength(string(addr), decoded.length);
 
         // Extract components
         uint8 version = uint8(decoded[0]);
@@ -118,7 +116,7 @@ library BitcoinAddressUtils {
 
         bytes32 checksum = sha256(abi.encodePacked(sha256(toHash)));
         for (uint256 i = 0; i < 4; i++) {
-            if (decoded[21 + i] != checksum[i]) revert InvalidChecksum();
+            if (decoded[21 + i] != checksum[i]) revert QCErrors.InvalidBitcoinAddressFormat(string(addr));
         }
 
         // Determine script type based on version byte
@@ -131,7 +129,7 @@ library BitcoinAddressUtils {
         ) {
             return (1, hash); // P2SH
         } else {
-            revert InvalidAddressPrefix();
+            revert QCErrors.InvalidBitcoinAddressFormat(string(addr));
         }
     }
 
@@ -154,7 +152,7 @@ library BitcoinAddressUtils {
         }
 
         if (sepIndex == 0 || sepIndex + 7 > addr.length)
-            revert InvalidAddressLength();
+            revert QCErrors.InvalidBitcoinAddressFormat("");
 
         // Decode data part
         bytes memory data = new bytes(addr.length - sepIndex - 1);
@@ -170,7 +168,7 @@ library BitcoinAddressUtils {
 
         // Verify checksum (last 6 characters)
         if (!verifyBech32Checksum(addr, sepIndex, values))
-            revert InvalidChecksum();
+            revert QCErrors.InvalidBitcoinAddressFormat(string(addr));
 
         // Convert from 5-bit to 8-bit, excluding version and checksum
         uint256 witnessVersion = values[0];
@@ -192,7 +190,7 @@ library BitcoinAddressUtils {
             }
         }
 
-        revert UnsupportedAddressType();
+        revert QCErrors.InvalidBitcoinAddressFormat(string(addr));
     }
 
     /// @notice Base58 decode implementation
@@ -236,7 +234,7 @@ library BitcoinAddressUtils {
                 carry /= 256;
             }
             
-            if (carry != 0) revert InvalidAddressLength();
+            if (carry != 0) revert QCErrors.InvalidBitcoinAddressFormat("");
         }
         
         // Find first non-zero byte
@@ -250,7 +248,7 @@ library BitcoinAddressUtils {
         
         // If no non-zero bytes found, but we have non-leading-one characters, it's an error
         if (firstNonZero == WORK_SIZE && leadingOnes < source.length) {
-            revert InvalidAddressLength();
+            revert QCErrors.InvalidBitcoinAddressFormat("");
         }
         
         // Calculate result size
@@ -294,8 +292,8 @@ library BitcoinAddressUtils {
         } else if (c >= 0x6D && c <= 0x7A) { // 'm' to 'z'
             return c - 0x6D + 44; // 44-57
         }
-        
-        revert InvalidAddressPrefix();
+
+        revert QCErrors.InvalidAddressPrefix();
     }
 
     /// @notice Convert Bech32 character to its numeric value
@@ -343,8 +341,8 @@ library BitcoinAddressUtils {
         if (c == 0x61 || c == 0x41) return 29; // 'a' or 'A'
         if (c == 0x37) return 30; // '7'
         if (c == 0x6C || c == 0x4C) return 31; // 'l' or 'L'
-        
-        revert InvalidAddressPrefix();
+
+        revert QCErrors.InvalidAddressPrefix();
     }
 
     /// @notice Verify Bech32 checksum
@@ -504,7 +502,7 @@ library BitcoinAddressUtils {
     /// @param publicKey The uncompressed public key (64 bytes, no 0x04 prefix)
     /// @return btcAddress The derived Bitcoin address in bech32 format
     function deriveBitcoinAddressFromPublicKey(bytes memory publicKey) internal pure returns (string memory) {
-        if (publicKey.length != 64) revert InvalidAddressLength();
+        if (publicKey.length != 64) revert QCErrors.InvalidAddressLength();
         
         // Step 1: Compress the public key
         // Take the X coordinate (first 32 bytes)
@@ -631,19 +629,19 @@ library BitcoinAddressUtils {
         uint256 length = addr.length;
         
         // Basic length check
-        if (length < 26 || length > 90) revert InvalidAddressLength();
+        if (length < 26 || length > 90) revert QCErrors.InvalidBitcoinAddressLength(btcAddress, length);
         
         bytes1 first = addr[0];
         
         // P2PKH addresses: start with '1', length 26-35
         if (first == 0x31) { // '1'
-            if (length > 35) revert InvalidAddressLength();
+            if (length > 35) revert QCErrors.InvalidBitcoinAddressLength(btcAddress, length);
             return;
         }
         
         // P2SH addresses: start with '3', length 26-35  
         if (first == 0x33) { // '3'
-            if (length > 35) revert InvalidAddressLength();
+            if (length > 35) revert QCErrors.InvalidBitcoinAddressLength(btcAddress, length);
             return;
         }
         
@@ -656,7 +654,7 @@ library BitcoinAddressUtils {
                 
                 // Ensure no mixed case (BIP-173 requirement)
                 if (hasMixedCaseInAddress(addr)) {
-                    revert InvalidAddressPrefix();
+                    revert QCErrors.InvalidBitcoinAddressFormat(btcAddress);
                 }
                 
                 // Basic character validation for Bech32
@@ -666,7 +664,7 @@ library BitcoinAddressUtils {
                     if (!((c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7a))) {
                         // Allow uppercase if entire address is uppercase
                         if (!((c >= 0x41 && c <= 0x5a) && addr[0] == 0x42)) {
-                            revert InvalidAddressPrefix();
+                            revert QCErrors.InvalidBitcoinAddressFormat(btcAddress);
                         }
                     }
                 }
@@ -680,7 +678,7 @@ library BitcoinAddressUtils {
                 
                 // Ensure no mixed case
                 if (hasMixedCaseInAddress(addr)) {
-                    revert InvalidAddressPrefix();
+                    revert QCErrors.InvalidBitcoinAddressFormat(btcAddress);
                 }
                 
                 // Basic character validation
@@ -688,14 +686,14 @@ library BitcoinAddressUtils {
                     uint8 c = uint8(addr[i]);
                     if (!((c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7a))) {
                         if (!((c >= 0x41 && c <= 0x5a) && addr[0] == 0x54)) {
-                            revert InvalidAddressPrefix();
+                            revert QCErrors.InvalidBitcoinAddressFormat(btcAddress);
                         }
                     }
                 }
                 return;
             }
         }
-        
-        revert InvalidAddressPrefix();
+
+        revert QCErrors.InvalidBitcoinAddressFormat("");
     }
 }

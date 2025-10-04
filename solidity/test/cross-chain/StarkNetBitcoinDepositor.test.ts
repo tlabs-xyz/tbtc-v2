@@ -8,7 +8,7 @@ import type {
   MockTBTCToken,
   MockStarkGateBridge,
 } from "../../typechain"
-// import { to1ePrecision } from "../helpers/math-utils"
+// import { to1ePrecision } from "../helpers/contract-test-helpers"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 

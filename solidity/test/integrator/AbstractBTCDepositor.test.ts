@@ -6,7 +6,7 @@ import type {
   MockTBTCVault,
   TestBTCDepositor,
 } from "../../typechain"
-import { to1ePrecision } from "../helpers/math-utils"
+import { to1ePrecision } from "../helpers/contract-test-helpers"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 
@@ -50,7 +50,6 @@ describe("AbstractBTCDepositor", () => {
     const MockTBTCVault = await ethers.getContractFactory(
       "contracts/test/TestBTCDepositor.sol:MockTBTCVault"
     )
-
     tbtcVault = (await MockTBTCVault.deploy()) as MockTBTCVault
 
     fixture = loadFixture(tbtcVault.address)

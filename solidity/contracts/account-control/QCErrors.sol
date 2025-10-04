@@ -159,6 +159,12 @@ interface QCErrors {
     /// @param length The actual length
     error InvalidBitcoinAddressLength(string btcAddress, uint256 length);
 
+    /// @notice Thrown when address length is invalid (for public keys and other length validations)
+    error InvalidAddressLength();
+
+    /// @notice Thrown when address prefix is invalid
+    error InvalidAddressPrefix();
+
     // =================== Configuration Errors ===================
 
     /// @notice Thrown when AccountControl is not configured

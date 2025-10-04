@@ -104,4 +104,15 @@ interface IQCManagerEvents {
         uint256 oldValue,
         uint256 newValue
     );
+
+    /**
+     * @notice Wallet registration requested by QC (relayed from QCWalletManager)
+     */
+    event WalletRegistrationRequested(
+        address indexed qc,
+        string btcAddress,
+        bytes32 indexed challenge,
+        address indexed requestedBy,
+        uint256 timestamp
+    );
 }

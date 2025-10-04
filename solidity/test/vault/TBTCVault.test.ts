@@ -4,7 +4,7 @@ import { expect } from "chai"
 import { ContractTransaction } from "ethers"
 import { FakeContract, smock } from "@defi-wonderland/smock"
 import { constants } from "../fixtures"
-import { toSatoshis } from "../helpers/math-utils"
+import { toSatoshis } from "../helpers/contract-test-helpers"
 
 import type {
   Bank,

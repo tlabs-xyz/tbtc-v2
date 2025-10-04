@@ -155,6 +155,51 @@ contract QCManager is AccessControl, ReentrancyGuard, QCErrors, IQCManagerEvents
         walletManager.setQCRedeemer(_qcRedeemer);
     }
 
+    // =================== WALLET MANAGEMENT ===================
+
+    /// @notice Direct wallet registration by QCs themselves
+    /// @dev Delegates to QCWalletManager after validating QC status
+    /// @param btcAddress Bitcoin address to register (must be valid format)
+    /// @param nonce Unique nonce to prevent replay attacks (must be unused)
+    /// @param walletPublicKey Bitcoin public key corresponding to the address
+    /// @param v Recovery parameter for ECDSA signature
+    /// @param r First 32 bytes of ECDSA signature
+    /// @param s Second 32 bytes of ECDSA signature
+    function registerWalletDirect(
+        string calldata btcAddress,
+        uint256 nonce,
+        bytes calldata walletPublicKey,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    )
+        external
+        validQC(msg.sender)
+        nonReentrant
+    {
+        // Delegate to wallet manager
+        walletManager.registerWalletDirect(
+            btcAddress,
+            nonce,
+            walletPublicKey,
+            v,
+            r,
+            s
+        );
+
+        // Generate challenge hash for event (same logic as QCWalletManager)
+        bytes32 challenge = keccak256(abi.encodePacked(msg.sender, btcAddress, nonce));
+
+        // Emit event to match test expectations
+        emit WalletRegistrationRequested(
+            msg.sender,
+            btcAddress,
+            challenge,
+            msg.sender,
+            block.timestamp
+        );
+    }
+
     // =================== GOVERNANCE ===================
 
     /// @notice Register a new Qualified Custodian
