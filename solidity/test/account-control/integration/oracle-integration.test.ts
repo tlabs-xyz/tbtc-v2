@@ -76,9 +76,9 @@ describe("Oracle Integration Tests", () => {
     const DISPUTE_ARBITER_ROLE = await reserveOracle.DISPUTE_ARBITER_ROLE()
     await reserveOracle.grantRole(DISPUTE_ARBITER_ROLE, owner.address)
 
-    // Set consensus threshold to 3 (minimum odd number)
-    await reserveOracle.setConsensusThreshold(3)
-    await reserveOracle.setAttestationTimeout(3600) // 1 hour
+    // Set consensus threshold to 3 (minimum odd number) via SystemState
+    await systemState.setOracleConsensusThreshold(3)
+    await systemState.setOracleAttestationTimeout(3600) // 1 hour
 
     // Grant attester roles
     const ATTESTER_ROLE = await reserveOracle.ATTESTER_ROLE()
@@ -123,6 +123,7 @@ describe("Oracle Integration Tests", () => {
       qcData.address,
       systemState.address,
       reserveOracle.address,
+      accountControl.address,
       pauseManager.address,
       walletManager.address
     )
@@ -135,9 +136,6 @@ describe("Oracle Integration Tests", () => {
 
     // Setup default system state
     await setupSystemStateDefaults(systemState, owner)
-
-    // Set AccountControl address in QCManager
-    await qcManager.connect(owner).setAccountControl(accountControl.address)
 
     // Grant GOVERNANCE_ROLE to owner for QCManager operations
     const GOVERNANCE_ROLE = await qcManager.GOVERNANCE_ROLE()
@@ -231,11 +229,11 @@ describe("Oracle Integration Tests", () => {
       // Submit attestation from first attester
       const tx = await reserveOracle
         .connect(attester1)
-        .submitAttestation(qc.address, reserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount])
 
       await expect(tx)
         .to.emit(reserveOracle, "AttestationSubmitted")
-        .withArgs(attester1.address, qc.address, reserveAmount)
+        .withArgs(attester1.address, qc.address, reserveAmount.toString())
 
       // Verify attestation is recorded but not yet finalized (needs consensus)
       const attestation = await reserveOracle.getAttestation(qc.address)
@@ -257,25 +255,25 @@ describe("Oracle Integration Tests", () => {
       // Submit attestations from all three attesters
       await reserveOracle
         .connect(attester1)
-        .submitAttestation(qc.address, reserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount])
 
       await reserveOracle
         .connect(attester2)
-        .submitAttestation(qc.address, reserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount])
 
       // Third attestation should trigger consensus
       const tx = await reserveOracle
         .connect(attester3)
-        .submitAttestation(qc.address, reserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount])
 
       await expect(tx)
         .to.emit(reserveOracle, "ConsensusReached")
-        .withArgs(qc.address, reserveAmount)
+        .withArgs(qc.address, reserveAmount.toString())
 
       // Should also trigger backing update in AccountControl
       await expect(tx)
         .to.emit(accountControl, "BackingUpdated")
-        .withArgs(qc.address, ONE_BTC_IN_SATOSHIS.mul(5), reserveAmount)
+        .withArgs(qc.address, ONE_BTC_IN_SATOSHIS.mul(5).toString(), reserveAmount.toString())
 
       // Verify attestation is finalized
       const attestation = await reserveOracle.getAttestation(qc.address)
@@ -309,16 +307,16 @@ describe("Oracle Integration Tests", () => {
       // Submit conflicting attestations
       await reserveOracle
         .connect(attester1)
-        .submitAttestation(qc.address, reserveAmount1, attestationData1)
+        .batchAttestBalances([qc.address], [reserveAmount1])
 
       await reserveOracle
         .connect(attester2)
-        .submitAttestation(qc.address, reserveAmount2, attestationData2)
+        .batchAttestBalances([qc.address], [reserveAmount2])
 
       // Third attester agrees with first
       await reserveOracle
         .connect(attester3)
-        .submitAttestation(qc.address, reserveAmount1, attestationData1)
+        .batchAttestBalances([qc.address], [reserveAmount1])
 
       // Should reach consensus on the majority opinion (reserveAmount1)
       const attestation = await reserveOracle.getAttestation(qc.address)
@@ -357,14 +355,14 @@ describe("Oracle Integration Tests", () => {
       // Achieve consensus
       await reserveOracle
         .connect(attester1)
-        .submitAttestation(qc.address, newReserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [newReserveAmount])
       await reserveOracle
         .connect(attester2)
-        .submitAttestation(qc.address, newReserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [newReserveAmount])
 
       const tx = await reserveOracle
         .connect(attester3)
-        .submitAttestation(qc.address, newReserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [newReserveAmount])
 
       // Verify backing was automatically updated
       const updatedBacking = await accountControl.backing(qc.address)
@@ -372,7 +370,7 @@ describe("Oracle Integration Tests", () => {
 
       await expect(tx)
         .to.emit(accountControl, "BackingUpdated")
-        .withArgs(qc.address, initialBacking, newReserveAmount)
+        .withArgs(qc.address, initialBacking.toString(), newReserveAmount.toString())
     })
 
     it("should respect minting constraints with oracle-updated backing", async () => {
@@ -390,13 +388,13 @@ describe("Oracle Integration Tests", () => {
       // Achieve consensus on reduced backing
       await reserveOracle
         .connect(attester1)
-        .submitAttestation(qc.address, reducedBacking, attestationData)
+        .batchAttestBalances([qc.address], [reducedBacking])
       await reserveOracle
         .connect(attester2)
-        .submitAttestation(qc.address, reducedBacking, attestationData)
+        .batchAttestBalances([qc.address], [reducedBacking])
       await reserveOracle
         .connect(attester3)
-        .submitAttestation(qc.address, reducedBacking, attestationData)
+        .batchAttestBalances([qc.address], [reducedBacking])
 
       // Verify backing is reduced
       const backing = await accountControl.backing(qc.address)
@@ -433,7 +431,7 @@ describe("Oracle Integration Tests", () => {
       // Submit one attestation
       await reserveOracle
         .connect(attester1)
-        .submitAttestation(qc.address, reserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount])
 
       // Fast forward time beyond timeout (set to 1 hour in beforeEach)
       await ethers.provider.send("evm_increaseTime", [3700]) // 1 hour + 100 seconds
@@ -443,7 +441,7 @@ describe("Oracle Integration Tests", () => {
       await expect(
         reserveOracle
           .connect(attester2)
-          .submitAttestation(qc.address, reserveAmount, attestationData)
+          .batchAttestBalances([qc.address], [reserveAmount])
       ).to.emit(reserveOracle, "AttestationSubmitted")
     })
 
@@ -461,7 +459,7 @@ describe("Oracle Integration Tests", () => {
 
       await reserveOracle
         .connect(attester1)
-        .submitAttestation(qc.address, reserveAmount1, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount1])
 
       // Fast forward beyond timeout
       await ethers.provider.send("evm_increaseTime", [3700])
@@ -479,16 +477,16 @@ describe("Oracle Integration Tests", () => {
       await expect(
         reserveOracle
           .connect(attester1)
-          .submitAttestation(qc.address, reserveAmount2, attestationData)
+          .batchAttestBalances([qc.address], [reserveAmount2])
       ).to.not.be.reverted
 
       // Complete the new round
       await reserveOracle
         .connect(attester2)
-        .submitAttestation(qc.address, reserveAmount2, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount2])
       await reserveOracle
         .connect(attester3)
-        .submitAttestation(qc.address, reserveAmount2, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount2])
 
       // Verify consensus was reached on the new amount
       const attestation = await reserveOracle.getAttestation(qc.address)
@@ -516,13 +514,13 @@ describe("Oracle Integration Tests", () => {
       // Achieve consensus on incorrect amount
       await reserveOracle
         .connect(attester1)
-        .submitAttestation(qc.address, reserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount])
       await reserveOracle
         .connect(attester2)
-        .submitAttestation(qc.address, reserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount])
       await reserveOracle
         .connect(attester3)
-        .submitAttestation(qc.address, reserveAmount, attestationData)
+        .batchAttestBalances([qc.address], [reserveAmount])
 
       // Verify wrong consensus was reached
       let attestation = await reserveOracle.getAttestation(qc.address)
@@ -541,7 +539,7 @@ describe("Oracle Integration Tests", () => {
 
       await expect(tx)
         .to.emit(reserveOracle, "AttestationOverridden")
-        .withArgs(qc.address, reserveAmount, correctAmount)
+        .withArgs(qc.address, reserveAmount.toString(), correctAmount.toString())
 
       // Verify override took effect
       attestation = await reserveOracle.getAttestation(qc.address)

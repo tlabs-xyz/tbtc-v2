@@ -104,7 +104,7 @@ describe("QCWalletManager", () => {
     // Setup test QC in QCData
     await qcData.registerQC(
       signers.qcAddress.address,
-      TEST_CONSTANTS.MEDIUM_CAP
+      ethers.utils.parseEther("100")
     )
   })
 

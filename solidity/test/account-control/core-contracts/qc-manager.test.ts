@@ -88,6 +88,7 @@ describe("QCManager", () => {
       fakeQCData.address,
       fakeSystemState.address,
       fakeReserveOracle.address,
+      fakeAccountControl.address,
       fakePauseManager.address,
       fakeWalletManager.address
     )) as QCManager
@@ -98,11 +99,8 @@ describe("QCManager", () => {
     await qcManager.grantRole(DISPUTE_ARBITER_ROLE, arbiter.address)
     await qcManager.grantRole(ENFORCEMENT_ROLE, watchdog.address)
 
-    // Set AccountControl (requires DEFAULT_ADMIN_ROLE)
+    // AccountControl is set in constructor, no need for setAccountControl
     await qcManager.grantRole(DEFAULT_ADMIN_ROLE, governance.address)
-    await qcManager
-      .connect(governance)
-      .setAccountControl(fakeAccountControl.address)
   })
 
   describe("Deployment", () => {
@@ -166,7 +164,8 @@ describe("QCManager", () => {
 
       await expect(
         qcManager.connect(governance).registerQC(qcAddress.address, LARGE_CAP)
-      ).to.be.revertedWith("QCAlreadyRegistered")
+      ).to.be.revertedWithCustomError(qcManager, "QCAlreadyRegistered")
+        .withArgs(qcAddress.address)
     })
 
     it("should prevent registration with invalid parameters", async () => {
@@ -175,13 +174,13 @@ describe("QCManager", () => {
         qcManager
           .connect(governance)
           .registerQC(ethers.constants.AddressZero, MEDIUM_CAP)
-      ).to.be.revertedWith("InvalidQCAddress")
+      ).to.be.revertedWithCustomError(qcManager, "InvalidQCAddress")
 
       // Zero capacity
       const validAddress = ethers.Wallet.createRandom().address
       await expect(
         qcManager.connect(governance).registerQC(validAddress, 0)
-      ).to.be.revertedWith("InvalidMintingCapacity")
+      ).to.be.revertedWithCustomError(qcManager, "InvalidMintingCapacity")
     })
 
     it("should enforce governance role for registration", async () => {
@@ -221,8 +220,8 @@ describe("QCManager", () => {
         .withArgs(
           qcAddress.address,
           ethers.utils.keccak256(ethers.utils.toUtf8Bytes("CAP")),
-          MEDIUM_CAP,
-          newCapacity
+          MEDIUM_CAP.toString(),
+          newCapacity.toString()
         )
 
       expect(fakeQCData.updateMaxMintingCapacity).to.have.been.calledWith(
@@ -257,7 +256,8 @@ describe("QCManager", () => {
         qcManager
           .connect(governance)
           .increaseMintingCapacity(qcAddress.address, MEDIUM_CAP)
-      ).to.be.revertedWith("NewCapMustBeHigher")
+      ).to.be.revertedWithCustomError(qcManager, "NewCapMustBeHigher")
+        .withArgs(LARGE_CAP.toString(), MEDIUM_CAP.toString())
     })
 
     it("should prevent capacity increase for unregistered QC", async () => {
@@ -277,7 +277,8 @@ describe("QCManager", () => {
         qcManager
           .connect(governance)
           .increaseMintingCapacity(unregisteredQC, LARGE_CAP)
-      ).to.be.revertedWith("QCNotRegistered")
+      ).to.be.revertedWithCustomError(qcManager, "QCNotRegistered")
+        .withArgs(unregisteredQC)
     })
   })
 

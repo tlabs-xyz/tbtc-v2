@@ -12,7 +12,7 @@ import {
   IQCPauseManager,
   IQCWalletManager,
 } from "../../../typechain"
-import { deployQCManagerFixture } from "../../fixtures"
+import { deployQCManagerFixture } from "../fixtures/account-control-fixtures"
 
 /**
  * Transaction Atomicity Integration Tests
@@ -195,7 +195,7 @@ describe("QCManager Transaction Atomicity", () => {
       const corruptBalance = ethers.utils.parseEther("999999") // Unrealistic value
 
       // Capture initial state
-      const initialOracleData = await qcManager.qcOracleData(qc)
+      const initialOracleData = await qcData.getQCOracleData(qc)
       const initialBackingInfo = await accountControl.getBackingInfo(qc)
 
       // Update oracle with corrupt data that should trigger validation failure
@@ -209,7 +209,7 @@ describe("QCManager Transaction Atomicity", () => {
       }
 
       // Validate no partial updates occurred
-      const currentOracleData = await qcManager.qcOracleData(qc)
+      const currentOracleData = await qcData.getQCOracleData(qc)
       const currentBackingInfo = await accountControl.getBackingInfo(qc)
 
       // Oracle data should remain unchanged
@@ -528,7 +528,7 @@ describe("QCManager Transaction Atomicity", () => {
   async function captureSystemState(qcAddress: string) {
     const qcInfo = await qcData.getQCInfo(qcAddress)
     const reserveInfo = await accountControl.reserveInfo(qcAddress)
-    const oracleData = await qcManager.qcOracleData(qcAddress)
+    const [lastSyncTimestamp, oracleFailureDetected] = await qcData.getQCOracleData(qcAddress)
     const pauseInfo = await pauseManager.getPauseInfo(qcAddress)
 
     return {
@@ -541,20 +541,18 @@ describe("QCManager Transaction Atomicity", () => {
       mintingCap: reserveInfo.mintingCap,
       mintingPaused: reserveInfo.mintingPaused,
       redeemingPaused: reserveInfo.redeemingPaused,
-      lastKnownReserveBalance: oracleData.lastKnownReserveBalance,
-      lastKnownBalanceTimestamp: oracleData.lastKnownBalanceTimestamp,
-      oracleFailureDetected: oracleData.oracleFailureDetected,
+      lastSyncTimestamp,
+      oracleFailureDetected,
       isPaused: pauseInfo.isPaused,
       selfPauseTimestamp: pauseInfo.selfPauseTimestamp,
     }
   }
 
   async function captureOracleState(qcAddress: string) {
-    const oracleData = await qcManager.qcOracleData(qcAddress)
+    const [lastSyncTimestamp, oracleFailureDetected] = await qcData.getQCOracleData(qcAddress)
     return {
-      lastKnownReserveBalance: oracleData.lastKnownReserveBalance,
-      lastKnownBalanceTimestamp: oracleData.lastKnownBalanceTimestamp,
-      oracleFailureDetected: oracleData.oracleFailureDetected,
+      lastSyncTimestamp,
+      oracleFailureDetected,
     }
   }
 

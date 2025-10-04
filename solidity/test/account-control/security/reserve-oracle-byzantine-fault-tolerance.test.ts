@@ -77,13 +77,13 @@ describe("ReserveOracle - Byzantine Fault Tolerance", () => {
       for (let i = 0; i < 4; i++) {
         await reserveOracle
           .connect(maliciousAttesters[i])
-          .attestBalance(qcAddress.address, maliciousBalance)
+          .batchAttestBalances([qcAddress.address], [maliciousBalance])
       }
 
       // 5th attester (honest) should trigger consensus
       const tx = await reserveOracle
         .connect(honestAttesters[0])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
@@ -105,22 +105,22 @@ describe("ReserveOracle - Byzantine Fault Tolerance", () => {
       // 2 malicious attesters
       await reserveOracle
         .connect(maliciousAttesters[0])
-        .attestBalance(qcAddress.address, maliciousBalance)
+        .batchAttestBalances([qcAddress.address], [maliciousBalance])
       await reserveOracle
         .connect(maliciousAttesters[1])
-        .attestBalance(qcAddress.address, maliciousBalance)
+        .batchAttestBalances([qcAddress.address], [maliciousBalance])
 
       // 3 honest attesters
       await reserveOracle
         .connect(honestAttesters[0])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
       await reserveOracle
         .connect(honestAttesters[1])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
 
       const tx = await reserveOracle
         .connect(honestAttesters[2])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
@@ -143,19 +143,19 @@ describe("ReserveOracle - Byzantine Fault Tolerance", () => {
       for (let i = 0; i < 3; i++) {
         await reserveOracle
           .connect(maliciousAttesters[i])
-          .attestBalance(qcAddress.address, maliciousBalance)
+          .batchAttestBalances([qcAddress.address], [maliciousBalance])
       }
 
       // 3 honest attesters (50%)
       for (let i = 0; i < 2; i++) {
         await reserveOracle
           .connect(honestAttesters[i])
-          .attestBalance(qcAddress.address, honestBalance)
+          .batchAttestBalances([qcAddress.address], [honestBalance])
       }
 
       const tx = await reserveOracle
         .connect(honestAttesters[2])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
@@ -245,21 +245,21 @@ describe("ReserveOracle - Byzantine Fault Tolerance", () => {
       // Malicious attesters coordinate to submit just before consensus
       await reserveOracle
         .connect(honestAttesters[0])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
       await reserveOracle
         .connect(honestAttesters[1])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
       await reserveOracle
         .connect(honestAttesters[2])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
       await reserveOracle
         .connect(honestAttesters[3])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
 
       // Malicious attester tries to manipulate final consensus
       const tx = await reserveOracle
         .connect(maliciousAttesters[0])
-        .attestBalance(qcAddress.address, attackBalance)
+        .batchAttestBalances([qcAddress.address], [attackBalance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
@@ -283,25 +283,28 @@ describe("ReserveOracle - Byzantine Fault Tolerance", () => {
         balance: baselineBalance,
       })
 
+      // Reset consensus to allow new attestations
+      await reserveOracle.connect(arbiter).resetConsensus(qcAddress.address)
+
       // Second round: attackers try gradual increase
       const slightlyInflated = ethers.utils.parseEther("120") // 20% inflation
 
       await reserveOracle
         .connect(maliciousAttesters[0])
-        .attestBalance(qcAddress.address, slightlyInflated)
+        .batchAttestBalances([qcAddress.address], [slightlyInflated])
       await reserveOracle
         .connect(maliciousAttesters[1])
-        .attestBalance(qcAddress.address, slightlyInflated)
+        .batchAttestBalances([qcAddress.address], [slightlyInflated])
       await reserveOracle
-        .connect(honestAttesters[0])
-        .attestBalance(qcAddress.address, baselineBalance)
+        .connect(maliciousAttesters[2])
+        .batchAttestBalances([qcAddress.address], [slightlyInflated])
       await reserveOracle
-        .connect(honestAttesters[1])
-        .attestBalance(qcAddress.address, baselineBalance)
+        .connect(maliciousAttesters[3])
+        .batchAttestBalances([qcAddress.address], [slightlyInflated])
 
       const tx = await reserveOracle
-        .connect(honestAttesters[2])
-        .attestBalance(qcAddress.address, baselineBalance)
+        .connect(honestAttesters[3])
+        .batchAttestBalances([qcAddress.address], [baselineBalance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
@@ -321,10 +324,10 @@ describe("ReserveOracle - Byzantine Fault Tolerance", () => {
       // Malicious attesters submit bad data
       await reserveOracle
         .connect(maliciousAttesters[0])
-        .attestBalance(qcAddress.address, attackBalance)
+        .batchAttestBalances([qcAddress.address], [attackBalance])
       await reserveOracle
         .connect(maliciousAttesters[1])
-        .attestBalance(qcAddress.address, attackBalance)
+        .batchAttestBalances([qcAddress.address], [attackBalance])
 
       // Revoke malicious attesters
       await reserveOracle
@@ -334,18 +337,21 @@ describe("ReserveOracle - Byzantine Fault Tolerance", () => {
         .connect(deployer)
         .revokeRole(ATTESTER_ROLE, maliciousAttesters[1].address)
 
+      // Reset consensus to allow new attestations
+      await reserveOracle.connect(arbiter).resetConsensus(qcAddress.address)
+
       // Honest attesters complete consensus
       const honestBalance = ethers.utils.parseEther("100")
       await reserveOracle
         .connect(honestAttesters[0])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
       await reserveOracle
         .connect(honestAttesters[1])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
 
       const tx = await reserveOracle
         .connect(honestAttesters[2])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
 
       // Should reach consensus with only honest values (revoked attestations ignored)
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
@@ -367,14 +373,14 @@ describe("ReserveOracle - Byzantine Fault Tolerance", () => {
       // 3 malicious attesters force consensus
       await reserveOracle
         .connect(maliciousAttesters[0])
-        .attestBalance(qcAddress.address, compromisedBalance)
+        .batchAttestBalances([qcAddress.address], [compromisedBalance])
       await reserveOracle
         .connect(maliciousAttesters[1])
-        .attestBalance(qcAddress.address, compromisedBalance)
+        .batchAttestBalances([qcAddress.address], [compromisedBalance])
 
       const tx = await reserveOracle
         .connect(maliciousAttesters[2])
-        .attestBalance(qcAddress.address, compromisedBalance)
+        .batchAttestBalances([qcAddress.address], [compromisedBalance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
@@ -415,13 +421,13 @@ describe("ReserveOracle - Byzantine Fault Tolerance", () => {
       for (let i = 0; i < threshold - 1; i++) {
         await reserveOracle
           .connect(maliciousAttesters[i])
-          .attestBalance(qcAddress.address, maliciousBalance)
+          .batchAttestBalances([qcAddress.address], [maliciousBalance])
       }
 
       // 1 honest attester triggers consensus
       const tx = await reserveOracle
         .connect(honestAttesters[0])
-        .attestBalance(qcAddress.address, honestBalance)
+        .batchAttestBalances([qcAddress.address], [honestBalance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
@@ -446,26 +452,28 @@ describe("ReserveOracle - Byzantine Fault Tolerance", () => {
       ]
 
       for (const pattern of attackPatterns) {
-        // Reset consensus
+        // Reset consensus and advance time to clear attestation state
         await reserveOracle.connect(arbiter).resetConsensus(qcAddress.address)
+        await ethers.provider.send("evm_increaseTime", [1])
+        await ethers.provider.send("evm_mine", [])
 
         // 2 malicious, 3 honest (honest majority)
         await reserveOracle
           .connect(maliciousAttesters[0])
-          .attestBalance(qcAddress.address, pattern.balance)
+          .batchAttestBalances([qcAddress.address], [pattern.balance])
         await reserveOracle
           .connect(maliciousAttesters[1])
-          .attestBalance(qcAddress.address, pattern.balance)
+          .batchAttestBalances([qcAddress.address], [pattern.balance])
         await reserveOracle
           .connect(honestAttesters[0])
-          .attestBalance(qcAddress.address, baseBalance)
+          .batchAttestBalances([qcAddress.address], [baseBalance])
         await reserveOracle
           .connect(honestAttesters[1])
-          .attestBalance(qcAddress.address, baseBalance)
+          .batchAttestBalances([qcAddress.address], [baseBalance])
 
         const tx = await reserveOracle
           .connect(honestAttesters[2])
-          .attestBalance(qcAddress.address, baseBalance)
+          .batchAttestBalances([qcAddress.address], [baseBalance])
 
         await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 

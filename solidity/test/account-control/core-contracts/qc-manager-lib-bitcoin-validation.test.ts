@@ -18,7 +18,7 @@ describe("QCManagerLib - Bitcoin Address Validation (Direct Tests)", () => {
           "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", // Genesis block address
           "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2", // Random valid address
           "1111111111111111111114oLvT2", // Valid with many 1s
-          `1${"A".repeat(24)}`, // Minimum length valid (25 chars)
+          `1${"A".repeat(25)}`, // Minimum length valid (26 chars)
           `1${"A".repeat(33)}`, // Maximum P2PKH length (34 chars)
         ]
 

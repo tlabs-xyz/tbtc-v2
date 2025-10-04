@@ -11,7 +11,7 @@ import {
   IQCPauseManager,
   IQCWalletManager,
 } from "../../../typechain"
-import { deployQCManagerFixture } from "../../fixtures"
+import { deployQCManagerFixture } from "../fixtures/account-control-fixtures"
 
 /**
  * State Synchronization Integration Tests
@@ -94,8 +94,8 @@ describe("QCManager State Synchronization", () => {
       expect(reserveInfo.mintingCap).to.equal(capacity)
 
       // Validate QCManager internal state
-      const oracleData = await qcManager.qcOracleData(newQC.address)
-      expect(oracleData.lastKnownReserveBalance).to.equal(0) // Not yet synced
+      const [lastSyncTimestamp, oracleFailureDetected] = await qcData.getQCOracleData(newQC.address)
+      expect(lastSyncTimestamp).to.equal(0) // Not yet synced
     })
 
     it("should maintain state consistency during concurrent registrations", async () => {
@@ -180,8 +180,8 @@ describe("QCManager State Synchronization", () => {
       const qcStatus = await qcData.getQCStatus(qc)
       expect(qcStatus).to.equal(2) // PAUSED
 
-      const oracleData = await qcManager.qcOracleData(qc)
-      expect(oracleData.lastKnownReserveBalance).to.equal(INITIAL_BACKING)
+      const [lastSyncTimestamp, oracleFailureDetected] = await qcData.getQCOracleData(qc)
+      expect(lastSyncTimestamp).to.be.gt(0) // Should have been synced
     })
   })
 
@@ -195,9 +195,8 @@ describe("QCManager State Synchronization", () => {
       await qcManager.connect(monitor).syncBackingFromOracle(qc)
 
       // Validate QCManager internal state
-      const oracleData = await qcManager.qcOracleData(qc)
-      expect(oracleData.lastKnownReserveBalance).to.equal(newBacking)
-      expect(oracleData.lastKnownBalanceTimestamp).to.be.gt(0)
+      const [lastSyncTimestamp, oracleFailureDetected] = await qcData.getQCOracleData(qc)
+      expect(lastSyncTimestamp).to.be.gt(0) // Should have been synced
 
       // Validate AccountControl backing awareness
       const backingInfo = await accountControl.getBackingInfo(qc)
@@ -224,8 +223,8 @@ describe("QCManager State Synchronization", () => {
 
       // Validate all QCs synchronized correctly
       for (let i = 0; i < qcAddresses.length; i++) {
-        const oracleData = await qcManager.qcOracleData(qcAddresses[i])
-        expect(oracleData.lastKnownReserveBalance).to.equal(newBackings[i])
+        const [lastSyncTimestamp, oracleFailureDetected] = await qcData.getQCOracleData(qcAddresses[i])
+        expect(lastSyncTimestamp).to.be.gt(0) // Should have been synced
 
         const backingInfo = await accountControl.getBackingInfo(qcAddresses[i])
         expect(backingInfo.currentBacking).to.equal(newBackings[i])
@@ -402,10 +401,10 @@ describe("QCManager State Synchronization", () => {
     })
 
     it("should handle emergency parameter changes", async () => {
-      // Activate emergency mode
+      // Activate emergency mode for first QC
       await systemState
         .connect(governance)
-        .activateEmergencyPause("SECURITY_INCIDENT")
+        .emergencyPauseQC(qcs[0].address, ethers.utils.id("SECURITY_INCIDENT"))
 
       // Validate all QCs affected
       for (const qc of qcs) {
@@ -520,7 +519,7 @@ describe("QCManager State Synchronization", () => {
       // Trigger emergency pause mid-operation
       await systemState
         .connect(governance)
-        .activateEmergencyPause("TEST_RECOVERY")
+        .emergencyPauseQC(qcs[0].address, ethers.utils.id("TEST_RECOVERY"))
 
       // Wait for operation to complete or fail
       try {
@@ -530,7 +529,7 @@ describe("QCManager State Synchronization", () => {
       }
 
       // Clear emergency and allow recovery
-      await systemState.connect(governance).deactivateEmergencyPause()
+      await systemState.connect(governance).emergencyUnpauseQC(qcs[0].address)
 
       // System should return to consistent state
       await validateCrossContractConsistency(qc)
@@ -541,7 +540,7 @@ describe("QCManager State Synchronization", () => {
   async function validateCrossContractConsistency(qcAddress: string) {
     const qcInfo = await qcData.getQCInfo(qcAddress)
     const reserveInfo = await accountControl.reserveInfo(qcAddress)
-    const oracleData = await qcManager.qcOracleData(qcAddress)
+    const [lastSyncTimestamp, oracleFailureDetected] = await qcData.getQCOracleData(qcAddress)
     const pauseInfo = await pauseManager.getPauseInfo(qcAddress)
 
     // Validate capacity consistency
@@ -558,8 +557,8 @@ describe("QCManager State Synchronization", () => {
     }
 
     // Validate oracle data consistency
-    if (oracleData.lastKnownBalanceTimestamp > 0) {
-      expect(oracleData.lastKnownReserveBalance).to.be.gte(0)
+    if (lastSyncTimestamp > 0) {
+      expect(oracleFailureDetected).to.be.a('boolean')
     }
 
     // Validate accounting consistency

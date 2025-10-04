@@ -234,8 +234,8 @@ describe("Cross-Implementation Validation", () => {
     })
   })
 
-  describe("Compatibility Validation", () => {
-    it("should maintain compatibility with existing wallet registrations", async () => {
+  describe("Integration Validation", () => {
+    it("should support wallet registrations with derived addresses", async () => {
       // Simulate existing wallet data that might depend on address format
       const keyPair = generateBitcoinKeyPair()
 

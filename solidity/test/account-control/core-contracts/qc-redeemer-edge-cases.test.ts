@@ -78,11 +78,10 @@ describe("QCRedeemer Edge Cases and Scenarios", () => {
     fakeWalletManager = await smock.fake<QCWalletManager>("QCWalletManager")
 
     // Deploy QCRedeemer with library linking
-    const libraryLinkingHelper = new LibraryLinkingHelper()
-    await libraryLinkingHelper.deployLibraries()
+    const libraries = await LibraryLinkingHelper.deployAllLibraries()
 
     const QCRedeemer = await ethers.getContractFactory("QCRedeemer", {
-      libraries: libraryLinkingHelper.libraries,
+      libraries: libraries,
     })
 
     qcRedeemer = await QCRedeemer.deploy(

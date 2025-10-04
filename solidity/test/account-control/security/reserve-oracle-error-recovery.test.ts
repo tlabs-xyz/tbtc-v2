@@ -86,11 +86,15 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
     await reserveOracle.deployed()
 
     // Deploy mock dependencies
+    const MockBankFactory = await ethers.getContractFactory("MockBank")
+    const mockBank = await MockBankFactory.deploy()
+    await mockBank.deployed()
+
     const MockAccountControlFactory = await ethers.getContractFactory(
       "MockAccountControl"
     )
 
-    accountControl = await MockAccountControlFactory.deploy()
+    accountControl = await MockAccountControlFactory.deploy(mockBank.address)
     await accountControl.deployed()
 
     const MockQCPauseManagerFactory = await ethers.getContractFactory(
@@ -113,11 +117,11 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       qcData.address,
       systemState.address,
       reserveOracle.address,
+      accountControl.address,
       pauseManager.address,
       walletManager.address
     )) as QCManager
     await qcManager.deployed()
-    await qcManager.initialize(accountControl.address)
 
     // Setup roles
     await setupReserveOracleRoles(reserveOracle, {
@@ -132,7 +136,7 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
     await qcManager.grantRole(MONITOR_ROLE, reserveOracle.address)
 
     // Register QC
-    await qcData.grantRole(await qcData.QC_REGISTRAR_ROLE(), deployer.address)
+    await qcData.grantRole(qcData.QC_MANAGER_ROLE, deployer.address)
     await qcData.registerQC(
       qcAddress.address,
       "Test QC",
@@ -190,10 +194,10 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Submit first two attestations
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qcAddress.address, attestedBalance)
+        .batchAttestBalances([qcAddress.address], [attestedBalance])
       await reserveOracle
         .connect(attester2)
-        .attestBalance(qcAddress.address, attestedBalance)
+        .batchAttestBalances([qcAddress.address], [attestedBalance])
 
       // Remove QCManager
       await reserveOracle.setQCManager(ethers.constants.AddressZero)
@@ -201,7 +205,7 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Third attestation should still trigger consensus
       const tx = await reserveOracle
         .connect(attester3)
-        .attestBalance(qcAddress.address, attestedBalance)
+        .batchAttestBalances([qcAddress.address], [attestedBalance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
@@ -265,10 +269,10 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Submit partial attestations
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
       await reserveOracle
         .connect(attester2)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Verify pending attestations
       expect(
@@ -285,7 +289,7 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // New attestation should trigger cleanup of expired ones
       await reserveOracle
         .connect(attester3)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Should not reach consensus due to expired attestations
       const [pending, count] = await reserveOracle.getAttestation(
@@ -298,12 +302,12 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Need more fresh attestations to reach consensus
       await reserveOracle
         .connect(attester4)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Still need one more
       const tx = await reserveOracle
         .connect(attester1) // Can resubmit after expiry
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
     })
@@ -314,7 +318,7 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Submit first attestation
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Advance time to make first attestation expire
       const timeout = await systemState.oracleAttestationTimeout()
@@ -326,10 +330,10 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Submit fresh attestations
       await reserveOracle
         .connect(attester2)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
       await reserveOracle
         .connect(attester3)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Should not reach consensus (only 2 valid, 1 expired)
       const [pending, count] = await reserveOracle.getAttestation(
@@ -342,7 +346,7 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // One more fresh attestation should trigger consensus
       const tx = await reserveOracle
         .connect(attester4)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
     })
@@ -353,10 +357,10 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Submit attestations from different attesters
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
       await reserveOracle
         .connect(attester2)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Advance time to make attestations expire
       const timeout = await systemState.oracleAttestationTimeout()
@@ -369,8 +373,8 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       await expect(
         reserveOracle
           .connect(attester3)
-          .attestBalance(qcAddress.address, balance)
-      ).to.be.revertedWith("AttestationTooOld")
+          .batchAttestBalances([qcAddress.address], [balance])
+      ).to.be.revertedWithCustomError(reserveOracle, "AttestationTooOld")
     })
   })
 
@@ -381,10 +385,10 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Submit attestations
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
       await reserveOracle
         .connect(attester2)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Revoke one attester's role
       await reserveOracle
@@ -394,7 +398,7 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Third attestation should trigger cleanup and consensus
       const tx = await reserveOracle
         .connect(attester3)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
 
@@ -418,7 +422,7 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       await expect(
         reserveOracle
           .connect(attester1)
-          .attestBalance(qcAddress.address, balance)
+          .batchAttestBalances([qcAddress.address], [balance])
       ).to.be.revertedWith("AccessControl")
     })
 
@@ -428,10 +432,10 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Submit attestations including from soon-to-be-revoked attester
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
       await reserveOracle
         .connect(attester2)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Verify attestations are pending
       expect(
@@ -446,7 +450,7 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // New attestation should trigger cleanup
       await reserveOracle
         .connect(attester3)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Count should reflect cleanup of revoked attester
       const pendingCount = await reserveOracle.getPendingAttestationCount(
@@ -464,10 +468,10 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Create a stuck situation - partial attestations that won't reach consensus
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
       await reserveOracle
         .connect(attester2)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Verify stuck state
       const [pending, count] = await reserveOracle.getAttestation(
@@ -507,10 +511,10 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Start consensus process
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
       await reserveOracle
         .connect(attester2)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Arbiter emergency override
       await reserveOracle
@@ -593,16 +597,16 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Submit all available attestations
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
       await reserveOracle
         .connect(attester2)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
       await reserveOracle
         .connect(attester3)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
       await reserveOracle
         .connect(attester4)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Should not reach consensus
       const [pending, count] = await reserveOracle.getAttestation(
@@ -657,10 +661,10 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       const promises = [
         reserveOracle
           .connect(attester1)
-          .attestBalance(qcAddress.address, balance),
+          .batchAttestBalances([qcAddress.address], [balance]),
         reserveOracle
           .connect(attester2)
-          .attestBalance(qcAddress.address, balance),
+          .batchAttestBalances([qcAddress.address], [balance]),
       ]
 
       await Promise.all(promises)
@@ -668,7 +672,7 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // Final attestation
       const tx = await reserveOracle
         .connect(attester3)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       await expect(tx).to.emit(reserveOracle, "ConsensusReached")
     })
@@ -682,8 +686,8 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       await expect(
         reserveOracle
           .connect(attester1)
-          .attestBalance(ethers.constants.AddressZero, balance)
-      ).to.be.revertedWith("QCAddressRequired")
+          .batchAttestBalances([ethers.constants.AddressZero], [balance])
+      ).to.be.revertedWithCustomError(reserveOracle, "QCAddressRequired")
     })
 
     it("should handle balance overflow protection", async () => {
@@ -693,8 +697,8 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       await expect(
         reserveOracle
           .connect(attester1)
-          .attestBalance(qcAddress.address, overflowBalance)
-      ).to.be.revertedWith("BalanceOverflow")
+          .batchAttestBalances([qcAddress.address], [overflowBalance])
+      ).to.be.revertedWithCustomError(reserveOracle, "BalanceOverflow")
     })
 
     it("should handle attester already submitted error correctly", async () => {
@@ -703,14 +707,14 @@ describe("ReserveOracle - Error Recovery & Path Coverage", () => {
       // First attestation
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qcAddress.address, balance)
+        .batchAttestBalances([qcAddress.address], [balance])
 
       // Duplicate attestation should fail
       await expect(
         reserveOracle
           .connect(attester1)
-          .attestBalance(qcAddress.address, balance)
-      ).to.be.revertedWith("AttesterAlreadySubmitted")
+          .batchAttestBalances([qcAddress.address], [balance])
+      ).to.be.revertedWithCustomError(reserveOracle, "AttesterAlreadySubmitted")
     })
   })
 })

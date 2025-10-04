@@ -83,11 +83,15 @@ describe("ReserveOracle - QCManager Integration", () => {
     await reserveOracle.deployed()
 
     // Deploy mock AccountControl and other dependencies
+    const MockBankFactory = await ethers.getContractFactory("MockBank")
+    const mockBank = await MockBankFactory.deploy()
+    await mockBank.deployed()
+
     const MockAccountControlFactory = await ethers.getContractFactory(
       "MockAccountControl"
     )
 
-    accountControl = await MockAccountControlFactory.deploy()
+    accountControl = await MockAccountControlFactory.deploy(mockBank.address)
     await accountControl.deployed()
 
     const MockQCPauseManagerFactory = await ethers.getContractFactory(
@@ -110,14 +114,12 @@ describe("ReserveOracle - QCManager Integration", () => {
       qcData.address,
       systemState.address,
       reserveOracle.address,
+      accountControl.address,
       pauseManager.address,
       walletManager.address
     )) as QCManager
 
     await qcManager.deployed()
-
-    // Initialize QCManager
-    await qcManager.initialize(accountControl.address)
 
     // Set QCManager address in ReserveOracle for integration
     await reserveOracle.setQCManager(qcManager.address)
@@ -135,7 +137,7 @@ describe("ReserveOracle - QCManager Integration", () => {
     await qcManager.grantRole(MONITOR_ROLE, reserveOracle.address) // Allow oracle to call sync
 
     // Register QC in QCManager for testing
-    await qcData.grantRole(await qcData.QC_REGISTRAR_ROLE(), deployer.address)
+    await qcData.grantRole(qcData.QC_MANAGER_ROLE, deployer.address)
     await qcData.registerQC(
       qcAddress.address,
       "Test QC",
@@ -267,7 +269,7 @@ describe("ReserveOracle - QCManager Integration", () => {
       // Immediate second sync should be rate limited
       await expect(
         qcManager.connect(monitor).syncBackingFromOracle(qcAddress.address)
-      ).to.be.revertedWith("OracleRetryTooSoon")
+      ).to.be.revertedWithCustomError(reserveOracle, "OracleRetryTooSoon")
     })
 
     it("should revert manual sync for invalid QC", async () => {
@@ -395,10 +397,10 @@ describe("ReserveOracle - QCManager Integration", () => {
       // Second QC only has partial attestations (no consensus)
       await reserveOracle
         .connect(attester1)
-        .attestBalance(qc2Address.address, ethers.utils.parseEther("200"))
+        .batchAttestBalances([qc2Address.address], [ethers.utils.parseEther("200")]);
       await reserveOracle
         .connect(attester2)
-        .attestBalance(qc2Address.address, ethers.utils.parseEther("200"))
+        .batchAttestBalances([qc2Address.address], [ethers.utils.parseEther("200")]);
       // Missing third attestation
 
       // Verify first QC was synced

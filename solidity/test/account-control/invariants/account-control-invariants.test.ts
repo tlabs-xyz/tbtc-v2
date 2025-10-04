@@ -140,7 +140,7 @@ describe("AccountControl Invariant Tests", () => {
         accountControl
           .connect(reserve1)
           .mintTBTC(user1.address, excessiveAmount)
-      ).to.be.revertedWith("Insufficient backing for mint")
+      ).to.be.revertedWith("Minting cap exceeded")
 
       await checkAllInvariants()
     })

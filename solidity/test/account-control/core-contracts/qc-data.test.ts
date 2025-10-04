@@ -15,8 +15,8 @@ describe("QCData", () => {
   let qcManager: any
 
   // Test data - use valid Bitcoin addresses from test-data
-  const testBtcAddress = BTC_ADDRESSES.VALID_BECH32_BTC
-  const testBtcAddress2 = BTC_ADDRESSES.VALID_P2WSH_BTC
+  const testBtcAddress = BTC_ADDRESSES.BECH32_STANDARD
+  const testBtcAddress2 = BTC_ADDRESSES.BECH32_P2WSH
   const testReason = ethers.utils.id("TEST_REASON")
   const mintedAmount = ethers.utils.parseEther("5")
 
@@ -77,7 +77,7 @@ describe("QCData", () => {
           .withArgs(
             signers.qcAddress.address,
             qcManager.address,
-            ethers.utils.parseEther("1000"),
+            ethers.utils.parseEther("1000").toString(),
             await ethers.provider
               .getBlock(tx.blockNumber)
               .then((b) => b.timestamp)
@@ -1193,8 +1193,8 @@ describe("QCData", () => {
           .to.emit(qcData, "QCMaxMintingCapacityUpdated")
           .withArgs(
             signers.qcAddress.address,
-            testCapacity, // oldCapacity (set in beforeEach)
-            testCapacity, // newCapacity (same as testCapacity)
+            testCapacity.toString(), // oldCapacity (set in beforeEach)
+            testCapacity.toString(), // newCapacity (same as testCapacity)
             qcManager.address,
             currentBlock.timestamp
           )
@@ -1218,8 +1218,8 @@ describe("QCData", () => {
           .to.emit(qcData, "QCMaxMintingCapacityUpdated")
           .withArgs(
             signers.qcAddress.address,
-            testCapacity, // oldCapacity (first capacity set)
-            updatedCapacity, // newCapacity
+            testCapacity.toString(), // oldCapacity (first capacity set)
+            updatedCapacity.toString(), // newCapacity
             qcManager.address,
             currentBlock.timestamp
           )

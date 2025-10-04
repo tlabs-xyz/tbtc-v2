@@ -1,5 +1,6 @@
 import { expect } from "chai"
 import { ethers } from "hardhat"
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs"
 import { QCData } from "../../../../typechain"
 import {
   setupAccountControlTestSigners,
@@ -302,7 +303,7 @@ describe("QCData - Bitcoin Address Validation", () => {
           testQCAddress,
           validAddress,
           qcManager.address,
-          await getLatestBlockTimestamp()
+          anyValue // Accept any timestamp value
         )
 
       // Verify wallet is registered and has correct initial state

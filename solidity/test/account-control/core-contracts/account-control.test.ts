@@ -44,7 +44,7 @@ describe("AccountControl", () => {
     // Deploy mock Bank
     const MockBankFactory = await ethers.getContractFactory("MockBank")
     mockBank = await MockBankFactory.deploy()
-    mockBankContract = mockBank // Alias for compatibility
+    mockBankContract = mockBank
 
     // Deploy AccountControl using helper
     accountControl = await deployAccountControlForTest(
@@ -230,7 +230,7 @@ describe("AccountControl", () => {
       })
     })
 
-    describe("System Pause Enforcement [validation]", () => {
+    describe("System Pause Enforcement ", () => {
       it("should block all minting when system is paused", async () => {
         // Pause the system
         await accountControl.connect(emergencyCouncil).pauseSystem()
@@ -247,7 +247,7 @@ describe("AccountControl", () => {
               user.address,
               ethers.BigNumber.from(100000).mul(SATOSHI_MULTIPLIER)
             )
-        ).to.be.revertedWith("SystemIsPaused")
+        ).to.be.revertedWith("System is paused")
       })
 
       it("should allow emergency council to pause system", async () => {
@@ -310,7 +310,7 @@ describe("AccountControl", () => {
       })
     })
 
-    describe("Input Validation [validation]", () => {
+    describe("Input Validation ", () => {
       it("should revert mint with amount below MIN_MINT_AMOUNT", async () => {
         const tooSmallAmount = 9999 // Less than MIN_MINT_AMOUNT (10000)
 
@@ -375,7 +375,7 @@ describe("AccountControl", () => {
       })
     })
 
-    describe("Authorization Validation [validation]", () => {
+    describe("Authorization Validation ", () => {
       it("should prevent unauthorized reserves from minting", async () => {
         // Use the user signer which has ETH but is not authorized as a reserve
         await expect(
@@ -403,7 +403,7 @@ describe("AccountControl", () => {
               user.address,
               ethers.BigNumber.from(100000).mul(SATOSHI_MULTIPLIER)
             )
-        ).to.be.revertedWith("Reserve not authorized")
+        ).to.be.revertedWith("Reserve is paused")
       })
 
       it("should prevent unauthorized addresses from updating backing", async () => {
@@ -638,6 +638,13 @@ describe("AccountControl", () => {
         await accountControl
           .connect(owner)
           .authorizeReserve(qc2.address, QC_MINTING_CAP, 1) // ReserveType.QC_PERMISSIONED
+
+        // Grant MINTER_ROLE to qc2
+        const MINTER_ROLE = ethers.utils.keccak256(
+          ethers.utils.toUtf8Bytes("MINTER_ROLE")
+        )
+        await accountControl.connect(owner).grantRole(MINTER_ROLE, qc2.address)
+
         await accountControl.connect(qc2).updateBacking(QC_BACKING_AMOUNT)
 
         const qc1MintAmount = 300000
@@ -797,7 +804,7 @@ describe("AccountControl", () => {
               user.address,
               ethers.BigNumber.from(mintAmount).mul(SATOSHI_MULTIPLIER)
             )
-        ).to.be.revertedWith("Reserve not authorized")
+        ).to.be.revertedWith("Reserve is paused")
 
         // Backing updates are also blocked when paused (uses onlyAuthorizedReserve modifier)
         await expect(

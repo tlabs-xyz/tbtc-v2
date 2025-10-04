@@ -86,6 +86,7 @@ describe("QCManagerLib - Consolidated Tests", () => {
       qcData.address,
       systemState.address,
       reserveOracle.address,
+      accountControl.address,
       pauseManager.address,
       walletManager.address
     )

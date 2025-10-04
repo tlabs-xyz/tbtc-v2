@@ -61,7 +61,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
         // This should not revert if all validation passes
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc1.address,
             VALID_BTC_ADDRESS,
             SAMPLE_CHALLENGE,
@@ -83,7 +83,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
         for (const address of validAddresses) {
           await expect(
             qcManagerLib.validateWalletRegistrationFull(
-              qcData.address,
+              qcData,
               qc1.address,
               address,
               SAMPLE_CHALLENGE,
@@ -101,7 +101,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
       it("should revert with InvalidWalletAddress for empty address", async () => {
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc1.address,
             "", // Empty address
             SAMPLE_CHALLENGE,
@@ -116,7 +116,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
       it("should revert with InvalidWalletAddress for malformed address", async () => {
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc1.address,
             INVALID_BTC_ADDRESS,
             SAMPLE_CHALLENGE,
@@ -131,7 +131,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
       it("should revert with InvalidWalletAddress for Ethereum address", async () => {
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc1.address,
             "0x1234567890123456789012345678901234567890",
             SAMPLE_CHALLENGE,
@@ -148,7 +148,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
       it("should revert with QCNotRegistered for unregistered QC", async () => {
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             unregisteredQC.address, // Not registered
             VALID_BTC_ADDRESS,
             SAMPLE_CHALLENGE,
@@ -170,7 +170,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc2.address,
             VALID_BTC_ADDRESS,
             SAMPLE_CHALLENGE,
@@ -192,7 +192,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc2.address,
             VALID_BTC_ADDRESS,
             SAMPLE_CHALLENGE,
@@ -209,7 +209,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
       it("should revert with SignatureVerificationFailed for invalid signature", async () => {
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc1.address,
             VALID_BTC_ADDRESS,
             SAMPLE_CHALLENGE,
@@ -229,7 +229,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc1.address,
             VALID_BTC_ADDRESS,
             SAMPLE_CHALLENGE,
@@ -257,7 +257,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
         for (const challenge of challenges) {
           await expect(
             qcManagerLib.validateWalletRegistrationFull(
-              qcData.address,
+              qcData,
               qc1.address,
               VALID_BTC_ADDRESS,
               challenge,
@@ -275,7 +275,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc1.address,
             maxLengthAddress,
             SAMPLE_CHALLENGE,
@@ -295,7 +295,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
         const nonce = 12345
 
         const result = await qcManagerLib.validateDirectWalletRegistration(
-          qcData.address,
+          qcData,
           qc1.address,
           VALID_BTC_ADDRESS,
           nonce,
@@ -315,7 +315,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
         const nonce = 54321
 
         const result1 = await qcManagerLib.validateDirectWalletRegistration(
-          qcData.address,
+          qcData,
           qc1.address,
           VALID_BTC_ADDRESS,
           nonce,
@@ -327,7 +327,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
         )
 
         const result2 = await qcManagerLib.validateDirectWalletRegistration(
-          qcData.address,
+          qcData,
           qc1.address,
           VALID_BTC_ADDRESS,
           nonce, // Same nonce
@@ -346,7 +346,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
         const baseNonce = 99999
 
         const challenge1 = await qcManagerLib.validateDirectWalletRegistration(
-          qcData.address,
+          qcData,
           qc1.address,
           VALID_BTC_ADDRESS,
           baseNonce,
@@ -358,7 +358,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
         )
 
         const challenge2 = await qcManagerLib.validateDirectWalletRegistration(
-          qcData.address,
+          qcData,
           qc1.address,
           VALID_BTC_ADDRESS,
           baseNonce + 1, // Different nonce
@@ -384,7 +384,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
         for (const address of validAddresses) {
           const challenge = await qcManagerLib.validateDirectWalletRegistration(
-            qcData.address,
+            qcData,
             qc1.address,
             address,
             nonce,
@@ -409,7 +409,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
       it("should revert with QCNotRegistered for unregistered QC", async () => {
         await expect(
           qcManagerLib.validateDirectWalletRegistration(
-            qcData.address,
+            qcData,
             unregisteredQC.address,
             VALID_BTC_ADDRESS,
             12345,
@@ -431,7 +431,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
         await expect(
           qcManagerLib.validateDirectWalletRegistration(
-            qcData.address,
+            qcData,
             qc2.address,
             VALID_BTC_ADDRESS,
             12345,
@@ -449,7 +449,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
       it("should revert with InvalidWalletAddress for empty address", async () => {
         await expect(
           qcManagerLib.validateDirectWalletRegistration(
-            qcData.address,
+            qcData,
             qc1.address,
             "",
             12345,
@@ -465,7 +465,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
       it("should revert with InvalidWalletAddress for invalid format", async () => {
         await expect(
           qcManagerLib.validateDirectWalletRegistration(
-            qcData.address,
+            qcData,
             qc1.address,
             "invalid_bitcoin_address",
             12345,
@@ -483,7 +483,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
       it("should revert with SignatureVerificationFailed for invalid signature", async () => {
         await expect(
           qcManagerLib.validateDirectWalletRegistration(
-            qcData.address,
+            qcData,
             qc1.address,
             VALID_BTC_ADDRESS,
             12345,
@@ -504,7 +504,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
         await expect(
           qcManagerLib.validateDirectWalletRegistration(
-            qcData.address,
+            qcData,
             qc1.address,
             VALID_BTC_ADDRESS,
             12345,
@@ -526,7 +526,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
         const nonce = 42
 
         const challenge = await qcManagerLib.validateDirectWalletRegistration(
-          qcData.address,
+          qcData,
           qc1.address,
           VALID_BTC_ADDRESS,
           nonce,
@@ -557,7 +557,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
         for (const nonce of edgeNonces) {
           const challenge = await qcManagerLib.validateDirectWalletRegistration(
-            qcData.address,
+            qcData,
             qc1.address,
             VALID_BTC_ADDRESS,
             nonce,
@@ -581,7 +581,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
       await expect(
         qcManagerLib.validateWalletRegistrationFull(
-          qcData.address,
+          qcData,
           qc1.address,
           invalidAddress,
           SAMPLE_CHALLENGE,
@@ -594,7 +594,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
       await expect(
         qcManagerLib.validateDirectWalletRegistration(
-          qcData.address,
+          qcData,
           qc1.address,
           invalidAddress,
           12345,
@@ -616,7 +616,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
       await expect(
         qcManagerLib.validateWalletRegistrationFull(
-          qcData.address,
+          qcData,
           qc2.address,
           VALID_BTC_ADDRESS,
           SAMPLE_CHALLENGE,
@@ -629,7 +629,7 @@ describe("QCManagerLib - Wallet Registration Validation (External Functions)", (
 
       await expect(
         qcManagerLib.validateDirectWalletRegistration(
-          qcData.address,
+          qcData,
           qc2.address,
           VALID_BTC_ADDRESS,
           12345,

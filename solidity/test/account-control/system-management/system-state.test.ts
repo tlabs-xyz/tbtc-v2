@@ -1,10 +1,11 @@
 import { expect } from "chai"
 import { ethers, helpers } from "hardhat"
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs"
 import { SystemState } from "../../../typechain"
 import {
-  setupAccountControlTestSigners,
+  setupTestSigners,
   createBaseTestEnvironment,
-  restoreBaseTestEnvironment,
+  restoreTestEnvironment,
   AccountControlTestSigners,
 } from "../../fixtures"
 import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
@@ -19,6 +20,15 @@ describe("SystemState ", () => {
   let EMERGENCY_ROLE: string
   let OPERATIONS_ROLE: string
 
+  // Common constants
+  const DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
+
+  // Test accounts
+  let attacker: any
+  let attacker2: any
+  let emergencyCouncil: any
+  let pauser: any
+
   // Test parameters
   const testMinMintAmount = ethers.utils.parseEther("0.1")
   const testMaxMintAmount = ethers.utils.parseEther("100")
@@ -26,11 +36,17 @@ describe("SystemState ", () => {
   const testStaleThreshold = 3600 // 1 hour
 
   before(async () => {
-    signers = await setupAccountControlTestSigners()
+    signers = await setupTestSigners<AccountControlTestSigners>({ type: "account-control" })
 
     // Use watchdog and liquidator as pauser and admin accounts
     pauserAccount = signers.watchdog
     adminAccount = signers.liquidator
+
+    // Set up test accounts
+    pauser = signers.watchdog
+    emergencyCouncil = signers.user
+    attacker = signers.thirdParty
+    attacker2 = signers.qcAddress // Using different signer for attacker2
 
     // Generate role hashes
     EMERGENCY_ROLE = ethers.utils.id("EMERGENCY_ROLE")
@@ -51,7 +67,7 @@ describe("SystemState ", () => {
   })
 
   afterEach(async () => {
-    await restoreBaseTestEnvironment()
+    await restoreTestEnvironment()
   })
 
   describe("Deployment ", () => {
@@ -387,7 +403,7 @@ describe("SystemState ", () => {
           )
           await expect(tx)
             .to.emit(systemState, "RedemptionTimeoutUpdated")
-            .withArgs(oldTimeout, testRedemptionTimeout, adminAccount.address)
+            .withArgs(oldTimeout, testRedemptionTimeout, adminAccount.address, anyValue)
         })
 
         it("should revert with zero timeout", async () => {
@@ -422,7 +438,7 @@ describe("SystemState ", () => {
           )
           await expect(tx)
             .to.emit(systemState, "StaleThresholdUpdated")
-            .withArgs(oldThreshold, testStaleThreshold, adminAccount.address)
+            .withArgs(oldThreshold, testStaleThreshold, adminAccount.address, anyValue)
         })
 
         it("should revert with zero threshold", async () => {
@@ -468,7 +484,7 @@ describe("SystemState ", () => {
           )
           await expect(tx)
             .to.emit(systemState, "EmergencyPauseDurationUpdated")
-            .withArgs(oldDuration, newDuration, adminAccount.address)
+            .withArgs(oldDuration, newDuration, adminAccount.address, anyValue)
         })
 
         it("should revert with zero duration", async () => {
@@ -659,7 +675,7 @@ describe("SystemState ", () => {
     })
   })
 
-  describe("Access Control [validation]", () => {
+  describe("Access Control ", () => {
     context("role management", () => {
       it("should allow admin to grant pauser role", async () => {
         await systemState.grantRole(EMERGENCY_ROLE, signers.thirdParty.address)
@@ -2017,6 +2033,11 @@ describe("SystemState ", () => {
         const testQC = ethers.Wallet.createRandom().address
         const testReason = ethers.utils.id("COUNCIL_TRANSITION")
 
+        // Set pauserAccount as the official emergency council first
+        await systemState
+          .connect(signers.deployer)
+          .setEmergencyCouncil(currentCouncil.address)
+
         // Current council initiates emergency response
         await systemState
           .connect(currentCouncil)
@@ -2221,7 +2242,7 @@ describe("SystemState ", () => {
         const maxDuration = 30 * 24 * 60 * 60 // 30 days
         await expect(
           systemState
-            .connect(paramAdmin)
+            .connect(adminAccount)
             .setEmergencyPauseDuration(maxDuration + 1)
         ).to.be.revertedWith("DurationTooLong")
       })
@@ -2252,7 +2273,7 @@ describe("SystemState ", () => {
       it("should handle concurrent pause attempts safely", async () => {
         // Grant EMERGENCY_ROLE to multiple addresses
         await systemState
-          .connect(signers.governance)
+          .connect(signers.deployer)
           .grantRole(EMERGENCY_ROLE, emergencyCouncil.address)
 
         // First pause succeeds
@@ -2264,39 +2285,38 @@ describe("SystemState ", () => {
         ).to.be.revertedWith("MintingAlreadyPaused")
       })
     })
-  })
 
   describe("Parameter Validation", () => {
     describe("Mint Amount Parameters", () => {
       it("should validate min/max relationship", async () => {
         await systemState
-          .connect(paramAdmin)
+          .connect(adminAccount)
           .setMaxMintAmount(ethers.utils.parseEther("1000"))
 
         // Cannot set min > max
         await expect(
           systemState
-            .connect(paramAdmin)
+            .connect(adminAccount)
             .setMinMintAmount(ethers.utils.parseEther("2000"))
         ).to.be.revertedWith("MinAmountExceedsMax")
       })
 
       it("should validate max >= min when setting max", async () => {
         await systemState
-          .connect(paramAdmin)
+          .connect(adminAccount)
           .setMinMintAmount(ethers.utils.parseEther("100"))
 
         // Cannot set max < min
         await expect(
           systemState
-            .connect(paramAdmin)
+            .connect(adminAccount)
             .setMaxMintAmount(ethers.utils.parseEther("50"))
         ).to.be.revertedWith("MaxAmountBelowMin")
       })
 
       it("should prevent zero amounts", async () => {
         await expect(
-          systemState.connect(paramAdmin).setMinMintAmount(0)
+          systemState.connect(adminAccount).setMinMintAmount(0)
         ).to.be.revertedWith("InvalidAmount")
       })
     })
@@ -2305,13 +2325,13 @@ describe("SystemState ", () => {
       it("should enforce redemption timeout limits", async () => {
         const maxTimeout = 30 * 24 * 60 * 60 // 30 days
         await expect(
-          systemState.connect(paramAdmin).setRedemptionTimeout(maxTimeout + 1)
+          systemState.connect(adminAccount).setRedemptionTimeout(maxTimeout + 1)
         ).to.be.revertedWith("TimeoutTooLong")
       })
 
       it("should prevent zero timeout", async () => {
         await expect(
-          systemState.connect(paramAdmin).setRedemptionTimeout(0)
+          systemState.connect(adminAccount).setRedemptionTimeout(0)
         ).to.be.revertedWith("InvalidTimeout")
       })
     })
@@ -2320,13 +2340,13 @@ describe("SystemState ", () => {
       it("should enforce stale threshold limits", async () => {
         const maxThreshold = 7 * 24 * 60 * 60 // 7 days
         await expect(
-          systemState.connect(paramAdmin).setStaleThreshold(maxThreshold + 1)
+          systemState.connect(adminAccount).setStaleThreshold(maxThreshold + 1)
         ).to.be.revertedWith("ThresholdTooLong")
       })
 
       it("should validate failure threshold", async () => {
         await expect(
-          systemState.connect(paramAdmin).setFailureThreshold(0)
+          systemState.connect(adminAccount).setFailureThreshold(0)
         ).to.be.revertedWith("InvalidThreshold")
       })
     })
@@ -2335,12 +2355,12 @@ describe("SystemState ", () => {
       it("should enforce collateral ratio bounds", async () => {
         // Cannot set below 100%
         await expect(
-          systemState.connect(paramAdmin).setMinCollateralRatio(99)
+          systemState.connect(adminAccount).setMinCollateralRatio(99)
         ).to.be.revertedWith("InvalidAmount")
 
         // Cannot set above 200%
         await expect(
-          systemState.connect(paramAdmin).setMinCollateralRatio(201)
+          systemState.connect(adminAccount).setMinCollateralRatio(201)
         ).to.be.revertedWith("InvalidAmount")
       })
     })
@@ -2360,7 +2380,7 @@ describe("SystemState ", () => {
     it("should prevent setting zero address as emergency council", async () => {
       await expect(
         systemState
-          .connect(signers.governance)
+          .connect(signers.deployer)
           .setEmergencyCouncil(ethers.constants.AddressZero)
       ).to.be.revertedWith("InvalidCouncilAddress")
     })
@@ -2368,7 +2388,7 @@ describe("SystemState ", () => {
     it("should emit event when setting emergency council", async () => {
       await expect(
         systemState
-          .connect(signers.governance)
+          .connect(signers.deployer)
           .setEmergencyCouncil(emergencyCouncil.address)
       )
         .to.emit(systemState, "EmergencyCouncilUpdated")
@@ -2383,18 +2403,18 @@ describe("SystemState ", () => {
   describe("Parameter Update Edge Cases", () => {
     it("should handle parameter updates at boundaries", async () => {
       // Set at minimum allowed
-      await systemState.connect(paramAdmin).setMinCollateralRatio(100)
+      await systemState.connect(adminAccount).setMinCollateralRatio(100)
       expect(await systemState.minCollateralRatio()).to.equal(100)
 
       // Set at maximum allowed
-      await systemState.connect(paramAdmin).setMinCollateralRatio(200)
+      await systemState.connect(adminAccount).setMinCollateralRatio(200)
       expect(await systemState.minCollateralRatio()).to.equal(200)
     })
 
     it("should handle rapid parameter updates", async () => {
       // Multiple updates in sequence
       for (let i = 100; i <= 150; i += 10) {
-        await systemState.connect(paramAdmin).setMinCollateralRatio(i)
+        await systemState.connect(adminAccount).setMinCollateralRatio(i)
         expect(await systemState.minCollateralRatio()).to.equal(i)
       }
     })
@@ -2402,15 +2422,15 @@ describe("SystemState ", () => {
     it("should maintain parameter consistency across updates", async () => {
       // Set initial parameters
       await systemState
-        .connect(paramAdmin)
+        .connect(adminAccount)
         .setMinMintAmount(ethers.utils.parseEther("10"))
       await systemState
-        .connect(paramAdmin)
+        .connect(adminAccount)
         .setMaxMintAmount(ethers.utils.parseEther("1000"))
 
       // Update min - should maintain relationship
       await systemState
-        .connect(paramAdmin)
+        .connect(adminAccount)
         .setMinMintAmount(ethers.utils.parseEther("100"))
       expect(await systemState.minMintAmount()).to.equal(
         ethers.utils.parseEther("100")
@@ -2440,10 +2460,10 @@ describe("SystemState ", () => {
     it("should expose all parameters correctly", async () => {
       // Set various parameters
       await systemState
-        .connect(paramAdmin)
+        .connect(adminAccount)
         .setMinMintAmount(ethers.utils.parseEther("10"))
-      await systemState.connect(paramAdmin).setRedemptionTimeout(48 * 60 * 60)
-      await systemState.connect(paramAdmin).setMinCollateralRatio(100)
+      await systemState.connect(adminAccount).setRedemptionTimeout(48 * 60 * 60)
+      await systemState.connect(adminAccount).setMinCollateralRatio(100)
 
       // Verify all are readable
       expect(await systemState.minMintAmount()).to.equal(
@@ -2527,9 +2547,9 @@ describe("SystemState ", () => {
       it("should maintain strict role separation", async () => {
         // Parameter admin cannot pause (different role)
         await expect(
-          systemState.connect(paramAdmin).pauseMinting()
+          systemState.connect(adminAccount).pauseMinting()
         ).to.be.revertedWith(
-          `AccessControl: account ${paramAdmin.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
+          `AccessControl: account ${adminAccount.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
         )
 
         // Pauser cannot modify parameters (different role)
@@ -2550,11 +2570,11 @@ describe("SystemState ", () => {
 
         // These should fail with proper validation
         await expect(
-          systemState.connect(paramAdmin).setMinMintAmount(maxUint256)
+          systemState.connect(adminAccount).setMinMintAmount(maxUint256)
         ).to.be.reverted
 
         await expect(
-          systemState.connect(paramAdmin).setRedemptionTimeout(maxUint256)
+          systemState.connect(adminAccount).setRedemptionTimeout(maxUint256)
         ).to.be.reverted
       })
     })
@@ -2563,7 +2583,7 @@ describe("SystemState ", () => {
       it("should handle concurrent pause attempts safely", async () => {
         // Grant EMERGENCY_ROLE to multiple addresses
         await systemState
-          .connect(signers.governance)
+          .connect(signers.deployer)
           .grantRole(EMERGENCY_ROLE, emergencyCouncil.address)
 
         // First pause succeeds
@@ -2573,375 +2593,6 @@ describe("SystemState ", () => {
         await expect(
           systemState.connect(emergencyCouncil).pauseMinting()
         ).to.be.revertedWith("MintingAlreadyPaused")
-      })
-    })
-  })
-
-  describe("Parameter Validation", () => {
-    describe("Mint Amount Parameters", () => {
-      it("should validate min/max relationship", async () => {
-        await systemState
-          .connect(paramAdmin)
-          .setMaxMintAmount(ethers.utils.parseEther("1000"))
-
-        // Cannot set min > max
-        await expect(
-          systemState
-            .connect(paramAdmin)
-            .setMinMintAmount(ethers.utils.parseEther("2000"))
-        ).to.be.revertedWith("MinAmountExceedsMax")
-      })
-
-      it("should validate max >= min when setting max", async () => {
-        await systemState
-          .connect(paramAdmin)
-          .setMinMintAmount(ethers.utils.parseEther("100"))
-
-        // Cannot set max < min
-        await expect(
-          systemState
-            .connect(paramAdmin)
-            .setMaxMintAmount(ethers.utils.parseEther("50"))
-        ).to.be.revertedWith("MaxAmountBelowMin")
-      })
-
-      it("should prevent zero amounts", async () => {
-        await expect(
-          systemState.connect(paramAdmin).setMinMintAmount(0)
-        ).to.be.revertedWith("InvalidAmount")
-      })
-    })
-
-    describe("Timeout Parameters", () => {
-      it("should enforce redemption timeout limits", async () => {
-        const maxTimeout = 30 * 24 * 60 * 60 // 30 days
-        await expect(
-          systemState.connect(paramAdmin).setRedemptionTimeout(maxTimeout + 1)
-        ).to.be.revertedWith("TimeoutTooLong")
-      })
-
-      it("should prevent zero timeout", async () => {
-        await expect(
-          systemState.connect(paramAdmin).setRedemptionTimeout(0)
-        ).to.be.revertedWith("InvalidTimeout")
-      })
-    })
-
-    describe("Threshold Parameters", () => {
-      it("should enforce stale threshold limits", async () => {
-        const maxThreshold = 7 * 24 * 60 * 60 // 7 days
-        await expect(
-          systemState.connect(paramAdmin).setStaleThreshold(maxThreshold + 1)
-        ).to.be.revertedWith("ThresholdTooLong")
-      })
-
-      it("should validate failure threshold", async () => {
-        await expect(
-          systemState.connect(paramAdmin).setFailureThreshold(0)
-        ).to.be.revertedWith("InvalidThreshold")
-      })
-    })
-
-    describe("Collateral Ratio", () => {
-      it("should enforce collateral ratio bounds", async () => {
-        // Cannot set below 100%
-        await expect(
-          systemState.connect(paramAdmin).setMinCollateralRatio(99)
-        ).to.be.revertedWith("InvalidAmount")
-
-        // Cannot set above 200%
-        await expect(
-          systemState.connect(paramAdmin).setMinCollateralRatio(201)
-        ).to.be.revertedWith("InvalidAmount")
-      })
-    })
-  })
-
-  describe("Emergency Council", () => {
-    it("should only allow PARAMETER_ADMIN to set emergency council", async () => {
-      await expect(
-        systemState
-          .connect(attacker)
-          .setEmergencyCouncil(emergencyCouncil.address)
-      ).to.be.revertedWith(
-        `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
-      )
-    })
-
-    it("should prevent setting zero address as emergency council", async () => {
-      await expect(
-        systemState
-          .connect(signers.governance)
-          .setEmergencyCouncil(ethers.constants.AddressZero)
-      ).to.be.revertedWith("InvalidCouncilAddress")
-    })
-
-    it("should emit event when setting emergency council", async () => {
-      await expect(
-        systemState
-          .connect(signers.governance)
-          .setEmergencyCouncil(emergencyCouncil.address)
-      )
-        .to.emit(systemState, "EmergencyCouncilUpdated")
-        .withArgs(
-          ethers.constants.AddressZero,
-          emergencyCouncil.address,
-          signers.governance.address
-        )
-    })
-  })
-
-  describe("Parameter Update Edge Cases", () => {
-    it("should handle parameter updates at boundaries", async () => {
-      // Set at minimum allowed
-      await systemState.connect(paramAdmin).setMinCollateralRatio(100)
-      expect(await systemState.minCollateralRatio()).to.equal(100)
-
-      // Set at maximum allowed
-      await systemState.connect(paramAdmin).setMinCollateralRatio(200)
-      expect(await systemState.minCollateralRatio()).to.equal(200)
-    })
-
-    it("should handle rapid parameter updates", async () => {
-      // Multiple updates in sequence
-      for (let i = 100; i <= 150; i += 10) {
-        await systemState.connect(paramAdmin).setMinCollateralRatio(i)
-        expect(await systemState.minCollateralRatio()).to.equal(i)
-      }
-    })
-
-    it("should maintain parameter consistency across updates", async () => {
-      // Set initial parameters
-      await systemState
-        .connect(paramAdmin)
-        .setMinMintAmount(ethers.utils.parseEther("10"))
-      await systemState
-        .connect(paramAdmin)
-        .setMaxMintAmount(ethers.utils.parseEther("1000"))
-
-      // Update min - should maintain relationship
-      await systemState
-        .connect(paramAdmin)
-        .setMinMintAmount(ethers.utils.parseEther("100"))
-      expect(await systemState.minMintAmount()).to.equal(
-        ethers.utils.parseEther("100")
-      )
-      expect(await systemState.maxMintAmount()).to.equal(
-        ethers.utils.parseEther("1000")
-      )
-    })
-  })
-
-  describe("View Function Security", () => {
-    it("should properly expose pause state", async () => {
-      expect(await systemState.isMintingPaused()).to.be.false
-      await systemState.connect(pauser).pauseMinting()
-      expect(await systemState.isMintingPaused()).to.be.true
-    })
-
-    it("should revert operations when paused", async () => {
-      await systemState.connect(pauser).pauseMinting()
-
-      // This tests the modifier behavior
-      await expect(systemState.requireMintingNotPaused()).to.be.revertedWith(
-        "MintingIsPaused"
-      )
-    })
-
-    it("should expose all parameters correctly", async () => {
-      // Set various parameters
-      await systemState
-        .connect(paramAdmin)
-        .setMinMintAmount(ethers.utils.parseEther("10"))
-      await systemState.connect(paramAdmin).setRedemptionTimeout(48 * 60 * 60)
-      await systemState.connect(paramAdmin).setMinCollateralRatio(100)
-
-      // Verify all are readable
-      expect(await systemState.minMintAmount()).to.equal(
-        ethers.utils.parseEther("10")
-      )
-      expect(await systemState.redemptionTimeout()).to.equal(48 * 60 * 60)
-      expect(await systemState.minCollateralRatio()).to.equal(100)
-    })
-  })
-
-  describe("Initialization Security", () => {
-    it("should initialize with secure defaults", async () => {
-      const freshSystemState = await (
-        await ethers.getContractFactory("SystemState")
-      ).deploy()
-
-      // Check default values are sensible
-      expect(await freshSystemState.minMintAmount()).to.equal(
-        ethers.utils.parseEther("0.001")
-      )
-      expect(await freshSystemState.maxMintAmount()).to.equal(
-        ethers.utils.parseEther("1000")
-      )
-      expect(await freshSystemState.redemptionTimeout()).to.equal(
-        7 * 24 * 60 * 60
-      ) // 7 days
-      expect(await freshSystemState.staleThreshold()).to.equal(24 * 60 * 60) // 24 hours
-      expect(await freshSystemState.minCollateralRatio()).to.equal(100) // 100%
-    })
-
-    it("should not be paused on deployment", async () => {
-      const freshSystemState = await (
-        await ethers.getContractFactory("SystemState")
-      ).deploy()
-
-      expect(await freshSystemState.isMintingPaused()).to.be.false
-      expect(await freshSystemState.isRedemptionPaused()).to.be.false
-      expect(await freshSystemState.isWalletRegistrationPaused()).to.be.false
-    })
-  })
-
-  describe("Security Pattern Validation", () => {
-    describe("Multi-Attacker Scenarios", () => {
-      it("should resist coordinated attacks from multiple accounts", async () => {
-        // Both attackers try to gain unauthorized access
-        await expect(
-          systemState.connect(attacker).pauseMinting()
-        ).to.be.revertedWith(
-          `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
-        )
-
-        await expect(
-          systemState.connect(attacker2).pauseMinting()
-        ).to.be.revertedWith(
-          `AccessControl: account ${attacker2.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
-        )
-      })
-
-      it("should prevent privilege escalation attempts", async () => {
-        // Attacker tries to grant themselves roles
-        await expect(
-          systemState
-            .connect(attacker)
-            .grantRole(EMERGENCY_ROLE, attacker.address)
-        ).to.be.revertedWith(
-          `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
-        )
-
-        // Another attacker tries different role
-        await expect(
-          systemState
-            .connect(attacker2)
-            .grantRole(OPERATIONS_ROLE, attacker2.address)
-        ).to.be.revertedWith(
-          `AccessControl: account ${attacker2.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
-        )
-      })
-    })
-
-    describe("Role Hierarchy Protection", () => {
-      it("should maintain strict role separation", async () => {
-        // Parameter admin cannot pause (different role)
-        await expect(
-          systemState.connect(paramAdmin).pauseMinting()
-        ).to.be.revertedWith(
-          `AccessControl: account ${paramAdmin.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
-        )
-
-        // Pauser cannot modify parameters (different role)
-        await expect(
-          systemState
-            .connect(pauser)
-            .setMinMintAmount(ethers.utils.parseEther("100"))
-        ).to.be.revertedWith(
-          `AccessControl: account ${pauser.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
-        )
-      })
-    })
-
-    describe("Input Validation Security", () => {
-      it("should validate all input parameters comprehensively", async () => {
-        // Test boundary conditions that could cause overflows or underflows
-        const maxUint256 = ethers.constants.MaxUint256
-
-        // These should fail with proper validation
-        await expect(
-          systemState.connect(paramAdmin).setMinMintAmount(maxUint256)
-        ).to.be.reverted
-
-        await expect(
-          systemState.connect(paramAdmin).setRedemptionTimeout(maxUint256)
-        ).to.be.reverted
-      })
-    })
-  })
-
-  describe("Security Pattern Validation", () => {
-    describe("Multi-Attacker Scenarios", () => {
-      it("should resist coordinated attacks from multiple accounts", async () => {
-        // Both attackers try to gain unauthorized access
-        await expect(
-          systemState.connect(attacker).pauseMinting()
-        ).to.be.revertedWith(
-          `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
-        )
-
-        await expect(
-          systemState.connect(attacker2).pauseMinting()
-        ).to.be.revertedWith(
-          `AccessControl: account ${attacker2.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
-        )
-      })
-
-      it("should prevent privilege escalation attempts", async () => {
-        // Attacker tries to grant themselves roles
-        await expect(
-          systemState
-            .connect(attacker)
-            .grantRole(EMERGENCY_ROLE, attacker.address)
-        ).to.be.revertedWith(
-          `AccessControl: account ${attacker.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
-        )
-
-        // Another attacker tries different role
-        await expect(
-          systemState
-            .connect(attacker2)
-            .grantRole(OPERATIONS_ROLE, attacker2.address)
-        ).to.be.revertedWith(
-          `AccessControl: account ${attacker2.address.toLowerCase()} is missing role ${DEFAULT_ADMIN_ROLE}`
-        )
-      })
-    })
-
-    describe("Role Hierarchy Protection", () => {
-      it("should maintain strict role separation", async () => {
-        // Parameter admin cannot pause (different role)
-        await expect(
-          systemState.connect(paramAdmin).pauseMinting()
-        ).to.be.revertedWith(
-          `AccessControl: account ${paramAdmin.address.toLowerCase()} is missing role ${EMERGENCY_ROLE}`
-        )
-
-        // Pauser cannot modify parameters (different role)
-        await expect(
-          systemState
-            .connect(pauser)
-            .setMinMintAmount(ethers.utils.parseEther("100"))
-        ).to.be.revertedWith(
-          `AccessControl: account ${pauser.address.toLowerCase()} is missing role ${OPERATIONS_ROLE}`
-        )
-      })
-    })
-
-    describe("Input Validation Security", () => {
-      it("should validate all input parameters comprehensively", async () => {
-        // Test boundary conditions that could cause overflows or underflows
-        const maxUint256 = ethers.constants.MaxUint256
-
-        // These should fail with proper validation
-        await expect(
-          systemState.connect(paramAdmin).setMinMintAmount(maxUint256)
-        ).to.be.reverted
-
-        await expect(
-          systemState.connect(paramAdmin).setRedemptionTimeout(maxUint256)
-        ).to.be.reverted
       })
     })
   })

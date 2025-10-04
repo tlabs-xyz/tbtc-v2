@@ -13,7 +13,7 @@ import {
   MockReserveOracle,
   MockSystemState,
 } from "../../../typechain"
-import { deployQCManagerFixture } from "../../fixtures"
+import { deployQCManagerFixture } from "../fixtures/account-control-fixtures"
 
 describe("SystemState Cross-Contract Integration Tests", () => {
   let systemState: SystemState
@@ -79,11 +79,9 @@ describe("SystemState Cross-Contract Integration Tests", () => {
     // Deploy AccountControl to test full integration
     const AccountControl = await ethers.getContractFactory("AccountControl")
     accountControl = await AccountControl.deploy(
-      systemState.address,
-      qcManager.address,
-      qcData.address,
-      mockReserveOracle.address,
-      mockWalletManager.address
+      owner.address,
+      emergency.address,
+      mockReserveOracle.address
     )
 
     // Grant necessary roles

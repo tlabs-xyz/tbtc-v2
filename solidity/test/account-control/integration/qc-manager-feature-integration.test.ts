@@ -12,7 +12,7 @@ import {
   IQCPauseManager,
   IQCWalletManager,
 } from "../../../typechain"
-import { deployQCManagerFixture } from "../../fixtures"
+import { deployQCManagerFixture } from "../fixtures/account-control-fixtures"
 import * as LibraryLinkingHelper from "../helpers/library-linking-helper"
 
 describe("QCManager - Feature Integration Tests", () => {

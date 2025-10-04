@@ -72,6 +72,17 @@ describe("QCManagerLib - Financial Function Integration Tests", () => {
 
     const walletManager = await MockQCWalletManagerFactory.deploy()
 
+    // Deploy AccountControl first (required for QCManager)
+    const AccountControlFactory = await ethers.getContractFactory(
+      "AccountControl"
+    )
+
+    accountControl = await AccountControlFactory.deploy(
+      owner.address,
+      owner.address,
+      mockBank.address
+    )
+
     // Deploy QCManager with library linked
     const QCManagerFactory = await ethers.getContractFactory("QCManager", {
       libraries: {
@@ -83,6 +94,7 @@ describe("QCManagerLib - Financial Function Integration Tests", () => {
       qcData.address,
       systemState.address,
       reserveOracle.address,
+      accountControl.address,
       pauseManager.address,
       walletManager.address
     )
@@ -91,17 +103,6 @@ describe("QCManagerLib - Financial Function Integration Tests", () => {
     const QC_MANAGER_ROLE = await pauseManager.QC_MANAGER_ROLE()
     await pauseManager.grantRole(QC_MANAGER_ROLE, qcManager.address)
     await pauseManager.revokeRole(QC_MANAGER_ROLE, owner.address)
-
-    // Deploy AccountControl
-    const AccountControlFactory = await ethers.getContractFactory(
-      "AccountControl"
-    )
-
-    accountControl = await AccountControlFactory.deploy(
-      owner.address,
-      owner.address,
-      mockBank.address
-    )
 
     // Setup roles for QCData
     const QC_MANAGER_ROLE_DATA = ethers.utils.keccak256(
@@ -114,9 +115,6 @@ describe("QCManagerLib - Financial Function Integration Tests", () => {
     const GOVERNANCE_ROLE = await qcManager.GOVERNANCE_ROLE()
     await qcManager.grantRole(GOVERNANCE_ROLE, owner.address)
     await qcManager.grantRole(GOVERNANCE_ROLE, governance.address)
-
-    // Set AccountControl in QCManager
-    await qcManager.connect(owner).setAccountControl(accountControl.address)
 
     // Grant QCManager necessary roles in AccountControl
     await accountControl.connect(owner).grantReserveRole(qcManager.address)
@@ -135,7 +133,7 @@ describe("QCManagerLib - Financial Function Integration Tests", () => {
 
         await expect(
           qcManager.connect(owner).increaseMintingCapacity(qc1.address, newCap)
-        ).to.emit(qcManager, "QCMintingCapacityIncreased")
+        ).to.emit(qcManager, "BalanceUpdate")
 
         const updatedCap = await qcData.getMaxMintingCapacity(qc1.address)
         expect(updatedCap).to.equal(newCap)

@@ -6,7 +6,7 @@ import type {
   MockTBTCVault,
   TestBTCDepositor,
 } from "../../typechain"
-import { to1ePrecision } from "../helpers/contract-test-helpers"
+import { to1ePrecision } from "../helpers/math-utils"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
 

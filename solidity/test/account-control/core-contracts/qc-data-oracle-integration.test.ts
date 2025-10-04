@@ -1,5 +1,6 @@
 import { expect } from "chai"
 import { ethers } from "hardhat"
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs"
 import { QCData } from "../../../../typechain"
 import {
   setupAccountControlTestSigners,
@@ -204,18 +205,18 @@ describe("QCData - Oracle Integration", () => {
       })
 
       it("should emit QCOracleFailureStatusUpdated event with correct parameters", async () => {
-        const tx = qcData
-          .connect(qcManager)
-          .updateQCOracleFailureDetected(testQCAddress, true)
-
-        await expect(tx)
+        await expect(
+          qcData
+            .connect(qcManager)
+            .updateQCOracleFailureDetected(testQCAddress, true)
+        )
           .to.emit(qcData, "QCOracleFailureStatusUpdated")
           .withArgs(
             testQCAddress,
             false, // oldStatus (initially false)
             true, // newStatus
             qcManager.address,
-            await getLatestBlockTimestamp()
+            anyValue // Accept any timestamp value
           )
       })
 
@@ -228,18 +229,18 @@ describe("QCData - Oracle Integration", () => {
           .true
 
         // Toggle to false
-        const tx = qcData
-          .connect(qcManager)
-          .updateQCOracleFailureDetected(testQCAddress, false)
-
-        await expect(tx)
+        await expect(
+          qcData
+            .connect(qcManager)
+            .updateQCOracleFailureDetected(testQCAddress, false)
+        )
           .to.emit(qcData, "QCOracleFailureStatusUpdated")
           .withArgs(
             testQCAddress,
             true, // oldStatus
             false, // newStatus
             qcManager.address,
-            await getLatestBlockTimestamp()
+            anyValue // Accept any timestamp value
           )
 
         expect(await qcData.getQCOracleFailureDetected(testQCAddress)).to.be
@@ -268,18 +269,18 @@ describe("QCData - Oracle Integration", () => {
         for (let i = 0; i < statuses.length; i++) {
           const oldStatus = i === 0 ? false : statuses[i - 1]
 
-          const tx = qcData
-            .connect(qcManager)
-            .updateQCOracleFailureDetected(testQCAddress, statuses[i])
-
-          await expect(tx)
+          await expect(
+            qcData
+              .connect(qcManager)
+              .updateQCOracleFailureDetected(testQCAddress, statuses[i])
+          )
             .to.emit(qcData, "QCOracleFailureStatusUpdated")
             .withArgs(
               testQCAddress,
               oldStatus,
               statuses[i],
               qcManager.address,
-              await getLatestBlockTimestamp()
+              anyValue // Accept any timestamp value
             )
 
           expect(

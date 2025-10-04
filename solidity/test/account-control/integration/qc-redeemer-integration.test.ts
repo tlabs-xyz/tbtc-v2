@@ -5,7 +5,7 @@ import {
   deployQCRedeemerFixture,
   createTestRedemption,
   TEST_CONSTANTS,
-} from "../../fixtures"
+} from "../fixtures/account-control-fixtures"
 import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
 
 const { createSnapshot, restoreSnapshot } = helpers.snapshot
@@ -294,7 +294,7 @@ describe("QCRedeemer Integration Tests", () => {
     })
   })
 
-  describe("System Pause [validation]", () => {
+  describe("System Pause ", () => {
     it("should prevent new redemptions when paused", async () => {
       const fixture = await loadFixture(deployQCRedeemerFixture)
       const { qcRedeemer, systemState, user, qcAddress, constants } = fixture

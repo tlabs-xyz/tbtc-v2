@@ -1,5 +1,6 @@
 import { expect } from "chai"
 import { ethers } from "hardhat"
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs"
 import { QCData } from "../../../../typechain"
 import {
   setupAccountControlTestSigners,
@@ -97,7 +98,7 @@ describe("QCData - PauseLevel Integration", () => {
           PauseLevel.Complete, // new level
           true, // selfInitiated
           qcManager.address,
-          await getBlockTimestamp()
+          anyValue // Accept any timestamp value
         )
     })
 

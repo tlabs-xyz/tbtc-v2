@@ -6,7 +6,7 @@ import { BytesLike } from "@ethersproject/bytes"
 
 import { constants, walletState } from "../fixtures"
 import bridgeFixture from "../fixtures/bridge"
-import { toSatoshis } from "../helpers/contract-test-helpers"
+import { toSatoshis } from "../helpers/math-utils"
 
 import type {
   Bank,

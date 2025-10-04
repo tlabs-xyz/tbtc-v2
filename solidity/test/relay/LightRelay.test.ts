@@ -8,7 +8,7 @@ import { ContractTransaction } from "ethers"
 
 import type { LightRelayStub } from "../../typechain"
 
-import { concatenateHexStrings } from "../helpers/contract-test-helpers"
+import { concatenateHexStrings } from "../helpers/math-utils"
 
 import headers from "./headersWithRetarget.json"
 import reorgHeaders from "./headersReorgAndRetarget.json"

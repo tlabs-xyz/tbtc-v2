@@ -72,7 +72,7 @@ describe("QCManagerLib - Comprehensive Error Condition Testing", () => {
     )
 
     const pauseManager = await QCPauseManagerFactory.deploy(
-      qcData.address,
+      qcData,
       owner.address,
       owner.address,
       owner.address
@@ -93,9 +93,10 @@ describe("QCManagerLib - Comprehensive Error Condition Testing", () => {
     })
 
     qcManager = await QCManagerFactory.deploy(
-      qcData.address,
+      qcData,
       systemState.address,
       reserveOracle.address,
+      accountControl.address,
       pauseManager.address,
       walletManager.address
     )
@@ -350,7 +351,7 @@ describe("QCManagerLib - Comprehensive Error Condition Testing", () => {
 
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc1.address,
             "",
             SAMPLE_CHALLENGE,
@@ -436,7 +437,7 @@ describe("QCManagerLib - Comprehensive Error Condition Testing", () => {
         for (const sig of invalidSignatures) {
           await expect(
             qcManagerLib.validateWalletRegistrationFull(
-              qcData.address,
+              qcData,
               qc1.address,
               VALID_BTC_ADDRESS,
               SAMPLE_CHALLENGE,
@@ -464,7 +465,7 @@ describe("QCManagerLib - Comprehensive Error Condition Testing", () => {
         for (const pubkey of invalidPubkeys) {
           await expect(
             qcManagerLib.validateWalletRegistrationFull(
-              qcData.address,
+              qcData,
               qc1.address,
               VALID_BTC_ADDRESS,
               SAMPLE_CHALLENGE,
@@ -503,7 +504,7 @@ describe("QCManagerLib - Comprehensive Error Condition Testing", () => {
         // Test wallet validation functions
         await expect(
           qcManagerLib.validateWalletRegistrationFull(
-            qcData.address,
+            qcData,
             qc1.address,
             VALID_BTC_ADDRESS,
             SAMPLE_CHALLENGE,
@@ -516,7 +517,7 @@ describe("QCManagerLib - Comprehensive Error Condition Testing", () => {
 
         await expect(
           qcManagerLib.validateDirectWalletRegistration(
-            qcData.address,
+            qcData,
             qc1.address,
             VALID_BTC_ADDRESS,
             12345,
@@ -579,7 +580,7 @@ describe("QCManagerLib - Comprehensive Error Condition Testing", () => {
           // Test wallet validation fails
           await expect(
             qcManagerLib.validateWalletRegistrationFull(
-              qcData.address,
+              qcData,
               qc1.address,
               VALID_BTC_ADDRESS,
               SAMPLE_CHALLENGE,
@@ -674,7 +675,7 @@ describe("QCManagerLib - Comprehensive Error Condition Testing", () => {
 
       await expect(
         qcManagerLib.validateWalletRegistrationFull(
-          qcData.address,
+          qcData,
           unregisteredQC,
           "", // Invalid address
           SAMPLE_CHALLENGE,

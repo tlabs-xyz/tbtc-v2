@@ -39,13 +39,13 @@ describe("Bitcoin Address Handling", () => {
       scriptType: 1,
     },
     p2wpkh: {
-      mainnet: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
-      testnet: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx",
+      mainnet: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", // BIP173 test vector (scriptHash: 751e76e8199196d454941c45d1b3a323f1433bd6)
+      testnet: "tb1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq2dzmyqn", // Different testnet P2WPKH (scriptHash: 0000000000000000000000000000000000000000)
       scriptType: 2,
     },
     p2wsh: {
-      mainnet: "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3", // BIP173 example
-      testnet: "tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7",
+      mainnet: "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3", // BIP173 test vector (32-byte scriptHash)
+      testnet: "tb1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq4dh5vz", // Different testnet P2WSH (different 32-byte scriptHash)
       scriptType: 3,
     },
   }
@@ -487,7 +487,7 @@ describe("Bitcoin Address Handling", () => {
             testnetBech32Addresses.p2wpkh.uppercase,
             testnetBech32Addresses.p2wpkh.uppercase
           )
-        ).to.be.revertedWith("ValidationFailed")
+        ).to.be.revertedWithCustomError(testQcRedeemer, "InvalidBitcoinAddressFormat")
       })
 
       it("should reject mixed case testnet P2WPKH address", async () => {

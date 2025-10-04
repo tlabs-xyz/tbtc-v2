@@ -781,62 +781,6 @@ describe("QCPauseManager", () => {
     })
   })
 
-  describe("Migration Functions", () => {
-    it("should allow admin to migrate pause credits", async () => {
-      const qcs = [signers.qcAddress.address]
-
-      const credits = [
-        {
-          hasCredit: true,
-          lastUsed: 0,
-          creditRenewTime: 0,
-          isPaused: false,
-          pauseEndTime: 0,
-          pauseReason: ethers.constants.HashZero,
-        },
-      ]
-
-      await qcPauseManager.migratePauseCredits(qcs, credits)
-
-      const pauseInfo = await qcPauseManager.getPauseInfo(
-        signers.qcAddress.address
-      )
-
-      expect(pauseInfo.hasCredit).to.be.true
-    })
-
-    it("should prevent non-admin from migrating credits", async () => {
-      const qcs = [signers.qcAddress.address]
-
-      const credits = [
-        {
-          hasCredit: true,
-          lastUsed: 0,
-          creditRenewTime: 0,
-          isPaused: false,
-          pauseEndTime: 0,
-          pauseReason: ethers.constants.HashZero,
-        },
-      ]
-
-      await expect(
-        qcPauseManager.connect(signers.user).migratePauseCredits(qcs, credits)
-      ).to.be.revertedWith(
-        `AccessControl: account ${signers.user.address.toLowerCase()} is missing role ${
-          ethers.constants.HashZero
-        }`
-      )
-    })
-
-    it("should revert migration with mismatched array lengths", async () => {
-      const qcs = [signers.qcAddress.address]
-      const credits: any[] = [] // Empty array
-
-      await expect(
-        qcPauseManager.migratePauseCredits(qcs, credits)
-      ).to.be.revertedWith("QCPauseManager: array length mismatch")
-    })
-  })
 
   describe("Escalation Mechanisms", () => {
     beforeEach(async () => {

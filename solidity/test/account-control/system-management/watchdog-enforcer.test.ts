@@ -11,9 +11,9 @@ import {
   SystemState,
 } from "../../../typechain"
 import {
-  setupAccountControlTestSigners,
+  setupTestSigners,
   createBaseTestEnvironment,
-  restoreBaseTestEnvironment,
+  restoreTestEnvironment,
   AccountControlTestSigners,
 } from "../../fixtures"
 import { expectCustomError, ERROR_MESSAGES } from "../helpers/error-helpers"
@@ -45,7 +45,7 @@ describe("WatchdogEnforcer", () => {
   const minCollateralRatio = 100 // 100% = 1:1 ratio
 
   before(async () => {
-    signers = await setupAccountControlTestSigners()
+    signers = await setupTestSigners<AccountControlTestSigners>({ type: "account-control" })
 
     // Generate role hashes
     DEFAULT_ADMIN_ROLE = ethers.constants.HashZero
@@ -91,7 +91,7 @@ describe("WatchdogEnforcer", () => {
   })
 
   afterEach(async () => {
-    await restoreBaseTestEnvironment()
+    await restoreTestEnvironment()
   })
 
   describe("Deployment", () => {
